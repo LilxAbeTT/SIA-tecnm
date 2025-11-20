@@ -3,7 +3,7 @@ name: Build Android APK
 on:
   push:
     branches:
-      - main  # O 'master', según el nombre de tu rama principal
+      - main
 
 jobs:
   build:
@@ -11,42 +11,38 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Obtener el código del repositorio
+      # ACTUALIZADO a v4
       - name: Checkout source
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
-      # 2. Configurar Node.js para instalar dependencias web
+      # ACTUALIZADO a v4
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: '18'
 
-      # 3. Instalar dependencias del proyecto (Capacitor, etc.)
       - name: Install NPM Dependencies
         run: npm install
 
-      # 4. Sincronizar código web con carpeta nativa Android
       - name: Capacitor Sync
         run: npx cap sync
 
-      # 5. Configurar Java (Necesario para Android)
+      # ACTUALIZADO a v4
       - name: Setup Java
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
           java-version: '17'
 
-      # 6. Dar permisos de ejecución a Gradle
       - name: Make gradlew executable
         run: cd android && chmod +x gradlew
 
-      # 7. Compilar el APK (Debug)
       - name: Build APK
         run: cd android && ./gradlew assembleDebug
 
-      # 8. Subir el APK generado para que lo puedas descargar
+      # ACTUALIZADO a v4 (Aquí estaba el error crítico)
       - name: Upload APK
-        uses: actions/upload-artifact@v3
+        uses: actions/actions/upload-artifact@v4
         with:
           name: SIA-App-Debug
           path: android/app/build/outputs/apk/debug/app-debug.apk
