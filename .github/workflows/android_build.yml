@@ -11,11 +11,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # ACTUALIZADO a v4
       - name: Checkout source
         uses: actions/checkout@v4
 
-      # ACTUALIZADO a v4
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -27,7 +25,6 @@ jobs:
       - name: Capacitor Sync
         run: npx cap sync
 
-      # ACTUALIZADO a v4
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
@@ -40,9 +37,9 @@ jobs:
       - name: Build APK
         run: cd android && ./gradlew assembleDebug
 
-      # ACTUALIZADO a v4 (Aquí estaba el error crítico)
+      # CORREGIDO: "actions/upload-artifact@v4" (sin el "actions" extra)
       - name: Upload APK
-        uses: actions/actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4
         with:
           name: SIA-App-Debug
           path: android/app/build/outputs/apk/debug/app-debug.apk
