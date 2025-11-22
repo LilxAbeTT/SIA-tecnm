@@ -1,0 +1,2168 @@
+/* SIA - Main Stylesheet 
+  Desarrollado por SIA-Dev v2.1 (Responsive Update)
+*/
+
+:root {
+    /* PALETA DE COLORES OFICIAL */
+    --primary: #0A2540;
+    /* Azul Oscuro Profundo */
+    --primary-hover: #06182a;
+    --accent: #00D0FF;
+    /* Cian Eléctrico */
+
+    /* Módulos */
+    --biblio: #FFD24D;
+    --med: #00D0FF;
+    --aula: #4e1bda;
+
+    /* Superficies */
+    --surface: #FFFFFF;
+    --surface-muted: #F6F7F8;
+    --text-body: #4A5568;
+}
+
+html {
+    scroll-behavior: smooth;
+}
+
+/* Utilidades de color por módulo */
+.text-aula {
+    color: var(--aula);
+}
+
+.text-med {
+    color: var(--med);
+}
+
+.text-biblio {
+    color: var(--biblio);
+}
+
+
+/* Tipografía Base */
+body {
+    font-family: 'Inter', sans-serif;
+    color: var(--text-body);
+    background-color: var(--surface-muted);
+    overflow-x: hidden;
+    /* Evita scroll horizontal accidental en móvil */
+}
+
+h1,
+h2,
+h3,
+h4,
+h5 {
+    color: var(--primary);
+    font-weight: 700;
+}
+
+/* --- COMPONENTES DE INTERFAZ --- */
+
+/* Scrollbars estilizados para las listas internas */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #cbd5e0;
+    border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #a0aec0;
+}
+
+/* Navbar Responsive */
+.navbar-brand {
+    font-weight: 800;
+    letter-spacing: -0.5px;
+}
+
+/* Cards Responsive */
+.card {
+    border: none;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+/* Listas con scroll interno (Aula/Biblio) */
+.scroll-container {
+    max-height: 500px;
+    overflow-y: auto;
+    padding-right: 4px;
+    /* Espacio para el scrollbar */
+}
+
+/* --- LOGIN SPLIT LAYOUT (Responsive Fix) --- */
+.login-wrapper {
+    min-height: 100vh;
+    background-color: var(--surface);
+}
+
+.login-brand-side {
+    background-color: var(--primary);
+    background-image: linear-gradient(160deg, var(--primary) 0%, #03111f 100%);
+    position: relative;
+    overflow: hidden;
+}
+
+/* Decoración abstracta fondo */
+.login-brand-side::before {
+    content: '';
+    position: absolute;
+    top: -10%;
+    right: -10%;
+    width: 300px;
+    height: 300px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0) 70%);
+}
+
+/* Botón Google Pro */
+.btn-google-pro {
+    background-color: white;
+    border: 1px solid #e1e4e8;
+    color: #1f1f1f;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    position: relative;
+}
+
+.btn-google-pro:hover {
+    background-color: #f8f9fa;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* Filtros de Logos */
+.filter-white {
+    filter: brightness(0) invert(1);
+    -webkit-filter: brightness(0) invert(1);
+    transition: opacity 0.3s ease;
+}
+
+.filter-primary {
+    filter: brightness(0) saturate(100%) invert(13%) sepia(30%) saturate(1886%) hue-rotate(177deg) brightness(93%) contrast(96%);
+    /* Aproximación CSS al color #0A2540 */
+}
+
+/* --- AULA SPECIFIC --- */
+.aula-course-card {
+    transition: all 0.2s;
+}
+
+.aula-course-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05) !important;
+}
+
+/* Progress bar delgada */
+.aula-list-progress {
+    height: 6px;
+    border-radius: 3px;
+}
+
+/* Ajustes Mobile */
+@media (max-width: 768px) {
+    .display-4 {
+        font-size: 2.5rem;
+    }
+
+    /* Títulos más pequeños en móvil */
+    .p-md-5 {
+        padding: 1.5rem !important;
+    }
+
+    /* Menos padding en contenedores login */
+}
+
+.filter-white {
+    filter: brightness(0) invert(1);
+    -webkit-filter: brightness(0) invert(1);
+    transition: opacity 0.3s ease;
+}
+
+.filter-black {
+    filter: brightness(0) invert(0);
+    -webkit-filter: brightness(0) invert(0);
+    transition: opacity 0.3s ease;
+}
+
+
+
+
+
+/* --- PANTALLA DE CARGA (LOADER) --- */
+#app-loader {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: var(--surface);
+    z-index: 9999;
+    /* Encima de absolutamente todo */
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    transition: opacity 0.5s ease-out;
+}
+
+/* ... (MANTIENE TODO TU CSS ANTERIOR) ... */
+
+/* --- NUEVOS ESTILOS LANDING --- */
+.hover-lift {
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.hover-lift:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.08) !important;
+}
+
+/* Animación suave para la flecha abajo */
+.fade-down-anim {
+    animation: fadeDown 2s infinite;
+}
+
+@keyframes fadeDown {
+
+    0%,
+    100% {
+        transform: translateY(0);
+        opacity: 0.5;
+    }
+
+    50% {
+        transform: translateY(5px);
+        opacity: 1;
+    }
+}
+
+/* Navbar landing (onepage) */
+.landing-navbar {
+    position: sticky;
+    top: 0;
+    z-index: 1040;
+    background: linear-gradient(160deg, var(--primary) 0%, #03111f 100%);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.4);
+}
+
+
+.landing-navbar .navbar-brand span.fw-bold {
+    letter-spacing: -0.03em;
+}
+
+.landing-navbar .nav-link {
+    font-weight: 500;
+    font-size: 0.95rem;
+    color: var(--text-body);
+}
+
+.landing-navbar .nav-link:hover,
+.landing-navbar .nav-link.active {
+    color: var(--primary);
+}
+
+.landing-navbar .btn-outline-primary {
+    border-radius: 999px;
+}
+
+.landing-navbar .navbar-brand span.fw-bold,
+.landing-navbar .navbar-brand .small {
+    color: #fff !important;
+}
+
+.landing-navbar .nav-link {
+    font-weight: 500;
+    font-size: 0.95rem;
+    color: rgba(255, 255, 255, 0.75);
+}
+
+.landing-navbar .nav-link:hover,
+.landing-navbar .nav-link.active {
+    color: #ffffff;
+}
+
+.landing-navbar .btn-outline-primary {
+    color: #ffffff;
+    border-color: rgba(255, 255, 255, 0.7);
+}
+
+.landing-navbar .btn-outline-primary:hover {
+    background-color: #ffffff;
+    color: var(--primary);
+}
+
+/* Icono del toggler en blanco */
+.landing-navbar .navbar-toggler {
+    border-color: rgba(255, 255, 255, 0.7);
+}
+
+.landing-navbar .navbar-toggler-icon {
+    filter: invert(1);
+}
+
+
+/* Cards de servicios (módulos) */
+.module-card-cover {
+    background-size: cover;
+    background-position: center;
+    position: relative;
+}
+
+.module-card-cover::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(10, 37, 64, 0.15), rgba(10, 37, 64, 0.88));
+}
+
+.module-card-inner {
+    position: relative;
+    z-index: 1;
+}
+
+/* Sección Infórmate */
+#informate .stat-card {
+    border-radius: 1rem;
+}
+
+/* Contacto */
+.contact-card {
+    border-radius: 1.25rem;
+}
+
+.contact-map {
+    min-height: 260px;
+    border-radius: 1.25rem;
+    overflow: hidden;
+}
+
+.login-wrapper {
+    min-height: 100vh;
+    background-color: transparent;
+}
+
+#hero {
+    background-color: transparent !important;
+}
+
+/* --- NAVBAR LANDING (ESTILO CODEPEN SMOOTH UNDERLINE) --- */
+
+.main-header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 1200;
+    width: 100%;
+    background: transparent;
+    display: flex;
+    justify-content: center;
+    /* centra visualmente la píldora */
+    pointer-events: none;
+    /* evita que el área vacía capture clicks */
+}
+
+.main-header .navbar {
+    pointer-events: auto;
+    /* solo la píldora es clickeable */
+}
+
+
+.main-header .navbar {
+    padding: 0.35rem 1.25rem;
+    /* menos espacio interno lateral */
+    margin: 0.75rem auto;
+    max-width: 1080px;
+    /* ligeramente más angosta */
+    width: calc(100% - 3rem);
+    /* deja más margen a los costados */
+    border-radius: 999px;
+    background: linear-gradient(160deg, var(--primary) 0%, #03111f 100%);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.32);
+    align-items: center;
+}
+
+.main-header .navbar-brand {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-left: 0.5rem;
+    /* empuja un poco adentro del borde */
+}
+
+.main-header .navbar-brand .nav-logo {
+    max-width: 34px;
+    height: auto;
+}
+
+.main-header .navbar-brand .brand-text {
+    font-size: 1rem;
+}
+
+
+.main-header .navbar-brand {
+    color: #fff;
+    font-weight: 700;
+    letter-spacing: -0.04em;
+}
+
+.main-header .navbar-brand .brand-text {
+    font-size: 1.1rem;
+}
+
+.main-header .navbar-brand .nav-logo {
+    max-width: 40px;
+    height: auto;
+    margin-right: 0.35rem;
+}
+
+/* botón que controla el #mainMenu */
+[data-bs-target="#mainMenu"] {
+    position: relative;
+    z-index: 999;
+}
+
+/* Links con subrayado animado */
+#mainMenu li>a {
+    font-size: 0.78rem;
+    letter-spacing: 0.16em;
+    color: #fff;
+    font-weight: 500;
+    position: relative;
+    z-index: 1;
+    text-decoration: none;
+    text-transform: uppercase;
+    padding: 0.25rem 0;
+    margin: 0 0.75rem;
+}
+
+#mainMenu li:not(:last-of-type) {
+    margin-right: 0;
+}
+
+#mainMenu li>a::before {
+    position: absolute;
+    content: "";
+    width: 100%;
+    height: 2px;
+    background: #fff;
+    bottom: -6px;
+    left: 0;
+
+    transform: scaleX(0);
+    transform-origin: right center;
+    transition: transform 0.5s ease;
+    z-index: -1;
+}
+
+#mainMenu li>a:hover::before,
+#mainMenu li>a.active::before {
+    transform: scaleX(1);
+    transform-origin: left center;
+}
+
+.main-header .nav-login-btn {
+    font-size: 0.78rem;
+    letter-spacing: 0.14em;
+}
+
+/* Toggler tipo “tres barritas” */
+.main-header .navbar-toggler {
+    margin: 0;
+    padding: 0;
+    width: 40px;
+    height: 40px;
+    border: none;
+    border-radius: 0;
+    outline: none !important;
+}
+
+.main-header .navbar-toggler .icon-bar {
+    background-color: #fff;
+    margin: 0 auto 6px;
+    width: 30px;
+    height: 3px;
+    display: block;
+    transition: all 0.2s ease;
+}
+
+.main-header .navbar-toggler .icon-bar-1 {
+    width: 10px;
+}
+
+.main-header .navbar-toggler .icon-bar-2 {
+    width: 20px;
+}
+
+.main-header .navbar-toggler .icon-bar-3 {
+    width: 30px;
+}
+
+
+/* --- EFECTO AURORA (Fondo Animado Panel Izquierdo) --- */
+.aurora-bg {
+    background: linear-gradient(-45deg, var(--primary), #051525, #004e92, #000428);
+    background-size: 400% 400%;
+    animation: auroraMove 15s ease infinite;
+    position: relative;
+    overflow: hidden;
+}
+
+/* Luces flotantes desenfocadas encima del gradiente */
+.aurora-bg::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle, rgba(0, 208, 255, 0.15) 0%, transparent 60%),
+        radial-gradient(circle, rgba(195, 255, 0, 0.1) 0%, transparent 50%);
+    animation: floatLight 10s infinite alternate;
+    filter: blur(60px);
+    z-index: 0;
+}
+
+@keyframes auroraMove {
+    0% {
+        background-position: 0% 50%;
+    }
+
+    50% {
+        background-position: 100% 50%;
+    }
+
+    100% {
+        background-position: 0% 50%;
+    }
+}
+
+@keyframes floatLight {
+    0% {
+        transform: translate(0, 0) rotate(0deg);
+    }
+
+    100% {
+        transform: translate(50px, 50px) rotate(10deg);
+    }
+}
+
+/* Asegura que el contenido esté encima del fondo animado */
+.z-1 {
+    z-index: 1;
+    position: relative;
+}
+
+/* --- SCROLL ANIMADO --- */
+html {
+    scroll-behavior: smooth;
+    /* Desplazamiento suave al dar clic en flechas */
+}
+
+.fade-up-entry {
+    animation: fadeUp 1s ease-out forwards;
+    opacity: 0;
+    transform: translateY(30px);
+}
+
+/* Retrasos escalonados para las tarjetas */
+.delay-1 {
+    animation-delay: 0.2s;
+}
+
+.delay-2 {
+    animation-delay: 0.4s;
+}
+
+.delay-3 {
+    animation-delay: 0.6s;
+}
+
+@keyframes fadeUp {
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.hover-scale {
+    transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.hover-scale:hover {
+    transform: scale(1.05);
+}
+
+/* --- PANTALLA DE CARGA (LOADER) --- */
+#app-loader {
+    position: fixed;
+    inset: 0;
+    background: radial-gradient(circle at top, #082338, #02111f);
+    z-index: 9999;
+    /* Encima de absolutamente todo */
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 1rem;
+    transition: opacity 0.5s ease-out;
+}
+
+
+/* Contenedor de los cubos */
+.logo-wave {
+    display: flex;
+    align-items: flex-end;
+    gap: 0px;
+}
+
+/* Estilo base de cada cubo */
+.cube {
+    width: 85px;
+    /* ajusta según tamaño de tus PNG */
+    height: auto;
+    animation: cube-bounce 1s infinite ease-in-out;
+    filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.35));
+}
+
+/* Retrasos para hacer la "ola" */
+.cube-2 {
+    animation-delay: 0.12s;
+
+}
+
+.cube-3 {
+    animation-delay: 0.24s;
+}
+
+/* Texto SIA */
+.loader-text {
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-weight: 700;
+    font-size: 2.4rem;
+    letter-spacing: 0.12em;
+    color: #ffffff;
+}
+
+/* Animación de salto */
+@keyframes cube-bounce {
+
+    0%,
+    80%,
+    100% {
+        transform: translateY(0);
+    }
+
+    40% {
+        transform: translateY(-14px);
+        /* altura del salto */
+    }
+}
+
+/* Opcional: responsivo */
+@media (max-width: 480px) {
+    .cube {
+        width: 52px;
+    }
+
+    .loader-text {
+        font-size: 1.8rem;
+    }
+
+}
+
+/* ==== Aula Quiz – confeti simple al aprobar ==== */
+.quiz-confetti-piece {
+    position: fixed;
+    top: -10px;
+    width: 8px;
+    height: 14px;
+    border-radius: 2px;
+    opacity: 0.9;
+    pointer-events: none;
+    animation: quiz-confetti-fall 1.6s linear forwards;
+    z-index: 2000;
+}
+
+@keyframes quiz-confetti-fall {
+    0% {
+        transform: translate3d(0, -100px, 0) rotateZ(0deg);
+    }
+
+    100% {
+        transform: translate3d(0, 120vh, 0) rotateZ(360deg);
+        opacity: 0;
+    }
+}
+
+.module-logo-sm {
+    height: 70px;
+    width: auto;
+    opacity: 0.95;
+}
+
+/* --- SECCIONES NUEVAS LANDING (v2.2) --- */
+
+/* FAQ Accordion Tweak */
+.accordion-button:not(.collapsed) {
+    color: var(--primary);
+    background-color: rgba(10, 37, 64, 0.05);
+    box-shadow: inset 0 -1px 0 rgba(0, 0, 0, .125);
+}
+
+.accordion-button:focus {
+    border-color: rgba(10, 37, 64, 0.1);
+    box-shadow: 0 0 0 0.25rem rgba(10, 37, 64, 0.1);
+}
+
+/* Fondo punteado sutil para Testimonios */
+#testimonios {
+    background-color: #f8f9fa;
+    /* Fallback */
+}
+
+/* --- Footer & Utils (v2.2) --- */
+.hover-primary:hover {
+    color: var(--primary) !important;
+    transition: color 0.2s ease;
+}
+
+.extra-small {
+    font-size: 0.75rem;
+    line-height: 1.4;
+}
+
+/* Ajuste línea conectora pasos en móvil */
+@media (max-width: 991.98px) {
+    #como-funciona .position-absolute.border-top {
+        display: none !important;
+    }
+}
+
+/* --- COMPONENTES SECCIÓN SIA (v2.3) --- */
+
+/* Icon Box para features */
+.icon-box {
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.2s ease, background-color 0.2s ease;
+}
+
+.icon-box:hover {
+    transform: scale(1.1) rotate(-5deg);
+    background-color: #fff !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+/* Laptop Mockup (CSS Pure) */
+.laptop-mockup {
+    position: relative;
+    width: 100%;
+    max-width: 600px;
+    margin: 0 auto;
+    perspective: 1000px;
+}
+
+.laptop-mockup .screen {
+    background: #000;
+    border-radius: 12px 12px 0 0;
+    border: 10px solid #1e293b;
+    /* Marco gris oscuro */
+    border-bottom: none;
+    position: relative;
+    overflow: hidden;
+    aspect-ratio: 16/10;
+    /* Proporción laptop moderna */
+    box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.5);
+}
+
+.laptop-mockup video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+/* Barra superior simulada del SO */
+.mockup-header {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 28px;
+    background: rgba(30, 41, 59, 0.95);
+    backdrop-filter: blur(4px);
+    z-index: 2;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.mockup-header .dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+}
+
+/* Base de la laptop */
+.laptop-mockup .base {
+    height: 18px;
+    background: #334155;
+    border-radius: 0 0 16px 16px;
+    position: relative;
+    z-index: 1;
+    box-shadow: 0 15px 30px rgba(0, 0, 0, 0.2);
+}
+
+.laptop-mockup .base::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 120px;
+    height: 4px;
+    background: #475569;
+    border-radius: 0 0 4px 4px;
+}
+
+/* Ajuste Navbar item spacing */
+.main-header .navbar-nav .nav-item {
+    margin-left: 0.25rem;
+    margin-right: 0.25rem;
+}
+
+/* Estado activo para secciones nuevas al hacer scroll (Spy) */
+/* (Bootstrap ScrollSpy maneja esto, pero aseguramos el estilo visual) */
+.main-header .nav-link.active {
+    color: #ffffff !important;
+    opacity: 1;
+}
+
+.main-header .nav-link.active::before {
+    transform: scaleX(1);
+}
+
+/* --- TARJETAS DE SERVICIOS (v2.3) --- */
+
+.service-card {
+    transition: transform 0.4s cubic-bezier(0.165, 0.84, 0.44, 1), box-shadow 0.4s ease;
+    background-color: var(--primary);
+    /* Color de respaldo */
+}
+
+.service-card:hover {
+    transform: translateY(-8px);
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.35) !important;
+}
+
+/* Fondo con zoom suave */
+.service-bg {
+    position: absolute;
+    inset: 0;
+    background-size: cover;
+    background-position: center;
+    transition: transform 0.8s cubic-bezier(0.19, 1, 0.22, 1);
+    z-index: 0;
+}
+
+.service-card:hover .service-bg {
+    transform: scale(1.1);
+}
+
+/* Overlay inteligente usando el color del tema */
+.service-overlay {
+    position: absolute;
+    inset: 0;
+    /* Gradiente desde el color del tema hacia negro/oscuro */
+    background: linear-gradient(to bottom,
+            rgba(10, 37, 64, 0.6) 0%,
+            rgba(5, 20, 35, 0.95) 100%);
+    z-index: 0;
+    border-top: 4px solid var(--theme);
+    /* Línea superior de color */
+}
+
+.service-icon {
+    width: 56px;
+    height: 56px;
+    transition: transform 0.3s ease;
+}
+
+.service-card:hover .service-icon {
+    transform: rotate(-10deg) scale(1.1);
+}
+
+/* Botón dentro de la tarjeta */
+.btn-white {
+    background-color: #ffffff;
+    border: 1px solid transparent;
+    color: var(--primary);
+    transition: all 0.3s ease;
+}
+
+.service-card:hover .btn-white {
+    background-color: var(--theme);
+    color: white;
+    border-color: var(--theme);
+}
+
+.backdrop-blur {
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+}
+
+/* --- WIDGETS DE IMPACTO (v2.4) --- */
+
+.widget-card {
+    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s ease;
+}
+
+/* --- ANIMACIONES MEDI (v2.5) --- */
+
+/* Aparición suave de elementos */
+.fade-in {
+    animation: fadeIn 0.4s ease-out forwards;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Desaparición al remover elementos */
+.slide-out {
+    animation: slideOut 0.3s ease-in forwards;
+}
+
+@keyframes slideOut {
+    from {
+        opacity: 1;
+        transform: translateX(0);
+    }
+
+    to {
+        opacity: 0;
+        transform: translateX(-20px);
+    }
+}
+
+/* Pulse para botones de acción crítica */
+.pulse-btn {
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+
+    0%,
+    100% {
+        box-shadow: 0 0 0 0 rgba(0, 208, 255, 0.4);
+    }
+
+    50% {
+        box-shadow: 0 0 0 8px rgba(0, 208, 255, 0);
+    }
+}
+
+/* --- MODERN APPOINTMENT UI (v2.6) --- */
+
+.slots-scroll-container {
+    display: flex;
+    gap: 0.5rem;
+    overflow-x: auto;
+    padding: 0.5rem 0.25rem;
+    scroll-behavior: smooth;
+    white-space: nowrap;
+    scrollbar-width: thin;
+    /* Firefox */
+    -webkit-overflow-scrolling: touch;
+    mask-image: linear-gradient(to right, transparent, black 5%, black 95%, transparent);
+    -webkit-mask-image: linear-gradient(to right, transparent, black 5%, black 95%, transparent);
+}
+
+/* Hide scrollbar for Chrome/Safari/Opera */
+.slots-scroll-container::-webkit-scrollbar {
+    height: 6px;
+}
+
+.slots-scroll-container::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.slots-scroll-container::-webkit-scrollbar-thumb {
+    background-color: rgba(0, 0, 0, 0.1);
+    border-radius: 20px;
+}
+
+.slot-btn {
+    flex: 0 0 auto;
+    border: 1px solid #dee2e6;
+    background: white;
+    color: #495057;
+    padding: 0.5rem 1.2rem;
+    border-radius: 50rem;
+    /* Pill shape */
+    font-weight: 500;
+    transition: all 0.2s ease;
+    cursor: pointer;
+    user-select: none;
+}
+
+.slot-btn:hover {
+    border-color: var(--primary-color);
+    color: var(--primary-color);
+    background-color: rgba(var(--primary-rgb), 0.05);
+    transform: translateY(-2px);
+}
+
+.slot-btn.active {
+    background-color: var(--primary-color);
+    color: white;
+    border-color: var(--primary-color);
+    box-shadow: 0 4px 10px rgba(var(--primary-rgb), 0.3);
+    transform: scale(1.05);
+}
+
+.slot-summary {
+    animation: fadeIn 0.3s ease-out;
+}
+
+
+
+
+
+
+.widget-card:hover {
+    transform: translateY(-5px) scale(1.02);
+    box-shadow: 0 15px 30px rgba(0, 0, 0, 0.1) !important;
+}
+
+.widget-icon {
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Utilidad para transiciones base */
+.transition-base {
+    transition: all 0.2s ease-in-out;
+}
+
+/* --- FORMULARIO CONTACTO MODERNO (v2.5) --- */
+#landing-contact-form .form-control:focus,
+#landing-contact-form .form-select:focus {
+    background-color: #fff;
+    box-shadow: 0 0 0 4px rgba(10, 37, 64, 0.1);
+    /* Sombra suave color primario */
+    border: 1px solid rgba(10, 37, 64, 0.2) !important;
+}
+
+#landing-contact-form .form-control,
+#landing-contact-form .form-select {
+    transition: all 0.3s ease;
+}
+
+/* --- HERO V2.6 PREMIUM STYLES --- */
+
+/* Texto con gradiente cian brillante */
+.text-gradient-cyan {
+    background: linear-gradient(to right, #00D0FF, #00ffbf);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+/* Sombra profunda para la tarjeta de login */
+.shadow-2xl {
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.15);
+}
+
+/* Efecto Glassmorphism (Panel de cristal) */
+.glass-panel {
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.6);
+}
+
+/* Blur decorativo de fondo */
+.blur-xl {
+    filter: blur(60px);
+    opacity: 0.08;
+}
+
+/* Alert personalizado más suave */
+.alert-custom-blue {
+    background-color: rgba(10, 37, 64, 0.04);
+}
+
+/* Animación de entrada desde arriba */
+.fade-down-entry {
+    animation: fadeDownSlide 0.8s ease-out forwards;
+    opacity: 0;
+    transform: translateY(-20px);
+}
+
+@keyframes fadeDownSlide {
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Ajustes tipográficos */
+.tracking-tight {
+    letter-spacing: -0.025em;
+}
+
+.tracking-wide {
+    letter-spacing: 0.15em;
+}
+
+/* --- HERO V3.1 FIXES --- */
+
+/* Forzar fondo oscuro (asegura contraste) */
+.hero-forced-dark {
+    background-color: #051525 !important;
+    color: #ffffff;
+}
+
+/* Sombras de texto para legibilidad máxima */
+.text-shadow-lg {
+    text-shadow: 0 4px 8px rgba(0, 0, 0, 0.6);
+}
+
+.text-shadow-sm {
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+}
+
+/* Tarjeta de Login Corregida */
+.glass-card-dark {
+    background: rgba(15, 23, 42, 0.75) !important;
+    /* Más opaco para evitar que se vea el fondo */
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+/* Texto aurora más brillante */
+.text-gradient-aurora {
+    background: linear-gradient(to right, #4facfe 0%, #00f2fe 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    filter: drop-shadow(0 0 10px rgba(0, 242, 254, 0.3));
+    /* Brillo extra */
+}
+
+/* Tracking del logo SIA */
+.tracking-wide {
+    letter-spacing: 0.1em;
+}
+
+/* Opacidad de texto blanco mejorada */
+.text-white-75 {
+    color: rgba(255, 255, 255, 0.85) !important;
+}
+
+/* --- NAVBAR V3.2 (Glassmorphism) --- */
+
+.main-header {
+    /* Asegura que flote sobre todo */
+    z-index: 1050;
+    transition: transform 0.3s ease;
+}
+
+/* La Cápsula de Cristal */
+.nav-glass {
+    background: rgba(5, 21, 37, 0.7);
+    /* Azul oscuro muy transparente */
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+    transition: all 0.3s ease;
+}
+
+/* Sombra sutil para el logo */
+.filter-drop-shadow {
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+}
+
+/* --- ESTILOS DE ENLACES --- */
+
+.navbar-nav .nav-link {
+    font-size: 0.8rem;
+    letter-spacing: 0.05em;
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+/* Efecto Glow al pasar el mouse */
+.hover-glow:hover {
+    color: #fff !important;
+    background: rgba(255, 255, 255, 0.1);
+    text-shadow: 0 0 8px rgba(255, 255, 255, 0.6);
+}
+
+/* Estado Activo (Brillo constante) */
+.active-glow {
+    color: #fff !important;
+    background: rgba(255, 255, 255, 0.15);
+    box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.2);
+}
+
+/* --- BOTÓN GRADIENTE --- */
+.btn-gradient-primary {
+    background: linear-gradient(135deg, var(--primary) 0%, #0056b3 100%);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.2s;
+}
+
+.btn-gradient-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 15px rgba(0, 123, 255, 0.4) !important;
+    border-color: rgba(255, 255, 255, 0.3);
+}
+
+/* --- MENÚ MÓVIL --- */
+/* Icono Hamburguesa Animado (CSS puro) */
+.hamburger-icon {
+    width: 24px;
+    height: 18px;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+.hamburger-icon span {
+    display: block;
+    height: 2px;
+    width: 100%;
+    background: #fff;
+    border-radius: 2px;
+    transition: all 0.3s;
+}
+
+.navbar-toggler:not(.collapsed) .hamburger-icon span:nth-child(1) {
+    transform: rotate(45deg) translate(5px, 5px);
+}
+
+.navbar-toggler:not(.collapsed) .hamburger-icon span:nth-child(2) {
+    opacity: 0;
+}
+
+.navbar-toggler:not(.collapsed) .hamburger-icon span:nth-child(3) {
+    transform: rotate(-45deg) translate(6px, -6px);
+}
+
+.focus-none:focus {
+    box-shadow: none;
+}
+
+
+
+/* --- CORRECCIÓN MENÚ MÓVIL --- */
+/* --- CORRECCIÓN FINAL NAVBAR MÓVIL & RESPONSIVE (v3.3) --- */
+@media (max-width: 991.98px) {
+
+    /* 1. Solo el navbar de la LANDING */
+    .main-header .navbar-collapse {
+        position: static;
+        box-shadow: none !important;
+        background-color: transparent !important;
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+        margin-top: 0.5rem;
+        padding-top: 1rem;
+    }
+
+    /* 2. La burbuja de cristal solo ahí */
+    .main-header .nav-glass {
+        height: auto;
+        border-radius: 20px !important;
+        padding: 1rem !important;
+        background: rgba(5, 21, 37, 0.85);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+    }
+
+    /* 3. Links dentro de esa cápsula */
+    .main-header .navbar-nav .nav-item {
+        text-align: center;
+        margin-bottom: 0.5rem;
+    }
+
+    .main-header .navbar-nav .nav-link {
+        display: block;
+        padding: 10px;
+        border-radius: 10px;
+    }
+
+    .main-header .active-glow {
+        background: rgba(255, 255, 255, 0.1);
+    }
+
+    /* 4. Botón “Ingresar” solo en la landing */
+    #btn-ingresar-nav {
+        display: block;
+        width: 100%;
+        text-align: center;
+        margin-top: 1rem;
+    }
+
+    /* 5. Logo y margen del header solo ahí */
+    .main-header .navbar-brand img {
+        height: 28px !important;
+    }
+
+    .main-header {
+        padding: 0 10px;
+    }
+}
+
+/* ============================================================
+   MODO OSCURO TOTAL (DARK LANDING V3.0)
+   Unifica el fondo con el Hero (#051525) y adapta componentes.
+   ============================================================ */
+
+/* 1. Forzar Fondo Oscuro en todas las secciones y Footer */
+#landing-view section,
+#landing-view footer,
+#landing-view .bg-surface-muted,
+#landing-view .bg-white,
+#landing-view .bg-light {
+    background-color: #051525 !important;
+    /* Azul Profundo del Hero */
+    background-image: none !important;
+    /* Quita patrones viejos */
+    color: #ffffff !important;
+}
+
+/* 2. Adaptar Textos */
+#landing-view h1,
+#landing-view h2,
+#landing-view h3,
+#landing-view h4,
+#landing-view h5,
+#landing-view h6,
+#landing-view .text-dark,
+#landing-view .text-body {
+    color: #ffffff !important;
+}
+
+#landing-view .text-muted {
+    color: rgba(255, 255, 255, 0.6) !important;
+}
+
+#landing-view .lead {
+    color: rgba(255, 255, 255, 0.8) !important;
+}
+
+/* 3. Tarjetas (Testimonios, Widgets, Contacto) -> Efecto Cristal Oscuro */
+#landing-view .card,
+#landing-view .accordion-item {
+    background-color: rgba(255, 255, 255, 0.03) !important;
+    /* Transparente sutil */
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3) !important;
+    color: #fff;
+}
+
+/* Hover en tarjetas */
+#landing-view .hover-lift:hover {
+    background-color: rgba(255, 255, 255, 0.06) !important;
+    border-color: rgba(255, 255, 255, 0.2) !important;
+}
+
+/* 4. Acordeón (FAQ) */
+#landing-view .accordion-button {
+    background-color: rgba(255, 255, 255, 0.05) !important;
+    color: #fff !important;
+    box-shadow: none !important;
+}
+
+#landing-view .accordion-button:not(.collapsed) {
+    background-color: rgba(0, 208, 255, 0.1) !important;
+    /* Acento cian suave al abrir */
+    color: #00D0FF !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* 5. Iconos y Cajas de Iconos */
+#landing-view .icon-box,
+#landing-view .widget-icon,
+#landing-view .service-icon {
+    background-color: rgba(255, 255, 255, 0.1) !important;
+    color: #fff !important;
+    /* Iconos blancos */
+}
+
+/* Excepción: Iconos que deben mantener su color original (ej. en widgets de colores) */
+#landing-view .text-primary {
+    color: #4facfe !important;
+}
+
+/* Azul brillante */
+#landing-view .text-success {
+    color: #00f2fe !important;
+}
+
+/* Cian/Verde brillante */
+#landing-view .text-warning {
+    color: #ffd700 !important;
+}
+
+/* Amarillo */
+#landing-view .text-danger {
+    color: #ff6b6b !important;
+}
+
+/* Rojo suave */
+
+/* 6. Formulario de Contacto */
+#landing-view input.form-control,
+#landing-view textarea.form-control,
+#landing-view select.form-select {
+    background-color: rgba(0, 0, 0, 0.3) !important;
+    /* Fondo input oscuro */
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    color: #fff !important;
+}
+
+#landing-view input.form-control::placeholder,
+#landing-view textarea.form-control::placeholder {
+    color: rgba(255, 255, 255, 0.4);
+}
+
+#landing-view input.form-control:focus,
+#landing-view textarea.form-control:focus,
+#landing-view select.form-select:focus {
+    border-color: var(--accent) !important;
+    box-shadow: 0 0 0 4px rgba(0, 208, 255, 0.15) !important;
+}
+
+/* 7. Badges (Etiquetas pequeñas) */
+#landing-view .badge {
+    background-color: rgba(255, 255, 255, 0.1) !important;
+    color: #fff !important;
+    border: 1px solid rgba(255, 255, 255, 0.2) !important;
+}
+
+/* 8. Footer Links */
+#landing-view footer a.text-muted {
+    color: rgba(255, 255, 255, 0.6) !important;
+}
+
+#landing-view footer a.text-muted:hover {
+    color: #fff !important;
+}
+
+/* 9. Sección "Cómo funciona" (Círculos con números) */
+#como-funciona .bg-white.rounded-circle {
+    background-color: rgba(255, 255, 255, 0.05) !important;
+    /* Círculo oscuro */
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+#como-funciona .border-dashed {
+    border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+/* 10. Laptop Mockup (Ajuste para fondo oscuro) */
+.laptop-mockup .base {
+    background: #1e293b !important;
+    /* Base más clara que el fondo */
+}
+
+/* Tamaño por defecto (escritorio) */
+.hero-logo-main {
+    height: 120px;
+}
+
+.hero-logo-secondary {
+    height: 68px;
+}
+
+/* ==== Ajustes HERO en móvil ==== */
+@media (max-width: 767.98px) {
+
+    /* Que el hero baje un poco y no choque con el navbar */
+    main#hero {
+        padding-top: 7rem !important;
+        /* ajusta a 6–8rem si quieres más/menos espacio */
+        padding-bottom: 3rem !important;
+    }
+
+    /* Logos más compactos y centrados */
+    .hero-logos {
+        justify-content: center;
+        flex-wrap: wrap;
+        row-gap: 0.5rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .hero-logo-main {
+        height: 72px;
+    }
+
+    .hero-logo-secondary {
+        height: 40px;
+    }
+
+    .hero-title {
+        font-size: 2rem;
+        line-height: 1.2;
+    }
+
+    .hero-lead {
+        font-size: 0.95rem;
+    }
+
+    /* Botones uno debajo del otro */
+    .hero-cta {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .hero-cta .btn {
+        width: 100%;
+    }
+
+    /* Card de login centrada y con ancho cómodo */
+    .hero-login-card {
+        max-width: 380px;
+        margin: 1.5rem auto 0;
+    }
+}
+
+/* --- DASHBOARD 2.0 & NAV REVAMP --- */
+
+/* Navbar Flotante "Glass" */
+.nav-floating {
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.05);
+    border-radius: 1rem;
+    margin: 1rem auto;
+    width: calc(100% - 2rem);
+    max-width: 1200px;
+    z-index: 1030;
+}
+
+.nav-floating .nav-link {
+    color: var(--text-body);
+    font-weight: 500;
+    border-radius: 0.5rem;
+    transition: all 0.2s ease;
+    padding: 0.5rem 1rem;
+}
+
+.nav-floating .nav-link:hover {
+    background: rgba(10, 37, 64, 0.05);
+    color: var(--primary);
+}
+
+.nav-floating .nav-link.active {
+    background: var(--primary);
+    color: #fff !important;
+    box-shadow: 0 4px 10px rgba(10, 37, 64, 0.2);
+}
+
+/* Dashboard Hero */
+.dashboard-hero {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border-radius: 1.5rem;
+    padding: 2rem;
+    position: relative;
+    overflow: hidden;
+    margin-bottom: 2rem;
+    border: 1px solid #fff;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.03);
+}
+
+/* Tarjetas de Módulo Modernas */
+.module-card-modern {
+    border: none;
+    border-radius: 1.25rem;
+    overflow: hidden;
+    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s ease;
+    position: relative;
+    background: #fff;
+    height: 100%;
+}
+
+.module-card-modern::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 6px;
+    background: var(--theme-color, var(--primary));
+}
+
+.module-card-modern:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 15px 30px rgba(0, 0, 0, 0.08);
+}
+
+.module-icon-circle {
+    width: 50px;
+    height: 50px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    margin-bottom: 1rem;
+    background: var(--bg-light);
+    color: var(--theme-color);
+}
+
+/* Accesos Rápidos */
+.quick-action-btn {
+    background: #fff;
+    border: 1px solid rgba(0, 0, 0, 0.05);
+    border-radius: 1rem;
+    padding: 1rem;
+    text-align: center;
+    transition: all 0.2s;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    color: var(--text-body);
+    text-decoration: none;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.02);
+}
+
+.quick-action-btn:hover {
+    background: #fff;
+    border-color: var(--primary);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 15px rgba(0, 0, 0, 0.05);
+    color: var(--primary);
+}
+
+.quick-action-icon {
+    font-size: 1.5rem;
+    margin-bottom: 0.25rem;
+}
+
+/* --- FASE 2: PERFIL Y BREADCRUMBS --- */
+
+/* Breadcrumbs Contextuales */
+.breadcrumb-glass {
+    background: rgba(255, 255, 255, 0.6);
+    backdrop-filter: blur(8px);
+    border-radius: 50rem;
+    padding: 0.25rem 1rem;
+    font-size: 0.85rem;
+    display: inline-flex;
+    align-items: center;
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    margin-bottom: 1.5rem;
+}
+
+.breadcrumb-item a {
+    color: var(--text-body);
+    text-decoration: none;
+    transition: color 0.2s;
+}
+
+.breadcrumb-item a:hover {
+    color: var(--primary);
+}
+
+.breadcrumb-item.active {
+    color: var(--primary);
+    font-weight: 600;
+}
+
+.breadcrumb-item+.breadcrumb-item::before {
+    color: rgba(0, 0, 0, 0.3);
+}
+
+/* Avatar Generado (Iniciales) */
+.avatar-initials {
+    font-family: 'Inter', sans-serif;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    background: linear-gradient(135deg, var(--primary) 0%, #2c5282 100%);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    text-transform: uppercase;
+}
+
+/* Tarjeta de Perfil */
+.profile-header {
+    height: 150px;
+    background: linear-gradient(120deg, var(--primary), #03111f);
+    border-radius: 1.5rem 1.5rem 0 0;
+    position: relative;
+}
+
+.profile-avatar-container {
+    position: absolute;
+    bottom: -40px;
+    left: 40px;
+    padding: 4px;
+    background: #fff;
+    border-radius: 50%;
+}
+
+.profile-body {
+    padding-top: 50px;
+}
+
+/* --- FASE 2: WIDGETS DE ACTIVIDAD --- */
+
+.widget-list-item {
+    display: flex;
+    align-items: center;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    transition: background-color 0.2s;
+}
+
+.widget-list-item:last-child {
+    border-bottom: none;
+}
+
+.widget-list-item:hover {
+    background-color: rgba(0, 0, 0, 0.01);
+}
+
+.widget-date-box {
+    background: var(--surface-muted);
+    border-radius: 0.5rem;
+    padding: 0.25rem 0.5rem;
+    text-align: center;
+    min-width: 50px;
+    border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.progress-mini {
+    height: 6px;
+    border-radius: 3px;
+    background-color: #e9ecef;
+    overflow: hidden;
+    width: 100%;
+}
+
+.progress-bar-mini {
+    height: 100%;
+    background-color: var(--aula);
+    border-radius: 3px;
+}
+
+.empty-state-widget {
+    text-align: center;
+    padding: 2rem 1rem;
+    color: #adb5bd;
+    font-size: 0.85rem;
+    border: 1px dashed #dee2e6;
+    border-radius: 1rem;
+}
+
+/* --- FASE 3: AULA PRO --- */
+
+/* Hero de Curso Activo */
+.aula-hero-card {
+    background: linear-gradient(135deg, var(--aula) 0%, #240090 100%);
+    border-radius: 1.5rem;
+    color: white;
+    padding: 2rem;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 15px 40px rgba(78, 27, 218, 0.25);
+    margin-bottom: 2.5rem;
+}
+
+.aula-hero-card::after {
+    content: '';
+    position: absolute;
+    top: -50%;
+    right: -10%;
+    width: 300px;
+    height: 300px;
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.15) 0%, transparent 70%);
+    border-radius: 50%;
+}
+
+.aula-hero-btn {
+    background: white;
+    color: var(--aula);
+    border: none;
+    font-weight: 700;
+    transition: transform 0.2s;
+}
+
+.aula-hero-btn:hover {
+    transform: scale(1.05);
+    background: #f8f9fa;
+    color: var(--aula);
+}
+
+/* Stats Rápidos */
+.aula-stat-pill {
+    background: white;
+    border: 1px solid rgba(0, 0, 0, 0.05);
+    border-radius: 1rem;
+    padding: 0.75rem 1.25rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+    min-width: 160px;
+}
+
+/* Tarjetas de Curso Minimalistas */
+.course-card-minimal {
+    background: white;
+    border: 1px solid rgba(0, 0, 0, 0.04);
+    border-radius: 1.25rem;
+    padding: 1.5rem;
+    transition: all 0.3s ease;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+}
+
+.course-card-minimal:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 15px 30px rgba(0, 0, 0, 0.06);
+    border-color: rgba(78, 27, 218, 0.1);
+}
+
+.course-icon-box {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    background: var(--surface-muted);
+    color: var(--aula);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    margin-bottom: 1rem;
+}
+
+/* --- SUPER ADMIN: TORRE DE CONTROL --- */
+
+.super-admin-hero {
+    background: linear-gradient(135deg, #1a202c 0%, #2d3748 100%);
+    color: #fff;
+    border-radius: 1.5rem;
+    padding: 2.5rem;
+    margin-bottom: 2rem;
+    position: relative;
+    overflow: hidden;
+}
+
+.metric-card-huge {
+    background: #fff;
+    border-radius: 1.25rem;
+    padding: 1.5rem;
+    text-align: center;
+    height: 100%;
+    border: 1px solid rgba(0, 0, 0, 0.04);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.02);
+    transition: transform 0.2s;
+}
+
+.metric-card-huge:hover {
+    transform: translateY(-5px);
+}
+
+.metric-value-huge {
+    font-size: 3rem;
+    font-weight: 800;
+    line-height: 1;
+    background: -webkit-linear-gradient(45deg, var(--primary), var(--aula));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 0.5rem;
+}
+
+.report-action-card {
+    background: #fff;
+    border: 1px dashed #cbd5e0;
+    border-radius: 1rem;
+    padding: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.report-action-card:hover {
+    border-color: var(--primary);
+    background: #f8fafc;
+}
+
+/* --- TOASTS 2.0 (Notificaciones Superiores) --- */
+
+/* Animación de Entrada: Baja suavemente */
+@keyframes toast-slide-down {
+    from {
+        transform: translateY(-100%);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+/* Animación de Salida: Sube y desaparece */
+@keyframes toast-slide-up {
+    from {
+        transform: translateY(0);
+        opacity: 1;
+    }
+
+    to {
+        transform: translateY(-150%);
+        opacity: 0;
+    }
+}
+
+.toast-animate-enter {
+    animation: toast-slide-down 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+.toast-animate-exit {
+    animation: toast-slide-up 0.4s ease-in forwards;
+}
+
+/* Estilo visual mejorado (Glass/Moderno) */
+.toast-custom {
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+    border-radius: 50rem;
+    /* Pill shape */
+    min-width: 300px;
+    font-weight: 500;
+    border: none;
+}
+
+/* Iconos un poco más grandes */
+.toast-icon-box {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 50%;
+    margin-right: 0.75rem;
+}
+
+/* Animación Latido para SOS */
+.heartbeat-anim {
+    animation: heartbeat 2s infinite;
+}
+
+@keyframes heartbeat {
+    0% {
+        transform: scale(1);
+        box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.7);
+    }
+
+    70% {
+        transform: scale(1.05);
+        box-shadow: 0 0 0 10px rgba(220, 53, 69, 0);
+    }
+
+    100% {
+        transform: scale(1);
+        box-shadow: 0 0 0 0 rgba(220, 53, 69, 0);
+    }
+}
+
+/* --- NUEVO SELECTOR DE HORARIOS (MEDI) --- */
+.time-slot-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+    gap: 0.75rem;
+    margin-top: 0.5rem;
+}
+
+.btn-time-slot {
+    border: 1px solid #e2e8f0;
+    background-color: #fff;
+    color: var(--text-body);
+    padding: 0.5rem 0.25rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    border-radius: 0.75rem;
+    transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
+    position: relative;
+    overflow: hidden;
+}
+
+.btn-time-slot:hover:not(:disabled) {
+    border-color: var(--med);
+    color: var(--med);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 208, 255, 0.15);
+}
+
+/* Estado Seleccionado */
+.btn-time-slot.selected {
+    background-color: var(--med);
+    color: #fff;
+    border-color: var(--med);
+    box-shadow: 0 4px 15px rgba(0, 208, 255, 0.4);
+    transform: scale(1.05);
+}
+
+/* Estado Ocupado */
+.btn-time-slot:disabled {
+    background-color: #f1f5f9;
+    color: #cbd5e1;
+    border-color: #f1f5f9;
+    cursor: not-allowed;
+    text-decoration: line-through;
+}
+
+/* Animación de entrada */
+.slot-enter {
+    animation: fadeUpSlot 0.3s ease-out forwards;
+    opacity: 0;
+    transform: translateY(10px);
+}
+
+@keyframes fadeUpSlot {
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* --- NUEVO SELECTOR DE HORARIOS (MEDI) --- */
+.time-slot-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+    gap: 0.75rem;
+    margin-top: 0.5rem;
+}
+
+.btn-time-slot {
+    border: 1px solid #e2e8f0;
+    background-color: #fff;
+    color: var(--text-body);
+    padding: 0.5rem 0.25rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    border-radius: 0.75rem;
+    transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
+    position: relative;
+    overflow: hidden;
+    width: 100%;
+    /* Asegura que ocupe su celda */
+}
+
+.btn-time-slot:hover:not(:disabled) {
+    border-color: var(--med);
+    color: var(--med);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 208, 255, 0.15);
+}
+
+/* Estado Seleccionado */
+.btn-time-slot.selected {
+    background-color: var(--med);
+    color: #fff;
+    border-color: var(--med);
+    box-shadow: 0 4px 15px rgba(0, 208, 255, 0.4);
+    transform: scale(1.05);
+}
+
+/* Estado Ocupado */
+.btn-time-slot:disabled {
+    background-color: #f1f5f9;
+    color: #cbd5e1;
+    border-color: #f1f5f9;
+    cursor: not-allowed;
+    text-decoration: line-through;
+    opacity: 0.6;
+}
+
+/* Animación de entrada */
+.slot-enter {
+    animation: fadeUpSlot 0.3s ease-out forwards;
+    opacity: 0;
+    transform: translateY(10px);
+}
+
+@keyframes fadeUpSlot {
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* --- FIX BIBLIO CARDS (Fase 3) --- */
+
+/* Relación de aspecto vertical para libros (2:3) */
+.ratio-2x3 {
+    --bs-aspect-ratio: 150%; /* (3 / 2) * 100 */
+}
+
+/* Ajuste para el contenedor de carrusel */
+.scrollbar-hide::-webkit-scrollbar {
+    display: none;
+}
+.scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+
+/* Efecto Hover en la portada */
+.book-cover-hover {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.book-card:hover .book-cover-hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 20px rgba(0,0,0,0.15) !important;
+}
+
+/* Gradiente negro suave para textos sobre portada */
+.bg-gradient-to-t {
+    background: linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.4) 50%, transparent 100%) !important;
+}

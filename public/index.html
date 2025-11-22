@@ -1,0 +1,3239 @@
+<!DOCTYPE html>
+<html lang="es" data-bs-theme="light">
+
+<head>
+  <meta charset="utf-8" />
+  <base href="/">
+  <meta name="theme-color" content="#0d6efd">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="assets/icons/icon-192x192.png">
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SIA | Sistema de Integración Académico</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+
+
+</head>
+
+<body class="bg-surface-muted">
+  <div id="kiosk-overlay"
+    class="d-none position-fixed top-0 start-0 w-100 h-100 bg-dark text-white d-flex flex-column justify-content-center align-items-center text-center"
+    style="z-index: 99999;">
+    <div class="mb-4">
+      <img src="/images/logo-sia.png" width="80" class="mb-3 opacity-75">
+      <h1 class="display-4 fw-bold">Terminal Bloqueada</h1>
+      <p class="lead text-white-50" id="kiosk-id-label">ID: --</p>
+    </div>
+    <div class="p-4 bg-white bg-opacity-10 rounded-4 backdrop-blur border border-white border-opacity-10"
+      style="max-width: 400px;">
+      <i class="bi bi-pc-display-horizontal fs-1 mb-3 text-warning"></i>
+      <p class="mb-0">Esta computadora está gestionada por SIA.</p>
+      <p class="small text-white-50">Solicita su desbloqueo en el mostrador.</p>
+    </div>
+  </div>
+  <div id="app-loader">
+    <div class="logo-wave">
+      <img src="/images/cubo1.png" alt="Cubo 1" class="cube cube-1">
+      <img src="/images/cubo2.png" alt="Cubo 2" class="cube cube-2">
+      <img src="/images/cubo3.png" alt="Cubo 3" class="cube cube-3">
+
+    </div>
+    <span class="loader-text">SIA</span>
+  </div>
+
+
+  <div id="landing-view" class="d-none">
+
+    <!-- NAVBAR estilo CodePen -->
+    <header class="main-header fixed-top mt-3">
+      <div class="container">
+        <nav class="navbar navbar-expand-lg nav-glass rounded-pill px-3 py-2">
+
+          <a class="navbar-brand d-flex align-items-center gap-2 ms-2" href="#hero">
+            <img src="/images/logo-sia.png" alt="SIA" class="nav-logo filter-drop-shadow"
+              style="height: 32px; width: auto;">
+            <span class="fw-bold text-white tracking-wide" style="font-size: 1.1rem;">SIA</span>
+          </a>
+
+          <button class="navbar-toggler border-0 focus-none pe-2" type="button" data-bs-toggle="collapse"
+            data-bs-target="#mainMenu" aria-controls="mainMenu" aria-expanded="false" aria-label="Menú">
+            <div class="hamburger-icon">
+              <span></span>
+              <span></span>
+              <span></span>
+            </div>
+          </button>
+
+          <div class="collapse navbar-collapse" id="mainMenu">
+            <ul class="navbar-nav mx-auto gap-1 text-uppercase small fw-bold">
+              <li class="nav-item">
+                <a href="#hero" class="nav-link px-3 rounded-pill text-white active-glow">Inicio</a>
+              </li>
+              <li class="nav-item">
+                <a href="#sia" class="nav-link px-3 rounded-pill text-white-75 hover-glow">SIA</a>
+              </li>
+              <li class="nav-item">
+                <a href="#servicios" class="nav-link px-3 rounded-pill text-white-75 hover-glow">Servicios</a>
+              </li>
+              <li class="nav-item">
+                <a href="#faq" class="nav-link px-3 rounded-pill text-white-75 hover-glow">Ayuda</a>
+              </li>
+              <li class="nav-item">
+                <a href="#contacto" class="nav-link px-3 rounded-pill text-white-75 hover-glow">Contacto</a>
+              </li>
+            </ul>
+
+            <div class="d-lg-block ms-lg-2">
+              <a href="#hero" id="btn-ingresar-nav"
+                class="btn btn-sm btn-gradient-primary rounded-pill px-4 py-2 fw-bold text-white shadow-sm">
+                <i class="bi bi-person-fill me-2"></i>Ingresar
+              </a>
+            </div>
+          </div>
+
+        </nav>
+      </div>
+    </header>
+
+    <main id="hero" class="position-relative w-100 overflow-hidden d-flex align-items-center hero-forced-dark"
+      style="min-height: 100vh;">
+
+      <div class="position-absolute top-0 start-0 w-100 h-100 overflow-hidden" style="z-index: 0;">
+        <div class="position-absolute w-100 h-100" style="background-color: #051525;"></div>
+        <div class="position-absolute top-0 start-0 bg-primary opacity-20 rounded-circle blur-xxl"
+          style="width: 50vw; height: 50vw; transform: translate(-30%, -30%);"></div>
+        <div class="position-absolute bottom-0 end-0 bg-info opacity-10 rounded-circle blur-xxl"
+          style="width: 40vw; height: 40vw; transform: translate(20%, 20%);"></div>
+        <div class="position-absolute w-100 h-100"
+          style="background-image: radial-gradient(rgba(255,255,255,0.1) 1px, transparent 1px); background-size: 40px 40px; opacity: 0.3;">
+        </div>
+      </div>
+
+      <div class="container position-relative z-1 py-5">
+        <div class="row align-items-center gy-5">
+
+          <div class="col-lg-7 text-white pe-lg-5">
+
+            <!-- BLOQUE DE LOGOS -->
+            <div class="d-flex align-items-center gap-3 mb-4 fade-down-entry hero-logos">
+              <img src="/images/logo-sia.png" alt="SIA" class="hero-logo-main"
+                style="width: auto; filter: drop-shadow(0 0 15px rgba(0, 208, 255, 0.4));">
+
+              <span class="display-5 fw-bold text-white tracking-wide hero-logo-text"
+                style="text-shadow: 0 2px 10px rgba(0,0,0,0.5);">
+                SIA
+              </span>
+
+              <div class="vr filter-white opacity-50 mx-2" style="height: 110px;"></div>
+
+              <div class="d-flex gap-3 opacity-75">
+                <img src="/images/logo-tecnm.png" alt="TecNM" class="hero-logo-secondary" style="width: auto;">
+                <img src="/images/logo-ites.png" alt="ITES" class="hero-logo-secondary" style="width: auto;">
+              </div>
+            </div>
+
+            <h1 class="display-3 fw-bold mb-3 lh-sm tracking-tight text-white text-shadow-lg hero-title">
+              Tu campus digital,<br>
+              <span class="text-gradient-aurora">reimaginado.</span>
+            </h1>
+
+            <p class="lead text-white-75 mb-5 fw-light text-shadow-sm hero-lead" style="max-width: 550px;">
+              SIA unifica tu trayectoria académica, servicios de salud y biblioteca en una sola plataforma segura. Sin
+              filas, sin papel.
+            </p>
+
+            <div class="d-flex flex-wrap gap-3 hero-cta">
+              <a href="#servicios"
+                class="btn btn-primary rounded-pill px-4 py-3 fw-bold shadow-lg hover-scale border-0">
+                <i class="bi bi-grid-fill me-2"></i>Explorar Servicios
+              </a>
+              <a href="#informate"
+                class="btn btn-outline-light rounded-pill px-4 py-3 fw-bold hover-scale backdrop-blur">
+                Conocer más
+              </a>
+            </div>
+          </div>
+
+          <div class="col-lg-5">
+            <div
+              class="card border-0 shadow-3xl rounded-5 overflow-hidden position-relative glass-card-dark ms-lg-auto hero-login-card"
+              style="max-width: 420px;">
+              <div class="h-1 bg-gradient-primary w-100"></div>
+
+              <div class="card-body p-4 p-md-5">
+                <div class="text-center mb-4">
+                  <h3 class="fw-bold text-white mb-1">Bienvenido</h3>
+                  <p class="text-white-50 small">Ingresa a tu panel de control</p>
+                </div>
+
+                <button id="btn-login-google"
+                  class="btn btn-white w-100 py-3 mb-4 rounded-pill shadow-sm d-flex align-items-center justify-content-center gap-3 hover-lift position-relative">
+                  <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" width="24" height="24"
+                    alt="G">
+                  <span class="fw-bold filter">Acceder con Google</span>
+                </button>
+
+                <div class="d-flex align-items-center gap-3 mb-4">
+                  <div class="h-px bg-white bg-opacity-10 flex-grow-1"></div>
+                  <span class="filter-white extra-small text-uppercase">Acceso Institucional</span>
+                  <div class="h-px bg-white bg-opacity-10 flex-grow-1"></div>
+                </div>
+
+                <div class="rounded-4 p-3 d-flex gap-3 align-items-start border border-white border-opacity-10"
+                  style="background: rgba(0,0,0,0.2);">
+                  <i class="bi bi-shield-check text-success mt-1"></i>
+                  <div class="text-white-50 small lh-sm">
+                    <strong class="text-white d-block mb-1">Sitio Seguro</strong>
+                    Exclusivo para cuentas activas con dominio <strong>@loscabos.tecnm.mx</strong>.
+                  </div>
+                </div>
+              </div>
+
+              <div class="card-footer border-0 py-3 text-center bg-transparent">
+                <a href="#contacto" class="filter-white small text-decoration-none hover-light">¿Necesitas ayuda para
+                  ingresar?</a>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+    </main>
+
+    <!-- Acerca de SIA -->
+    <section id="sia" class="py-5 bg-white position-relative overflow-hidden">
+      <div class="position-absolute top-50 start-0 translate-middle rounded-circle bg-primary opacity-5"
+        style="width: 600px; height: 600px; filter: blur(80px); z-index: 0;"></div>
+
+      <div class="container position-relative z-1">
+        <div class="row align-items-center gx-5">
+
+          <div class="col-lg-6 mb-5 mb-lg-0">
+            <div class="laptop-mockup shadow-lg fade-up-entry">
+              <div class="screen">
+                <video class="img-fluid" src="/videos/logo-sia.mp4" autoplay muted loop playsinline
+                  poster="/images/logo-sia.png"></video>
+
+                <div class="mockup-header d-flex align-items-center gap-2 px-3">
+                  <div class="dot bg-danger"></div>
+                  <div class="dot bg-warning"></div>
+                  <div class="dot bg-success"></div>
+                  <div class="bar bg-light opacity-25 rounded-pill ms-2 w-50" style="height:6px;"></div>
+                </div>
+              </div>
+              <div class="base"></div>
+            </div>
+          </div>
+
+          <div class="col-lg-6">
+            <div class="ms-lg-4">
+              <span
+                class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill px-3 py-2 mb-3 fw-semibold">
+                Ecosistema Institucional
+              </span>
+              <h2 class="display-5 fw-bold mb-3 text-primary">Tu vida académica,<br><span
+                  class="text-dark">sincronizada.</span></h2>
+              <p class="lead text-muted mb-4">
+                Olvídate de las filas y los trámites en papel. SIA conecta los servicios esenciales del campus en una
+                interfaz unificada, segura y siempre disponible.
+              </p>
+
+              <div class="row g-4 mt-2">
+                <div class="col-sm-6">
+                  <div class="d-flex gap-3">
+                    <div class="icon-box bg-surface-muted text-primary rounded-3 flex-shrink-0">
+                      <i class="bi bi-shield-lock-fill fs-5"></i>
+                    </div>
+                    <div>
+                      <h6 class="fw-bold mb-1">Acceso Seguro</h6>
+                      <p class="small text-muted mb-0">Autenticación única con tu cuenta institucional @loscabos.</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="col-sm-6">
+                  <div class="d-flex gap-3">
+                    <div class="icon-box bg-surface-muted text-aula rounded-3 flex-shrink-0">
+                      <i class="bi bi-mortarboard-fill fs-5"></i>
+                    </div>
+                    <div>
+                      <h6 class="fw-bold mb-1">Progreso Académico</h6>
+                      <p class="small text-muted mb-0">Inscripciones, cursos y constancias digitales al instante.</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="col-sm-6">
+                  <div class="d-flex gap-3">
+                    <div class="icon-box bg-surface-muted text-med rounded-3 flex-shrink-0">
+                      <i class="bi bi-heart-pulse-fill fs-5"></i>
+                    </div>
+                    <div>
+                      <h6 class="fw-bold mb-1">Salud y Bienestar</h6>
+                      <p class="small text-muted mb-0">Agenda citas médicas y psicológicas con privacidad total.</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="col-sm-6">
+                  <div class="d-flex gap-3">
+                    <div class="icon-box bg-surface-muted text-biblio rounded-3 flex-shrink-0">
+                      <i class="bi bi-book-half fs-5"></i>
+                    </div>
+                    <div>
+                      <h6 class="fw-bold mb-1">Biblioteca 24/7</h6>
+                      <p class="small text-muted mb-0">Reserva libros y consulta el catálogo desde donde estés.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="como-funciona" class="py-5 bg-surface-muted position-relative">
+      <div class="container py-4">
+        <div class="text-center mb-5">
+          <span class="badge bg-white text-primary border shadow-sm rounded-pill px-3 py-2 mb-3">Flujo de uso</span>
+          <h2 class="fw-bold">Tu vida académica en 3 pasos</h2>
+        </div>
+
+        <div class="row g-4 justify-content-center position-relative">
+          <div
+            class="d-none d-lg-block position-absolute top-50 start-0 w-100 border-top border-2 border-dashed text-primary opacity-25"
+            style="z-index: 0; transform: translateY(-20px);"></div>
+
+          <div class="col-lg-4 text-center position-relative z-1">
+            <div
+              class="bg-white rounded-circle shadow-sm d-inline-flex align-items-center justify-content-center mb-3 position-relative"
+              style="width: 100px; height: 100px;">
+              <span
+                class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-primary border border-white">1</span>
+              <i class="bi bi-google fs-1 text-primary"></i>
+            </div>
+            <h5 class="fw-bold">Inicia Sesión</h5>
+            <p class="text-muted small px-4">Usa tu cuenta institucional <strong>@loscabos.tecnm.mx</strong>. Sin
+              registros nuevos ni contraseñas extra.</p>
+          </div>
+
+          <div class="col-lg-4 text-center position-relative z-1">
+            <div
+              class="bg-white rounded-circle shadow-sm d-inline-flex align-items-center justify-content-center mb-3 position-relative"
+              style="width: 100px; height: 100px;">
+              <span
+                class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-primary border border-white">2</span>
+              <i class="bi bi-grid-1x2-fill fs-1 text-aula"></i>
+            </div>
+            <h5 class="fw-bold">Elige tu Módulo</h5>
+            <p class="text-muted small px-4">Accede a <strong>Aula</strong> para cursos, <strong>Medi</strong> para
+              salud o <strong>Biblio</strong> para libros desde el panel central.</p>
+          </div>
+
+          <div class="col-lg-4 text-center position-relative z-1">
+            <div
+              class="bg-white rounded-circle shadow-sm d-inline-flex align-items-center justify-content-center mb-3 position-relative"
+              style="width: 100px; height: 100px;">
+              <span
+                class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-primary border border-white">3</span>
+              <i class="bi bi-check-circle-fill fs-1 text-success"></i>
+            </div>
+            <h5 class="fw-bold">Gestiona y Avanza</h5>
+            <p class="text-muted small px-4">Recibe confirmaciones, descarga constancias y consulta tu historial en
+              tiempo real.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+
+    <section id="servicios" class="py-5 bg-light">
+      <div class="container py-5">
+        <div class="text-center mb-5 mx-auto" style="max-width: 700px;">
+          <span
+            class="badge bg-white text-primary border shadow-sm rounded-pill px-3 py-2 mb-3 fw-bold tracking-wide">ECOSISTEMA</span>
+          <h2 class="display-5 fw-bold mb-3">Nuestros Módulos</h2>
+          <p class="text-muted lead">Herramientas especializadas diseñadas para potenciar cada aspecto de tu vida
+            universitaria.</p>
+        </div>
+
+        <div class="row g-4">
+
+          <div class="col-lg-4 col-md-6">
+            <div class="card service-card h-100 border-0 shadow-lg overflow-hidden text-white"
+              style="--theme: var(--aula);">
+              <div class="service-bg"
+                style="background-image: url('https://images.unsplash.com/photo-1522202176988-66273c2fd55f?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80');">
+              </div>
+              <div class="service-overlay"></div>
+
+              <div class="card-body p-4 p-xl-5 position-relative d-flex flex-column h-100 z-1">
+                <div class="d-flex justify-content-between align-items-start mb-4">
+                  <div
+                    class="service-icon rounded-circle bg-white d-flex align-items-center justify-content-center shadow-sm"
+                    style="color: var(--aula);">
+                    <i class="bi bi-mortarboard-fill fs-4"></i>
+                  </div>
+                  <span
+                    class="badge bg-white bg-opacity-25 backdrop-blur text-white border border-white border-opacity-25 px-3 py-2 rounded-pill">Académico</span>
+                </div>
+
+                <h3 class="h2 fw-bold mb-2">Aula</h3>
+                <p class="opacity-75 mb-4 text-white-50">Plataforma de aprendizaje y certificación.</p>
+
+                <ul class="list-unstyled mb-4 opacity-90 small space-y-2">
+                  <li class="d-flex align-items-center mb-2"><i
+                      class="bi bi-check-circle-fill me-2 text-warning"></i>Inscripciones automáticas</li>
+                  <li class="d-flex align-items-center mb-2"><i
+                      class="bi bi-check-circle-fill me-2 text-warning"></i>Cursos con valor curricular</li>
+                  <li class="d-flex align-items-center"><i
+                      class="bi bi-check-circle-fill me-2 text-warning"></i>Constancias digitales QR</li>
+                </ul>
+
+                <div class="mt-auto">
+                  <button class="btn btn-white w-100 rounded-pill fw-bold text-primary stretched-link service-btn">
+                    Entrar a Aula <i class="bi bi-arrow-right ms-2"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-lg-4 col-md-6">
+            <div class="card service-card h-100 border-0 shadow-lg overflow-hidden text-white"
+              style="--theme: var(--med);">
+              <div class="service-bg"
+                style="background-image: url('https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80');">
+              </div>
+              <div class="service-overlay"></div>
+
+              <div class="card-body p-4 p-xl-5 position-relative d-flex flex-column h-100 z-1">
+                <div class="d-flex justify-content-between align-items-start mb-4">
+                  <div
+                    class="service-icon rounded-circle bg-white d-flex align-items-center justify-content-center shadow-sm"
+                    style="color: var(--med);">
+                    <i class="bi bi-heart-pulse-fill fs-4"></i>
+                  </div>
+                  <span
+                    class="badge bg-white bg-opacity-25 backdrop-blur text-white border border-white border-opacity-25 px-3 py-2 rounded-pill">Salud</span>
+                </div>
+
+                <h3 class="h2 fw-bold mb-2">Medi</h3>
+                <p class="opacity-75 mb-4 text-white-50">Atención médica y bienestar estudiantil.</p>
+
+                <ul class="list-unstyled mb-4 opacity-90 small space-y-2">
+                  <li class="d-flex align-items-center mb-2"><i
+                      class="bi bi-check-circle-fill me-2 text-warning"></i>Citas en línea (Méd/Psic)</li>
+                  <li class="d-flex align-items-center mb-2"><i
+                      class="bi bi-check-circle-fill me-2 text-warning"></i>Historial clínico privado</li>
+                  <li class="d-flex align-items-center"><i
+                      class="bi bi-check-circle-fill me-2 text-warning"></i>Seguimiento de salud</li>
+                </ul>
+
+                <div class="mt-auto">
+                  <button class="btn btn-white w-100 rounded-pill fw-bold text-primary stretched-link service-btn">
+                    Ir a Consultorio <i class="bi bi-arrow-right ms-2"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-lg-4 col-md-6">
+            <div class="card service-card h-100 border-0 shadow-lg overflow-hidden text-white"
+              style="--theme: var(--biblio);">
+              <div class="service-bg"
+                style="background-image: url('https://images.unsplash.com/photo-1521587760476-6c12a4b040da?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80');">
+              </div>
+              <div class="service-overlay"></div>
+
+              <div class="card-body p-4 p-xl-5 position-relative d-flex flex-column h-100 z-1">
+                <div class="d-flex justify-content-between align-items-start mb-4">
+                  <div
+                    class="service-icon rounded-circle bg-white d-flex align-items-center justify-content-center shadow-sm"
+                    style="color: #d97706;">
+                    <i class="bi bi-book-half fs-4"></i>
+                  </div>
+                  <span
+                    class="badge bg-white bg-opacity-25 backdrop-blur text-white border border-white border-opacity-25 px-3 py-2 rounded-pill">Recursos</span>
+                </div>
+
+                <h3 class="h2 fw-bold mb-2">Biblio</h3>
+                <p class="opacity-75 mb-4 text-white-50">Centro de información digital y físico.</p>
+
+                <ul class="list-unstyled mb-4 opacity-90 small space-y-2">
+                  <li class="d-flex align-items-center mb-2"><i
+                      class="bi bi-check-circle-fill me-2 text-warning"></i>Catálogo en tiempo real</li>
+                  <li class="d-flex align-items-center mb-2"><i
+                      class="bi bi-check-circle-fill me-2 text-warning"></i>Reserva de libros</li>
+                  <li class="d-flex align-items-center"><i class="bi bi-check-circle-fill me-2 text-warning"></i>Control
+                    de préstamos</li>
+                </ul>
+
+                <div class="mt-auto">
+                  <button class="btn btn-white w-100 rounded-pill fw-bold text-primary stretched-link service-btn">
+                    Consultar Catálogo <i class="bi bi-arrow-right ms-2"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+
+    <section id="informate" class="py-5 bg-white border-top">
+      <div class="container py-5">
+        <div class="row g-5 align-items-center">
+
+          <div class="col-lg-5">
+            <span
+              class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-3 py-2 small mb-3 fw-bold">
+              EFICIENCIA INSTITUCIONAL
+            </span>
+            <h2 class="display-6 fw-bold mb-4 text-primary">Una plataforma viva,<br>en constante crecimiento.</h2>
+            <p class="text-muted lead mb-4">
+              SIA no es solo un portal de trámites; es el sistema nervioso del campus. Optimizamos tiempos y recursos
+              para que tú te enfoques en lo importante: tu formación.
+            </p>
+
+            <div class="d-flex flex-column gap-3">
+              <div class="d-flex align-items-center p-3 rounded-3 bg-surface-muted border hover-lift transition-base">
+                <div class="icon-box bg-white text-primary rounded-circle shadow-sm me-3"
+                  style="width:40px; height:40px;">
+                  <i class="bi bi-lightning-charge-fill"></i>
+                </div>
+                <div>
+                  <h6 class="fw-bold mb-0 text-dark">Agilidad en Trámites</h6>
+                  <small class="text-muted">Procesos que antes tomaban horas, ahora son inmediatos.</small>
+                </div>
+              </div>
+
+              <div class="d-flex align-items-center p-3 rounded-3 bg-surface-muted border hover-lift transition-base">
+                <div class="icon-box bg-white text-med rounded-circle shadow-sm me-3" style="width:40px; height:40px;">
+                  <i class="bi bi-heart-pulse-fill"></i>
+                </div>
+                <div>
+                  <h6 class="fw-bold mb-0 text-dark">Salud Integral</h6>
+                  <small class="text-muted">Atención preventiva y seguimiento clínico confidencial.</small>
+                </div>
+              </div>
+
+              <div class="d-flex align-items-center p-3 rounded-3 bg-surface-muted border hover-lift transition-base">
+                <div class="icon-box bg-white text-aula rounded-circle shadow-sm me-3" style="width:40px; height:40px;">
+                  <i class="bi bi-graph-up-arrow"></i>
+                </div>
+                <div>
+                  <h6 class="fw-bold mb-0 text-dark">Trazabilidad Académica</h6>
+                  <small class="text-muted">Historial completo de tus actividades extraescolares.</small>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-lg-7">
+            <div class="row g-3">
+
+              <div class="col-md-6">
+                <div class="card widget-card h-100 bg-primary text-white border-0 shadow rounded-4 p-4">
+                  <div class="d-flex justify-content-between align-items-start mb-4">
+                    <div class="widget-icon bg-white bg-opacity-10 rounded-3 p-2">
+                      <i class="bi bi-people-fill fs-4"></i>
+                    </div>
+                    <span class="badge bg-white text-primary rounded-pill">Activos</span>
+                  </div>
+                  <h2 class="display-4 fw-bold mb-1">+2,500</h2>
+                  <p class="opacity-75 mb-0">Estudiantes y docentes conectados diariamente.</p>
+                </div>
+              </div>
+
+              <div class="col-md-6">
+                <div class="row g-3">
+                  <div class="col-12">
+                    <div class="card widget-card border-0 shadow-sm bg-surface-muted rounded-4 p-4">
+                      <div class="d-flex align-items-center gap-3">
+                        <div class="widget-icon bg-success-subtle text-success rounded-3 p-2">
+                          <i class="bi bi-clock-history fs-4"></i>
+                        </div>
+                        <div>
+                          <h3 class="fw-bold mb-0">24/7</h3>
+                          <small class="text-muted">Disponibilidad total</small>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="col-12">
+                    <div class="card widget-card border-0 shadow-sm bg-surface-muted rounded-4 p-4">
+                      <div class="d-flex align-items-center gap-3">
+                        <div class="widget-icon bg-warning-subtle text-warning rounded-3 p-2">
+                          <i class="bi bi-qr-code-scan fs-4"></i>
+                        </div>
+                        <div>
+                          <h3 class="fw-bold mb-0">100%</h3>
+                          <small class="text-muted">Digital y Verificable</small>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="col-12">
+                    <div class="card widget-card border-0 shadow-sm bg-surface-muted rounded-4 p-4">
+                      <div class="d-flex align-items-center gap-3">
+                        <div class="widget-icon bg-info-subtle text-info rounded-3 p-2">
+                          <i class="bi bi-layers-fill fs-4"></i>
+                        </div>
+                        <div>
+                          <h3 class="fw-bold mb-0">3 Módulos</h3>
+                          <small class="text-muted">Integración nativa</small>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="testimonios" class="py-5 bg-surface-muted position-relative overflow-hidden">
+      <div class="position-absolute top-0 start-0 w-100 h-100 opacity-25"
+        style="background-image: radial-gradient(#0A2540 1px, transparent 1px); background-size: 20px 20px; pointer-events: none;">
+      </div>
+
+      <div class="container py-4 position-relative z-1">
+        <div class="text-center mb-5">
+          <h2 class="display-6 fw-bold">La comunidad habla</h2>
+          <p class="text-muted">Lo que estudiantes y docentes dicen sobre la evolución digital del campus.</p>
+        </div>
+
+        <div class="row g-4">
+          <div class="col-md-4">
+            <div class="card border-0 shadow-sm h-100 p-4 hover-lift">
+              <div class="mb-3 text-warning">
+                <i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i
+                  class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i>
+              </div>
+              <p class="text-muted small mb-4">
+                "Antes tenía que hacer fila en servicios escolares para mis constancias. Ahora con el módulo
+                <strong>Aula</strong> las descargo con el QR en segundos."
+              </p>
+              <div class="d-flex align-items-center gap-3 mt-auto">
+                <div
+                  class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center fw-bold"
+                  style="width:45px; height:45px;">MA</div>
+                <div>
+                  <h6 class="mb-0 fw-bold fs-6">Mariana A.</h6>
+                  <span class="small text-muted">Ing. en Sistemas</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-md-4">
+            <div class="card border-0 shadow-sm h-100 p-4 hover-lift">
+              <div class="mb-3 text-warning">
+                <i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i
+                  class="bi bi-star-fill"></i><i class="bi bi-star-half"></i>
+              </div>
+              <p class="text-muted small mb-4">
+                "El sistema de citas de <strong>Medi</strong> me ayudó mucho. Pude agendar mi seguimiento psicológico
+                sin exponer mis horarios en ventanilla."
+              </p>
+              <div class="d-flex align-items-center gap-3 mt-auto">
+                <div class="rounded-circle bg-info text-dark d-flex align-items-center justify-content-center fw-bold"
+                  style="width:45px; height:45px;">CR</div>
+                <div>
+                  <h6 class="mb-0 fw-bold fs-6">Carlos R.</h6>
+                  <span class="small text-muted">Lic. Administración</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-md-4">
+            <div class="card border-0 shadow-sm h-100 p-4 hover-lift">
+              <div class="mb-3 text-warning">
+                <i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i
+                  class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i>
+              </div>
+              <p class="text-muted small mb-4">
+                "Como docente, gestionar los cursos extraescolares era un caos. SIA centralizó todo y la asistencia
+                ahora es automática."
+              </p>
+              <div class="d-flex align-items-center gap-3 mt-auto">
+                <div class="rounded-circle bg-dark text-white d-flex align-items-center justify-content-center fw-bold"
+                  style="width:45px; height:45px;">JP</div>
+                <div>
+                  <h6 class="mb-0 fw-bold fs-6">Ing. Juan P.</h6>
+                  <span class="small text-muted">Licenciatura en Turismo</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="faq" class="py-5 bg-white border-top border-bottom">
+      <div class="container py-4">
+        <div class="row justify-content-center">
+          <div class="col-lg-8 text-center mb-5">
+            <span class="badge bg-primary-subtle text-primary rounded-pill px-3 py-2 mb-3">Soporte</span>
+            <h2 class="fw-bold">Preguntas Frecuentes</h2>
+            <p class="text-muted">Resolvemos tus dudas principales antes de iniciar sesión.</p>
+          </div>
+        </div>
+
+        <div class="row justify-content-center">
+          <div class="col-lg-8">
+            <div class="accordion accordion-flush" id="accordionFaq">
+
+              <div class="accordion-item border mb-3 rounded-3 overflow-hidden shadow-sm">
+                <h2 class="accordion-header">
+                  <button class="accordion-button collapsed fw-semibold bg-light" type="button"
+                    data-bs-toggle="collapse" data-bs-target="#faq1">
+                    ¿Cómo obtengo mi correo institucional?
+                  </button>
+                </h2>
+                <div id="faq1" class="accordion-collapse collapse" data-bs-parent="#accordionFaq">
+                  <div class="accordion-body text-muted small">
+                    Tu correo institucional (@loscabos.tecnm.mx) se genera automáticamente al inscribirte. Si eres de
+                    nuevo ingreso, revisa tu hoja de asignación o acude al Centro de Cómputo con tu credencial.
+                  </div>
+                </div>
+              </div>
+
+              <div class="accordion-item border mb-3 rounded-3 overflow-hidden shadow-sm">
+                <h2 class="accordion-header">
+                  <button class="accordion-button collapsed fw-semibold bg-light" type="button"
+                    data-bs-toggle="collapse" data-bs-target="#faq2">
+                    ¿Mis constancias de Aula tienen valor curricular?
+                  </button>
+                </h2>
+                <div id="faq2" class="accordion-collapse collapse" data-bs-parent="#accordionFaq">
+                  <div class="accordion-body text-muted small">
+                    Sí. Todos los cursos publicados en el módulo Aula están avalados por el departamento académico
+                    correspondiente y cuentan con un folio único de validación institucional mediante código QR.
+                  </div>
+                </div>
+              </div>
+
+              <div class="accordion-item border mb-3 rounded-3 overflow-hidden shadow-sm">
+                <h2 class="accordion-header">
+                  <button class="accordion-button collapsed fw-semibold bg-light" type="button"
+                    data-bs-toggle="collapse" data-bs-target="#faq3">
+                    ¿Puedo agendar citas médicas si no soy estudiante regular?
+                  </button>
+                </h2>
+                <div id="faq3" class="accordion-collapse collapse" data-bs-parent="#accordionFaq">
+                  <div class="accordion-body text-muted small">
+                    El servicio médico está disponible para todos los estudiantes con matrícula activa, docentes y
+                    personal administrativo. Egresados pueden acceder a servicios limitados según disponibilidad.
+                  </div>
+                </div>
+              </div>
+
+              <div class="accordion-item border mb-3 rounded-3 overflow-hidden shadow-sm">
+                <h2 class="accordion-header">
+                  <button class="accordion-button collapsed fw-semibold bg-light" type="button"
+                    data-bs-toggle="collapse" data-bs-target="#faq4">
+                    Olvidé mi contraseña, ¿qué hago?
+                  </button>
+                </h2>
+                <div id="faq4" class="accordion-collapse collapse" data-bs-parent="#accordionFaq">
+                  <div class="accordion-body text-muted small">
+                    Al usar el inicio de sesión con Google, tu contraseña es la misma de tu correo institucional. Si la
+                    olvidaste, debes recuperarla directamente en la plataforma de Gmail o con el administrador de TI del
+                    campus.
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="contacto" class="py-5 position-relative overflow-hidden" style="background-color: #f8fafc;">
+      <div class="position-absolute top-0 end-0 translate-middle-y opacity-10 d-none d-lg-block">
+        <svg width="500" height="500" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+          <path fill="rgba(255,255,255,0.03)"
+            d="M44.7,-76.4C58.9,-69.2,71.8,-59.1,81.6,-46.6C91.4,-34.1,98.1,-19.2,95.8,-5.3C93.5,8.6,82.2,21.4,70.8,31.4C59.4,41.4,47.9,48.6,36.3,53.4C24.7,58.2,13,60.6,-0.4,61.3C-13.8,62,-26.3,61,-38.4,56.2C-50.5,51.4,-62.2,42.8,-70.5,31.6C-78.8,20.4,-83.7,6.6,-81.8,-6.3C-79.9,-19.2,-71.2,-31.2,-60.8,-40.6C-50.4,-50,-38.3,-56.8,-25.8,-65.2C-13.3,-73.6,-0.4,-83.6,13.5,-85.6C27.4,-87.6,40,-81.6,44.7,-76.4Z"
+            transform="translate(100 100)" />
+        </svg>
+      </div>
+
+      <div class="container py-5 position-relative z-1">
+        <div class="row g-5 align-items-center">
+
+          <div class="col-lg-5">
+            <span class="badge bg-primary text-white rounded-pill px-3 py-2 mb-3 shadow-sm">Centro de Ayuda</span>
+            <h2 class="display-5 fw-bold mb-4 text-dark">Estamos aquí para ayudarte.</h2>
+            <p class="text-muted lead mb-5">
+              ¿Tienes problemas con tu cuenta o algún módulo? Contacta directamente al equipo de TI del campus.
+            </p>
+
+            <div class="d-flex flex-column gap-4">
+
+              <div
+                class="d-flex align-items-start hover-lift transition-base p-3 rounded-3 bg-white shadow-sm border-start border-4 border-primary">
+                <div class="flex-shrink-0 text-primary mt-1">
+                  <i class="bi bi-geo-alt-fill fs-4"></i>
+                </div>
+                <div class="ms-3">
+                  <h6 class="fw-bold mb-1">Campus Los Cabos</h6>
+                  <p class="text-muted small mb-0">Carretera Transpeninsular km 119,<br>Col. El Tezal, C.P. 23450.</p>
+                  <a href="https://maps.google.com" target="_blank"
+                    class="small text-primary fw-bold text-decoration-none mt-1 d-inline-block">Ver en mapa <i
+                      class="bi bi-arrow-right-short"></i></a>
+                </div>
+              </div>
+
+              <div
+                class="d-flex align-items-start hover-lift transition-base p-3 rounded-3 bg-white shadow-sm border-start border-4 border-info">
+                <div class="flex-shrink-0 text-info mt-1">
+                  <i class="bi bi-envelope-check-fill fs-4"></i>
+                </div>
+                <div class="ms-3">
+                  <h6 class="fw-bold mb-1">Soporte Digital</h6>
+                  <p class="text-muted small mb-0">Tiempo de respuesta: &lt; 24 hrs.</p>
+                  <a href="mailto:soporte@loscabos.tecnm.mx"
+                    class="small text-dark fw-bold text-decoration-none">soporte@loscabos.tecnm.mx</a>
+                </div>
+              </div>
+
+              <div
+                class="d-flex align-items-start hover-lift transition-base p-3 rounded-3 bg-white shadow-sm border-start border-4 border-success">
+                <div class="flex-shrink-0 text-success mt-1">
+                  <i class="bi bi-whatsapp fs-4"></i>
+                </div>
+                <div class="ms-3">
+                  <h6 class="fw-bold mb-1">Atención Rápida</h6>
+                  <p class="text-muted small mb-0">Lun - Vie, 8:00 a 16:00 hrs</p>
+                  <span class="small text-dark fw-bold">+52 (624) 123 4567</span>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          <div class="col-lg-7">
+            <div class="card border-0 shadow-lg rounded-4 overflow-hidden">
+              <div class="card-body p-4 p-lg-5 bg-white">
+                <h3 class="fw-bold mb-4">Crear Ticket de Soporte</h3>
+                <form id="landing-contact-form" class="row g-3">
+
+                  <div class="col-md-6">
+                    <label class="form-label small fw-bold text-muted">Nombre completo</label>
+                    <input type="text" class="form-control bg-light border-0 py-2 px-3" placeholder="Tu nombre"
+                      required>
+                  </div>
+
+                  <div class="col-md-6">
+                    <label class="form-label small fw-bold text-muted">Matrícula / ID</label>
+                    <input type="text" class="form-control bg-light border-0 py-2 px-3" placeholder="Ej. 21380XXX">
+                  </div>
+
+                  <div class="col-12">
+                    <label class="form-label small fw-bold text-muted">Correo Institucional</label>
+                    <input type="email" class="form-control bg-light border-0 py-2 px-3"
+                      placeholder="usuario@loscabos.tecnm.mx" required>
+                  </div>
+
+                  <div class="col-12">
+                    <label class="form-label small fw-bold text-muted">¿En qué podemos ayudarte?</label>
+                    <select class="form-select bg-light border-0 py-2 px-3 text-muted" style="cursor: pointer;">
+                      <option selected>Selecciona un tema...</option>
+                      <option value="acceso">Problemas de acceso / Contraseña</option>
+                      <option value="aula">Error en módulo Aula</option>
+                      <option value="medi">Citas médicas</option>
+                      <option value="constancia">Problema con Constancias</option>
+                      <option value="otro">Otro</option>
+                    </select>
+                  </div>
+
+                  <div class="col-12">
+                    <label class="form-label small fw-bold text-muted">Detalles del problema</label>
+                    <textarea class="form-control bg-light border-0 px-3" rows="4"
+                      placeholder="Describe brevemente qué sucede..." required></textarea>
+                  </div>
+
+                  <div class="col-12 mt-4">
+                    <button type="submit" class="btn btn-primary w-100 py-3 rounded-pill fw-bold shadow-sm hover-scale">
+                      <i class="bi bi-send-fill me-2"></i> Enviar Solicitud
+                    </button>
+                    <div class="text-center mt-3">
+                      <small class="text-muted" style="font-size: 0.75rem;">Al enviar, aceptas nuestros términos de
+                        privacidad.</small>
+                    </div>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+
+    <footer id="landing-footer" class="bg-white border-top pt-5 pb-4">
+      <div class="container">
+        <div class="row g-4 justify-content-between">
+
+          <div class="col-lg-4">
+            <a href="#hero" class="d-flex align-items-center text-decoration-none mb-3">
+              <img src="/images/logo-sia.png" alt="SIA" style="height:36px; width:auto;" class="me-2">
+              <span class="fw-bold text-primary fs-5">SIA</span>
+            </a>
+            <p class="text-muted small mb-3">
+              Plataforma integral para la gestión académica, bienestar y recursos bibliotecarios del TecNM Campus Los
+              Cabos.
+            </p>
+            <div class="d-flex gap-3">
+              <a href="#" class="text-secondary fs-5"><i class="bi bi-facebook"></i></a>
+              <a href="#" class="text-secondary fs-5"><i class="bi bi-twitter-x"></i></a>
+              <a href="#" class="text-secondary fs-5"><i class="bi bi-instagram"></i></a>
+              <a href="#" class="text-secondary fs-5"><i class="bi bi-youtube"></i></a>
+            </div>
+          </div>
+
+          <div class="col-6 col-lg-2">
+            <h6 class="fw-bold mb-3">Plataforma</h6>
+            <ul class="list-unstyled small space-y-2">
+              <li class="mb-2"><a href="#hero" class="text-decoration-none text-muted hover-primary">Inicio</a></li>
+              <li class="mb-2"><a href="#servicios" class="text-decoration-none text-muted hover-primary">Módulos</a>
+              </li>
+              <li class="mb-2"><a href="#testimonios"
+                  class="text-decoration-none text-muted hover-primary">Comunidad</a></li>
+              <li class="mb-2"><a href="#faq" class="text-decoration-none text-muted hover-primary">Preguntas (FAQ)</a>
+              </li>
+            </ul>
+          </div>
+
+          <div class="col-6 col-lg-2">
+            <h6 class="fw-bold mb-3">Soporte</h6>
+            <ul class="list-unstyled small space-y-2">
+              <li class="mb-2"><a href="#contacto" class="text-decoration-none text-muted hover-primary">Contáctanos</a>
+              </li>
+              <li class="mb-2"><a href="#" class="text-decoration-none text-muted hover-primary">Mesa de Ayuda</a></li>
+              <li class="mb-2"><a href="#" class="text-decoration-none text-muted hover-primary">Privacidad</a></li>
+              <li class="mb-2"><a href="#" class="text-decoration-none text-muted hover-primary">Términos de Uso</a>
+              </li>
+            </ul>
+          </div>
+
+          <div class="col-lg-3">
+            <div class="p-3 bg-surface-muted rounded-3 border">
+              <div class="d-flex align-items-center gap-2 mb-2">
+                <i class="bi bi-shield-check text-success fs-4"></i>
+                <div class="small fw-bold lh-1">Plataforma<br>Institucional</div>
+              </div>
+              <p class="text-muted extra-small mb-0">
+                Desarrollado y operado por el Centro de Cómputo del ITES Los Cabos.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <hr class="my-4 opacity-10">
+
+        <div class="row align-items-center">
+          <div class="col-md-6 text-center text-md-start small text-muted">
+            &copy; 2025 Sistema de Integración Académico v2.2
+          </div>
+          <div class="col-md-6 text-center text-md-end small text-muted">
+            <a href="https://www.itesloscabos.edu.mx" target="_blank" class="text-decoration-none text-muted me-3">Sitio
+              Oficial</a>
+            <span class="opacity-50">|</span>
+            <span class="ms-3">Hecho con <i class="bi bi-heart-fill text-danger" style="font-size:10px;"></i> en Los
+              Cabos</span>
+          </div>
+        </div>
+      </div>
+    </footer>
+
+    <button id="btn-back-to-top" type="button"
+      class="btn btn-primary rounded-circle shadow p-0 position-fixed d-none fade-up-entry"
+      style="bottom: 20px; right: 20px; width: 45px; height: 45px; z-index: 1090;">
+      <i class="bi bi-arrow-up"></i>
+    </button>
+
+
+  </div>
+  <div id="app-shell" class="d-none">
+
+    <div class="container sticky-top" style="margin-top: -1rem; padding-top: 1rem;">
+      <nav class="navbar navbar-expand-lg nav-floating p-2">
+        <div class="container-fluid">
+          <a class="navbar-brand d-flex align-items-center gap-2" href="#" id="btn-brand-home">
+            <img src="/images/logo-sia.png" width="32" height="32" alt="SIA" class="filter-primary">
+            <span class="fw-bold text-primary tracking-tight">SIA</span>
+          </a>
+
+          <button class="navbar-toggler border-0 small" type="button" data-bs-toggle="collapse"
+            data-bs-target="#navContent">
+            <i class="bi bi-grid-fill text-muted"></i>
+          </button>
+
+          <div class="collapse navbar-collapse mt-3 mt-lg-0" id="navContent">
+            <ul class="navbar-nav mx-auto gap-1">
+              <li class="nav-item">
+                <a class="nav-link active px-3 d-flex align-items-center gap-2" data-view="view-dashboard" href="#">
+                  <i class="bi bi-grid"></i> Inicio
+                </a>
+              </li>
+              <li class="nav-item">
+                <a class="nav-link px-3 d-flex align-items-center gap-2" data-view="view-aula" href="#">
+                  <i class="bi bi-mortarboard"></i> Aula
+                </a>
+              </li>
+              <li class="nav-item">
+                <a class="nav-link px-3 d-flex align-items-center gap-2" data-view="view-biblio" href="#">
+                  <i class="bi bi-book"></i> Biblio
+                </a>
+              </li>
+              <li class="nav-item">
+                <a class="nav-link px-3 d-flex align-items-center gap-2" data-view="view-medi" href="#">
+                  <i class="bi bi-heart-pulse"></i> Medi
+                </a>
+              </li>
+            </ul>
+
+            <div class="d-flex align-items-center gap-3 pt-3 pt-lg-0 border-lg-0">
+              <div class="text-end d-none d-lg-block lh-1">
+                <div class="small fw-bold text-dark" id="user-name-nav">Usuario</div>
+                <div class="text-muted" style="font-size: 0.7rem;" id="user-role-nav">Estudiante</div>
+              </div>
+
+              <div class="dropdown me-2">
+                <button class="btn btn-light border-0 position-relative rounded-circle text-primary shadow-sm"
+                  type="button" id="btn-notif-dropdown" data-bs-toggle="dropdown" data-bs-auto-close="outside"
+                  aria-expanded="false" style="width: 40px; height: 40px;">
+                  <i class="bi bi-bell-fill"></i>
+                  <span id="nav-notif-badge"
+                    class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger border border-light d-none">
+                    0
+                  </span>
+                </button>
+
+                <ul class="dropdown-menu dropdown-menu-end shadow border-0 rounded-4 mt-2 p-0"
+                  aria-labelledby="btn-notif-dropdown" style="width: 320px;">
+
+                  <li
+                    class="d-flex justify-content-between align-items-center px-3 py-2 bg-light border-bottom rounded-top-4">
+                    <span class="small fw-bold text-muted text-uppercase">Notificaciones</span>
+                    <button class="btn btn-link btn-sm text-decoration-none p-0" style="font-size: 0.75rem;"
+                      id="btn-notif-mark-all">
+                      Marcar leídas
+                    </button>
+                  </li>
+
+                  <div id="nav-notif-list" style="max-height: 350px; overflow-y: auto;">
+                    <li class="text-center p-4 text-muted small">
+                      <i class="bi bi-bell-slash mb-2 d-block fs-5 opacity-50"></i>
+                      Cargando...
+                    </li>
+                  </div>
+                </ul>
+              </div>
+
+              <div class="dropdown">
+                <button class="btn p-0 border-0" type="button" data-bs-toggle="dropdown">
+                  <div
+                    class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center shadow-sm"
+                    style="width: 38px; height: 38px;">
+                    <i class="bi bi-person-fill"></i>
+                  </div>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0 rounded-3 mt-2">
+                  <li><span class="dropdown-header" id="user-email-nav">correo@ejemplo.com</span></li>
+                  <li>
+                    <hr class="dropdown-divider">
+                  </li>
+                  <li><button class="dropdown-item small" data-view="view-profile"><i
+                        class="bi bi-person-gear me-2"></i>Mi Perfil</button></li>
+                  <li>
+                    <hr class="dropdown-divider">
+                  </li>
+                  <li><button class="dropdown-item text-danger small" id="btn-logout"><i
+                        class="bi bi-box-arrow-right me-2"></i>Cerrar Sesión</button></li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </div>
+
+    <section id="global-avisos-wrap" class="bg-transparent mb-3">
+      <div class="container">
+        <div class="alert alert-light border-0 shadow-sm rounded-4 d-flex align-items-center p-3 mb-0 gap-3"
+          role="alert">
+          <div class="bg-warning-subtle text-warning rounded-circle p-2 d-flex"><i class="bi bi-broadcast"></i></div>
+          <div class="flex-grow-1 small text-muted" id="global-avisos-container">Cargando novedades...</div>
+          <button class="btn btn-sm btn-light rounded-pill border" id="btn-global-avisos-modal">Ver todo</button>
+        </div>
+      </div>
+    </section>
+
+    <main class="container pb-5">
+
+      <div id="view-dashboard" class="app-view d-none">
+
+        <div class="dashboard-hero d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+          <div>
+            <h2 class="h3 fw-bold text-primary mb-1" id="dash-welcome-title">Hola, Estudiante</h2>
+            <p class="text-muted mb-0" id="dash-welcome-subtitle">Aquí tienes el resumen de tu actividad académica hoy.
+            </p>
+          </div>
+          <div class="d-flex gap-2">
+            <div class="bg-white p-2 rounded-3 shadow-sm text-center" style="min-width: 80px;">
+              <div class="small fw-bold text-primary" id="dash-date-day">01</div>
+              <div class="text-muted" style="font-size: 0.7rem;" id="dash-date-month">ENE</div>
+            </div>
+          </div>
+        </div>
+
+
+
+        <div class="row g-4 mb-5">
+
+          <div class="col-md-4">
+            <div class="module-card-modern p-4 h-100 d-flex flex-column"
+              style="--theme-color: var(--aula); --bg-light: #f0ebfa;">
+              <div class="d-flex justify-content-between mb-3">
+                <div class="module-icon-circle"><i class="bi bi-mortarboard-fill"></i></div>
+                <span class="badge bg-light text-dark border align-self-start" id="dash-aula-badge">0
+                  Inscripciones</span>
+              </div>
+              <h4 class="h5 fw-bold">Aula Virtual</h4>
+              <p class="text-muted small mb-4 flex-grow-1">Accede a tus cursos activos, completa lecciones y descarga
+                constancias.</p>
+              <a href="#" class="btn btn-sm btn-outline-primary stretched-link w-100 rounded-pill fw-semibold"
+                data-view="view-aula">Ir a mis cursos</a>
+            </div>
+          </div>
+
+          <div class="col-md-4">
+            <div class="module-card-modern p-4 h-100 d-flex flex-column"
+              style="--theme-color: var(--med); --bg-light: #e0fbff;">
+              <div class="d-flex justify-content-between mb-3">
+                <div class="module-icon-circle"><i class="bi bi-heart-pulse-fill"></i></div>
+                <span class="badge bg-light text-dark border align-self-start" id="dash-medi-badge">0 Citas</span>
+              </div>
+              <h4 class="h5 fw-bold">Salud Integral</h4>
+              <p class="text-muted small mb-4 flex-grow-1">Agenda citas médicas o psicológicas y revisa tu historial
+                clínico.</p>
+              <a href="#" class="btn btn-sm btn-outline-info stretched-link w-100 rounded-pill fw-semibold"
+                data-view="view-medi">Consultorio</a>
+            </div>
+          </div>
+
+          <div class="col-md-4">
+            <div class="module-card-modern p-4 h-100 d-flex flex-column"
+              style="--theme-color: var(--biblio); --bg-light: #fff8e1;">
+              <div class="d-flex justify-content-between mb-3">
+                <div class="module-icon-circle"><i class="bi bi-book-half"></i></div>
+                <span class="badge bg-light text-dark border align-self-start" id="dash-biblio-badge">0 Préstamos</span>
+              </div>
+              <h4 class="h5 fw-bold">Biblioteca</h4>
+              <p class="text-muted small mb-4 flex-grow-1">Consulta el catálogo de libros y gestiona tus préstamos
+                activos.</p>
+              <a href="#" class="btn btn-sm btn-outline-warning text-dark stretched-link w-100 rounded-pill fw-semibold"
+                data-view="view-biblio">Catálogo</a>
+            </div>
+          </div>
+
+        </div>
+
+        <h5 class="fw-bold text-muted small text-uppercase mb-3 ls-1">Accesos Rápidos</h5>
+        <div class="row row-cols-2 row-cols-md-4 row-cols-lg-5 g-3">
+          <div class="col">
+            <a href="#" class="quick-action-btn" data-view="view-aula">
+              <i class="bi bi-play-circle-fill text-aula quick-action-icon"></i>
+              <span class="small fw-bold">Continuar Curso</span>
+            </a>
+          </div>
+          <div class="col">
+            <a href="#" class="quick-action-btn" data-view="view-medi">
+              <i class="bi bi-calendar-plus-fill text-med quick-action-icon"></i>
+              <span class="small fw-bold">Nueva Cita</span>
+            </a>
+          </div>
+          <div class="col">
+            <a href="#" class="quick-action-btn" data-view="view-biblio">
+              <i class="bi bi-search text-biblio quick-action-icon"></i>
+              <span class="small fw-bold">Buscar Libro</span>
+            </a>
+          </div>
+          <div class="col">
+            <button type="button" class="quick-action-btn w-100 border-0" id="btn-quick-soporte"
+              onclick="document.getElementById('landing-contact-form')?.scrollIntoView()">
+              <i class="bi bi-question-circle-fill text-secondary quick-action-icon"></i>
+              <span class="small fw-bold">Ayuda</span>
+            </button>
+          </div>
+        </div>
+        <br>
+        <div class="row g-4 mb-5">
+
+          <div class="col-lg-6">
+            <div class="card border-0 shadow-sm rounded-4 h-100">
+              <div class="card-header bg-white border-0 pt-4 px-4 d-flex justify-content-between align-items-center">
+                <h5 class="fw-bold mb-0 text-dark"><i class="bi bi-calendar-check me-2 text-med"></i>Próximas Citas</h5>
+                <a href="#" data-view="view-medi" class="small text-decoration-none">Ver calendario</a>
+              </div>
+              <div class="card-body px-4 pb-4">
+                <div id="dash-widget-citas">
+                  <div class="empty-state-widget">
+                    <i class="bi bi-calendar-x mb-2 d-block fs-4"></i>
+                    No tienes citas próximas agendadas.
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-lg-6">
+            <div class="card border-0 shadow-sm rounded-4 h-100">
+              <div class="card-header bg-white border-0 pt-4 px-4 d-flex justify-content-between align-items-center">
+                <h5 class="fw-bold mb-0 text-dark"><i class="bi bi-bar-chart-line me-2 text-aula"></i>Mis Cursos</h5>
+                <a href="#" data-view="view-aula" class="small text-decoration-none">Ir a Aula</a>
+              </div>
+              <div class="card-body px-4 pb-4">
+                <div id="dash-widget-cursos">
+                  <div class="empty-state-widget">
+                    <i class="bi bi-journal-x mb-2 d-block fs-4"></i>
+                    No estás inscrito en cursos activos.
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+
+      </div>
+
+
+  </div>
+  </div>
+  </section>
+
+  <div id="app-breadcrumbs" class="d-none container mb-3">
+    <nav aria-label="breadcrumb">
+      <ol class="breadcrumb breadcrumb-glass shadow-sm">
+        <li class="breadcrumb-item"><a href="#" data-view="view-dashboard">Inicio</a></li>
+        <li class="breadcrumb-item active" aria-current="page" id="breadcrumb-current">Panel</li>
+      </ol>
+    </nav>
+  </div>
+
+
+  <main class="container py-4">
+
+    <div id="view-dashboard" class="app-view d-none">
+      <div class="row g-4 mb-4">
+        <div class="col-12">
+          <h2 class="h4 fw-bold text-primary">Panel General</h2>
+          <p class="text-muted">Bienvenido a tu espacio académico.</p>
+        </div>
+      </div>
+
+      <div class="row g-3 g-lg-4">
+        <div class="col-12 col-md-4">
+          <div class="card border-0 shadow-sm rounded-4 h-100 position-relative overflow-hidden">
+            <a href="#" class="stretched-link kpi-link" data-view="view-medi"></a>
+            <div class="card-body p-4">
+              <div class="d-flex justify-content-between align-items-start mb-3">
+                <img src="/images/medi.png" alt="Logo ITES" class="img-fluid" style="width: 80px; height: auto; ">
+                <span class="badge bg-surface text-muted border shadow-sm rounded-pill">Medi</span>
+              </div>
+              <h3 class="display-5 fw-bold mb-1" id="dash-medi-count">0</h3>
+              <div class="text-muted small text-truncate" id="dash-medi-label">Citas pendientes</div>
+            </div>
+            <div class="progress" style="height: 4px;">
+              <div class="progress-bar bg-info" style="width: 70%"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-12 col-md-4">
+          <div class="card border-0 shadow-sm rounded-4 h-100 position-relative overflow-hidden">
+            <a href="#" class="stretched-link kpi-link" data-view="view-biblio"></a>
+            <div class="card-body p-4">
+              <div class="d-flex justify-content-between align-items-start mb-3">
+                <img src="/images/biblio.png" alt="Logo ITES" class="img-fluid" style="width: 80px; height: auto; ">
+                <span class="badge bg-surface text-muted border shadow-sm rounded-pill">Biblio</span>
+              </div>
+              <h3 class="display-5 fw-bold mb-1" id="dash-biblio-count">0</h3>
+              <div class="text-muted small text-truncate" id="dash-biblio-label">Préstamos activos</div>
+            </div>
+            <div class="progress" style="height: 4px;">
+              <div class="progress-bar bg-warning" style="width: 45%"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-12 col-md-4">
+          <div class="card border-0 shadow-sm rounded-4 h-100 position-relative overflow-hidden">
+            <a href="#" class="stretched-link kpi-link" data-view="view-aula"></a>
+            <div class="card-body p-4">
+              <div class="d-flex justify-content-between align-items-start mb-3">
+                <img src="/images/aula.png" alt="Logo ITES" class="img-fluid" style="width: 70px; height: auto; ">
+                <span class="badge bg-surface text-muted border shadow-sm rounded-pill">Aula</span>
+              </div>
+              <h3 class="display-5 fw-bold mb-1" id="dash-aula-count">0</h3>
+              <div class="text-muted small text-truncate" id="dash-aula-label">Inscripciones</div>
+            </div>
+            <div class="progress" style="height: 4px;">
+              <div class="progress-bar" style="width: 60%; background-color: var(--aula);"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div id="view-superadmin-dashboard" class="app-view d-none">
+
+      <div class="super-admin-hero shadow-lg">
+        <div class="position-relative z-1">
+          <div class="d-flex justify-content-between align-items-end mb-4">
+            <div>
+              <span class="badge bg-warning text-dark mb-2">Acceso Administrativo Total</span>
+              <h1 class="h2 fw-bold mb-1">Torre de Control SIA</h1>
+              <p class="text-white-50 mb-0">Visión global del ecosistema académico.</p>
+            </div>
+            <div class="text-end d-none d-md-block">
+              <div class="h2 fw-bold mb-0" id="sa-total-users">0</div>
+              <div class="small text-white-50">Usuarios Totales</div>
+            </div>
+          </div>
+
+          <div class="row g-4">
+            <div class="col-md-4">
+              <div class="p-3 rounded-3 bg-white bg-opacity-10 border border-white border-opacity-10 backdrop-blur">
+                <div class="d-flex align-items-center gap-3">
+                  <div class="bg-aula text-white rounded-circle p-2"><i class="bi bi-mortarboard-fill"></i></div>
+                  <div>
+                    <div class="h4 fw-bold mb-0" id="sa-kpi-aula">0</div>
+                    <div class="small text-white-50">Cursos Activos</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="p-3 rounded-3 bg-white bg-opacity-10 border border-white border-opacity-10 backdrop-blur">
+                <div class="d-flex align-items-center gap-3">
+                  <div class="bg-med text-white rounded-circle p-2"><i class="bi bi-heart-pulse-fill"></i></div>
+                  <div>
+                    <div class="h4 fw-bold mb-0" id="sa-kpi-medi">0</div>
+                    <div class="small text-white-50">Consultas (Mes)</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="p-3 rounded-3 bg-white bg-opacity-10 border border-white border-opacity-10 backdrop-blur">
+                <div class="d-flex align-items-center gap-3">
+                  <div class="bg-biblio text-dark rounded-circle p-2"><i class="bi bi-book-half"></i></div>
+                  <div>
+                    <div class="h4 fw-bold mb-0" id="sa-kpi-biblio">0</div>
+                    <div class="small text-white-50">Libros Prestados</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <i class="bi bi-graph-up-arrow position-absolute text-white opacity-10"
+          style="font-size: 15rem; right: -50px; bottom: -80px;"></i>
+      </div>
+
+      <h4 class="fw-bold text-primary mb-3"><i class="bi bi-file-earmark-bar-graph me-2"></i>Centro de Reportes</h4>
+      <div class="row g-4 mb-5">
+        <div class="col-md-4">
+          <div class="metric-card-huge">
+            <div class="text-muted small text-uppercase fw-bold mb-2">Rendimiento Académico</div>
+            <div class="metric-value-huge" id="sa-rate-aula">0%</div>
+            <p class="text-muted small mb-3">Tasa de finalización global</p>
+            <button class="btn btn-sm btn-outline-primary w-100"
+              onclick="if(confirm('¿Descargar reporte global de Aula?')) Aula.downloadCSV([{demo:'data'}], 'aula_global.csv')">
+              <i class="bi bi-download me-1"></i> Exportar Data
+            </button>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="metric-card-huge">
+            <div class="text-muted small text-uppercase fw-bold mb-2">Salud Estudiantil</div>
+            <div class="metric-value-huge" id="sa-rate-medi">0</div>
+            <p class="text-muted small mb-3">Atenciones hoy</p>
+            <button class="btn btn-sm btn-outline-info w-100">
+              <i class="bi bi-eye me-1"></i> Ver Detalle
+            </button>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="metric-card-huge">
+            <div class="text-muted small text-uppercase fw-bold mb-2">Inventario</div>
+            <div class="metric-value-huge" id="sa-rate-biblio">0%</div>
+            <p class="text-muted small mb-3">Disponibilidad de catálogo</p>
+            <button class="btn btn-sm btn-outline-warning text-dark w-100">
+              <i class="bi bi-archive me-1"></i> Auditoría
+            </button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+    <div id="view-profile" class="app-view d-none">
+      <div class="row justify-content-center">
+        <div class="col-lg-8">
+          <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
+            <div class="profile-header"></div>
+
+            <div class="card-body profile-body px-4 px-md-5 pb-5">
+              <div class="profile-avatar-container shadow-sm">
+                <div id="profile-avatar-big" class="avatar-initials"
+                  style="width: 80px; height: 80px; font-size: 2rem;">U</div>
+              </div>
+
+              <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+                <div>
+                  <h2 class="h3 fw-bold mb-0" id="profile-fullname">Cargando...</h2>
+                  <p class="text-muted mb-2" id="profile-role-email">Estudiante • usuario@loscabos.tecnm.mx</p>
+                  <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-3">
+                    <i class="bi bi-check-circle-fill me-1"></i> Cuenta Activa
+                  </span>
+                </div>
+                <button class="btn btn-outline-primary rounded-pill btn-sm px-4"
+                  onclick="showToast('Edición deshabilitada en demo', 'secondary')">
+                  <i class="bi bi-pencil-fill me-2"></i>Editar Perfil
+                </button>
+              </div>
+
+              <hr class="my-4 opacity-10">
+
+              <h5 class="fw-bold text-primary mb-3"><i class="bi bi-person-vcard me-2"></i>Información Académica</h5>
+              <div class="row g-3">
+                <div class="col-sm-6">
+                  <label class="small text-muted text-uppercase fw-bold">Matrícula / ID</label>
+                  <div class="p-3 bg-surface-muted rounded-3 border fw-semibold text-dark">
+                    21380XXX </div>
+                </div>
+                <div class="col-sm-6">
+                  <label class="small text-muted text-uppercase fw-bold">Carrera</label>
+                  <div class="p-3 bg-surface-muted rounded-3 border fw-semibold text-dark">
+                    Ingeniería en Sistemas </div>
+                </div>
+                <div class="col-12">
+                  <label class="small text-muted text-uppercase fw-bold">Bio / Intereses</label>
+                  <div class="p-3 bg-surface-muted rounded-3 border text-muted small">
+                    Sin información registrada.
+                  </div>
+                </div>
+              </div>
+
+              <h5 class="fw-bold text-primary mt-5 mb-3"><i class="bi bi-shield-lock me-2"></i>Seguridad</h5>
+              <div class="d-flex justify-content-between align-items-center p-3 border rounded-3">
+                <div>
+                  <h6 class="fw-bold mb-0">Contraseña</h6>
+                  <small class="text-muted">Última actualización: hace 3 meses</small>
+                </div>
+                <button class="btn btn-light btn-sm border"
+                  onclick="showToast('Gestionado por Google Auth', 'info')">Cambiar</button>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="view-biblio" class="app-view d-none">
+      <section id="biblio-student" class="d-none">
+        <div class="row g-4">
+          <div class="col-lg-8 order-2 order-lg-1">
+            <div class="card border-0 shadow-sm rounded-4 h-100">
+              <div class="card-header bg-surface border-0 pt-4 px-4">
+                <h2 class="h5 mb-1 text-primary fw-bold"><i class="bi bi-search me-2"
+                    style="color:var(--biblio)"></i>Catálogo</h2>
+                <form id="biblio-stu-search-form" class="mt-3">
+                  <div class="input-group">
+                    <span class="input-group-text bg-surface-muted border-end-0"><i class="bi bi-search"></i></span>
+                    <input type="search" id="biblio-stu-search-input"
+                      class="form-control bg-surface-muted border-start-0" placeholder="Título, autor o ISBN...">
+                  </div>
+                </form>
+              </div>
+              <div class="card-body p-0">
+                <div id="biblio-stu-search-results" class="list-group list-group-flush scroll-container p-3">
+                  <p class="text-muted p-3 text-center">Utiliza el buscador para encontrar material.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="col-lg-4 order-1 order-lg-2">
+            <div class="card border-0 shadow-sm rounded-4 bg-primary text-white mb-3">
+              <div class="card-body p-4 position-relative overflow-hidden">
+                <i class="bi bi-bookmark-star position-absolute top-0 end-0 opacity-25 m-3 display-1"></i>
+                <h5 class="fw-bold position-relative z-1">Mis Préstamos</h5>
+                <p class="small opacity-75 position-relative z-1">Revisa fechas de devolución para evitar multas.</p>
+              </div>
+            </div>
+            <div class="card border-0 shadow-sm rounded-4">
+              <div class="card-body p-0">
+                <div id="biblio-stu-prestamos" class="table-responsive">
+                  <p class="text-muted p-3">Cargando...</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="biblio-admin" class="d-none">
+        <div class="alert alert-info">Panel de Administración Bibliotecaria Cargado</div>
+        <ul class="nav nav-tabs mb-3" role="tablist">
+          <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab"
+              data-bs-target="#tab-biblio-pend">Pendientes</button></li>
+          <li class="nav-item"><button class="nav-link" data-bs-toggle="tab"
+              data-bs-target="#tab-biblio-aprob">Aprobados</button></li>
+          <li class="nav-item"><button class="nav-link" data-bs-toggle="tab"
+              data-bs-target="#tab-biblio-entreg">Entregados</button></li>
+          <li class="nav-item"><button class="nav-link" data-bs-toggle="tab"
+              data-bs-target="#tab-biblio-invent">Inventario</button></li>
+          <li class="nav-item"><button class="nav-link" data-bs-toggle="tab"
+              data-bs-target="#tab-biblio-servicios">Servicios & PCs</button></li>
+        </ul>
+        <div class="tab-content">
+          <div class="tab-pane fade show active" id="tab-biblio-pend">
+            <div id="biblio-adm-prestamos-pend" class="card p-3 border-0 shadow-sm"></div>
+          </div>
+          <div class="tab-pane fade" id="tab-biblio-aprob">
+            <div id="biblio-adm-prestamos-aprob" class="card p-3 border-0 shadow-sm"></div>
+          </div>
+          <div class="tab-pane fade" id="tab-biblio-entreg">
+            <div id="biblio-adm-prestamos-entreg" class="card p-3 border-0 shadow-sm"></div>
+          </div>
+          <div class="tab-pane fade" id="tab-biblio-invent">
+            <div class="row g-4">
+              <div class="col-lg-4">
+                <div class="card border-0 shadow-sm p-4">
+                  <h6>Nuevo Libro</h6>
+                  <form id="form-biblio-nuevo-libro">
+                    <input class="form-control mb-2" id="biblio-titulo" placeholder="Título" required>
+                    <input class="form-control mb-2" id="biblio-autor" placeholder="Autor" required>
+                    <input class="form-control mb-2" id="biblio-isbn" placeholder="ISBN">
+                    <input type="number" class="form-control mb-3" id="biblio-copias" value="1" min="1">
+                    <button class="btn btn-primary w-100">Guardar</button>
+                  </form>
+                </div>
+              </div>
+              <div class="col-lg-8">
+                <div id="biblio-adm-inventario" class="card p-3 border-0 shadow-sm scroll-container"></div>
+              </div>
+            </div>
+          </div>
+          <div class="tab-pane fade" id="tab-biblio-servicios">
+    <div class="row g-4">
+        <div class="col-lg-8">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                    <h6 class="fw-bold mb-0">Control de Activos</h6>
+                    <span class="badge bg-primary-subtle text-primary">Tiempo Real</span>
+                </div>
+                <div class="card-body p-0">
+                    <div id="biblio-assets-grid" class="row g-0">
+                        </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-4">
+            <div class="card border-0 shadow-sm p-4 mb-3">
+                <h6 class="fw-bold mb-3">Nuevo Activo</h6>
+                <form id="form-biblio-asset">
+                    <div class="mb-2">
+                        <label class="small fw-bold text-muted">ID Único (Ej. PC-01)</label>
+                        <input type="text" id="asset-id" class="form-control form-control-sm text-uppercase" required>
+                    </div>
+                    <div class="mb-2">
+                        <label class="small fw-bold text-muted">Tipo</label>
+                        <select id="asset-type" class="form-select form-select-sm">
+                            <option value="pc">Computadora</option>
+                            <option value="sala">Sala de Estudio</option>
+                            <option value="mesa">Mesa de Trabajo</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="small fw-bold text-muted">Nombre Visible</label>
+                        <input type="text" id="asset-name" class="form-control form-control-sm" placeholder="Ej. PC Diseño 1" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-sm w-100">Crear Activo</button>
+                </form>
+            </div>
+            
+            <div id="asset-control-panel" class="card border-0 shadow-sm p-4 bg-light d-none">
+                <h6 class="fw-bold mb-2" id="ctrl-asset-name">--</h6>
+                <p class="small text-muted mb-3" id="ctrl-asset-status">Selecciona un activo</p>
+                
+                <label class="small fw-bold">Asignar tiempo:</label>
+                <div class="d-flex gap-2 mb-3">
+                    <button class="btn btn-white border btn-sm flex-fill" onclick="Biblio.quickUnlock(30)">30m</button>
+                    <button class="btn btn-white border btn-sm flex-fill" onclick="Biblio.quickUnlock(60)">1h</button>
+                    <button class="btn btn-white border btn-sm flex-fill" onclick="Biblio.quickUnlock(120)">2h</button>
+                </div>
+                <input type="text" id="ctrl-user-label" class="form-control form-control-sm mb-3" placeholder="Nombre/Matrícula (Opcional)">
+                
+                <div class="d-grid gap-2">
+                    <button class="btn btn-success btn-sm" id="btn-unlock-custom">Desbloquear</button>
+                    <button class="btn btn-danger btn-sm" id="btn-force-lock">Bloquear Ahora</button>
+                    <button class="btn btn-outline-danger btn-sm" id="btn-delete-asset">Eliminar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+        </div>
+      </section>
+
+      <section id="biblio-superadmin" class="d-none">
+
+        <div class="card border-0 shadow-sm rounded-4 mb-4 overflow-hidden text-white"
+          style="background: linear-gradient(135deg, #2563eb 0%, #1e3a8a 100%);">
+          <div class="card-body p-4 position-relative">
+            <div class="d-flex justify-content-between align-items-center position-relative z-1">
+              <div>
+                <div class="d-flex align-items-center gap-2 mb-1">
+                  <i class="bi bi-cpu-fill fs-4"></i>
+                  <h2 class="h4 fw-bold mb-0">BiBlop Control</h2>
+                </div>
+                <p class="mb-0 opacity-75 small">Monitor de acceso en tiempo real y telemetría de servicios.</p>
+              </div>
+              <div class="text-end">
+                <div class="badge bg-white bg-opacity-25 border border-white border-opacity-25 backdrop-blur mb-1">
+                  <span class="dot-indicator bg-success border border-white d-inline-block rounded-circle me-1"
+                    style="width:8px; height:8px;"></span>
+                  En línea
+                </div>
+                <div class="small opacity-75" id="biblop-last-update">Actualizando...</div>
+              </div>
+            </div>
+            <i class="bi bi-wifi position-absolute text-white opacity-10"
+              style="font-size: 8rem; right: -20px; bottom: -40px;"></i>
+          </div>
+        </div>
+
+        <div class="d-flex flex-wrap gap-3 align-items-center justify-content-between mb-4">
+          <div class="d-flex align-items-center gap-2">
+            <label class="small fw-bold text-muted">Rango:</label>
+            <select id="biblop-range" class="form-select form-select-sm rounded-pill shadow-sm border-0"
+              style="min-width: 150px;">
+              <option value="1h">Última hora</option>
+              <option value="6h">Últimas 6 horas</option>
+              <option value="24h" selected>Últimas 24 horas</option>
+              <option value="7d">Últimos 7 días</option>
+              <option value="30d">Últimos 30 días</option>
+            </select>
+          </div>
+          <button class="btn btn-sm btn-outline-primary rounded-pill" id="biblop-refresh-btn">
+            <i class="bi bi-arrow-clockwise me-1"></i> Actualizar
+          </button>
+        </div>
+
+        <div class="row g-3 mb-4">
+          <div class="col-md-3">
+            <div class="card border-0 shadow-sm h-100 p-3 border-start border-4 border-primary">
+              <div class="small text-muted fw-bold text-uppercase">Entradas</div>
+              <div class="h2 mb-0 fw-bold text-primary" id="biblop-kpi-entro">-</div>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="card border-0 shadow-sm h-100 p-3 border-start border-4 border-success">
+              <div class="small text-muted fw-bold text-uppercase">Salidas</div>
+              <div class="h2 mb-0 fw-bold text-success" id="biblop-kpi-salio">-</div>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="card border-0 shadow-sm h-100 p-3 border-start border-4 border-warning">
+              <div class="small text-muted fw-bold text-uppercase">Aforo Actual</div>
+              <div class="h2 mb-0 fw-bold text-dark" id="biblop-kpi-inside">-</div>
+              <small class="text-muted" style="font-size: 0.7rem;">Estimado</small>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="card border-0 shadow-sm h-100 p-3">
+              <div class="small text-muted fw-bold text-uppercase">Ratio E/S</div>
+              <div class="h2 mb-0 fw-bold text-secondary" id="biblop-kpi-ratio">-</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="row g-4 mb-4">
+          <div class="col-12">
+            <div class="card border-0 shadow-sm rounded-4">
+              <div class="card-header bg-white py-3 border-0 d-flex justify-content-between align-items-center">
+                <h6 class="fw-bold mb-0"><i class="bi bi-bar-chart-line-fill me-2 text-primary"></i>Flujo de Entradas y
+                  Salidas</h6>
+                <small class="text-muted">Comparativa por intervalo</small>
+              </div>
+              <div class="card-body">
+                <div style="height: 300px; position: relative; width: 100%;">
+                  <canvas id="chart-biblop-flow"></canvas>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-lg-6">
+            <div class="card border-0 shadow-sm rounded-4 h-100">
+              <div class="card-header bg-white py-3 border-0">
+                <h6 class="fw-bold mb-0"><i class="bi bi-activity me-2 text-warning"></i>Tendencia de Ocupación</h6>
+              </div>
+              <div class="card-body">
+                <div style="height: 250px; position: relative; width: 100%;">
+                  <canvas id="chart-biblop-occupancy"></canvas>
+                </div>
+                <div class="text-center mt-3 small text-muted">
+                  Estimación de aforo a lo largo del tiempo.
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-lg-6">
+            <div class="card border-0 shadow-sm rounded-4 h-100">
+              <div class="card-header bg-white py-3 border-0">
+                <h6 class="fw-bold mb-0"><i class="bi bi-pie-chart-fill me-2 text-info"></i>Distribución de Servicios
+                </h6>
+              </div>
+              <div class="card-body">
+                <div class="row align-items-center h-100">
+                  <div class="col-md-6">
+                    <div style="height: 200px; position: relative; width: 100%;">
+                      <canvas id="chart-biblop-services"></canvas>
+                    </div>
+                  </div>
+                  <div class="col-md-6">
+                    <ul class="list-group list-group-flush small" id="biblop-services-legend">
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card border-0 shadow-sm rounded-4 mb-5">
+          <div class="card-header bg-white py-3 border-0 d-flex justify-content-between align-items-center">
+            <h6 class="fw-bold mb-0">Bitácora del Dispositivo</h6>
+            <span class="badge bg-light text-dark">Últimos 12 eventos</span>
+          </div>
+          <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0 small">
+              <thead class="table-light">
+                <tr>
+                  <th>Hora</th>
+                  <th>Evento</th>
+                  <th>Servicio</th>
+                  <th>ID Credencial</th>
+                </tr>
+              </thead>
+              <tbody id="biblop-table-body">
+                <tr>
+                  <td colspan="4" class="text-center text-muted py-3">Cargando datos...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="d-flex justify-content-between align-items-center mb-3 mt-5">
+          <h4 class="h5 fw-bold text-muted">Gestión de Inventario</h4>
+        </div>
+        <div class="row g-3 mb-4">
+          <div class="col-md-4">
+            <div class="card border-0 shadow-sm p-3">
+              <div class="small text-muted fw-bold">INVENTARIO TOTAL</div>
+              <div class="h4 mb-0" id="biblio-sa-total">0</div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="card border-0 shadow-sm p-3">
+              <div class="small text-muted fw-bold">PRÉSTAMOS ACTIVOS</div>
+              <div class="h4 mb-0 text-warning" id="biblio-sa-activos">0</div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="card border-0 shadow-sm p-3">
+              <div class="small text-muted fw-bold">NO DEVUELTOS</div>
+              <div class="h4 mb-0 text-danger" id="biblio-sa-vencidos">0</div>
+            </div>
+          </div>
+        </div>
+        <div class="card border-0 shadow-sm rounded-4">
+          <div class="card-header bg-white py-3">
+            <h5 class="mb-0 fw-bold">Préstamos (Firebase)</h5>
+          </div>
+          <div class="card-body p-0">
+            <div id="biblio-sa-list" class="table-responsive scroll-container" style="max-height: 300px;"></div>
+          </div>
+        </div>
+
+      </section>
+    </div>
+
+    <div id="view-medi" class="app-view d-none">
+      <div id="medi-student">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+          <div>
+            <h2 class="h4 fw-bold text-primary mb-1">Mi Salud</h2>
+            <p class="text-muted mb-0 small">Gestiona tu bienestar y emergencias.</p>
+          </div>
+          <button class="btn btn-danger btn-sm rounded-pill shadow-sm heartbeat-anim" onclick="Medi.toggleSOS()">
+            <i class="bi bi-exclamation-circle-fill me-1"></i> SOS / Emergencia
+          </button>
+        </div>
+
+        <div class="row g-4">
+          <div class="col-lg-4">
+
+            <div class="card border-0 shadow-sm rounded-4 mb-4 overflow-hidden bg-white">
+              <div
+                class="card-header bg-danger text-white border-0 py-3 d-flex justify-content-between align-items-center">
+                <h6 class="mb-0 fw-bold"><i class="bi bi-postcard-heart-fill me-2"></i>Tarjeta de Emergencia</h6>
+                <button class="btn btn-sm btn-white text-danger py-0" style="font-size:0.7rem"
+                  onclick="Medi.editarTarjeta()">
+                  Editar
+                </button>
+              </div>
+              <div class="card-body position-relative">
+                <div id="medi-card-view">
+                  <div class="row g-2 text-center mb-3">
+                    <div class="col-6">
+                      <div class="p-2 bg-light rounded-3 border">
+                        <div class="extra-small text-muted text-uppercase fw-bold">Tipo Sangre</div>
+                        <div class="h4 mb-0 fw-bold text-dark" id="view-sangre">--</div>
+                      </div>
+                    </div>
+                    <div class="col-6">
+                      <div class="p-2 bg-light rounded-3 border">
+                        <div class="extra-small text-muted text-uppercase fw-bold">Alergias</div>
+                        <div class="small fw-semibold text-dark text-truncate" id="view-alergias">Ninguna</div>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="p-3 bg-danger-subtle text-danger rounded-3 border border-danger-subtle">
+                    <div class="extra-small text-uppercase fw-bold opacity-75">Contacto de Emergencia</div>
+                    <div class="fw-bold" id="view-contacto-nombre">--</div>
+                    <div class="small"><i class="bi bi-telephone-fill me-1"></i> <span id="view-contacto-tel">--</span>
+                    </div>
+                  </div>
+                </div>
+
+                <form id="medi-card-form" class="d-none">
+                  <div class="mb-2">
+                    <label class="form-label extra-small fw-bold">Tipo de Sangre</label>
+                    <select class="form-select form-select-sm" id="edit-sangre">
+                      <option value="">Seleccionar</option>
+                      <option value="A+">A+</option>
+                      <option value="A-">A-</option>
+                      <option value="B+">B+</option>
+                      <option value="B-">B-</option>
+                      <option value="AB+">AB+</option>
+                      <option value="AB-">AB-</option>
+                      <option value="O+">O+</option>
+                      <option value="O-">O-</option>
+                    </select>
+                  </div>
+                  <div class="mb-2">
+                    <label class="form-label extra-small fw-bold">Alergias (Medicamentos/Alimentos)</label>
+                    <input type="text" class="form-control form-control-sm" id="edit-alergias"
+                      placeholder="Ej. Penicilina, Nueces">
+                  </div>
+                  <div class="mb-2">
+                    <label class="form-label extra-small fw-bold">Nombre Contacto</label>
+                    <input type="text" class="form-control form-control-sm" id="edit-contacto-nombre">
+                  </div>
+                  <div class="mb-3">
+                    <label class="form-label extra-small fw-bold">Teléfono Contacto</label>
+                    <input type="tel" class="form-control form-control-sm" id="edit-contacto-tel">
+                  </div>
+                  <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-light btn-sm w-50"
+                      onclick="Medi.cancelarEdicionTarjeta()">Cancelar</button>
+                    <button type="submit" class="btn btn-primary btn-sm w-50">Guardar</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+
+            <div class="card border-0 shadow-sm rounded-4">
+              <div class="card-body p-4">
+                <div class="d-flex align-items-center gap-3 mb-4">
+                  <div class="bg-info-subtle text-info rounded-circle p-3"><i class="bi bi-calendar-plus fs-4"></i>
+                  </div>
+                  <h2 class="h5 mb-0 fw-bold">Agendar Cita</h2>
+                </div>
+                <form id="form-medi-nueva-cita">
+
+                  <div class="mb-3">
+                    <label class="form-label small fw-bold text-muted text-uppercase">1. Motivo de visita</label>
+                    <div class="input-group shadow-sm rounded-3 overflow-hidden">
+                      <span class="input-group-text bg-white border-end-0"><i
+                          class="bi bi-list-check text-primary"></i></span>
+                      <select id="medi-cita-categoria" class="form-select border-start-0 ps-0" required
+                        style="cursor: pointer;">
+                        <option value="" selected disabled>Selecciona una opción...</option>
+                        <option value="Malestar Físico">Me siento mal físicamente</option>
+                        <option value="Salud Mental">Apoyo emocional / Psicológico</option>
+                        <option value="Certificado">Trámite / Certificado</option>
+                        <option value="Consulta General">Consulta General</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div class="mb-3">
+                    <label class="form-label small fw-bold text-muted text-uppercase">2. Fecha deseada</label>
+                    <div class="input-group shadow-sm rounded-3 overflow-hidden">
+                      <span class="input-group-text bg-white border-end-0"><i
+                          class="bi bi-calendar-event text-primary"></i></span>
+                      <input type="date" id="medi-cita-fecha" class="form-control border-start-0 ps-0" required>
+                    </div>
+                  </div>
+
+                  <div class="mb-4">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                      <label class="form-label small fw-bold text-muted text-uppercase mb-0">3. Horario
+                        disponible</label>
+                      <div id="medi-cita-disponibilidad" class="badge bg-light text-secondary border">Selecciona fecha
+                      </div>
+                    </div>
+
+                    <div id="medi-time-grid" class="time-slot-grid p-2 bg-light rounded-3 border d-none">
+                    </div>
+
+                    <div id="medi-time-msg" class="text-center text-muted small py-3 border rounded-3 bg-light">
+                      <i class="bi bi-arrow-up-circle me-1"></i> Elige una fecha arriba.
+                    </div>
+
+                    <input type="hidden" id="medi-cita-hora" required>
+                  </div>
+
+                  <input type="hidden" id="medi-cita-tipo" value="Medico">
+
+                  <div class="form-floating mb-4">
+                    <textarea id="medi-cita-motivo" class="form-control shadow-sm"
+                      style="height: 80px; border-radius: 1rem;" placeholder="Detalles" required></textarea>
+                    <label class="text-muted">Describe brevemente tus síntomas...</label>
+                  </div>
+
+                  <button type="submit" class="btn btn-primary w-100 py-3 rounded-pill fw-bold shadow hover-scale">
+                    <i class="bi bi-check-circle-fill me-2"></i> Confirmar Cita
+                  </button>
+                </form>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-lg-8">
+            <div class="card border-0 shadow-sm rounded-4 mb-4">
+              <div class="card-header bg-surface border-0 pt-4 px-4 d-flex justify-content-between align-items-center">
+                <h5 class="fw-bold mb-0">Historial de Actividad</h5>
+                <ul class="nav nav-pills small" id="medi-stu-tabs" role="tablist">
+                  <li class="nav-item"><button class="nav-link active py-1 px-3 rounded-pill" data-bs-toggle="tab"
+                      data-bs-target="#tab-citas">Citas</button></li>
+                  <li class="nav-item"><button class="nav-link py-1 px-3 rounded-pill" data-bs-toggle="tab"
+                      data-bs-target="#tab-expediente">Expediente</button></li>
+                </ul>
+              </div>
+              <div class="card-body p-0">
+                <div class="tab-content">
+                  <div class="tab-pane fade show active" id="tab-citas">
+                    <div id="medi-stu-citas" class="table-responsive"></div>
+                  </div>
+                  <div class="tab-pane fade" id="tab-expediente">
+                    <div id="medi-stu-consultas" class="p-3"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <h5 class="mb-3 fw-bold text-primary"><i class="bi bi-stars me-2"></i>Tu Feed de Bienestar</h5>
+            <div id="medi-recos" class="row g-3"></div>
+          </div>
+        </div>
+
+        <div class="modal fade" id="modalSOS" tabindex="-1" aria-hidden="true">
+          <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 rounded-4 overflow-hidden">
+              <div class="modal-header bg-danger text-white border-0">
+                <h5 class="modal-title fw-bold"><i class="bi bi-shield-exclamation me-2"></i>Ayuda de Emergencia</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+              </div>
+              <div class="modal-body text-center p-4">
+                <p class="text-muted mb-4">Si estás en el campus y requieres asistencia inmediata:</p>
+
+                <div class="d-grid gap-3">
+                  <a href="tel:911" class="btn btn-outline-danger btn-lg fw-bold rounded-pill">
+                    <i class="bi bi-telephone-fill me-2"></i> Llamar al 911
+                  </a>
+                  <a href="tel:1234567890" class="btn btn-danger btn-lg fw-bold rounded-pill shadow">
+                    <i class="bi bi-hospital-fill me-2"></i> Enfermería Campus
+                  </a>
+                </div>
+
+                <div class="mt-4 p-3 bg-light rounded-3 text-start">
+                  <h6 class="fw-bold text-dark small mb-2">Ubicación Enfermería:</h6>
+                  <p class="mb-0 small text-muted"><i class="bi bi-geo-alt-fill me-1"></i> Edificio B, Planta Baja
+                    (Junto a cafetería).</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+
+      </div>
+    </div>
+
+    <section id="medi-admin" class="d-none">
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+          <h2 class="h4 fw-bold text-primary mb-1">Estación Médica</h2>
+          <p class="text-muted mb-0 small">
+            <span id="medi-pro-name" class="fw-bold">Doctor</span> •
+            <span id="medi-pro-esp" class="badge bg-info text-dark">General</span>
+          </p>
+        </div>
+        <div class="d-flex gap-2">
+          <button class="btn btn-outline-primary btn-sm" onclick="Medi.refreshAdmin()">
+            <i class="bi bi-arrow-clockwise"></i> Actualizar
+          </button>
+          <button class="btn btn-primary btn-sm shadow-sm" onclick="Medi.nuevaConsultaWalkIn()">
+            <i class="bi bi-plus-lg me-1"></i> Consulta Express
+          </button>
+        </div>
+      </div>
+
+      <ul class="nav nav-pills mb-4 gap-2" id="pills-tab" role="tablist">
+        <li class="nav-item" role="presentation">
+          <button class="nav-link active rounded-pill px-4" id="tab-muro-btn" data-bs-toggle="pill"
+            data-bs-target="#tab-muro" type="button">
+            <i class="bi bi-clipboard-data me-2"></i>Sala de Espera
+            <span class="badge bg-danger ms-2 rounded-pill" id="badge-sala-espera">0</span>
+          </button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link rounded-pill px-4" id="tab-agenda-btn" data-bs-toggle="pill"
+            data-bs-target="#tab-agenda" type="button">
+            <i class="bi bi-calendar-check me-2"></i>Mi Agenda
+          </button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link rounded-pill px-4" id="tab-pacientes-btn" data-bs-toggle="pill"
+            data-bs-target="#tab-pacientes" type="button">
+            <i class="bi bi-people me-2"></i>Pacientes
+          </button>
+        </li>
+      </ul>
+
+      <div class="tab-content" id="pills-tabContent">
+
+        <div class="tab-pane fade show active" id="tab-muro" role="tabpanel">
+          <div class="row g-4">
+            <div class="col-lg-8">
+              <div class="card border-0 shadow-sm rounded-4 h-100">
+                <div class="card-header bg-white border-0 pt-4 px-4">
+                  <h5 class="fw-bold mb-0">Solicitudes Entrantes</h5>
+                  <small class="text-muted">Pacientes esperando asignación</small>
+                </div>
+                <div class="card-body p-0">
+                  <div id="medi-muro-list" class="list-group list-group-flush p-3">
+                    <div class="text-center p-5 text-muted">Cargando sala de espera...</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="col-lg-4">
+              <div class="card border-0 shadow-sm rounded-4 bg-primary text-white mb-4">
+                <div class="card-body p-4">
+                  <h5 class="fw-bold"><i class="bi bi-lightning-charge-fill me-2"></i>Acción Rápida</h5>
+                  <p class="small opacity-75 mb-3">Si tienes un paciente enfrente sin cita, inicia aquí.</p>
+                  <button class="btn btn-white text-primary w-100 fw-bold rounded-pill"
+                    onclick="Medi.nuevaConsultaWalkIn()">
+                    Atender Ahora
+                  </button>
+                </div>
+              </div>
+              <div class="card border-0 shadow-sm rounded-4">
+                <div class="card-body">
+                  <h6 class="fw-bold small text-muted text-uppercase">Hoy</h6>
+                  <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span>Atendidos</span>
+                    <span class="fw-bold" id="kpi-atendidos-hoy">0</span>
+                  </div>
+                  <div class="d-flex justify-content-between align-items-center">
+                    <span>Pendientes</span>
+                    <span class="fw-bold text-warning" id="kpi-pendientes-hoy">0</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="tab-pane fade" id="tab-agenda" role="tabpanel">
+          <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-header bg-white border-0 pt-4 px-4 d-flex justify-content-between align-items-center">
+              <h5 class="fw-bold mb-0">Mis Citas Asignadas</h5>
+              <span class="badge bg-primary-subtle text-primary">Próximas 24h</span>
+            </div>
+            <div class="card-body p-0">
+              <div id="medi-agenda-list" class="table-responsive">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="tab-pane fade" id="tab-pacientes" role="tabpanel">
+          <div class="input-group mb-4 shadow-sm rounded-pill overflow-hidden border-0">
+            <span class="input-group-text bg-white border-0 ps-4"><i class="bi bi-search"></i></span>
+            <input type="text" class="form-control border-0 py-3" id="medi-search-paciente"
+              placeholder="Buscar por nombre, correo o matrícula...">
+          </div>
+          <div id="medi-pacientes-results"></div>
+        </div>
+
+      </div>
+    </section>
+
+    <div class="modal fade" id="modalConsultaSOAP" tabindex="-1" data-bs-backdrop="static" aria-hidden="true">
+      <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content rounded-4 border-0">
+          <div class="modal-header bg-primary text-white border-0">
+            <div>
+              <h5 class="modal-title fw-bold" id="soap-modal-title">Consulta Médica</h5>
+              <div class="small opacity-75" id="soap-patient-info">Cargando paciente...</div>
+            </div>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body bg-surface-muted p-0">
+            <div class="row g-0 h-100">
+              <div class="col-lg-4 border-end bg-white d-flex flex-column" style="max-height: 80vh;">
+                <div class="p-3 border-bottom bg-light">
+                  <h6 class="fw-bold mb-0 text-primary"><i class="bi bi-clock-history me-2"></i>Historial Clínico</h6>
+                </div>
+                <div id="soap-history-list" class="flex-grow-1 overflow-auto p-3">
+                </div>
+              </div>
+
+              <div class="col-lg-8 d-flex flex-column" style="max-height: 80vh; overflow-y: auto;">
+                <form id="form-soap" class="p-4">
+                  <input type="hidden" id="soap-cita-id">
+                  <input type="hidden" id="soap-student-id">
+                  <input type="hidden" id="soap-student-email">
+
+                  <div class="mb-4">
+                    <label class="small fw-bold text-muted text-uppercase mb-2">Subjetivo (Motivo de consulta)</label>
+                    <textarea class="form-control bg-white shadow-sm border-0" id="soap-s" rows="3"
+                      placeholder="¿Qué refiere el paciente?" required></textarea>
+                  </div>
+
+                  <div class="mb-4">
+                    <label class="small fw-bold text-muted text-uppercase mb-2">Objetivo (Signos Vitales)</label>
+                    <div class="card border-0 shadow-sm p-3 bg-white">
+                      <div class="row g-3">
+                        <div class="col-md-3">
+                          <label class="form-label small">Temp (°C)</label>
+                          <input type="number" step="0.1" class="form-control form-control-sm" id="soap-temp">
+                        </div>
+                        <div class="col-md-3">
+                          <label class="form-label small">Presión (mmHg)</label>
+                          <input type="text" class="form-control form-control-sm" id="soap-presion"
+                            placeholder="120/80">
+                        </div>
+                        <div class="col-md-3">
+                          <label class="form-label small">Peso (kg)</label>
+                          <input type="number" step="0.1" class="form-control form-control-sm" id="soap-peso">
+                        </div>
+                        <div class="col-md-3">
+                          <label class="form-label small">Talla (cm)</label>
+                          <input type="number" class="form-control form-control-sm" id="soap-talla">
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="mb-4">
+                    <label class="small fw-bold text-muted text-uppercase mb-2">Análisis (Diagnóstico)</label>
+                    <textarea class="form-control bg-white shadow-sm border-0" id="soap-a" rows="2"
+                      placeholder="Conclusión diagnóstica..."></textarea>
+                  </div>
+
+                  <div class="mb-4">
+                    <label class="small fw-bold text-muted text-uppercase mb-2">Plan (Indicaciones Generales)</label>
+                    <textarea class="form-control bg-white shadow-sm border-0" id="soap-p" rows="3"
+                      placeholder="Reposo, dieta, cuidados generales..."></textarea>
+                  </div>
+
+                  <div class="mb-4">
+                    <label class="small fw-bold text-muted text-uppercase mb-2 text-primary">
+                      <i class="bi bi-capsule me-1"></i>Medicamentos / Receta
+                    </label>
+                    <textarea class="form-control bg-white shadow-sm border-0" id="soap-meds" rows="4"
+                      placeholder="Ej: Paracetamol 500mg - 1 tableta cada 8 horas por 3 días..."></textarea>
+                    <div class="form-text small">Esto aparecerá en la receta PDF.</div>
+                  </div>
+
+
+                  <div class="form-check form-switch mb-4">
+                    <input class="form-check-input" type="checkbox" id="soap-visible" checked>
+                    <label class="form-check-label small" for="soap-visible">
+                      Hacer visible el Plan/Receta al paciente (en su app)
+                    </label>
+                  </div>
+
+                  <div class="d-grid">
+                    <button type="submit" class="btn btn-success btn-lg rounded-pill shadow">
+                      <i class="bi bi-save-fill me-2"></i> Guardar Consulta
+                    </button>
+                  </div>
+
+                </form>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Success Consulta -->
+    <div class="modal fade" id="modalConsultaSuccess" tabindex="-1" data-bs-backdrop="static">
+      <div class="modal-dialog modal-sm modal-dialog-centered">
+        <div class="modal-content rounded-4 border-0 shadow-lg">
+          <div class="modal-body text-center p-4">
+            <div class="mb-3 text-success">
+              <i class="bi bi-check-circle-fill display-1"></i>
+            </div>
+            <h5 class="fw-bold mb-3">¡Consulta Guardada!</h5>
+            <p class="small text-muted mb-4">La consulta se ha registrado correctamente.</p>
+
+            <div class="d-grid gap-2">
+              <button class="btn btn-primary rounded-pill" onclick="Medi.printReceta()">
+                <i class="bi bi-printer-fill me-2"></i>Imprimir Receta
+              </button>
+              <button class="btn btn-outline-primary rounded-pill" onclick="Medi.sendToPatient()">
+                <i class="bi bi-send-fill me-2"></i>Enviar a Paciente
+              </button>
+              <button class="btn btn-light rounded-pill text-muted" data-bs-dismiss="modal">
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Detalle Consulta (Estudiante) -->
+    <div class="modal fade" id="modalDetalleConsulta" tabindex="-1">
+      <div class="modal-dialog modal-lg">
+        <div class="modal-content rounded-4 border-0">
+          <div class="modal-header bg-light border-0">
+            <h5 class="modal-title fw-bold text-primary">Detalle de Consulta</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body p-4">
+            <div class="d-flex justify-content-between mb-4">
+              <div>
+                <div class="small text-muted text-uppercase">Fecha</div>
+                <div class="fw-bold" id="detail-date">--</div>
+              </div>
+              <div class="text-end">
+                <div class="small text-muted text-uppercase">Servicio</div>
+                <span class="badge bg-primary" id="detail-service">--</span>
+              </div>
+            </div>
+
+            <div class="mb-3">
+              <div class="small text-muted text-uppercase fw-bold">Diagnóstico</div>
+              <div class="p-3 bg-light rounded-3 mt-1" id="detail-diagnosis">--</div>
+            </div>
+
+            <div class="mb-3">
+              <div class="small text-muted text-uppercase fw-bold">Plan / Indicaciones</div>
+              <div class="p-3 bg-light rounded-3 mt-1" id="detail-plan">--</div>
+            </div>
+
+            <div id="detail-meds-container" class="d-none mb-4">
+              <div class="small text-muted text-uppercase fw-bold text-primary">
+                <i class="bi bi-capsule me-1"></i>Medicamentos Recetados
+              </div>
+              <div class="p-3 bg-primary-subtle text-primary-emphasis rounded-3 mt-1 border border-primary-subtle"
+                id="detail-meds">
+                --
+              </div>
+            </div>
+
+            <hr>
+
+            <div class="d-flex justify-content-end gap-2">
+              <button type="button" class="btn btn-light border" data-bs-dismiss="modal">Cerrar</button>
+              <button type="button" class="btn btn-primary shadow-sm d-none" id="btn-download-receta">
+                <i class="bi bi-file-earmark-pdf-fill me-2"></i>Descargar Receta
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <section id="medi-superadmin" class="d-none">
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="h4 fw-bold text-primary mb-0">Supervisión Médica</h2>
+        <span class="badge bg-info text-dark">Vista Global</span>
+      </div>
+
+      <div class="row g-3 mb-4">
+        <div class="col-md-6">
+          <div class="card border-0 shadow-sm p-3 border-start border-4 border-info">
+            <div class="small text-muted fw-bold">CONSULTAS MÉDICAS (MES)</div>
+            <div class="h3 mb-0" id="medi-sa-medico">0</div>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="card border-0 shadow-sm p-3 border-start border-4 border-primary">
+            <div class="small text-muted fw-bold">ATENCIÓN PSICOLÓGICA (MES)</div>
+            <div class="h3 mb-0" id="medi-sa-psico">0</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card border-0 shadow-sm rounded-4">
+        <div class="card-header bg-white py-3 d-flex justify-content-between">
+          <h5 class="mb-0 fw-bold">Bitácora de Atención</h5>
+          <small class="text-muted">Últimos 50 registros</small>
+        </div>
+        <div class="card-body p-0">
+          <div id="medi-sa-list" class="table-responsive scroll-container" style="max-height: 500px;">
+          </div>
+        </div>
+      </div>
+    </section>
+    </div>
+
+    <section id="view-aula" class="app-view d-none container-fluid px-0">
+
+
+      <div class="row g-4">
+        <div id="aula-student" class="col-12">
+          <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-end mb-4 gap-3">
+            <div>
+              <h1 class="h3 fw-bold text-primary mb-1">Aula Virtual</h1>
+              <p class="text-muted mb-0">Gestiona tu aprendizaje y certificaciones.</p>
+            </div>
+
+            <div id="aula-stats-bar" class="d-flex gap-3 overflow-auto pb-2 pb-md-0">
+            </div>
+          </div>
+
+          <div id="aula-student-hero" class="d-none"></div>
+          <div class="row g-3 mb-4 align-items-center fade-up-entry delay-1">
+            <div class="col-md-6 col-lg-5">
+              <div class="input-group shadow-sm rounded-pill bg-white overflow-hidden border-0">
+                <span class="input-group-text bg-white border-0 ps-3 text-muted"><i class="bi bi-search"></i></span>
+                <input type="text" id="aula-search-input" class="form-control border-0 py-2 shadow-none"
+                  placeholder="Buscar cursos por título..." autocomplete="off">
+              </div>
+            </div>
+            <div class="col-6 col-md-3 col-lg-2">
+              <select class="form-select rounded-pill border-0 shadow-sm py-2 text-muted small fw-bold"
+                id="aula-filter-level" style="cursor: pointer;">
+                <option value="all">Nivel: Todos</option>
+                <option value="Básico">Básico</option>
+                <option value="Intermedio">Intermedio</option>
+                <option value="Avanzado">Avanzado</option>
+              </select>
+            </div>
+            <div class="col-auto ms-auto d-none d-md-block">
+              <span class="text-muted small" id="aula-result-count">Mostrando todo</span>
+            </div>
+          </div>
+          <div id="aula-student-home" class="d-flex flex-column gap-5">
+
+            <section id="aula-student-recommended">
+              <div class="d-flex align-items-center mb-3">
+                <div class="bg-primary-subtle text-primary rounded-circle p-2 me-2"><i class="bi bi-stars"></i></div>
+                <h2 class="h5 fw-bold mb-0">Recomendados para ti</h2>
+                <br>
+                <br>
+                <br>
+              </div>
+              <div class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-4" data-role="course-grid"></div>
+              <div class="alert alert-light border-0 shadow-sm d-none" data-role="empty-msg">
+                <i class="bi bi-info-circle me-2"></i>No hay nuevos cursos recomendados por el momento.
+              </div>
+            </section>
+
+            <section id="aula-student-inprogress" class="d-none">
+              <div class="d-flex align-items-center mb-3">
+                <div class="bg-info-subtle text-info rounded-circle p-2 me-2"><i class="bi bi-play-fill"></i></div>
+                <h2 class="h5 fw-bold mb-0">Otros cursos en curso</h2>
+              </div>
+              <div class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-4" data-role="course-grid"></div>
+            </section>
+
+            <section id="aula-student-completed">
+              <div class="d-flex align-items-center mb-3">
+                <div class="bg-success-subtle text-success rounded-circle p-2 me-2"><i class="bi bi-award-fill"></i>
+                </div>
+                <h2 class="h5 fw-bold mb-0">Tu Historial</h2>
+              </div>
+              <div class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-4" data-role="course-grid"></div>
+              <div class="text-muted small mt-2 d-none" data-role="empty-msg">
+                Completa tu primer curso para verlo aquí.
+              </div>
+            </section>
+          </div>
+
+          <div id="aula-student-home" class="d-flex flex-column gap-4">
+            <section id="aula-student-recommended">
+              <div class="d-flex justify-content-between align-items-baseline mb-2">
+                <div>
+                  <h2 class="h5 mb-0">Cursos recomendados</h2>
+                  <p class="text-muted small mb-0">Explora nuevos cursos disponibles para ti.</p>
+                </div>
+              </div>
+              <div class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-3" data-role="course-grid"></div>
+              <p class="text-muted small mt-2 d-none" data-role="empty-msg">Por ahora no hay cursos recomendados.
+                Cuando se publique alguno nuevo aparecerá aquí.</p>
+            </section>
+
+            <section id="aula-student-inprogress">
+              <div class="d-flex justify-content-between align-items-baseline mb-2">
+                <div>
+                  <h2 class="h5 mb-0">En progreso</h2>
+                  <p class="text-muted small mb-0">Continúa donde te quedaste en tus cursos activos.</p>
+                </div>
+              </div>
+              <div class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-3" data-role="course-grid"></div>
+              <p class="text-muted small mt-2 d-none" data-role="empty-msg">Todavía no tienes cursos en progreso.
+                Inscríbete en alguno para empezar.</p>
+            </section>
+
+            <section id="aula-student-completed">
+              <div class="d-flex justify-content-between align-items-baseline mb-2">
+                <div>
+                  <h2 class="h5 mb-0">Completados</h2>
+                  <p class="text-muted small mb-0">Consulta los cursos terminados y tus constancias.</p>
+                </div>
+              </div>
+              <div class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-3" data-role="course-grid"></div>
+              <p class="text-muted small mt-2 d-none" data-role="empty-msg">Aún no has completado ningún curso. Cuando
+                termines uno se mostrará aquí.</p>
+            </section>
+          </div>
+
+        </div>
+        <div id="aula-admin" class="col-12 d-none">
+
+          <div class="row g-3 mb-4">
+            <div class="col-12">
+              <div class="d-flex justify-content-between align-items-center mb-3" id="aula-admin-toolbar">
+                <h5 class="mb-0 fw-bold">Mi Centro de Mando</h5>
+
+              </div>
+              <div class="d-flex gap-2">
+                <button type="button" class="btn btn-outline-secondary btn-sm" id="btn-quick-aviso">
+                  <i class="bi bi-megaphone-fill me-1"></i> Publicar aviso
+                </button>
+                <button type="button" class="btn btn-primary btn-sm" id="btn-quick-create-course">
+                  <i class="bi bi-plus-lg me-1"></i> Crear curso
+                </button>
+              </div>
+
+            </div>
+            <div class="col-md-4">
+              <div class="card border-0 shadow-sm rounded-4 h-100">
+                <div class="card-body p-4">
+                  <div class="d-flex justify-content-between align-items-start mb-2">
+                    <div class="bg-primary-subtle text-primary p-3 rounded-3"><i class="bi bi-people-fill fs-4"></i>
+                    </div>
+                    <span class="badge bg-light text-dark border shadow-sm">Total</span>
+                  </div>
+                  <h3 class="display-5 fw-bold mb-1" id="kpi-total-alumnos">...</h3>
+                  <div class="text-muted small text-truncate">Alumnos Activos (en mis cursos)</div>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="card border-0 shadow-sm rounded-4 h-100">
+                <div class="card-body p-4">
+                  <div class="d-flex justify-content-between align-items-start mb-2">
+                    <div class="bg-success-subtle text-success p-3 rounded-3"><i class="bi bi-check-all fs-4"></i>
+                    </div>
+                    <span class="badge bg-light text-dark border shadow-sm">Promedio</span>
+                  </div>
+                  <h3 class="display-5 fw-bold mb-1" id="kpi-tasa-finalizacion">...</h3>
+                  <div class="text-muted small text-truncate">Tasa de Finalización</div>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="card border-0 shadow-sm rounded-4 h-100">
+                <div class="card-body p-4">
+                  <div class="d-flex justify-content-between align-items-start mb-2">
+                    <div class="bg-warning-subtle text-warning p-3 rounded-3"><i class="bi bi-star-half fs-4"></i>
+                    </div>
+                    <span class="badge bg-light text-dark border shadow-sm">Promedio</span>
+                  </div>
+                  <h3 class="display-5 fw-bold mb-1" id="kpi-promedio-general">...</h3>
+                  <div class="text-muted small text-truncate">Calificación General (Quizzes)</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="row g-4">
+
+            <div class="col-lg-8">
+              <div class="card border-0 shadow-sm rounded-4 mb-4">
+                <div class="card-header bg-surface border-0 pt-4 px-4 d-flex justify-content-between">
+                  <h5 class="fw-bold mb-0">Actividad Reciente</h5>
+                  <i class="bi bi-bell-fill text-muted"></i>
+                </div>
+                <div class="card-body p-0">
+                  <div id="aula-admin-feed" class="list-group list-group-flush scroll-container"
+                    style="max-height: 350px;">
+                    <div class="list-group-item text-center p-5">
+                      <div class="spinner-border spinner-border-sm text-primary"></div>
+                      <div class="text-muted small mt-2">Cargando actividad...</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="card border-0 shadow-sm rounded-4">
+                <div class="card-header bg-surface border-0 pt-4 px-4">
+                  <h5 class="fw-bold mb-0">Mis Cursos Publicados</h5>
+                </div>
+                <div class="card-body">
+                  <div id="aula-adm-cursos">
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="col-lg-4">
+              <div class="card border-0 shadow-sm rounded-4 mb-4">
+                <div class="card-header bg-surface border-0 pt-4 px-4">
+                  <h5 class="fw-bold mb-0">Accesos Rápidos</h5>
+                </div>
+                <div class="card-body vstack gap-2">
+                  <button class="btn btn-primary btn-lg w-100" id="btn-quick-create-course">
+                    <i class="bi bi-plus-circle-fill me-2"></i>Crear Curso Nuevo
+                  </button>
+                  <button class="btn btn-outline-secondary w-100" id="btn-quick-aviso">
+                    <i class="bi bi-broadcast me-2"></i>Publicar Aviso
+                  </button>
+                </div>
+              </div>
+
+              <div class="card border-0 shadow-sm rounded-4 bg-surface-muted">
+                <div class="card-header bg-surface-muted border-0 pt-4 px-4">
+                  <h5 class="fw-bold mb-0 text-primary"><i class="bi bi-file-earmark-spreadsheet me-2"></i>Reportería
+                  </h5>
+                </div>
+                <div class="card-body">
+                  <form id="aula-admin-report-form">
+                    <div class="mb-3">
+                      <label class="form-label small fw-bold">1. Selecciona un Reporte</label>
+                      <select id="report-type-select" class="form-select" required>
+                        <option value="" selected disabled>Elegir tipo...</option>
+                        <option value="general_alumnos">General de Alumnos</option>
+                        <option value="calificaciones_curso">Calificaciones por Curso</option>
+                      </select>
+                    </div>
+                    <div class="mb-3 d-none" id="report-curso-select-group">
+                      <label class="form-label small fw-bold">2. Elige el Curso</label>
+                      <select id="report-curso-select" class="form-select">
+                      </select>
+                    </div>
+                    <button type="submit" class="btn btn-success w-100">
+                      <i class="bi bi-download me-1"></i> Generar y Descargar (CSV)
+                    </button>
+                  </form>
+                </div>
+              </div>
+
+              <div class="card border-0 shadow-sm rounded-4 mt-4">
+                <div class="card-header bg-surface pt-4 px-4">
+                  <h5 class="fw-bold mb-0">Gestión de Avisos</h5>
+                </div>
+                <div class="card-body">
+                  <form id="aula-adm-avisos-form" class="d-flex gap-2 mb-3">
+                    <input type="text" id="aula-adm-aviso-input" class="form-control" placeholder="Escribe un aviso..."
+                      required>
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-send"></i></button>
+                  </form>
+                  <div id="aula-adm-avisos-list" class="list-group list-group-flush scroll-container"
+                    style="max-height: 150px;">
+                    <div class="text-muted small p-2">Cargando...</div>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+        <div id="aula-superadmin" class="col-12 d-none">
+          <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+              <h2 class="h4 fw-bold text-primary mb-1">Auditoría Académica</h2>
+              <p class="text-muted mb-0">Supervisión de cursos e instructores.</p>
+            </div>
+            <button class="btn btn-outline-primary btn-sm"
+              onclick="Aula.downloadCSV(window._saAulaData, 'reporte_cursos_global.csv')">
+              <i class="bi bi-download me-2"></i>Exportar Todo
+            </button>
+          </div>
+
+          <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-body p-0">
+              <div id="aula-sa-list" class="table-responsive">
+                <p class="text-center p-5 text-muted">Consultando cursos...</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="view-aula-course" class="app-view d-none container my-4">
+      <div class="d-flex align-items-center mb-3 gap-3">
+        <button class="btn btn-light border shadow-sm rounded-circle" id="aula-course-back"><i
+            class="bi bi-arrow-left"></i></button>
+        <h4 id="aula-course-title" class="mb-0 fw-bold text-primary">Cargando...</h4>
+      </div>
+      <p id="aula-course-desc" class="text-muted small mb-1"></p>
+      <p id="aula-course-meta" class="text-muted small mb-3"></p>
+
+      <div class="row g-4">
+        <aside class="col-lg-4 order-2 order-lg-1">
+          <div class="card border-0 shadow-sm rounded-4 mb-3">
+            <div class="card-header bg-surface fw-bold">Temario</div>
+            <div id="aula-course-lessons" class="list-group list-group-flush scroll-container"
+              style="max-height: 400px;"></div>
+          </div>
+          <div class="card border-0 shadow-sm rounded-4 p-3">
+            <label class="small fw-bold text-muted mb-1">Tu Progreso</label>
+            <div class="progress" style="height: 8px;">
+              <div id="aula-course-progress" class="progress-bar bg-aula" style="width:0%"></div>
+            </div>
+            <div class="d-flex justify-content-between align-items-center mt-2">
+              <span id="aula-course-progress-label" class="small text-muted">0% completado</span>
+            </div>
+            <button class="btn btn-outline-primary w-100 mt-3" id="aula-course-resume" disabled>
+              Reanudar última lección
+            </button>
+            <button class="btn btn-primary w-100 mt-2" id="aula-course-open-quiz" disabled>
+              Realizar Evaluación Final
+            </button>
+          </div>
+
+        </aside>
+        <main class="col-lg-8 order-1 order-lg-2">
+          <div class="card border-0 shadow-sm rounded-4" style="min-height: 500px;">
+            <div class="card-body p-4 p-lg-5" id="aula-lesson-container">
+              <div class="text-center text-muted mt-5">Selecciona una lección para comenzar.</div>
+            </div>
+            <div class="card-footer bg-surface border-top p-3 d-flex justify-content-between">
+              <button class="btn btn-outline-secondary" id="aula-lesson-prev">Anterior</button>
+              <div class="d-flex gap-2">
+                <button class="btn btn-success text-white" id="aula-lesson-complete"><i class="bi bi-check2"></i>
+                  Completar</button>
+                <button class="btn btn-primary" id="aula-lesson-next">Siguiente</button>
+              </div>
+            </div>
+          </div>
+        </main>
+      </div>
+    </section>
+
+  </main>
+  </div>
+
+  <!-- NUEVA VISTA: Verificación de constancias -->
+  <div id="verify-shell" class="d-none">
+    <main class="min-vh-100 d-flex align-items-center bg-surface-muted py-5">
+      <div class="container">
+        <div class="row justify-content-center">
+          <div class="col-lg-8">
+            <div class="card border-0 shadow-sm rounded-4">
+              <div class="card-body p-4 p-md-5">
+
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                  <div>
+                    <h1 class="h5 fw-bold text-primary mb-1">
+                      <i class="bi bi-shield-check me-2"></i>
+                      Verificación de Constancia
+                    </h1>
+                    <p class="small text-muted mb-0">
+                      Validación electrónica emitida por SIA — TecNM Campus Los Cabos.
+                    </p>
+                  </div>
+                  <span id="verify-badge" class="badge bg-secondary-subtle text-secondary">
+                    Pendiente
+                  </span>
+                </div>
+
+                <!-- Estado: cargando -->
+                <div id="verify-loading" class="text-center py-5">
+                  <div class="spinner-border text-primary mb-3"></div>
+                  <div class="small text-muted">Consultando información...</div>
+                </div>
+
+                <!-- Estado: constancia válida -->
+                <div id="verify-ok" class="d-none"></div>
+
+                <!-- Estado: error / no encontrada -->
+                <div id="verify-error" class="d-none"></div>
+
+                <div class="mt-4 d-flex justify-content-between align-items-center small text-muted">
+                  <span>© 2025 Sistema de Integración Académico (SIA)</span>
+                  <a href="/" class="text-decoration-none" id="verify-back-link">
+                    Volver al inicio
+                  </a>
+                </div>
+
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <div class="modal fade" id="modal-consulta" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+      <div class="modal-content rounded-4 border-0">
+        <div class="modal-header border-0">
+          <h5 class="modal-title fw-bold">Detalle</h5><button type="button" class="btn-close"
+            data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body bg-surface-muted">
+          <div id="modal-consulta-body" class="bg-surface p-3 rounded shadow-sm"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- Modal Aula: Crear / editar curso -->
+  <div class="modal fade" id="modalAulaCourse" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+      <div class="modal-content rounded-4 border-0">
+        <div class="modal-header border-0">
+          <h5 class="modal-title fw-bold" id="aula-course-modal-title">
+            <i class="bi bi-journal-plus me-2"></i> Crear curso
+          </h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+        </div>
+
+        <form id="aula-course-form">
+          <input type="hidden" id="aula-course-id">
+
+          <div class="modal-body">
+            <div class="mb-3">
+              <label class="form-label small fw-semibold">Título del curso</label>
+              <input type="text" id="aula-course-title" class="form-control" placeholder="Ej. Inducción a SIA" required>
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label small fw-semibold">Descripción breve</label>
+              <textarea id="aula-course-desc" class="form-control" rows="3"
+                placeholder="Describe brevemente el objetivo del curso..."></textarea>
+            </div>
+
+            <div class="row g-3">
+              <div class="col-md-4">
+                <label class="form-label small fw-semibold">Duración estimada (horas)</label>
+                <input type="number" id="aula-course-hours" class="form-control" min="1" step="1" value="1" required>
+              </div>
+              <!-- Público objetivo -->
+              <div class="mb-3">
+                <label class="form-label fw-bold">Público objetivo</label>
+
+                <div id="course-publico-group" class="d-flex flex-wrap gap-2">
+                  <div class="form-check form-check-inline">
+                    <input class="form-check-input course-publico-chk" type="checkbox" id="course-publico-all"
+                      value="todos" checked>
+                    <label class="form-check-label" for="course-publico-all">Todos</label>
+                  </div>
+
+                  <div class="form-check form-check-inline">
+                    <input class="form-check-input course-publico-chk" type="checkbox" id="course-publico-stu"
+                      value="estudiantes">
+                    <label class="form-check-label" for="course-publico-stu">Estudiantes</label>
+                  </div>
+
+                  <div class="form-check form-check-inline">
+                    <input class="form-check-input course-publico-chk" type="checkbox" id="course-publico-doc"
+                      value="docentes">
+                    <label class="form-check-label" for="course-publico-doc">Docentes</label>
+                  </div>
+                </div>
+
+                <div class="form-text">
+                  Puedes marcar una o varias opciones.
+                  Si eliges más de una, el curso se tratará como <strong>"Todos"</strong>.
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          <div class="modal-footer border-0">
+            <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+            <button type="submit" class="btn btn-primary">
+              <i class="bi bi-check-lg me-1"></i> Guardar curso
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal fade" id="modalAulaContent" tabindex="-1">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+      <div class="modal-content rounded-4">
+        <div class="modal-header bg-primary text-white">
+          <h5 class="modal-title">Editor de Contenido</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="row">
+            <div class="col-lg-4 border-end">
+              <label class="form-label fw-bold">Curso Seleccionado</label>
+              <select id="ac-curso-select" class="form-select mb-3"></select>
+              <div class="nav flex-column nav-pills me-3" role="tablist">
+                <button class="nav-link active text-start" data-bs-toggle="pill" data-bs-target="#ac-tab-lec"><i
+                    class="bi bi-file-text me-2"></i>Lecciones</button>
+                <button class="nav-link text-start" data-bs-toggle="pill" data-bs-target="#ac-tab-quiz"><i
+                    class="bi bi-check2-square me-2"></i>Quiz (Evaluación)</button>
+              </div>
+            </div>
+            <div class="col-lg-8">
+              <div class="tab-content p-3">
+                <div class="tab-pane fade show active" id="ac-tab-lec">
+                  <form id="ac-lesson-form">
+                    <input type="hidden" id="ac-lesson-id">
+                    <div class="row g-2 mb-2">
+                      <div class="col-9"><input id="ac-lesson-title" class="form-control fw-bold"
+                          placeholder="Título de la lección" required></div>
+                      <div class="col-3"><input type="number" id="ac-lesson-order" class="form-control"
+                          placeholder="Orden" value="1"></div>
+                    </div>
+                    <textarea id="ac-lesson-text" class="form-control mb-2" rows="6"
+                      placeholder="Contenido HTML o Texto..."></textarea>
+                    <input type="url" id="ac-lesson-resource" class="form-control mb-3"
+                      placeholder="URL Recurso (Youtube/Drive)">
+                    <div class="d-flex justify-content-between">
+                      <button type="button" class="btn btn-light btn-sm text-danger d-none"
+                        id="ac-btn-cancel-edit">Cancelar</button>
+                      <button type="button" class="btn btn-success" id="ac-save-lesson">Guardar Lección</button>
+                    </div>
+                  </form>
+                  <hr>
+                  <div id="ac-lessons-list" class="list-group list-group-flush scroll-container"
+                    style="max-height: 250px;"></div>
+                </div>
+                <div class="tab-pane fade" id="ac-tab-quiz">
+                  <form id="ac-quiz-form">
+                    <input type="hidden" id="ac-quiz-id">
+
+                    <div class="row g-2 mb-3">
+                      <div class="col-md-12">
+                        <label class="form-label small fw-bold">Título de la Evaluación</label>
+                        <input id="ac-quiz-title" class="form-control" placeholder="Ej: Examen Final" required>
+                      </div>
+                    </div>
+
+                    <div class="p-3 bg-light rounded-3 border mb-3">
+                      <h6 class="small fw-bold text-muted text-uppercase mb-3"><i class="bi bi-sliders me-1"></i>Reglas
+                        de la Prueba</h6>
+                      <div class="row g-2">
+                        <div class="col-4">
+                          <label class="form-label small">Mínimo (%)</label>
+                          <input type="number" id="ac-quiz-min" class="form-control form-control-sm" value="70" min="1"
+                            max="100">
+                        </div>
+                        <div class="col-4">
+                          <label class="form-label small">Tiempo (min)</label>
+                          <input type="number" id="ac-quiz-time" class="form-control form-control-sm" value="20" min="1"
+                            placeholder="Sin límite">
+                          <div class="form-text" style="font-size: 10px;">0 = Infinito</div>
+                        </div>
+                        <div class="col-4">
+                          <label class="form-label small">Intentos</label>
+                          <input type="number" id="ac-quiz-tries" class="form-control form-control-sm" value="3"
+                            min="1">
+                        </div>
+                      </div>
+                    </div>
+
+                    <label class="form-label small fw-bold">Preguntas</label>
+                    <div id="ac-quiz-items" class="vstack gap-2 mb-3"></div>
+
+                    <button type="button" class="btn btn-sm btn-outline-primary mb-3 w-100 border-dashed"
+                      id="ac-quiz-add">
+                      <i class="bi bi-plus-circle me-1"></i>Agregar Pregunta
+                    </button>
+
+                    <div class="d-flex justify-content-end gap-2 pt-2 border-top">
+                      <button type="button" class="btn btn-light btn-sm d-none" id="ac-btn-cancel-quiz">Cancelar
+                        Edición</button>
+                      <button type="button" class="btn btn-primary" id="ac-save-quiz">Guardar Configuración</button>
+                    </div>
+                  </form>
+                  <hr>
+                  <div id="ac-quizzes-list" class="list-group"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal fade" id="aulaQuizModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content border-0 shadow">
+        <div class="modal-header bg-light">
+          <h5 class="modal-title" id="aula-quiz-title">Evaluación</h5><button type="button" class="btn-close"
+            data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body" id="aula-quiz-body"></div>
+        <div class="modal-footer"><button class="btn btn-primary w-100" id="aula-quiz-submit">Enviar Respuestas</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+
+  <div class="modal fade" id="modalAulaStudents" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Gestión de Estudiantes</h5><button class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <h6 id="aula-students-course-title" class="text-muted mb-3"></h6>
+          <div id="aula-students-loading" class="text-center">
+            <div class="spinner-border text-primary"></div>
+          </div>
+          <div id="aula-students-empty" class="d-none text-center text-muted">Sin alumnos.</div>
+          <table id="aula-students-table" class="table table-hover d-none">
+            <tbody id="aula-students-list"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Aula Admin: Publicar aviso -->
+  <div class="modal fade" id="modalAulaAdmAviso" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-md modal-dialog-centered">
+      <div class="modal-content rounded-4">
+        <div class="modal-header border-0">
+          <h5 class="modal-title fw-bold">
+            <i class="bi bi-megaphone-fill me-2 text-primary"></i>
+            Publicar aviso de Aula
+          </h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+        </div>
+        <form id="aula-adm-aviso-modal-form">
+          <div class="modal-body pt-0">
+            <div class="mb-3">
+              <label for="adm-aviso-text" class="form-label small fw-semibold">Mensaje</label>
+              <textarea id="adm-aviso-text" class="form-control" rows="3"
+                placeholder="Escribe el aviso que verán los estudiantes y docentes de Aula..." required></textarea>
+            </div>
+
+            <div class="row g-3">
+              <div class="col-md-6">
+                <label for="adm-aviso-tipo" class="form-label small fw-semibold">Tipo de aviso</label>
+                <select id="adm-aviso-tipo" class="form-select form-select-sm">
+                  <option value="urgente">Urgente</option>
+                  <option value="aviso" selected>Aviso</option>
+                  <option value="recomendacion">Recomendación</option>
+                </select>
+              </div>
+              <div class="col-md-6">
+                <label for="adm-aviso-duracion" class="form-label small fw-semibold">Duración</label>
+                <select id="adm-aviso-duracion" class="form-select form-select-sm">
+                  <option value="0">Hasta nuevo aviso</option>
+                  <option value="60">1 hora</option>
+                  <option value="180">3 horas</option>
+                  <option value="1440" selected>1 día</option>
+                  <option value="4320">3 días</option>
+                  <option value="10080">1 semana</option>
+                </select>
+              </div>
+            </div>
+
+            <p class="small text-muted mt-3 mb-0">
+              Los avisos urgentes aparecerán primero en el banner de Novedades. La duración controla hasta cuándo se
+              mostrará el aviso.
+            </p>
+          </div>
+          <div class="modal-footer border-0">
+            <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+            <button type="submit" class="btn btn-primary">
+              <i class="bi bi-send-fill me-1"></i> Publicar
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Aula: listado completo de avisos -->
+  <div class="modal fade" id="modalAulaAvisos" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+      <div class="modal-content rounded-4">
+        <div class="modal-header border-0">
+          <h5 class="modal-title fw-bold">Novedades y avisos de Aula</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+        </div>
+        <div class="modal-body pt-0">
+          <p class="text-muted small mb-3">
+            Aquí verás los avisos activos ordenados por prioridad y fecha. Los avisos urgentes aparecen primero.
+          </p>
+          <ul class="list-group list-group-flush" id="aula-avisos-modal-list"></ul>
+          <div id="aula-avisos-modal-empty" class="text-center text-muted small py-4 d-none">
+            <i class="bi bi-bell-slash mb-2 d-block fs-3"></i>
+            No hay avisos activos por el momento.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast-container position-fixed top-0 start-50 translate-middle-x p-3" id="toast-container"
+    style="z-index: 2000;"></div>
+
+
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <!-- jsPDF for Prescriptions -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+  <script src="/services/firebase.js"></script>
+  <script src="/utils/pdf-generator.js"></script>
+
+
+  <script src="/services/notify.js"></script>
+  <script src="/utils/ui.js"></script>
+
+  <script src="/services/aula.service.js"></script>
+
+  <script src="/modules/aula.content.js"></script>
+  <script src="/services/medi-service.js"></script>
+  <script src="/modules/medi.js"></script>
+
+  <script src="/services/biblio-service.js"></script>
+  <script src="/services/biblio-assets-service.js"></script>
+  <script src="/modules/biblio.js"></script>
+
+  <script src="/modules/aula.js"></script>
+
+  <!-- FAB: crear curso Aula -->
+  <button type="button" id="aula-add-course-fab" class="btn btn-primary rounded-circle shadow position-fixed d-none"
+    style="bottom: 1.5rem; right: 1.5rem; z-index: 1080;">
+    <i class="bi bi-plus-lg"></i>
+  </button>
+
+  <script src="/app.js?v=3"></script>
+
+
+
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      // Esperar a que SIA esté listo
+      const checkInterval = setInterval(() => {
+        if (window.SIA && window.SIA.auth && window.SIA.db) {
+          clearInterval(checkInterval);
+          startNotifSystem();
+        }
+      }, 200);
+
+      function startNotifSystem() {
+        window.SIA.auth.onAuthStateChanged(user => {
+          if (!user) return;
+
+          console.log("🚀 [Sistema Notif] Activo v2.1 para:", user.uid);
+          const listEl = document.getElementById('nav-notif-list');
+          const badgeEl = document.getElementById('nav-notif-badge');
+          const btnMarkAll = document.getElementById('btn-notif-mark-all');
+          const btnBell = document.getElementById('btn-notif-dropdown');
+
+          const notifRef = window.SIA.db.collection('usuarios').doc(user.uid).collection('notificaciones');
+
+          // 1. Listener
+          notifRef.onSnapshot(snapshot => {
+            const notifs = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+
+            // Ordenar: Más recientes primero
+            notifs.sort((a, b) => {
+              const da = a.createdAt ? a.createdAt.toDate() : new Date();
+              const db = b.createdAt ? b.createdAt.toDate() : new Date();
+              return db - da;
+            });
+
+            const unread = notifs.filter(n => !n.leido).length;
+
+            // Badge
+            if (badgeEl) {
+              badgeEl.textContent = unread > 99 ? '99+' : unread;
+              badgeEl.classList.toggle('d-none', unread === 0);
+            }
+
+            // Render Lista
+            if (listEl) {
+              if (notifs.length === 0) {
+                listEl.innerHTML = `
+                     <li class="text-center p-4 text-muted small">
+                       <i class="bi bi-bell-slash mb-2 d-block fs-5 opacity-50"></i>
+                       Sin notificaciones.
+                     </li>`;
+              } else {
+                listEl.innerHTML = notifs.map(n => {
+                  const bg = n.leido ? 'bg-white' : 'bg-light';
+                  const dot = !n.leido ? '<span class="position-absolute top-50 start-0 translate-middle p-1 bg-danger border border-light rounded-circle ms-2"></span>' : '';
+
+                  let iconClass = 'bi-info-circle-fill text-primary';
+                  if (n.tipo === 'medi') iconClass = 'bi-heart-pulse-fill text-danger';
+                  if (n.tipo === 'biblio') iconClass = 'bi-book-half text-warning';
+                  if (n.tipo === 'aula') iconClass = 'bi-mortarboard-fill text-success';
+
+                  let dateStr = 'Reciente';
+                  try { dateStr = n.createdAt.toDate().toLocaleDateString(); } catch (e) { }
+
+                  // CAMBIO AQUI: Pasamos 'event' como primer argumento
+                  return `
+                       <li class="list-group-item ${bg} border-0 border-bottom p-3 position-relative" 
+                           style="cursor:pointer; transition: background 0.2s;"
+                           onclick="window.onNotifItemClick(event, '${n.id}', '${n.link || ''}')">
+                         
+                         ${dot}
+                         
+                         <div class="d-flex gap-3">
+                           <div class="mt-1"><i class="bi ${iconClass} fs-5"></i></div>
+                           <div class="flex-grow-1" style="line-height:1.3">
+                             <div class="d-flex justify-content-between">
+                               <span class="small fw-bold text-dark">${n.titulo}</span>
+                               <span class="extra-small text-muted">${dateStr}</span>
+                             </div>
+                             <div class="small text-muted text-truncate" style="max-width: 200px;">${n.mensaje}</div>
+                           </div>
+                         </div>
+                       </li>
+                     `;
+                }).join('');
+              }
+            }
+          });
+
+          // 2. Click Handler Mejorado
+          window.onNotifItemClick = async (event, id, link) => {
+            // Si NO hay link, evitamos que se cierre el dropdown
+            if (!link || link === 'null') {
+              event.stopPropagation();
+              event.preventDefault();
+            }
+
+            // Marcamos como leída (siempre)
+            try {
+              await notifRef.doc(id).update({ leido: true });
+            } catch (e) { console.error("Error update leido", e); }
+
+            // Si hay link, navegamos (esto cerrará el dropdown naturalmente al cambiar vista o recargar)
+            if (link && link !== 'null') {
+              let targetBtn = null;
+              if (link.includes('aula')) targetBtn = document.querySelector('[data-view="view-aula"]');
+              else if (link.includes('medi')) targetBtn = document.querySelector('[data-view="view-medi"]');
+              else if (link.includes('biblio')) targetBtn = document.querySelector('[data-view="view-biblio"]');
+
+              if (targetBtn) targetBtn.click();
+              else window.location.href = link;
+            }
+          };
+
+          // 3. Botón "Marcar todas"
+          if (btnMarkAll) {
+            // Clonar para limpiar listeners viejos
+            const newBtn = btnMarkAll.cloneNode(true);
+            btnMarkAll.parentNode.replaceChild(newBtn, btnMarkAll);
+
+            newBtn.addEventListener('click', async (e) => {
+              e.stopPropagation(); // No cerrar
+              e.preventDefault();
+
+              const snapshot = await notifRef.where('leido', '==', false).get();
+              if (snapshot.empty) return;
+
+              const batch = window.SIA.db.batch();
+              snapshot.docs.forEach(doc => {
+                batch.update(doc.ref, { leido: true });
+              });
+              await batch.commit();
+              if (typeof showToast === 'function') showToast('Todas leídas', 'success');
+            });
+          }
+
+          // 4. Ocultar globo visualmente al abrir
+          if (btnBell) {
+            btnBell.addEventListener('show.bs.dropdown', () => {
+              if (badgeEl) badgeEl.classList.add('d-none');
+            });
+          }
+
+        });
+      }
+    });
+  </script>
+
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js')
+          .then(reg => console.log('Service Worker registrado', reg))
+          .catch(err => console.log('Error SW:', err));
+      });
+    }
+  </script>
+</body>
+
+</html>
+</body>
+
+</html>
