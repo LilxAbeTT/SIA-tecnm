@@ -8,7 +8,8 @@
     "allowNavigation": [
       "*.firebaseapp.com",
       "*.googleapis.com",
-      "sia-tecnm.web.app"
+      "sia-tecnm.web.app",
+      "siaites.site"
     ]
   },
   "plugins": {

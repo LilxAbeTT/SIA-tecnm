@@ -1,986 +1,1301 @@
-// modules/biblio.js
-// Controlador de UI para Biblioteca (Consume BiblioService)
-
 const Biblio = (function () {
-  let _ctx = null;
-  let _currentStudentPrestamos = [];
-  let _chFlow = null;
-  let _chServ = null;
-  let _chOccupancy = null;
-  let _biblopInterval = null;
-  let _selectedAssetId = null; // Para el admin panel
-  let _allBooks = [];
-  let _wishlistSet = new Set();
-  let _bookModal = null; // Instancia de Bootstrap Modal
-  // Check URL params for Kiosk Mode immediately
-  const urlParams = new URLSearchParams(window.location.search);
-  if (urlParams.get('mode') === 'kiosk') {
-    const assetId = urlParams.get('id');
-    if (assetId) {
-      // Iniciamos modo kiosko y detenemos la carga normal de la app
-      initKioskMode(assetId);
+    let _ctx = null;
+    let _searchDebounce = null;
+    let _adminStatsInterval = null;
+
+    function init(ctx) {
+        _ctx = ctx;
+
+        // 1. Check for Simulated Profile (Dev Mode)
+        const isDevMode = localStorage.getItem('sia_dev_mode') === 'true';
+        const simProfileJson = localStorage.getItem('sia_simulated_profile');
+        let role = _ctx.profile?.role || 'student';
+
+        if (isDevMode && simProfileJson) {
+            try {
+                const sim = JSON.parse(simProfileJson);
+                if (sim.role) role = sim.role;
+                // Merge permissions if needed
+                if (!_ctx.profile) _ctx.profile = sim; // Force context if missing
+                console.log(`[Biblio] ⚡ Dev Mode Detectado: Rol ${role}`);
+            } catch (e) { console.error(e); }
+        }
+
+        // 2. Fallback if profile is missing
+        if (!_ctx.profile && _ctx.auth.currentUser && !isDevMode) {
+            _ctx.db.collection('usuarios').doc(_ctx.auth.currentUser.uid).get().then(doc => {
+                const fetchedRole = doc.data()?.role || 'student';
+                if (!_ctx.profile) _ctx.profile = { role: fetchedRole };
+                initStudent();
+            });
+        } else {
+            initStudent();
+        }
     }
-  }
 
-  function initKioskMode(assetId) {
-    console.log("🔒 Iniciando Modo Kiosko para:", assetId);
-    const overlay = document.getElementById('kiosk-overlay');
-    const label = document.getElementById('kiosk-id-label');
-    if (label) label.textContent = `ID: ${assetId}`;
+    // ============================================
+    //              VISTA ESTUDIANTE v2 (Modernizada)
+    // ============================================
 
-    // Ocultar loader de app normal si existe
-    const appLoader = document.getElementById('app-loader');
-    if (appLoader) appLoader.classList.add('d-none');
+    async function initStudent() {
+        const container = document.getElementById('view-biblio');
+        if (!container) return;
 
-    // Escuchar cambios
-    BiblioAssetsService.listenToAssetLock({ db: SIA.db }, assetId, (data) => {
-      if (!data) {
-        overlay.classList.remove('d-none');
-        label.textContent = "Error: Activo no encontrado";
-        return;
-      }
+        // Idempotency check
+        if (document.getElementById('biblio-student-app')) {
+            loadStudentFullData();
+            return;
+        }
 
-      // Lógica de bloqueo
-      const isLocked = data.estado === 'locked';
-      const isExpired = data.isExpired; // Calculado en el servicio
+        container.innerHTML = renderStudentStructure();
 
-      if (isLocked || isExpired) {
-        overlay.classList.remove('d-none'); // BLOQUEAR
-        // Si expiró pero seguía 'active', forzamos update en DB (opcional)
-      } else {
-        overlay.classList.add('d-none'); // DESBLOQUEAR
-      }
-    });
+        // Initiators
+        loadStudentFullData();
+        renderTopBooksCarousel();
+    }
 
-    // --- BLINDAJE DE UI PARA KIOSKO ---
-    document.addEventListener('contextmenu', event => event.preventDefault());
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'F12' || e.key === 'F5' || (e.ctrlKey && e.key === 'r')) {
-        e.preventDefault();
-      }
-    });
+    function renderStudentStructure() {
+        return `
+            <style>
+                #biblio-student-app .nav-pills .nav-link.active {
+                    background-color: #FFD24D !important;
+                    color: #000 !important;
+                    font-weight: 700;
+                }
+                #biblio-student-app .nav-pills .nav-link {
+                    color: #6c757d;
+                    transition: all 0.2s;
+                    font-size: 0.85rem;
+                }
+                #biblio-student-app .btn-biblio {
+                    background-color: #FFD24D;
+                    color: #000;
+                    border: none;
+                }
+                #biblio-student-app .btn-biblio:hover {
+                    background-color: #e6be45;
+                    color: #000;
+                }
+                #biblio-student-app .biblio-card-stripe-warning { border-left: 4px solid #FFD24D; }
+                #biblio-student-app .biblio-card-stripe-danger { border-left: 4px solid #dc3545; }
+                #biblio-student-app .biblio-card-stripe-info { border-left: 4px solid #0dcaf0; }
+                #biblio-student-app .biblio-card-stripe-success { border-left: 4px solid #198754; }
+                #biblio-student-app .biblio-card-stripe-secondary { border-left: 4px solid #6c757d; }
 
-    const enterFullScreen = () => {
-      if (!document.fullscreenElement) {
-        document.documentElement.requestFullscreen().catch(e => { });
-      }
-    };
+                /* Mobile responsive */
+                @media (max-width: 768px) {
+                    #biblio-student-app .biblio-hero { padding: 1.25rem !important; }
+                    #biblio-student-app .biblio-hero h2 { font-size: 1.3rem; }
+                    #biblio-student-app .biblio-hero-icon { display: none !important; }
+                    #biblio-student-app .nav-pills .nav-link { font-size: 0.75rem; padding: 0.4rem 0.5rem; }
+                    #biblio-student-app .nav-pills .nav-link i { display: none; }
+                    #biblio-student-app .biblio-search-card { order: -1; }
+                }
+            </style>
 
-    BiblioAssetsService.listenToAssetLock({ db: SIA.db }, assetId, (data) => {
-      const isLocked = data && (data.estado === 'locked' || data.isExpired);
-      if (isLocked) {
-        overlay.classList.remove('d-none');
-        enterFullScreen();
-      }
-    });
-  }
-
-  // ========== STUDENT ==========
-  async function initStudent(ctx) {
-    _ctx = ctx;
-    const user = _ctx.auth.currentUser;
-
-    renderStudentTabs();
-    initCatalogView(user);
-    initServicesView(user);
-    initDigitalView();
-    initProfileView(user);
-  }
-
-  function renderStudentTabs() {
-    const container = document.getElementById('biblio-student');
-    if (!container) return;
-
-    container.innerHTML = `
-        <div class="d-flex justify-content-between align-items-center mb-4">
-            <div>
-                <h2 class="h4 fw-bold text-primary mb-0">Biblioteca</h2>
-                <p class="text-muted small mb-0">Explora nuestro acervo físico y digital</p>
-            </div>
-            <span class="badge bg-warning text-dark rounded-pill shadow-sm px-3 py-2" id="biblio-user-level">
-                <i class="bi bi-star-fill me-1"></i> Nivel 1
-            </span>
-        </div>
-
-        <ul class="nav nav-pills mb-4 gap-2 overflow-x-auto flex-nowrap pb-2" id="biblio-stu-tabs" role="tablist">
-            <li class="nav-item"><button class="nav-link active rounded-pill white-space-nowrap" data-bs-toggle="pill" data-bs-target="#tab-catalogo"><i class="bi bi-collection-play me-2"></i>Explorar</button></li>
-            <li class="nav-item"><button class="nav-link rounded-pill white-space-nowrap" data-bs-toggle="pill" data-bs-target="#tab-servicios"><i class="bi bi-pc-display me-2"></i>Servicios</button></li>
-            <li class="nav-item"><button class="nav-link rounded-pill white-space-nowrap" data-bs-toggle="pill" data-bs-target="#tab-digital"><i class="bi bi-tablet me-2"></i>Digital</button></li>
-            <li class="nav-item"><button class="nav-link rounded-pill white-space-nowrap" data-bs-toggle="pill" data-bs-target="#tab-perfil"><i class="bi bi-person-badge me-2"></i>Mi Perfil</button></li>
-        </ul>
-
-        <div class="tab-content">
-            <div class="tab-pane fade show active" id="tab-catalogo">
-                <div class="row g-4">
-                    <div class="col-lg-8">
-                        <div class="input-group shadow-sm rounded-pill mb-4 bg-white">
-                            <span class="input-group-text bg-white border-0 ps-4"><i class="bi bi-search fs-5 text-muted"></i></span>
-                            <input type="search" id="biblio-search" class="form-control border-0 shadow-none" placeholder="Buscar por título, autor, materia..." style="height: 50px; font-size: 1.1rem;">
-                            <button class="btn btn-white border-0 pe-4 text-muted" type="button" id="btn-clear-search" style="display:none">
-                                <i class="bi bi-x-lg"></i>
-                            </button>
-                        </div>
-
-                        <div id="biblio-discovery-view" class="fade-in">
-                            <div class="text-center py-5"><div class="spinner-border text-primary"></div></div>
-                        </div>
-
-                        <div id="biblio-search-view" class="d-none fade-in">
-                            <h5 class="fw-bold mb-3 text-muted">Resultados de la búsqueda</h5>
-                            <div id="biblio-search-grid" class="row g-4"></div>
+            <div id="biblio-student-app">
+                <!-- HERO BANNER v2 (Mobile-friendly) -->
+                <div class="biblio-hero shadow-sm mb-4" style="background: linear-gradient(135deg, #FFD24D 0%, #fd7e14 100%); border-radius: 1rem; padding: 1.5rem; position: relative; overflow: hidden;">
+                    <div class="position-relative z-1">
+                        <span class="badge bg-white text-warning mb-2 fw-bold shadow-sm" style="font-size: 0.7rem;">
+                            <i class="bi bi-book-half me-1"></i>Biblioteca Digital
+                        </span>
+                        <h2 class="fw-bold mb-1 text-dark" id="hero-user-name" style="font-size: 1.5rem;">Biblioteca ITES</h2>
+                        <p class="small opacity-75 mb-2 text-dark" id="hero-user-subtitle" style="max-width: 70%;">Explora, aprende y crece.</p>
+                        <div class="d-flex align-items-center gap-2 flex-wrap">
+                            <span class="badge bg-dark bg-opacity-25 text-white rounded-pill px-2 py-1" id="xp-level-badge" style="font-size: 0.7rem;">NIVEL 1</span>
+                            <div class="progress rounded-pill" style="height: 5px; width: 120px; background: rgba(0,0,0,0.15);">
+                                <div id="xp-bar-fill" class="progress-bar bg-white rounded-pill" style="width: 0%"></div>
+                            </div>
+                            <small class="text-dark opacity-75 fw-bold" id="xp-current" style="font-size: 0.7rem;">0 XP</small>
                         </div>
                     </div>
+                    <i class="bi bi-book-half biblio-hero-icon position-absolute end-0 top-50 translate-middle-y me-3 text-dark opacity-10" style="font-size: 6rem;"></i>
+                </div>
 
-                    <div class="col-lg-4">
-                        <div id="biblio-digital-id-container"></div> 
-                        
-                        <div class="card border-0 shadow-sm rounded-4 mt-3 overflow-hidden">
-                            <div class="card-header bg-white border-0 pt-4 px-4">
-                                <h6 class="fw-bold mb-0"><i class="bi bi-bag-check-fill me-2 text-primary"></i>Mi Mochila</h6>
+                <!-- ALERTA DEUDA GLOBAL -->
+                <div id="debt-alert-sticky" class="alert alert-danger border-0 shadow-sm rounded-4 d-none align-items-center gap-3 mb-4">
+                    <i class="bi bi-exclamation-triangle-fill fs-4"></i>
+                    <div>
+                        <h6 class="fw-bold mb-0">Tienes un adeudo pendiente</h6>
+                        <p class="mb-0 small">Debes <strong id="debt-amount">$0.00</strong>. Acude a mostrador para regularizarte.</p>
+                    </div>
+                </div>
+
+                <!-- CARRUSEL TOP 5 LIBROS -->
+                <div class="card border-0 shadow-sm rounded-4 mb-4 bg-dark text-white overflow-hidden">
+                    <div class="card-body p-3 position-relative">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="badge bg-warning text-dark shadow-sm fw-bold">
+                                <i class="bi bi-fire me-1"></i>Lo mas leido
+                            </span>
+                            <div class="d-flex gap-1">
+                                <button class="btn btn-sm btn-dark bg-white bg-opacity-10 border-0 rounded-circle" onclick="Biblio.scrollCarousel(-1)" style="width:28px;height:28px;"><i class="bi bi-chevron-left small"></i></button>
+                                <button class="btn btn-sm btn-dark bg-white bg-opacity-10 border-0 rounded-circle" onclick="Biblio.scrollCarousel(1)" style="width:28px;height:28px;"><i class="bi bi-chevron-right small"></i></button>
                             </div>
-                            <div class="card-body p-0">
-                                <div id="biblio-prestamos-list" class="list-group list-group-flush p-2" style="min-height: 100px;">
-                                    <div class="text-center text-muted py-4 small">Tu mochila está vacía.</div>
+                        </div>
+                        <div id="biblio-top-carousel" class="d-flex gap-3 overflow-auto pb-2" style="scroll-behavior: smooth; scrollbar-width: none;">
+                            <div class="w-100 text-center py-4 text-white-50"><span class="spinner-border spinner-border-sm me-2"></span>Cargando destacados...</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- NAV PILLS -->
+                <ul class="nav nav-pills nav-fill bg-white p-1 rounded-pill shadow-sm mb-4" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active rounded-pill" data-bs-toggle="pill" data-bs-target="#tab-mochila" type="button" role="tab">
+                            <i class="bi bi-backpack2 me-1"></i>Mi Mochila
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link rounded-pill" data-bs-toggle="pill" data-bs-target="#tab-solicitados" type="button" role="tab">
+                            <i class="bi bi-clock-history me-1"></i>Solicitados
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link rounded-pill" data-bs-toggle="pill" data-bs-target="#tab-servicios" type="button" role="tab">
+                            <i class="bi bi-pc-display me-1"></i>Servicios
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link rounded-pill" data-bs-toggle="pill" data-bs-target="#tab-historial" type="button" role="tab">
+                            <i class="bi bi-archive me-1"></i>Historial
+                        </button>
+                    </li>
+                </ul>
+
+                <!-- ACTIONS ROW -->
+                <div class="row g-3 mb-4 row-cols-1 row-cols-md-5">
+                    <!-- Card 1: Registrar Visita -->
+                    <div class="col">
+                        <div class="card border-0 shadow-sm rounded-4 h-100 hover-lift" style="cursor:pointer;" onclick="Biblio.registrarVisita()">
+                            <div class="card-body p-3 text-center">
+                                <div class="bg-primary bg-opacity-10 p-2 rounded-3 text-primary d-inline-block mb-2">
+                                    <i class="bi bi-person-check fs-4"></i>
                                 </div>
+                                <h6 class="fw-bold mb-0 small text-dark">Registrar Visita</h6>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Card 2: Solicitar Libro -->
+                    <div class="col">
+                        <div class="card border-0 shadow-sm rounded-4 h-100 hover-lift" style="cursor:pointer;" onclick="Biblio.toggleSearch()">
+                            <div class="card-body p-3 text-center">
+                                <div class="bg-success bg-opacity-10 p-2 rounded-3 text-success d-inline-block mb-2">
+                                    <i class="bi bi-book fs-4"></i>
+                                </div>
+                                <h6 class="fw-bold mb-0 small text-dark">Solicitar Libro</h6>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Card 3: Reservar PC -->
+                    <div class="col">
+                        <div class="card border-0 shadow-sm rounded-4 h-100 hover-lift" style="cursor:pointer;" onclick="Biblio.abrirModalServicio('pc')">
+                            <div class="card-body p-3 text-center">
+                                <div class="bg-info bg-opacity-10 p-2 rounded-3 text-info d-inline-block mb-2">
+                                    <i class="bi bi-pc-display fs-4"></i>
+                                </div>
+                                <h6 class="fw-bold mb-0 small text-dark">Reservar PC</h6>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Card 4: Reservar Sala -->
+                    <div class="col">
+                        <div class="card border-0 shadow-sm rounded-4 h-100 hover-lift" style="cursor:pointer;" onclick="Biblio.abrirModalServicio('sala')">
+                            <div class="card-body p-3 text-center">
+                                <div class="bg-warning bg-opacity-10 p-2 rounded-3 text-warning d-inline-block mb-2">
+                                    <i class="bi bi-people fs-4"></i>
+                                </div>
+                                <h6 class="fw-bold mb-0 small text-dark">Reservar Sala</h6>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Card 5: Mis Adeudos -->
+                    <div class="col">
+                        <div class="card border-0 shadow-sm rounded-4 h-100 hover-lift" style="cursor:pointer;" onclick="Biblio.showDebtModal()">
+                            <div class="card-body p-3 text-center">
+                                <div class="bg-danger bg-opacity-10 p-2 rounded-3 text-danger d-inline-block mb-2">
+                                    <i class="bi bi-cash-coin fs-4"></i>
+                                </div>
+                                <h6 class="fw-bold mb-0 small text-dark">Mis Adeudos</h6>
                             </div>
                         </div>
                     </div>
                 </div>
-            </div>
 
-            <div class="tab-pane fade" id="tab-servicios"></div>
-            <div class="tab-pane fade" id="tab-digital"></div>
-            <div class="tab-pane fade" id="tab-perfil"></div>
-        </div>
+                <!-- TAB CONTENT -->
+                <div class="tab-content">
 
-        <div class="modal fade" id="modalBookDetail" tabindex="-1" aria-hidden="true">
-            <div class="modal-dialog modal-dialog-centered modal-lg">
-                <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
-                    <div class="modal-body p-0">
-                        <button type="button" class="btn-close position-absolute top-0 end-0 m-3 z-3 bg-white p-2 rounded-circle shadow-sm" data-bs-dismiss="modal" aria-label="Close"></button>
-                        <div class="row g-0">
-                            <div class="col-md-5 position-relative bg-light d-flex align-items-center justify-content-center p-4" 
-                                 id="modal-book-cover-container" style="min-height: 400px;">
-                                 </div>
-                            <div class="col-md-7 p-4 p-lg-5 d-flex flex-column">
-                                <div class="mb-auto">
-                                    <span class="badge bg-primary-subtle text-primary mb-2" id="modal-book-cat">General</span>
-                                    <h2 class="fw-bold mb-1" id="modal-book-title">Título</h2>
-                                    <p class="text-muted fs-5 mb-4" id="modal-book-author">Autor</p>
-                                    
-                                    <p class="text-body-secondary mb-4 small" style="line-height: 1.6;">
-                                        Sinopsis no disponible.
-                                    </p>
-
-                                    <div class="d-flex gap-4 mb-4">
-                                        <div>
-                                            <div class="small text-muted text-uppercase fw-bold">Disponibles</div>
-                                            <div class="fs-4 fw-bold text-success" id="modal-book-stock">0</div>
+                    <!-- TAB 1: MI MOCHILA -->
+                    <div class="tab-pane fade show active" id="tab-mochila" role="tabpanel">
+                        <div class="row g-4">
+                            <!-- Col Izquierda: Busqueda + XP -->
+                            <div class="col-lg-5">
+                                <!-- Buscar en Catalogo (Inline) -->
+                                <div class="card border-0 shadow-sm rounded-4 mb-4 biblio-search-card">
+                                    <div class="card-body p-4">
+                                        <h6 class="fw-bold mb-3" style="color: #fd7e14;">
+                                            <i class="bi bi-search me-2"></i>Buscar en Catálogo
+                                        </h6>
+                                        <div class="d-flex gap-2 mb-3">
+                                            <input type="text" class="form-control border-0 bg-light rounded-pill" placeholder="Título, autor, código..." id="biblio-quick-search"
+                                                   oninput="Biblio.handleInlineSearch(this.value)"
+                                                   onkeyup="if(event.key==='Enter' && this.value.length >= 3) Biblio.toggleSearch()">
+                                            <button class="btn btn-biblio rounded-pill px-3" onclick="Biblio.toggleSearch()" title="Búsqueda avanzada">
+                                                <i class="bi bi-arrow-up-right"></i>
+                                            </button>
                                         </div>
-                                        <div>
-                                            <div class="small text-muted text-uppercase fw-bold">Ubicación</div>
-                                            <div class="fs-4 fw-bold text-dark">Pasillo A2</div>
+                                        <!-- Resultados inline -->
+                                        <div id="biblio-inline-results" class="d-none">
+                                            <div id="biblio-inline-results-list"></div>
                                         </div>
                                     </div>
                                 </div>
 
-                                <div class="d-grid gap-2 d-sm-flex mt-3">
-                                    <button type="button" class="btn btn-primary btn-lg rounded-pill px-5 flex-grow-1" id="btn-modal-apartar">
-                                        Apartar Ahora
+                                <!-- Categorías -->
+                                <div class="card border-0 shadow-sm rounded-4 mb-4">
+                                    <div class="card-body p-3">
+                                        <h6 class="fw-bold mb-3 small" style="color: #fd7e14;">
+                                            <i class="bi bi-bookmark-star me-2"></i>Explorar por Categoría
+                                        </h6>
+                                        <div class="d-flex flex-wrap gap-2">
+                                            <button class="btn btn-sm  rounded-pill px-3 fw-bold" onclick="Biblio.openCategoryModal('Administración')">
+                                                <i class=" bi bi-briefcase me-1 text-primary"></i>Administración
+                                            </button>
+                                            <button class="btn btn-sm  rounded-pill px-3 fw-bold" onclick="Biblio.openCategoryModal('Arquitectura')">
+                                                <i class="bi bi-building me-1 text-info"></i>Arquitectura
+                                            </button>
+                                            <button class="btn btn-sm  rounded-pill px-3 fw-bold" onclick="Biblio.openCategoryModal('Ciencias Básicas')">
+                                                <i class="bi bi-calculator me-1 text-success"></i>Ciencias Básicas
+                                            </button>
+                                            <button class="btn btn-sm rounded-pill px-3 fw-bold" onclick="Biblio.openCategoryModal('Gastronomía')">
+                                                <i class="bi bi-cup-hot me-1 text-warning"></i>Gastronomía
+                                            </button>
+                                            <button class="btn btn-sm rounded-pill px-3 fw-bold" onclick="Biblio.openCategoryModal('Literatura')">
+                                                <i class="bi bi-journal-richtext me-1 text-danger"></i>Literatura
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- XP / Misiones Card -->
+                                <div class="card border-0 shadow-sm rounded-4">
+                                    <div class="card-body p-4">
+                                        <div class="d-flex align-items-center justify-content-between mb-3">
+                                            <div>
+                                                <span class="badge bg-warning text-dark rounded-pill fw-bold" id="xp-level-badge-card">NIVEL 1</span>
+                                                <div class="small text-muted mt-1" id="xp-detail">0 / 500 XP</div>
+                                            </div>
+                                            <button class="btn btn-outline-dark rounded-pill fw-bold btn-sm" onclick="Biblio.showMissionsModal()">
+                                                <i class="bi bi-trophy-fill me-2 text-warning"></i>Misiones
+                                            </button>
+                                        </div>
+                                        <div class="progress rounded-pill" style="height: 8px;">
+                                            <div id="xp-bar-fill-card" class="progress-bar bg-warning rounded-pill" style="width: 0%"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Col Derecha: Libros En Mano -->
+                            <div class="col-lg-7">
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <h6 class="fw-bold text-muted mb-0"><i class="bi bi-backpack2 me-2"></i>Libros En Mano</h6>
+                                    <button class="btn btn-sm btn-light rounded-pill" onclick="Biblio.refreshData()">
+                                        <i class="bi bi-arrow-clockwise"></i>
                                     </button>
-                                    <button type="button" class="btn btn-outline-secondary btn-lg rounded-pill px-4" id="btn-modal-wishlist">
-                                        <i class="bi bi-heart"></i>
-                                    </button>
+                                </div>
+                                <div id="list-enmano" class="d-flex flex-column gap-3">
+                                    <div class="text-center py-5 text-muted">
+                                        <span class="spinner-border spinner-border-sm"></span>
+                                        <span class="ms-2">Cargando...</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TAB 2: SOLICITADOS -->
+                    <div class="tab-pane fade" id="tab-solicitados" role="tabpanel">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h6 class="fw-bold text-muted mb-0"><i class="bi bi-clock-history me-2"></i>Solicitudes Pendientes</h6>
+                        </div>
+                        <div id="list-solicitados" class="d-flex flex-column gap-3">
+                            <div class="text-center py-5 text-muted">
+                                <span class="spinner-border spinner-border-sm"></span>
+                                <span class="ms-2">Cargando...</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TAB 3: SERVICIOS DIGITALES -->
+                    <div class="tab-pane fade" id="tab-servicios" role="tabpanel">
+                        <h6 class="fw-bold text-muted mb-3"><i class="bi bi-grid me-2"></i>Servicios Disponibles</h6>
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-6">
+                                <div class="card border-0 shadow-sm rounded-4 h-100 hover-lift" style="cursor:pointer;" onclick="Biblio.abrirModalServicio('pc')">
+                                    <div class="card-body p-4 d-flex align-items-center gap-3">
+                                        <div class="bg-primary bg-opacity-10 p-3 rounded-4 text-primary">
+                                            <i class="bi bi-pc-display fs-3"></i>
+                                        </div>
+                                        <div class="flex-grow-1">
+                                            <h6 class="fw-bold mb-1 text-dark">Reservar Computadora</h6>
+                                            <small class="text-muted">Consultar disponibilidad de equipos</small>
+                                        </div>
+                                        <i class="bi bi-chevron-right text-muted"></i>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="card border-0 shadow-sm rounded-4 h-100 hover-lift" style="cursor:pointer;" onclick="Biblio.abrirModalServicio('sala')">
+                                    <div class="card-body p-4 d-flex align-items-center gap-3">
+                                        <div class="bg-success bg-opacity-10 p-3 rounded-4 text-success">
+                                            <i class="bi bi-people fs-3"></i>
+                                        </div>
+                                        <div class="flex-grow-1">
+                                            <h6 class="fw-bold mb-1 text-dark">Sala de Estudio</h6>
+                                            <small class="text-muted">Reservar sala para trabajo en equipo</small>
+                                        </div>
+                                        <i class="bi bi-chevron-right text-muted"></i>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Mis Reservas -->
+                        <h6 class="fw-bold text-muted mb-3"><i class="bi bi-calendar-check me-2"></i>Mis Reservas</h6>
+                        <div id="list-mis-reservas">
+                            <div class="text-center py-4 text-muted bg-light rounded-4">
+                                <i class="bi bi-calendar-x fs-1 d-block mb-2 opacity-50"></i>
+                                <p class="mb-0 small">No tienes reservas activas.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TAB 4: HISTORIAL -->
+                    <div class="tab-pane fade" id="tab-historial" role="tabpanel">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h6 class="fw-bold text-muted mb-0"><i class="bi bi-archive me-2"></i>Historial de Libros</h6>
+                        </div>
+                        <div id="list-historial" class="d-flex flex-column gap-3">
+                            <div class="text-center py-5 text-muted">
+                                <span class="spinner-border spinner-border-sm"></span>
+                                <span class="ms-2">Cargando...</span>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- MODALES -->
+
+                <!-- Modal Misiones -->
+                <div class="modal fade" id="modal-misiones" tabindex="-1">
+                    <div class="modal-dialog modal-dialog-centered">
+                        <div class="modal-content rounded-4 border-0 shadow-lg overflow-hidden" id="misiones-content"></div>
+                    </div>
+                </div>
+
+                <!-- Modal Busqueda Global -->
+                <div class="modal fade" id="modal-search-global" tabindex="-1">
+                    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+                        <div class="modal-content rounded-4 border-0 shadow-lg bg-light">
+                            <div class="modal-header border-0 bg-white sticky-top py-3">
+                                <div class="input-group input-group-lg bg-light rounded-pill border overflow-hidden">
+                                    <span class="input-group-text border-0 bg-transparent ps-4"><i class="bi bi-search text-muted"></i></span>
+                                    <input type="text" class="form-control border-0 bg-transparent shadow-none" placeholder="Titulo, autor, codigo..." id="global-search-input" oninput="Biblio.handleGlobalSearch(this.value)">
+                                    <button class="btn btn-white border-0" onclick="document.getElementById('global-search-input').value=''; Biblio.handleGlobalSearch('')"><i class="bi bi-x-circle-fill text-muted"></i></button>
+                                </div>
+                                <button class="btn-close ms-3" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body p-4">
+                                <h6 class="fw-bold text-muted mb-3" id="search-results-title">Explorar</h6>
+                                <div class="row g-3" id="global-search-results">
+                                    <div class="col-12 text-center py-5 text-muted opacity-50">
+                                        <i class="bi bi-book fs-1 mb-3 d-block"></i>
+                                        Escribe para buscar en el catalogo
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
-            </div>
-        </div>
-    `;
-  }
 
-  function initCatalogView(user) {
-    const discoveryView = document.getElementById('biblio-discovery-view');
-    const searchView = document.getElementById('biblio-search-view');
-    const searchGrid = document.getElementById('biblio-search-grid');
-    const searchInput = document.getElementById('biblio-search');
-    const btnClear = document.getElementById('btn-clear-search');
-
-    // 1. Cargar Wishlist (Para marcar los corazones)
-    BiblioService.streamWishlist(_ctx, user.uid, (ids) => {
-      _wishlistSet = ids;
-      // Refrescar UI si ya está cargada (re-render simple o toggle clases)
-      updateHeartIcons();
-    });
-
-    // 2. Cargar Libros
-    BiblioService.streamCatalogo(_ctx, docs => {
-      _allBooks = docs.map(d => ({ id: d.id, ...d.data() }));
-      renderDiscovery(_allBooks);
-    }, console.error);
-
-    // 3. Lógica de Búsqueda
-    searchInput?.addEventListener('input', (e) => {
-      const term = e.target.value.trim().toLowerCase();
-
-      if (term.length > 0) {
-        discoveryView.classList.add('d-none');
-        searchView.classList.remove('d-none');
-        btnClear.style.display = 'block';
-
-        const results = _allBooks.filter(b =>
-          (b.titulo || '').toLowerCase().includes(term) ||
-          (b.autor || '').toLowerCase().includes(term)
-        );
-        renderGrid(searchGrid, results);
-      } else {
-        discoveryView.classList.remove('d-none');
-        searchView.classList.add('d-none');
-        btnClear.style.display = 'none';
-      }
-    });
-
-    btnClear?.addEventListener('click', () => {
-      searchInput.value = '';
-      searchInput.dispatchEvent(new Event('input'));
-    });
-  }
-
-  function renderDiscovery(books) {
-    const container = document.getElementById('biblio-discovery-view');
-    if (!container) return;
-
-    const cats = BiblioService.categorizeBooks(books);
-
-    container.innerHTML = `
-        ${renderCarouselSection('🔥 Tendencias', cats.trending)}
-        ${renderCarouselSection('✨ Recién Llegados', cats.new)}
-        ${renderCarouselSection('📐 Ingeniería y Ciencias', cats.tech)}
-        ${renderCarouselSection('📚 Colección General', cats.general)}
-      `;
-  }
-
-  function renderCarouselSection(title, books) {
-    if (!books || books.length === 0) return '';
-
-    // Generamos las cards
-    const cardsHtml = books.map(b => createBookCard(b)).join('');
-
-    return `
-        <div class="mb-5">
-            <h5 class="fw-bold mb-3 px-2">${title}</h5>
-            <div class="d-flex gap-3 overflow-x-auto pb-4 px-2 scrollbar-hide" style="scroll-snap-type: x mandatory;">
-                ${cardsHtml}
-            </div>
-        </div>
-      `;
-  }
-
-  function renderGrid(container, books) {
-    if (books.length === 0) {
-      container.innerHTML = `
-            <div class="col-12 text-center py-5 text-muted">
-                <i class="bi bi-search display-1 opacity-25 mb-3"></i>
-                <p>No encontramos libros con esa búsqueda.</p>
-            </div>`;
-      return;
-    }
-    container.innerHTML = books.map(b => `
-        <div class="col-6 col-md-4 col-lg-3 col-xl-2">
-            ${createBookCard(b, true)}
-        </div>
-      `).join('');
-  }
-
-  // Crea la tarjeta HTML (Poster vertical)
-  function createBookCard(book, isGrid = false) {
-      const coverStyle = getCoverGradient(book.titulo); 
-      const stockClass = book.copiasDisponibles > 0 ? 'border-success' : 'border-danger opacity-75';
-      const widthStyle = isGrid ? 'width: 100%;' : 'width: 160px; flex: 0 0 160px; scroll-snap-align: start;';
-      const safeBook = encodeURIComponent(JSON.stringify(book));
-
-      // Lógica de imagen segura: Si hay URL, intenta cargarla. Si falla (onerror), oculta la img y muestra el div de fondo.
-      let imageHtml = '';
-      if (book.portadaUrl) {
-          // Truco: La imagen está encima. Si falla, se oculta (display:none) y se ve el fondo gradiente.
-          imageHtml = `<img src="${book.portadaUrl}" class="position-absolute top-0 start-0 w-100 h-100 object-fit-cover rounded-3" 
-                            onerror="this.style.display='none'" alt="${book.titulo}">`;
-      }
-
-      return `
-        <div class="book-card position-relative group" style="${widthStyle} cursor: pointer;" onclick="Biblio.openBookDetail('${safeBook}')">
-            <div class="ratio ratio-2x3 rounded-3 shadow-sm overflow-hidden position-relative mb-2 book-cover-hover" 
-                 style="${coverStyle}">
-                 
-                 <div class="d-flex align-items-center justify-content-center h-100 text-center p-2">
-                    <span class="text-white fw-bold small text-shadow-sm" style="z-index:0">${book.titulo}</span>
-                 </div>
-
-                 ${imageHtml}
-
-                 <div class="position-absolute bottom-0 start-0 w-100 p-2 bg-gradient-to-t from-black-75" 
-                      style="background: linear-gradient(to top, rgba(0,0,0,0.9), transparent); z-index: 2;">
-                     <div class="text-white small fw-bold text-truncate">${book.titulo}</div>
-                     <div class="text-white-50 extra-small text-truncate">${book.autor}</div>
-                 </div>
-
-                 <div class="position-absolute top-0 end-0 m-2" style="z-index: 3;">
-                    ${book.copiasDisponibles > 0 
-                        ? '<span class="badge bg-success rounded-circle p-1" title="Disponible"><span class="visually-hidden">OK</span></span>' 
-                        : '<span class="badge bg-danger rounded-circle p-1" title="Agotado"><span class="visually-hidden">NO</span></span>'}
-                 </div>
-            </div>
-        </div>
-      `;
-  }
-
-  // --- MODAL & ACCIONES ---
-
-  function openBookDetail(jsonBook) {
-      const book = JSON.parse(decodeURIComponent(jsonBook));
-      const modalEl = document.getElementById('modalBookDetail');
-      _bookModal = new bootstrap.Modal(modalEl);
-
-      // 1. Datos Básicos
-      document.getElementById('modal-book-title').textContent = book.titulo;
-      document.getElementById('modal-book-author').textContent = book.autor;
-      
-      // Sinopsis (usar la del libro o generica)
-      const sinopsis = book.sinopsis || "Sinopsis no disponible. Este libro es una excelente adición a tu lista de lectura académica. Consulta su disponibilidad y apártalo antes de que se agote.";
-      document.querySelector('#modalBookDetail .text-body-secondary').textContent = sinopsis;
-
-      // Stock Visual
-      const stockEl = document.getElementById('modal-book-stock');
-      if(book.copiasDisponibles > 0) {
-          stockEl.className = 'fs-4 fw-bold text-success';
-          stockEl.textContent = `${book.copiasDisponibles} disponibles`;
-      } else {
-          stockEl.className = 'fs-4 fw-bold text-danger';
-          stockEl.textContent = 'Agotado';
-      }
-
-      // Portada (Imagen real o Generada)
-      const coverContainer = document.getElementById('modal-book-cover-container');
-      if (book.portadaUrl) {
-          coverContainer.innerHTML = `<img src="${book.portadaUrl}" class="img-fluid shadow-lg rounded-3" style="max-height: 400px; width: auto;">`;
-      } else {
-          coverContainer.innerHTML = `
-            <div class="ratio ratio-2x3 shadow-lg rounded-3" style="${getCoverGradient(book.titulo)}; max-width: 240px;">
-                <div class="d-flex align-items-center justify-content-center h-100 text-white text-center p-3">
-                    <div><i class="bi bi-book display-1 opacity-50"></i></div>
-                </div>
-            </div>`;
-      }
-
-      // 2. Lógica de Estado (Apartado / Wishlist)
-      const btnApartar = document.getElementById('btn-modal-apartar');
-      const btnWish = document.getElementById('btn-modal-wishlist');
-
-      // a) Verificar si YA está apartado/prestado
-      const isApartado = _currentStudentPrestamos.some(p => 
-          p.libroId === book.id && ['pendiente', 'aprobado', 'entregado'].includes(p.estado)
-      );
-
-      // Limpiar listeners anteriores (clonando)
-      const newBtnApartar = btnApartar.cloneNode(true);
-      btnApartar.parentNode.replaceChild(newBtnApartar, btnApartar);
-      
-      const newBtnWish = btnWish.cloneNode(true);
-      btnWish.parentNode.replaceChild(newBtnWish, btnWish);
-
-      if (isApartado) {
-          newBtnApartar.disabled = true;
-          newBtnApartar.className = 'btn btn-secondary btn-lg rounded-pill px-5 flex-grow-1';
-          newBtnApartar.innerHTML = '<i class="bi bi-check2-circle me-2"></i>Ya en tu mochila';
-      } else if (book.copiasDisponibles <= 0) {
-          newBtnApartar.disabled = true;
-          newBtnApartar.className = 'btn btn-outline-danger btn-lg rounded-pill px-5 flex-grow-1';
-          newBtnApartar.textContent = 'Agotado';
-      } else {
-          newBtnApartar.disabled = false;
-          newBtnApartar.className = 'btn btn-primary btn-lg rounded-pill px-5 flex-grow-1';
-          newBtnApartar.textContent = 'Apartar Ahora';
-          
-          newBtnApartar.onclick = async () => {
-              // Feedback visual inmediato (Loading)
-              newBtnApartar.disabled = true;
-              newBtnApartar.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Procesando...';
-              
-              try {
-                  await Biblio.solicitarLibro(book.id, book.titulo); // Llamada al servicio wrapper
-                  _bookModal.hide();
-                  // El listener de _currentStudentPrestamos actualizará la UI automáticamente
-              } catch (e) {
-                  newBtnApartar.disabled = false;
-                  newBtnApartar.textContent = 'Reintentar';
-              }
-          };
-      }
-
-      // b) Verificar Wishlist
-      const updateHeart = () => {
-          if(_wishlistSet.has(book.id)) {
-              newBtnWish.innerHTML = '<i class="bi bi-heart-fill text-danger"></i>';
-              newBtnWish.classList.add('border-danger', 'text-danger');
-          } else {
-              newBtnWish.innerHTML = '<i class="bi bi-heart"></i>';
-              newBtnWish.classList.remove('border-danger', 'text-danger');
-          }
-      };
-      updateHeart();
-
-      newBtnWish.onclick = async () => {
-          const uid = _ctx.auth.currentUser.uid;
-          // Toggle local optimista
-          if (_wishlistSet.has(book.id)) _wishlistSet.delete(book.id);
-          else _wishlistSet.add(book.id);
-          updateHeart();
-
-          try {
-              await BiblioService.toggleWishlist(_ctx, uid, book.id);
-          } catch (e) {
-              console.error(e); // Revertir si falla (opcional)
-          }
-      };
-
-      _bookModal.show();
-  }
-
-  function updateWishlistButton(btn, bookId) {
-    if (_wishlistSet.has(bookId)) {
-      btn.innerHTML = '<i class="bi bi-heart-fill text-danger"></i>';
-      btn.classList.add('border-danger', 'text-danger');
-    } else {
-      btn.innerHTML = '<i class="bi bi-heart"></i>';
-      btn.classList.remove('border-danger', 'text-danger');
-    }
-  }
-
-  // Actualizar iconos en tiempo real si cambia la wishlist
-  function updateHeartIcons() {
-    // Si el modal está abierto, refrescar su botón
-    // (Esto es complejo sin estado global del modal, lo omitimos por ahora para MVP)
-  }
-
-  // --- UTILS ---
-  // Genera un gradiente bonito basado en el título (siempre el mismo para el mismo libro)
-  function getCoverGradient(title) {
-    const colors = [
-      ['#ff9a9e', '#fecfef'], ['#a18cd1', '#fbc2eb'], ['#84fab0', '#8fd3f4'],
-      ['#cfd9df', '#e2ebf0'], ['#fccb90', '#d57eeb'], ['#e0c3fc', '#8ec5fc'],
-      ['#f093fb', '#f5576c'], ['#4facfe', '#00f2fe'], ['#43e97b', '#38f9d7']
-    ];
-
-    let hash = 0;
-    for (let i = 0; i < title.length; i++) {
-      hash = title.charCodeAt(i) + ((hash << 5) - hash);
-    }
-    const idx = Math.abs(hash) % colors.length;
-    const [c1, c2] = colors[idx];
-
-    return `background: linear-gradient(135deg, ${c1} 0%, ${c2} 100%);`;
-  }
-
-  function initServicesView(user) {
-    const select = document.getElementById('res-asset-sel');
-    const form = document.getElementById('form-reserva-asset');
-    const list = document.getElementById('biblio-reservas-list');
-
-    BiblioAssetsService.streamAssets(_ctx, assets => {
-      if (!select) return;
-      select.innerHTML = '<option value="" selected disabled>Selecciona...</option>' +
-        assets.filter(a => a.tipo !== 'mesa')
-          .map(a => `<option value="${a.id}">${a.nombre} (${a.tipo.toUpperCase()})</option>`).join('');
-    });
-
-    BiblioAssetsService.streamMyReservations(_ctx, user.uid, reservas => {
-      if (!list) return;
-      if (reservas.length === 0) { list.innerHTML = '<div class="p-4 text-center text-muted small">No tienes reservas próximas.</div>'; return; }
-
-      list.innerHTML = reservas.map(r => `
-            <div class="list-group-item d-flex justify-content-between align-items-center p-3">
-                <div>
-                    <div class="fw-bold text-dark">${r.assetName}</div>
-                    <div class="small text-muted"><i class="bi bi-calendar me-1"></i>${r.date} <i class="bi bi-clock ms-2 me-1"></i>${r.hourBlock}</div>
-                </div>
-                <button class="btn btn-sm btn-outline-danger" onclick="Biblio.cancelReserva('${r.id}')">Cancelar</button>
-            </div>
-          `).join('');
-    });
-
-    form?.addEventListener('submit', async e => {
-      e.preventDefault();
-      const assetId = select.value;
-      const date = document.getElementById('res-date').value;
-      const hour = document.getElementById('res-hour').value;
-      if (!assetId || !date) return showToast('Completa los campos', 'warning');
-
-      try {
-        await BiblioAssetsService.reserveAsset(_ctx, {
-          assetId, date, hourBlock: hour,
-          studentId: user.uid,
-          studentName: _ctx.currentUserProfile.displayName || user.email
-        });
-        showToast('Reserva confirmada', 'success');
-        select.value = '';
-      } catch (err) {
-        showToast(err.message, 'danger');
-      }
-    });
-  }
-
-  async function initDigitalView() {
-    const grid = document.getElementById('biblio-digital-grid');
-    if (!grid) return;
-    const books = await BiblioService.getDigitalBooks();
-
-    grid.innerHTML = books.map(b => `
-        <div class="col-sm-6 col-md-4 col-lg-3">
-            <div class="card h-100 border-0 shadow-sm hover-lift">
-                <div class="card-body text-center">
-                    <div class="mb-3 rounded-3 bg-light d-flex align-items-center justify-content-center" style="height:120px;">
-                        <i class="bi bi-file-earmark-pdf display-4 text-danger opacity-50"></i>
+                <!-- Modal Detalle Libro -->
+                <div class="modal fade" id="modal-libro-detalle" tabindex="-1">
+                    <div class="modal-dialog modal-dialog-centered">
+                        <div class="modal-content rounded-4 border-0 shadow-lg" id="libro-detalle-content"></div>
                     </div>
-                    <h6 class="fw-bold text-truncate mb-1" title="${b.titulo}">${b.titulo}</h6>
-                    <p class="small text-muted mb-3">${b.autor}</p>
-                    <a href="${b.url}" class="btn btn-sm btn-outline-primary w-100 stretched-link"><i class="bi bi-download me-1"></i> Descargar</a>
                 </div>
-            </div>
-        </div>
-      `).join('');
-  }
 
-  async function initProfileView(user) {
-    const list = document.getElementById('biblio-logros-list');
-    const statRead = document.getElementById('stat-books-read');
-    const badgeLevel = document.getElementById('biblio-user-level');
-
-    if (!list) return;
-
-    const { totalLeidos, logros } = await BiblioService.checkAchievements(_ctx, user.uid);
-
-    if (statRead) statRead.textContent = totalLeidos;
-
-    const nivel = Math.floor(totalLeidos / 3) + 1;
-    if (badgeLevel) badgeLevel.textContent = `Nivel ${nivel} - Lector`;
-
-    if (logros.length === 0) {
-      list.innerHTML = '<div class="col-12 text-center text-muted py-4">Devuelve tu primer libro para desbloquear logros.</div>';
-    } else {
-      list.innerHTML = logros.map(l => `
-            <div class="col-md-6">
-                <div class="d-flex align-items-center p-3 border rounded-3 bg-light h-100">
-                    <div class="text-warning fs-3 me-3"><i class="bi ${l.icon}"></i></div>
-                    <div>
-                        <div class="fw-bold text-dark">${l.title}</div>
-                        <div class="small text-muted">${l.desc}</div>
+                <!-- Modal Servicio Reserva -->
+                <div class="modal fade" id="modal-servicio-reserva" tabindex="-1">
+                    <div class="modal-dialog modal-dialog-centered">
+                        <div class="modal-content rounded-4 border-0 shadow-lg" id="servicio-reserva-content"></div>
                     </div>
                 </div>
             </div>
-          `).join('');
-    }
-  }
-
-  // Helper público para cancelar
-  function cancelReserva(id) {
-    if (!confirm('¿Cancelar reserva?')) return;
-    BiblioAssetsService.cancelReservation(_ctx, id)
-      .then(() => showToast('Reserva cancelada', 'info'))
-      .catch(() => showToast('Error', 'danger'));
-  }
-
-  // --- Renders Student Helpers ---
-  function renderMisPrestamos(container, arr) {
-    if (!arr || arr.length === 0) {
-      container.innerHTML = '<p class="text-muted p-3 small text-center">No tienes préstamos activos.</p>'; return;
-    }
-    let html = `<table class="table table-hover align-middle small mb-0"><thead class="table-light">
-      <tr><th>Libro</th><th>Estado</th></tr></thead><tbody>`;
-    arr.forEach(p => {
-      const f = p.fechaSolicitud?.toDate().toLocaleDateString() ?? '—';
-      let badge = 'bg-secondary', label = p.estado;
-      if (p.estado === 'pendiente') { badge = 'bg-warning text-dark'; label = 'Solicitado'; }
-      else if (p.estado === 'aprobado') { badge = 'bg-info text-dark'; label = 'Por recoger'; }
-      else if (p.estado === 'entregado') { badge = 'bg-success'; label = 'En uso'; }
-      else if (p.estado === 'rechazado') { badge = 'bg-danger'; }
-
-      html += `<tr>
-        <td><div class="fw-bold text-truncate" style="max-width: 140px;">${p.tituloLibro}</div><div class="text-muted extra-small">${f}</div></td>
-        <td><span class="badge ${badge}">${label}</span></td>
-      </tr>`;
-    });
-    html += '</tbody></table>';
-    container.innerHTML = html;
-  }
-
-  function renderCatalogo(container, docs) {
-    if (docs.length === 0) { container.innerHTML = '<p class="text-muted p-3 text-center">Catálogo vacío.</p>'; return; }
-
-    const solicitados = _currentStudentPrestamos
-      .filter(p => ['pendiente', 'aprobado', 'entregado'].includes(p.estado))
-      .map(p => p.libroId);
-
-    container.innerHTML = docs.map(doc => {
-      const l = doc.data(); const id = doc.id;
-      const copias = Number(l.copiasDisponibles) || 0;
-      const isSolic = solicitados.includes(id);
-
-      let btn = '';
-      if (isSolic) btn = `<button class="btn btn-light btn-sm border text-muted" disabled><i class="bi bi-check2 me-1"></i>Solicitado</button>`;
-      else if (copias > 0) btn = `<button class="btn btn-outline-primary btn-sm fw-bold" onclick="Biblio.solicitarLibro('${id}','${(l.titulo || '').replace(/'/g, "\\'")}')"><i class="bi bi-bag-plus me-1"></i>Apartar</button>`;
-      else btn = `<span class="badge bg-secondary-subtle text-secondary">Agotado</span>`;
-
-      return `
-        <div class="list-group-item list-group-item-action d-flex flex-column biblio-libro-item p-3" data-title="${BiblioService.norm(l.titulo)}" data-author="${BiblioService.norm(l.autor)}">
-            <div class="d-flex w-100 justify-content-between align-items-start mb-2">
-                <div><h6 class="mb-1 fw-bold text-dark">${l.titulo}</h6><p class="mb-0 small text-muted"><i class="bi bi-person me-1"></i>${l.autor || 'Autor desconocido'}</p></div>
-                <div class="text-end">${copias > 0 ? `<span class="badge bg-success-subtle text-success border border-success-subtle">${copias} disp.</span>` : `<span class="badge bg-danger-subtle text-danger">0 disp.</span>`}</div>
-            </div>
-            <div class="mt-2 d-flex justify-content-end">${btn}</div>
-        </div>`;
-    }).join('');
-  }
-
-  async function solicitarLibro(libroId, titulo) {
-    const user = _ctx.auth.currentUser;
-    
-    // Validación robusta contra la lista en memoria
-    // Busca si YA existe un préstamo activo (pendiente, aprobado, entregado) para este libro
-    const activo = _currentStudentPrestamos.find(p => 
-        p.libroId === libroId && 
-        ['pendiente', 'aprobado', 'entregado'].includes(p.estado)
-    );
-
-    if (activo) { 
-        showToast(`Ya tienes una solicitud activa para: ${titulo}`, 'warning'); 
-        return; 
+        `;
     }
 
-    try {
-      await BiblioService.solicitarLibro(_ctx, { user, libroId, titulo });
-      showToast('¡Libro apartado! Tienes 24h para recogerlo.', 'success');
-      
-      // Cerrar modal si está abierto
-      if(_bookModal) _bookModal.hide();
+    // --- CARRUSEL TOP 5 (Mas prestados) ---
+    async function renderTopBooksCarousel() {
+        const container = document.getElementById('biblio-top-carousel');
+        if (!container) return;
 
-      if (window.Notify) {
-        window.Notify.send(user.uid, { title: 'Apartado Confirmado', message: `Has apartado "${titulo}".`, type: 'biblio', link: '/biblio' });
-      }
-    } catch (e) { 
-        console.error(e); 
-        showToast('Error al solicitar. Verifica tu conexión.', 'danger'); 
+        try {
+            // Intentar cargar los mas prestados
+            let books = await BiblioService.getTopBooks(_ctx, 5);
+
+            // Fallback: si no hay historial de prestamos, usar catalogo
+            if (!books || books.length === 0) {
+                books = await BiblioService.searchCatalogo(_ctx, 'a');
+            }
+
+            if (!books || books.length === 0) {
+                container.innerHTML = '<div class="w-100 text-center py-4 text-white-50 small">No hay libros destacados por ahora.</div>';
+                return;
+            }
+
+            const top5 = books.slice(0, 5);
+            const colors = ['#e91e63', '#9c27b0', '#673ab7', '#3f51b5', '#2196f3', '#009688', '#ff5722', '#795548', '#607d8b'];
+
+            container.innerHTML = top5.map((book, i) => {
+                const titulo = (book.titulo || '?').replace(/'/g, "\\'");
+                const autor = (book.autor || '').replace(/'/g, "\\'");
+                const prestamos = book._prestamos ? `<span class="text-white-50" style="font-size:0.6rem;">${book._prestamos}x prestado</span>` : '';
+                return `
+                    <div class="flex-shrink-0 text-center" style="width: 110px; cursor: pointer;" onclick="Biblio.verDetalleLibro('${book.id}', '${titulo}', '${autor}', ${book.copiasDisponibles || 0})">
+                        <div class="card border-0 shadow-lg overflow-hidden rounded-3 mx-auto" style="width: 100px;">
+                            <div class="d-flex align-items-center justify-content-center text-white fw-bold" style="height: 130px; font-size: 2.5rem; background: linear-gradient(to bottom right, ${colors[i % colors.length]}, #222);">
+                                ${(book.titulo || '?').charAt(0)}
+                            </div>
+                        </div>
+                        <p class="text-white small mt-2 mb-0 text-truncate" style="max-width: 110px; font-size: 0.7rem;">${book.titulo}</p>
+                        ${prestamos}
+                    </div>`;
+            }).join('');
+
+        } catch (e) {
+            console.error(e);
+            container.innerHTML = '<div class="w-100 text-center py-4 text-white-50 small">Error cargando libros.</div>';
+        }
     }
-  }
 
-  // ========== ADMIN ==========
-  function initAdmin(ctx) {
-    _ctx = ctx;
-    const listPend = document.getElementById('biblio-adm-prestamos-pend');
-    const listAprob = document.getElementById('biblio-adm-prestamos-aprob');
-    const listEntr = document.getElementById('biblio-adm-prestamos-entreg');
-    const formNew = document.getElementById('form-biblio-nuevo-libro');
-    const invTable = document.getElementById('biblio-adm-inventario');
+    function scrollCarousel(dir) {
+        const c = document.getElementById('biblio-top-carousel');
+        if (c) c.scrollBy({ left: dir * 300, behavior: 'smooth' });
+    }
 
-    const uPend = BiblioService.streamPrestamosByState(_ctx, 'pendiente', docs => renderPrestamos(listPend, docs, 'pend'));
-    const uAprob = BiblioService.streamPrestamosByState(_ctx, 'aprobado', docs => renderPrestamos(listAprob, docs, 'aprob'));
-    const uEntr = BiblioService.streamPrestamosByState(_ctx, 'entregado', docs => renderPrestamos(listEntr, docs, 'entregado'));
+    // --- INLINE SEARCH ---
+    let _inlineSearchDebounce = null;
 
-    const uInv = BiblioService.streamCatalogo(_ctx,
-      docs => renderInventario(invTable, docs),
-      err => console.error(err)
-    );
+    function handleInlineSearch(val) {
+        if (_inlineSearchDebounce) clearTimeout(_inlineSearchDebounce);
 
-    formNew?.addEventListener('submit', async e => {
-      e.preventDefault();
-      const f = e.target;
-      const data = {
-        titulo: f.elements['biblio-titulo'].value,
-        autor: f.elements['biblio-autor'].value,
-        isbn: (f.elements['biblio-isbn'].value || '').trim(),
-        add: Number(f.elements['biblio-copias'].value) || 0
-      };
-      try {
-        const res = await BiblioService.addOrUpdateLibro(_ctx, data);
-        showToast(res.action === 'updated' ? 'Stock actualizado' : 'Libro añadido', 'success');
-        f.reset();
-      } catch (e) { showToast('Error al guardar', 'danger'); }
-    });
+        const wrapper = document.getElementById('biblio-inline-results');
+        const container = document.getElementById('biblio-inline-results-list');
+        if (!wrapper || !container) return;
 
-    _ctx.activeUnsubs.push(uPend, uAprob, uEntr, uInv);
-    initServicesAdmin(ctx);
-  }
-
-  function initServicesAdmin(ctx) {
-    const grid = document.getElementById('biblio-assets-grid');
-    const panel = document.getElementById('asset-control-panel');
-    const form = document.getElementById('form-biblio-asset');
-
-    BiblioAssetsService.streamAssets(ctx, (assets) => {
-      if (!grid) return;
-      if (assets.length === 0) {
-        grid.innerHTML = '<div class="p-5 text-center text-muted w-100">No hay activos registrados.</div>';
-        return;
-      }
-
-      grid.innerHTML = assets.map(a => {
-        const isLocked = a.estado === 'locked';
-        const statusColor = isLocked ? 'bg-danger' : 'bg-success';
-        const icon = a.tipo === 'pc' ? 'bi-pc-display' : a.tipo === 'sala' ? 'bi-people-fill' : 'bi-square-fill';
-        const statusText = isLocked ? 'Bloqueado' : `En uso: ${a.currentUser || 'Anon'}`;
-
-        let timeInfo = '';
-        if (!isLocked && a.unlockUntil) {
-          const left = Math.ceil((a.unlockUntil.toDate() - new Date()) / 60000);
-          timeInfo = `<span class="badge bg-light text-dark border mt-1">${left} min restantes</span>`;
+        if (!val || val.length < 3) {
+            wrapper.classList.add('d-none');
+            container.innerHTML = '';
+            return;
         }
 
-        return `
-                  <div class="col-md-4 col-lg-3 p-2">
-                      <div class="card h-100 border ${isLocked ? 'border-danger-subtle' : 'border-success-subtle'} shadow-sm asset-card" 
-                           style="cursor:pointer;" onclick="Biblio.selectAsset('${a.id}', '${a.nombre}', '${a.estado}')">
-                          <div class="card-body text-center p-3">
-                              <div class="position-absolute top-0 end-0 p-2">
-                                  <span class="badge ${statusColor} rounded-circle p-1"><span class="visually-hidden">Status</span></span>
-                              </div>
-                              <i class="bi ${icon} fs-1 ${isLocked ? 'text-secondary opacity-50' : 'text-primary'}"></i>
-                              <h6 class="fw-bold mt-2 mb-1 text-truncate">${a.nombre}</h6>
-                              <div class="small text-muted font-monospace">${a.id}</div>
-                              <div class="small ${isLocked ? 'text-danger' : 'text-success'} fw-bold mt-1">${statusText}</div>
-                              ${timeInfo}
-                          </div>
-                      </div>
-                  </div>
-              `;
-      }).join('');
-    });
+        wrapper.classList.remove('d-none');
+        container.innerHTML = '<div class="text-center py-2"><span class="spinner-border spinner-border-sm text-primary"></span></div>';
 
-    form?.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const id = document.getElementById('asset-id').value.trim().toUpperCase();
-      const tipo = document.getElementById('asset-type').value;
-      const nombre = document.getElementById('asset-name').value.trim();
+        _inlineSearchDebounce = setTimeout(async () => {
+            try {
+                const results = await BiblioService.searchCatalogo(_ctx, val);
+                if (!results || results.length === 0) {
+                    container.innerHTML = '<p class="text-muted small text-center mb-0 py-2">Sin resultados</p>';
+                    return;
+                }
 
-      try {
-        await BiblioAssetsService.createAsset(ctx, { id, tipo, nombre });
-        showToast('Activo creado', 'success');
-        form.reset();
-      } catch (e) { showToast('Error al crear', 'danger'); }
-    });
-
-    document.getElementById('btn-force-lock')?.addEventListener('click', () => {
-      if (_selectedAssetId) BiblioAssetsService.lockAsset(ctx, _selectedAssetId);
-    });
-
-    document.getElementById('btn-delete-asset')?.addEventListener('click', () => {
-      if (_selectedAssetId && confirm('¿Eliminar activo?')) {
-        BiblioAssetsService.deleteAsset(ctx, _selectedAssetId);
-        panel.classList.add('d-none');
-      }
-    });
-
-    document.getElementById('btn-unlock-custom')?.addEventListener('click', () => {
-      if (!_selectedAssetId) return;
-      const user = document.getElementById('ctrl-user-label').value || 'Manual';
-      BiblioAssetsService.unlockAsset(ctx, _selectedAssetId, 60, user);
-    });
-  }
-
-  function selectAsset(id, name, status) {
-    _selectedAssetId = id;
-    const panel = document.getElementById('asset-control-panel');
-    if (panel) {
-      panel.classList.remove('d-none');
-      document.getElementById('ctrl-asset-name').textContent = name;
-      document.getElementById('ctrl-asset-status').textContent = `ID: ${id} • Estado: ${status}`;
-    }
-  }
-
-  function quickUnlock(mins) {
-    if (!_selectedAssetId || !_ctx) return;
-    const user = document.getElementById('ctrl-user-label')?.value || 'Quick Access';
-    BiblioAssetsService.unlockAsset(_ctx, _selectedAssetId, mins, user);
-  }
-
-  function renderPrestamos(container, docs, fase) {
-    if (docs.length === 0) { 
-        container.innerHTML = '<div class="p-5 text-center text-muted bg-light rounded-3"><i class="bi bi-inbox fs-1 d-block mb-3 opacity-25"></i>Sin registros en esta etapa.</div>'; 
-        return; 
+                container.innerHTML = results.slice(0, 5).map(book => `
+                    <div class="d-flex align-items-center gap-2 p-2 rounded-3 hover-lift" style="cursor:pointer;"
+                         onclick="Biblio.verDetalleLibro('${book.id}', '${(book.titulo || '').replace(/'/g, "\\'")}', '${(book.autor || '').replace(/'/g, "\\'")}', ${book.copiasDisponibles || 0})">
+                        <div class="bg-light rounded-2 p-2 text-center" style="min-width:36px;">
+                            <i class="bi bi-book text-muted"></i>
+                        </div>
+                        <div class="flex-grow-1 overflow-hidden">
+                            <div class="fw-bold small text-truncate">${book.titulo}</div>
+                            <div class="text-muted" style="font-size:0.7rem;">${book.autor || ''}</div>
+                        </div>
+                        <span class="badge ${book.copiasDisponibles > 0 ? 'bg-success-subtle text-success' : 'bg-danger-subtle text-danger'} rounded-pill" style="font-size:0.65rem;">
+                            ${book.copiasDisponibles > 0 ? book.copiasDisponibles : 'Agotado'}
+                        </span>
+                    </div>
+                `).join('') + (results.length > 5 ? `
+                    <div class="text-center mt-2">
+                        <button class="btn btn-sm btn-outline-secondary rounded-pill px-3" onclick="Biblio.toggleSearch()">
+                            <i class="bi bi-search me-1"></i>Ver todos (${results.length})
+                        </button>
+                    </div>` : '');
+            } catch (e) {
+                container.innerHTML = '<p class="text-danger small text-center mb-0 py-2">Error en búsqueda</p>';
+            }
+        }, 400);
     }
 
-    let html = `<div class="table-responsive"><table class="table table-hover align-middle"><thead class="table-light"><tr>
-      <th>Usuario</th><th>Libro</th><th>Fecha</th><th class="text-end">Acción</th></tr></thead><tbody>`;
-    
-    docs.forEach(d => {
-      const p = d.data(); 
-      const id = d.id;
-      const fecha = p.fechaSolicitud ? p.fechaSolicitud.toDate().toLocaleString() : '—';
-      
-      let actions = '';
-      if (fase === 'pend') {
-        actions = `<button class="btn btn-success btn-sm" onclick="Biblio.aprobarPrestamo('${id}')" title="Aprobar"><i class="bi bi-check-lg"></i></button>
-                   <button class="btn btn-danger btn-sm ms-1" onclick="Biblio.rechazarPrestamo('${id}')" title="Rechazar"><i class="bi bi-x-lg"></i></button>`;
-      } else if (fase === 'aprob') {
-        actions = `<button class="btn btn-primary btn-sm" onclick="Biblio.entregarPrestamo('${id}','${p.libroId}')"><i class="bi bi-box-arrow-right me-1"></i>Entregar</button>`;
-      } else {
-        actions = `<button class="btn btn-outline-success btn-sm" onclick="Biblio.devolverPrestamo('${id}','${p.libroId}')"><i class="bi bi-box-arrow-in-left me-1"></i>Recibir</button>`;
-      }
+    // --- SEARCH (Modal Global) ---
+    function toggleSearch() {
+        const inlineVal = document.getElementById('biblio-quick-search')?.value || '';
+        // Reset title and placeholder
+        const titleEl = document.getElementById('search-results-title');
+        if (titleEl) titleEl.textContent = 'Explorar';
+        const globalInput = document.getElementById('global-search-input');
+        if (globalInput) globalInput.placeholder = 'Título, autor, código...';
 
-      html += `<tr>
-        <td>
-            <div class="fw-bold text-dark">${p.studentEmail.split('@')[0]}</div>
-            <div class="small text-muted">${p.studentEmail}</div>
-        </td>
-        <td class="fw-semibold text-primary">${p.tituloLibro}</td>
-        <td class="small text-muted">${fecha}</td>
-        <td class="text-end">${actions}</td>
-      </tr>`;
-    });
-    html += '</tbody></table></div>';
-    container.innerHTML = html;
-  }
-
-  function renderInventario(container, docs) {
-    if (docs.length === 0) { container.innerHTML = ''; return; }
-    let html = `<table class="table table-sm table-hover align-middle"><thead class="table-light">
-      <tr><th>Título</th><th>Stock</th><th></th></tr></thead><tbody>`;
-    docs.forEach(doc => {
-      const l = doc.data();
-      html += `<tr><td>${l.titulo}</td><td>${l.copiasDisponibles}</td>
-          <td class="text-end"><button class="btn btn-link text-danger btn-sm p-0" onclick="Biblio.eliminarLibro('${doc.id}')"><i class="bi bi-trash"></i></button></td></tr>`;
-    });
-    html += '</tbody></table>';
-    container.innerHTML = html;
-  }
-
-  // --- Acciones Admin Wrappers ---
-  async function aprobarPrestamo(id) { try { await BiblioService.aprobarPrestamo(_ctx, id); showToast('Aprobado', 'success'); } catch (e) { showToast('Error', 'danger'); } }
-  async function rechazarPrestamo(id) { if (!confirm('¿Rechazar?')) return; try { await BiblioService.rechazarPrestamo(_ctx, id); showToast('Rechazado', 'info'); } catch (e) { showToast('Error', 'danger'); } }
-  async function entregarPrestamo(pid, lid) { try { await BiblioService.entregarPrestamo(_ctx, pid, lid); showToast('Entregado', 'success'); } catch (e) { showToast(e.message, 'danger'); } }
-  async function devolverPrestamo(pid, lid) { try { await BiblioService.devolverPrestamo(_ctx, pid, lid); showToast('Devuelto', 'success'); } catch (e) { showToast('Error', 'danger'); } }
-  async function eliminarLibro(id) { if (!confirm('¿Borrar?')) return; try { await BiblioService.eliminarLibro(_ctx, id); showToast('Eliminado', 'info'); } catch (e) { showToast('Error', 'danger'); } }
-
-  // ========== SUPER ADMIN (IoT Dashboard) ==========
-  async function initSuperAdmin(ctx) {
-    _ctx = ctx;
-    try {
-      const stats = await BiblioService.getFirebaseStats(_ctx);
-      const kpiTotal = document.getElementById('biblio-sa-total');
-      if (kpiTotal) kpiTotal.textContent = stats.totalLibros;
-
-      const uAll = BiblioService.streamAllPrestamos(_ctx, 50, snap => {
-        renderSuperAdminList(snap);
-      });
-      _ctx.activeUnsubs.push(uAll);
-    } catch (e) { console.error(e); }
-
-    setupBiblopControls();
-    updateBiblopData();
-    if (_biblopInterval) clearInterval(_biblopInterval);
-    _biblopInterval = setInterval(updateBiblopData, 15000);
-  }
-
-  function renderSuperAdminList(snap) {
-    const listEl = document.getElementById('biblio-sa-list');
-    const kpiActivos = document.getElementById('biblio-sa-activos');
-    const kpiVencidos = document.getElementById('biblio-sa-vencidos');
-    let activos = 0, vencidos = 0;
-
-    let html = `<table class="table table-hover align-middle small"><thead class="table-light">
-          <tr><th>Fecha</th><th>Alumno</th><th>Libro</th><th>Estado</th></tr></thead><tbody>`;
-
-    snap.forEach(d => {
-      const p = d.data();
-      if (['pendiente', 'aprobado', 'entregado'].includes(p.estado)) activos++;
-      if (p.estado === 'entregado' && p.fechaEntrega) {
-        const diff = (new Date() - p.fechaEntrega.toDate()) / (86400000);
-        if (diff > 15) vencidos++;
-      }
-      const badge = p.estado === 'entregado' ? 'bg-success-subtle text-success' : 'bg-secondary-subtle text-secondary';
-      html += `<tr><td>${p.fechaSolicitud?.toDate().toLocaleDateString() || '-'}</td><td>${p.studentEmail}</td><td class="fw-bold">${p.tituloLibro}</td><td><span class="badge ${badge}">${p.estado}</span></td></tr>`;
-    });
-    html += '</tbody></table>';
-    if (listEl) listEl.innerHTML = html;
-    if (kpiActivos) kpiActivos.textContent = activos;
-    if (kpiVencidos) kpiVencidos.textContent = vencidos;
-  }
-
-  function setupBiblopControls() {
-    const rangeSel = document.getElementById('biblop-range');
-    const refreshBtn = document.getElementById('biblop-refresh-btn');
-    if (rangeSel) {
-      const newSel = rangeSel.cloneNode(true);
-      rangeSel.parentNode.replaceChild(newSel, rangeSel);
-      newSel.addEventListener('change', updateBiblopData);
+        new bootstrap.Modal(document.getElementById('modal-search-global')).show();
+        setTimeout(() => {
+            if (globalInput) {
+                globalInput.value = inlineVal;
+                globalInput.focus();
+                if (inlineVal.length >= 3) handleGlobalSearch(inlineVal);
+            }
+        }, 500);
     }
-    if (refreshBtn) {
-      const newBtn = refreshBtn.cloneNode(true);
-      refreshBtn.parentNode.replaceChild(newBtn, refreshBtn);
-      newBtn.addEventListener('click', updateBiblopData);
+
+    function handleGlobalSearch(val) {
+        if (_searchDebounce) clearTimeout(_searchDebounce);
+        _searchDebounce = setTimeout(async () => {
+            const container = document.getElementById('global-search-results');
+            if (!container) return;
+            if (!val || val.length < 3) {
+                container.innerHTML = '<div class="col-12 text-center text-muted opacity-50 py-5">Ingresa al menos 3 caracteres...</div>';
+                return;
+            }
+
+            container.innerHTML = '<div class="col-12 text-center text-primary py-5"><div class="spinner-border"></div></div>';
+
+            try {
+                const results = await BiblioService.searchCatalogo(_ctx, val);
+                if (!results || results.length === 0) {
+                    container.innerHTML = '<div class="col-12 text-center text-muted py-5">No se encontraron resultados.</div>';
+                    return;
+                }
+
+                container.innerHTML = results.map(book => `
+                    <div class="col-12">
+                        <div class="card border-0 shadow-sm rounded-3 hover-lift" style="cursor:pointer;" onclick="Biblio.verDetalleLibro('${book.id}', '${(book.titulo || '').replace(/'/g, "\\'")}', '${(book.autor || '').replace(/'/g, "\\'")}', ${book.copiasDisponibles})">
+                            <div class="card-body d-flex align-items-center gap-3 p-3">
+                                <div class="bg-light rounded-3 p-3 text-center text-muted fw-bold" style="min-width: 50px;">
+                                    <i class="bi bi-book fs-4"></i>
+                                </div>
+                                <div class="flex-grow-1">
+                                    <h6 class="fw-bold mb-1 text-dark">${book.titulo}</h6>
+                                    <p class="small text-muted mb-0">${book.autor}</p>
+                                </div>
+                                <div class="text-end">
+                                    <span class="badge ${book.copiasDisponibles > 0 ? 'bg-success-subtle text-success' : 'bg-danger-subtle text-danger'} rounded-pill d-block mb-1">
+                                        ${book.copiasDisponibles > 0 ? 'Disponible' : 'Agotado'}
+                                    </span>
+                                    <small class="text-muted" style="font-size:0.7rem;">Ver detalle <i class="bi bi-chevron-right"></i></small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (e) {
+                container.innerHTML = `<div class="col-12 text-center text-danger">Error: ${e.message}</div>`;
+            }
+        }, 500);
     }
-  }
 
-  async function updateBiblopData() {
-    const rangeVal = document.getElementById('biblop-range')?.value || '24h';
-    const updateLabel = document.getElementById('biblop-last-update');
-    if (updateLabel) updateLabel.textContent = 'Actualizando...';
+    // --- CATEGORÍA MODAL ---
+    async function openCategoryModal(category) {
+        // Abrir el modal de búsqueda global
+        const modal = new bootstrap.Modal(document.getElementById('modal-search-global'));
+        modal.show();
 
-    try {
-      const json = await BiblioService.fetchBiblopData();
-      const rawRows = (json.rows || json.data || []);
-      const rows = rawRows.map(r => ({
-        date: new Date(r.ts),
-        entro: Number(r.entro) || 0, salio: Number(r.salio) || 0,
-        cr: Number(r.cr) || 0, sala: Number(r.sala) || 0, info: Number(r.info) || 0,
-        id: r.id || ''
-      })).filter(r => !isNaN(r.date));
+        const titleEl = document.getElementById('search-results-title');
+        const container = document.getElementById('global-search-results');
+        const globalInput = document.getElementById('global-search-input');
 
-      processAndRenderBiblop(rows, rangeVal);
-      if (updateLabel) updateLabel.textContent = 'Act: ' + new Date().toLocaleTimeString();
-    } catch (e) {
-      console.error("BiBlop Error:", e);
-      if (updateLabel) updateLabel.textContent = 'Error de conexión';
+        if (titleEl) titleEl.innerHTML = `<i class="bi bi-bookmark-star-fill me-2 text-warning"></i>Categoría: ${category}`;
+        if (globalInput) { globalInput.value = ''; globalInput.placeholder = `Buscar en ${category}...`; }
+        if (container) container.innerHTML = '<div class="col-12 text-center text-primary py-5"><div class="spinner-border"></div></div>';
+
+        try {
+            const books = await BiblioService.getBooksByCategory(_ctx, category, 15);
+            if (!books || books.length === 0) {
+                container.innerHTML = `<div class="col-12 text-center text-muted py-5">
+                    <i class="bi bi-search fs-1 d-block mb-2 opacity-50"></i>
+                    No se encontraron libros en esta categoría.
+                </div>`;
+                return;
+            }
+
+            container.innerHTML = books.map(book => `
+                <div class="col-12">
+                    <div class="card border-0 shadow-sm rounded-3 hover-lift" style="cursor:pointer;" onclick="Biblio.verDetalleLibro('${book.id}', '${(book.titulo || '').replace(/'/g, "\\'")}', '${(book.autor || '').replace(/'/g, "\\'")}', ${book.copiasDisponibles || 0})">
+                        <div class="card-body d-flex align-items-center gap-3 p-3">
+                            <div class="bg-light rounded-3 p-3 text-center text-muted fw-bold" style="min-width: 50px;">
+                                <i class="bi bi-book fs-4"></i>
+                            </div>
+                            <div class="flex-grow-1">
+                                <h6 class="fw-bold mb-1 text-dark">${book.titulo}</h6>
+                                <p class="small text-muted mb-0">${book.autor || 'Autor desconocido'}</p>
+                            </div>
+                            <div class="text-end">
+                                <span class="badge ${(book.copiasDisponibles || 0) > 0 ? 'bg-success-subtle text-success' : 'bg-danger-subtle text-danger'} rounded-pill d-block mb-1">
+                                    ${(book.copiasDisponibles || 0) > 0 ? 'Disponible' : 'Agotado'}
+                                </span>
+                                <small class="text-muted" style="font-size:0.7rem;">Ver detalle <i class="bi bi-chevron-right"></i></small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        } catch (e) {
+            container.innerHTML = `<div class="col-12 text-center text-danger py-5">Error: ${e.message}</div>`;
+        }
     }
-  }
 
-  function processAndRenderBiblop(rows, rangeKey) {
-    const now = Date.now();
-    let ms = 0;
-    if (rangeKey === '1h') ms = 3600000;
-    else if (rangeKey === '6h') ms = 6 * 3600000;
-    else if (rangeKey === '24h') ms = 24 * 3600000;
-    else if (rangeKey === '7d') ms = 7 * 86400000;
-    else if (rangeKey === '30d') ms = 30 * 86400000;
-    const cutoff = ms > 0 ? now - ms : 0;
-    rows.sort((a, b) => a.date - b.date);
-    const filtered = rows.filter(r => r.date.getTime() >= cutoff);
+    // --- REGISTRAR VISITA (MANUAL) ---
+    async function registrarVisita() {
+        if (!confirm("¿Registrar tu visita a la biblioteca hoy?")) return;
+        try {
+            // Aquí idealmente habría una llamada al backend para validar ubicación o QR
+            // Por ahora simulamos y registramos para la encuesta
 
-    const kEntro = filtered.reduce((s, r) => s + r.entro, 0);
-    const kSalio = filtered.reduce((s, r) => s + r.salio, 0);
-    const inside = Math.max(0, kEntro - kSalio);
-    const ratio = kEntro ? Math.round((kSalio / kEntro) * 100) : 0;
-    setText('biblop-kpi-entro', kEntro);
-    setText('biblop-kpi-salio', kSalio);
-    setText('biblop-kpi-inside', inside);
-    setText('biblop-kpi-ratio', ratio + '%');
-  }
+            showToast("¡Bienvenido! Visita registrada.", "success");
 
-  function setText(id, val) { const el = document.getElementById(id); if (el) el.textContent = val; }
+            // [ENCUESTAS] Registrar uso
+            if (window.EncuestasServicioService) {
+                EncuestasServicioService.registerServiceUsage(_ctx, 'biblioteca', { action: 'visita_manual' });
+            }
 
-  return {
-    initStudent,
-    initAdmin,
-    initSuperAdmin,
-    selectAsset,
-    quickUnlock,
-    cancelReserva,
-    aprobarPrestamo,  // Local function directly
-    solicitarLibro,   // Local function directly
-    rechazarPrestamo,
-    entregarPrestamo,
-    devolverPrestamo,
-    eliminarLibro,
-    openBookDetail,
-  };
+            // check if survey should trigger immediately
+            if (window.Encuestas && window.Encuestas.checkAndShowServiceSurvey) {
+                setTimeout(() => window.Encuestas.checkAndShowServiceSurvey('biblioteca'), 1000);
+            }
+
+        } catch (e) { console.error(e); }
+    }
+
+    // --- DETALLE Y SOLICITUD DE LIBRO ---
+    function verDetalleLibro(id, titulo, autor, stock) {
+        const modalContent = document.getElementById('libro-detalle-content');
+        if (!modalContent) return;
+        modalContent.innerHTML = `
+            <div class="modal-header border-0 p-4">
+                <div>
+                    <h5 class="modal-title fw-bold text-dark">${titulo}</h5>
+                    <p class="mb-0 small text-muted">${autor}</p>
+                </div>
+                <button class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body px-4">
+                <div class="alert ${stock > 0 ? 'alert-success' : 'alert-secondary'} d-flex align-items-center gap-2 rounded-3">
+                    <i class="bi ${stock > 0 ? 'bi-check-circle-fill' : 'bi-x-circle-fill'}"></i>
+                    <div>Stock: <strong>${stock}</strong> copias disponibles</div>
+                </div>
+                <p class="small text-muted">ID: ${id}</p>
+            </div>
+            <div class="modal-footer border-0 px-4 pb-4">
+                <button class="btn btn-biblio w-100 rounded-pill fw-bold" ${stock < 1 ? 'disabled' : ''} onclick="Biblio.solicitarLibro('${id}', '${(titulo || '').replace(/'/g, "\\'")}')">
+                    <i class="bi bi-bag-plus me-2"></i>Solicitar para recoger
+                </button>
+            </div>
+        `;
+        new bootstrap.Modal(document.getElementById('modal-libro-detalle')).show();
+    }
+
+    async function solicitarLibro(id, titulo) {
+        try {
+            await BiblioService.apartarLibro(_ctx, { uid: _ctx.auth.currentUser.uid, email: _ctx.auth.currentUser.email, bookId: id, titulo: titulo });
+            showToast("Libro apartado. Tienes 24h para recogerlo.", "success");
+            bootstrap.Modal.getInstance(document.getElementById('modal-libro-detalle'))?.hide();
+            loadStudentFullData();
+
+            // [ENCUESTAS] Registrar uso
+            if (window.EncuestasServicioService) {
+                EncuestasServicioService.registerServiceUsage(_ctx, 'biblioteca', { action: 'solicitud_libro', bookId: id });
+            }
+        } catch (e) { showToast(e.message, "danger"); }
+    }
+
+    // --- MISIONES ---
+    function showMissionsModal() {
+        const currentLvl = document.getElementById('xp-level-badge')?.innerText || 'NIVEL 1';
+        const currentXP = parseInt(document.getElementById('xp-current')?.innerText) || 0;
+
+        const content = document.getElementById('misiones-content');
+        if (!content) return;
+
+        const missions = [
+            { icon: 'bi-check-circle-fill', title: 'Primeros Pasos', desc: 'Inicia sesion por primera vez.', xp: 50, done: currentXP > 0 },
+            { icon: 'bi-book-half', title: 'Raton de Biblioteca', desc: 'Solicita y devuelve 3 libros a tiempo.', xp: 150, done: false, progress: '0/3' },
+            { icon: 'bi-geo-alt-fill', title: 'Visitante Frecuente', desc: 'Registra tu asistencia en recepcion 5 veces.', xp: 100, done: false, progress: '1/5' },
+            { icon: 'bi-pc-display', title: 'Era Digital', desc: 'Reserva una computadora 3 veces.', xp: 75, done: false, progress: '0/3' },
+            { icon: 'bi-people-fill', title: 'Trabajo en Equipo', desc: 'Reserva una sala de estudio.', xp: 50, done: false, progress: '0/1' }
+        ];
+
+        content.innerHTML = `
+            <div class="modal-header border-0 p-4" style="background: linear-gradient(135deg, #FFD24D, #fd7e14);">
+                <h5 class="fw-bold mb-0 text-dark"><i class="bi bi-trophy-fill me-2"></i>Misiones y Logros</h5>
+                <button class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-0">
+                <div class="p-4 text-center">
+                    <h3 class="fw-bold">${currentLvl}</h3>
+                    <p class="mb-0 text-muted small">Experiencia acumulada: ${currentXP} XP</p>
+                </div>
+                <div class="list-group list-group-flush">
+                    ${missions.map(m => `
+                        <div class="list-group-item p-3 d-flex align-items-center">
+                            <div class="me-3 fs-3 ${m.done ? 'text-success' : 'text-secondary opacity-25'}"><i class="bi ${m.icon}"></i></div>
+                            <div class="flex-grow-1">
+                                <h6 class="fw-bold mb-1 small">${m.title}</h6>
+                                <small class="text-muted">${m.desc}</small>
+                                ${m.progress && !m.done ? `<div class="progress mt-2" style="height: 4px;"><div class="progress-bar bg-warning" style="width: 20%"></div></div>` : ''}
+                            </div>
+                            <span class="badge ${m.done ? 'bg-success' : 'bg-warning text-dark'} rounded-pill ms-2">${m.done ? 'OK' : `+${m.xp}`}</span>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+        new bootstrap.Modal(document.getElementById('modal-misiones')).show();
+    }
+
+    // --- PRESTAMO: DETALLE, EXTENSION, CANCELACION ---
+    function verDetallePrestamo(id) {
+        const content = document.getElementById('libro-detalle-content');
+        if (!content) return;
+        content.innerHTML = `
+            <div class="modal-header border-0 p-4">
+                <h5 class="fw-bold">Detalle de Prestamo</h5>
+                <button class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center p-4">
+                <div class="bg-light rounded-3 p-4 mb-3 d-inline-block">
+                    <i class="bi bi-book fs-1 text-primary"></i>
+                </div>
+                <h6 class="fw-bold mb-1">ID: ${id}</h6>
+                <p class="text-muted small">Recuerda entregar tus libros a tiempo para ganar XP y evitar multas.</p>
+            </div>
+        `;
+        new bootstrap.Modal(document.getElementById('modal-libro-detalle')).show();
+    }
+
+    async function solicitarExtension(loanId) {
+        if (!confirm("Solicitar extension de 1 dia? (Solo valido 1 vez)")) return;
+        try {
+            await BiblioService.extenderPrestamo(_ctx, loanId);
+            showToast("Extension aplicada", "success");
+            loadStudentFullData();
+        } catch (e) { showToast(e.message, "danger"); }
+    }
+
+    async function cancelarSolicitud(loanId) {
+        if (!confirm("Cancelar solicitud?")) return;
+        try {
+            await BiblioService.cancelarSolicitud(_ctx, loanId);
+            showToast("Solicitud cancelada", "success");
+            loadStudentFullData();
+        } catch (e) { showToast(e.message, "danger"); }
+    }
+
+    // --- CARGA DE DATOS ESTUDIANTE ---
+    async function loadStudentFullData() {
+        if (!_ctx.auth.currentUser) return;
+        try {
+            const tempProfile = await BiblioService.getPerfilBibliotecario(_ctx, _ctx.auth.currentUser.uid);
+            if (tempProfile && tempProfile.xp === 0) {
+                await BiblioService.procesarRecompensa(_ctx, _ctx.auth.currentUser.uid, 'first_login');
+            }
+
+            const perfil = await BiblioService.getPerfilBibliotecario(_ctx, _ctx.auth.currentUser.uid);
+            if (!perfil) return;
+
+            // [ENCUESTAS] Verificar encuesta de servicio
+            if (window.Encuestas && window.Encuestas.checkAndShowServiceSurvey) {
+                setTimeout(() => window.Encuestas.checkAndShowServiceSurvey('biblioteca'), 2000);
+            }
+
+            // Hero banner
+            const heroName = document.getElementById('hero-user-name');
+            const heroSub = document.getElementById('hero-user-subtitle');
+            if (heroName) heroName.textContent = `Hola, ${(perfil.nombre || 'Estudiante').split(' ')[0]}`;
+            if (heroSub) heroSub.textContent = `${perfil.matricula || ''} - Explora, aprende y crece.`;
+
+            // XP (hero)
+            const elLvlBadge = document.getElementById('xp-level-badge');
+            const elCur = document.getElementById('xp-current');
+            const elBar = document.getElementById('xp-bar-fill');
+            const nextLevelXP = perfil.nivel * 500;
+            const progress = Math.min((perfil.xp / nextLevelXP) * 100, 100);
+
+            if (elLvlBadge) elLvlBadge.innerText = `NIVEL ${perfil.nivel}`;
+            if (elCur) elCur.innerText = `${perfil.xp} XP`;
+            if (elBar) elBar.style.width = `${progress}%`;
+
+            // XP (card in mochila tab)
+            const elLvlCard = document.getElementById('xp-level-badge-card');
+            const elDetailCard = document.getElementById('xp-detail');
+            const elBarCard = document.getElementById('xp-bar-fill-card');
+            if (elLvlCard) elLvlCard.innerText = `NIVEL ${perfil.nivel}`;
+            if (elDetailCard) elDetailCard.innerText = `${perfil.xp} / ${nextLevelXP} XP`;
+            if (elBarCard) elBarCard.style.width = `${progress}%`;
+
+            // Debt Alert (global, visible in all tabs)
+            const debtBox = document.getElementById('debt-alert-sticky');
+            const debtAmt = document.getElementById('debt-amount');
+            if (debtBox && debtAmt) {
+                if (perfil.deudaTotal > 0) {
+                    debtBox.classList.remove('d-none');
+                    debtBox.classList.add('d-flex');
+                    debtAmt.innerText = `$${perfil.deudaTotal.toFixed(2)}`;
+                } else {
+                    debtBox.classList.add('d-none');
+                    debtBox.classList.remove('d-flex');
+                }
+            }
+
+            // Guardar listas completas para "ver mas"
+            _fullLists['list-enmano'] = perfil.recogidos;
+            _fullLists['list-solicitados'] = perfil.solicitados;
+            _fullLists['list-historial'] = perfil.historial.slice(0, 20);
+
+            // Render lists (muestra solo los primeros 3)
+            renderBookList('list-enmano', perfil.recogidos, 'recogido');
+            renderBookList('list-solicitados', perfil.solicitados, 'solicitado');
+            renderBookList('list-historial', perfil.historial.slice(0, 20), 'historial');
+
+            // Load reservations
+            loadMisReservas();
+
+        } catch (e) { console.error("Error cargando perfil:", e); }
+    }
+
+    function refreshData() {
+        loadStudentFullData();
+        showToast("Datos actualizados", "info");
+    }
+
+    // --- RENDER BOOK LIST (Modernizado + Lazy: 3 items + ver mas) ---
+    const INITIAL_SHOW = 3;
+
+    function renderBookList(containerId, list, type) {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+        container.innerHTML = '';
+
+        if (!list || list.length === 0) {
+            const emptyMessages = {
+                recogido: 'No tienes libros en mano.',
+                solicitado: 'No tienes solicitudes pendientes.',
+                historial: 'Tu historial esta vacio.'
+            };
+            const emptyIcons = {
+                recogido: 'bi-backpack2',
+                solicitado: 'bi-clock-history',
+                historial: 'bi-archive'
+            };
+            container.innerHTML = `
+                <div class="text-center py-4 text-muted bg-light rounded-4">
+                    <i class="bi ${emptyIcons[type] || 'bi-inbox'} fs-1 d-block mb-2 opacity-50"></i>
+                    <p class="mb-0 small">${emptyMessages[type] || 'No hay elementos.'}</p>
+                </div>`;
+            return;
+        }
+
+        // Mostrar solo los primeros INITIAL_SHOW items
+        const visibleItems = list.slice(0, INITIAL_SHOW);
+        const hasMore = list.length > INITIAL_SHOW;
+
+        visibleItems.forEach(item => container.appendChild(_createBookCard(item, type)));
+
+        // Boton "ver mas" si hay items ocultos
+        if (hasMore) {
+            const moreBtn = document.createElement('div');
+            moreBtn.className = 'text-center mt-2';
+            moreBtn.id = `btn-more-${containerId}`;
+            moreBtn.innerHTML = `
+                <button class="btn btn-sm btn-outline-secondary rounded-pill px-4" onclick="Biblio.showAllItems('${containerId}', '${type}')">
+                    <i class="bi bi-chevron-down me-1"></i>Ver todos (${list.length})
+                </button>`;
+            container.appendChild(moreBtn);
+        }
+    }
+
+    // Almacenar listas completas para "ver mas"
+    let _fullLists = {};
+
+    function showAllItems(containerId, type) {
+        const list = _fullLists[containerId];
+        if (!list) return;
+        const container = document.getElementById(containerId);
+        if (!container) return;
+        container.innerHTML = '';
+        list.forEach(item => container.appendChild(_createBookCard(item, type)));
+    }
+
+    function _createBookCard(item, type) {
+        const el = document.createElement('div');
+
+        let statusColor = 'secondary';
+        let statusText = 'Desconocido';
+        let mainDate = '';
+        let dateLabel = '';
+        let actionBtn = '';
+        let alertLate = false;
+
+        if (type === 'recogido') {
+            const venc = item.fechaVencimiento?.toDate ? item.fechaVencimiento.toDate() : null;
+            const now = new Date();
+            const isToday = venc && now.toDateString() === venc.toDateString();
+            const isLate = venc && now > venc;
+            const isAfter3PM = now.getHours() >= 15;
+
+            alertLate = (isToday && isAfter3PM) || isLate;
+            statusColor = isLate ? 'danger' : (isToday ? 'info' : 'warning');
+            statusText = isLate ? 'VENCIDO' : (isToday ? 'VENCE HOY' : 'EN PRESTAMO');
+            mainDate = venc ? venc.toLocaleDateString() : '???';
+            dateLabel = 'Fecha Limite';
+
+            const canExtend = !isLate && !isToday;
+            actionBtn = `
+                <button class="btn btn-sm btn-outline-dark rounded-pill" onclick="Biblio.verDetallePrestamo('${item.id}')">
+                    <i class="bi bi-eye me-1"></i>Detalle
+                </button>
+                ${canExtend ? `<button class="btn btn-sm btn-outline-warning rounded-pill ms-2" onclick="Biblio.solicitarExtension('${item.id}')">
+                    <i class="bi bi-plus-circle me-1"></i>+1 Dia
+                </button>` : ''}
+            `;
+
+        } else if (type === 'solicitado') {
+            const exp = item.fechaExpiracionRecoleccion?.toDate ? item.fechaExpiracionRecoleccion.toDate() : null;
+            statusColor = 'info';
+            statusText = 'APROBADO';
+            mainDate = exp ? `${exp.toLocaleDateString()} ${exp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : '???';
+            dateLabel = 'Recoger antes de';
+            actionBtn = `<button class="btn btn-sm btn-outline-danger rounded-pill" onclick="Biblio.cancelarSolicitud('${item.id}')">
+                <i class="bi bi-x-circle me-1"></i>Cancelar
+            </button>`;
+
+        } else if (type === 'historial') {
+            statusColor = item.estado === 'finalizado' ? 'success' : (item.estado === 'cobro_pendiente' ? 'danger' : 'secondary');
+            statusText = item.estado === 'finalizado' ? 'DEVUELTO' : (item.estado === 'cobro_pendiente' ? 'CON MULTA' : (item.estado || 'N/A').toUpperCase());
+            const devol = item.fechaDevolucionReal?.toDate ? item.fechaDevolucionReal.toDate().toLocaleDateString() : '';
+            mainDate = devol;
+            dateLabel = 'Devuelto el';
+        }
+
+        el.className = `card border-0 shadow-sm rounded-4 overflow-hidden biblio-card-stripe-${statusColor} mb-3`;
+        el.innerHTML = `
+            <div class="card-body p-3">
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                    <span class="badge bg-${statusColor}-subtle text-${statusColor} rounded-pill fw-bold small">${statusText}</span>
+                    ${alertLate ? '<i class="bi bi-alarm-fill text-danger fs-5" title="Devolver urgentemente"></i>' : ''}
+                </div>
+                <h6 class="fw-bold text-dark mb-1" style="font-size: 0.9rem;">${item.tituloLibro || 'Libro Desconocido'}</h6>
+                <div class="d-flex align-items-center text-muted small mb-2">
+                    <i class="bi bi-calendar-event me-2"></i>${dateLabel}: <strong class="ms-1 text-dark">${mainDate}</strong>
+                </div>
+                ${actionBtn ? `<div class="d-flex justify-content-end gap-2">${actionBtn}</div>` : ''}
+            </div>
+        `;
+        return el;
+    }
+
+    // --- MIS RESERVAS ---
+    async function loadMisReservas() {
+        const container = document.getElementById('list-mis-reservas');
+        if (!container) return;
+        try {
+            const reservas = await BiblioAssetsService.getMyReservations(_ctx, _ctx.auth.currentUser.uid);
+            if (!reservas || reservas.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-4 text-muted bg-light rounded-4">
+                        <i class="bi bi-calendar-x fs-1 d-block mb-2 opacity-50"></i>
+                        <p class="mb-0 small">No tienes reservas activas.</p>
+                    </div>`;
+                return;
+            }
+            container.innerHTML = reservas.map(r => `
+                <div class="card border-0 shadow-sm rounded-3 mb-2">
+                    <div class="card-body p-3 d-flex align-items-center gap-3">
+                        <div class="bg-${r.tipo === 'pc' ? 'primary' : 'success'} bg-opacity-10 p-2 rounded-3">
+                            <i class="bi bi-${r.tipo === 'pc' ? 'pc-display' : 'people'} text-${r.tipo === 'pc' ? 'primary' : 'success'}"></i>
+                        </div>
+                        <div class="flex-grow-1">
+                            <h6 class="fw-bold mb-0 small">${r.assetId}</h6>
+                            <small class="text-muted">${r.date} - ${r.hourBlock}</small>
+                        </div>
+                        <span class="badge bg-${r.status === 'activa' ? 'success' : 'secondary'}-subtle text-${r.status === 'activa' ? 'success' : 'secondary'} rounded-pill">${r.status}</span>
+                    </div>
+                </div>
+            `).join('');
+        } catch (e) {
+            console.warn("Error cargando reservas:", e);
+        }
+    }
+
+    async function sendSuggestion() {
+        const t = document.getElementById('sug-titulo')?.value;
+        const a = document.getElementById('sug-autor')?.value;
+        if (!t) return showToast("Falta titulo", "warning");
+        try {
+            await BiblioService.addSuggestion(_ctx, { titulo: t, autor: a, by: _ctx.auth.currentUser.uid });
+            showToast("Sugerencia enviada", "success");
+            bootstrap.Modal.getInstance(document.getElementById('modal-sugerencia'))?.hide();
+        } catch (e) { showToast("Error enviando", "danger"); }
+    }
+
+    // [FIX] Update Dashboard Helper
+    async function updateDashboard() {
+        try {
+            // Count active visits
+            const visitsSnap = await _ctx.db.collection('biblio-visitas') // Define Const or use string
+                .orderBy('fecha', 'desc')
+                .limit(50)
+                .get();
+
+            // Filter today
+            const now = new Date();
+            const startOfDay = new Date(now.setHours(0, 0, 0, 0));
+            const todayVisits = visitsSnap.docs.filter(d => d.data().fecha.toDate() >= startOfDay);
+
+            if (document.getElementById('stat-visitas-hoy'))
+                document.getElementById('stat-visitas-hoy').innerText = todayVisits.length;
+
+            // Load Access List
+            const listContainer = document.getElementById('admin-access-list');
+            if (listContainer) {
+                listContainer.innerHTML = todayVisits.slice(0, 10).map(d => {
+                    const v = d.data();
+                    const isTeam = v.motivo === 'Trabajo en Equipo' || v.relatedUsers?.length > 0;
+                    return `
+                        <div class="d-flex align-items-center justify-content-between p-3 border-bottom">
+                            <div class="d-flex align-items-center">
+                                <div class="bg-light rounded-circle p-2 me-3">
+                                    <i class="bi bi-${isTeam ? 'people' : 'person'} text-primary"></i>
+                                </div>
+                                <div>
+                                    <h6 class="fw-bold mb-0">${v.studentName}</h6>
+                                    <small class="text-muted">${v.matricula} &bull; ${v.motivo}</small>
+                                </div>
+                            </div>
+                            <div class="text-end">
+                                <span class="text-muted small d-block mb-1">${v.fecha.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                <button class="btn btn-sm btn-outline-danger rounded-pill px-3 py-0 mb-1" style="font-size: 0.75rem;" 
+                                        onclick="Biblio.terminarVisita('${d.id}', '${v.uid || ''}', '${v.matricula || ''}')">
+                                    Salida <i class="bi bi-box-arrow-right ms-1"></i>
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
+
+        } catch (e) {
+            console.warn("Dashboard update failed", e);
+        }
+    }
+
+    async function terminarVisita(visitId, uid, matricula) {
+        if (!confirm("¿Registrar salida del usuario? Se liberarán sus espacios asignados.")) return;
+        try {
+            // 1. Release Assets
+            let msgDetails = "";
+            if (uid) {
+                const freed = await BiblioAssetsService.liberarActivoDeUsuario(_ctx, uid);
+                if (freed) msgDetails = ` (Liberado: ${freed})`;
+            }
+
+            // 2. We could update the 'listing' status if we had one, but currently we just track valid visits.
+            // Maybe update 'biblio-visitas' doc to add 'exitTime'?
+            await _ctx.db.collection('biblio-visitas').doc(visitId).update({
+                salida: firebase.firestore.FieldValue.serverTimestamp(),
+                status: 'finalizada'
+            });
+
+            showToast(`Salida registrada.${msgDetails}`, "success");
+            updateDashboard(); // Refresh list
+
+        } catch (e) { showToast(e.message, "danger"); }
+    }
+
+
+// --- SERVICIOS DIGITALES (PC / SALAS) ---
+
+    let _currentServiceType = null;
+    let _selectedAssetId = null;
+    let _selectedTimeBlock = null;
+
+    function abrirModalServicio(type) {
+        _currentServiceType = type;
+        const title = type === 'pc' ? 'Reservar Computadora' : 'Reservar Sala de Estudio';
+        const modalContent = document.getElementById('servicio-reserva-content');
+
+        // Date Default: Today
+        const today = new Date().toISOString().split('T')[0];
+
+        modalContent.innerHTML = `
+            <div class="modal-header border-0 bg-primary text-white">
+                <h5 class="fw-bold mb-0"><i class="bi bi-${type === 'pc' ? 'pc-display' : 'people'} me-2"></i>${title}</h5>
+                <button class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4 bg-light">
+                <label class="small fw-bold text-muted mb-2">1. Elige una fecha</label>
+                <input type="date" id="service-date-picker" class="form-control rounded-pill mb-4 shadow-sm" value="${today}" min="${today}" onchange="AdminBiblio.renderAvailabilityGrid()">
+                
+                <label class="small fw-bold text-muted mb-2">2. Disponibilidad</label>
+                <div id="service-availability-grid" class="d-flex flex-column gap-2" style="max-height: 300px; overflow-y: auto;">
+                    <div class="text-center text-muted py-4"><span class="spinner-border spinner-border-sm"></span> Cargando horarios...</div>
+                </div>
+            </div>
+            <div class="modal-footer border-0 p-3">
+                <button class="btn btn-primary w-100 rounded-pill shadow" id="btn-confirm-service" disabled onclick="AdminBiblio.confirmarReserva()">
+                    Confirmar Reserva
+                </button>
+            </div>
+        `;
+
+        new bootstrap.Modal(document.getElementById('modal-servicio-reserva')).show();
+        setTimeout(renderAvailabilityGrid, 500); // Allow render
+    }
+
+    async function renderAvailabilityGrid() {
+        const date = document.getElementById('service-date-picker').value;
+        const container = document.getElementById('service-availability-grid');
+        const type = _currentServiceType;
+
+        container.innerHTML = '<div class="text-center py-3"><div class="spinner-border text-primary"></div></div>'; // Clear & Load
+
+        try {
+            // 1. Get Assets of Type
+            const allAssets = await new Promise(resolve => {
+                // Hack: use existing stream or fetch once.
+                const unsub = BiblioAssetsService.streamAssets(_ctx, (list) => {
+                    resolve(list.filter(a => a.tipo === type && (a.status === 'disponible' || !a.status))); // Filter active only
+                    unsub(); // Unsub immediately
+                });
+            });
+
+            // 2. Get Occupied Slots
+            const occupiedMap = await BiblioAssetsService.getAvailability(_ctx, date, type);
+
+            // 3. Render
+            if (allAssets.length === 0) {
+                container.innerHTML = `<div class="alert alert-secondary small">No hay equipos disponibles en este momento.</div>`;
+                return;
+            }
+
+            container.innerHTML = '';
+
+            // Generate Time Blocks (e.g. 8AM to 6PM)
+            const hours = [];
+            for (let i = 8; i <= 18; i++) hours.push(`${i.toString().padStart(2, '0')}:00`);
+
+            allAssets.forEach(asset => {
+                const assetRow = document.createElement('div');
+                assetRow.className = 'bg-white p-3 rounded-3 shadow-sm mb-2';
+
+                const occupiedHours = occupiedMap[asset.id] || [];
+
+                let slotsHtml = `<div class="d-flex gap-2 overflow-auto pb-1" style="scrollbar-width:thin;">`;
+                hours.forEach(h => {
+                    const isTaken = occupiedHours.includes(h);
+                    // Disable past hours if today
+                    const now = new Date();
+                    const isToday = new Date().toISOString().split('T')[0] === date;
+                    const isPast = isToday && parseInt(h) <= now.getHours();
+
+                    const disabled = isTaken || isPast;
+                    const styleClass = isTaken ? 'bg-danger-subtle text-danger border-danger' :
+                        (isPast ? 'bg-light text-muted border-light' : 'btn-outline-primary');
+
+                    if (disabled) {
+                        slotsHtml += `<button class="btn btn-sm ${styleClass} rounded-pill px-3" disabled style="min-width: 70px;">${h}</button>`;
+                    } else {
+                        slotsHtml += `<button class="btn btn-sm btn-outline-primary rounded-pill px-3" style="min-width: 70px;" 
+                                        onclick="AdminBiblio.selectSlot(this, '${asset.id}', '${h}')">${h}</button>`;
+                    }
+                });
+                slotsHtml += `</div>`;
+
+                assetRow.innerHTML = `
+                    <div class="d-flex align-items-center mb-2">
+                        <i class="bi bi-${type === 'pc' ? 'pc-display' : 'table'} text-muted me-2"></i>
+                        <span class="fw-bold small text-dark">${asset.nombre}</span>
+                    </div>
+                    ${slotsHtml}
+                `;
+                container.appendChild(assetRow);
+            });
+
+        } catch (e) {
+            container.innerHTML = `<div class="text-danger small">Error: ${e.message}</div>`;
+        }
+    }
+
+    function selectSlot(btn, assetId, time) {
+        // Clear previous selection
+        document.querySelectorAll('#service-availability-grid button').forEach(b => {
+            if (!b.disabled) {
+                b.classList.remove('btn-primary', 'text-white');
+                b.classList.add('btn-outline-primary');
+            }
+        });
+
+        // Highlight new
+        btn.classList.remove('btn-outline-primary');
+        btn.classList.add('btn-primary', 'text-white');
+
+        _selectedAssetId = assetId;
+        _selectedTimeBlock = time;
+
+        document.getElementById('btn-confirm-service').disabled = false;
+    }
+
+    async function confirmarReserva() {
+        const date = document.getElementById('service-date-picker').value;
+        if (!_selectedAssetId || !_selectedTimeBlock || !date) return;
+
+        const btn = document.getElementById('btn-confirm-service');
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Reservando...';
+
+        try {
+            await BiblioAssetsService.reservarEspacio(_ctx, {
+                studentId: _ctx.auth.currentUser.uid,
+                assetId: _selectedAssetId,
+                hourBlock: _selectedTimeBlock,
+                date: date,
+                tipo: _currentServiceType
+            });
+            showToast("Reserva exitosa", "success");
+            bootstrap.Modal.getInstance(document.getElementById('modal-servicio-reserva')).hide();
+
+            // [ENCUESTAS] Registrar uso
+            if (window.EncuestasServicioService) {
+                EncuestasServicioService.registerServiceUsage(_ctx, 'biblioteca', { action: 'reserva_espacio', type: _currentServiceType });
+            }
+        } catch (e) {
+            showToast(e.message, "danger");
+            btn.disabled = false;
+            btn.innerText = "Reintentar";
+        }
+    }
+
+    return {
+        init,
+        initStudent, // Export to allow router to call it
+        // Student
+        handleSearch: handleGlobalSearch, handleGlobalSearch, handleInlineSearch, openCategoryModal,
+        verDetalleLibro, solicitarLibro, sendSuggestion, registrarVisita,
+        toggleSearch, showMissionsModal, scrollCarousel, verDetallePrestamo, solicitarExtension, cancelarSolicitud,
+        refreshData, showAllItems,
+        // Digital Services (Student)
+        abrirModalServicio, renderAvailabilityGrid, selectSlot, confirmarReserva,
+        solicitarServicio: abrirModalServicio, renderTopBooksCarousel
+    };
 })();
+window.Biblio = Biblio;

@@ -1,0 +1,333 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // --- HELPERS ---
+    function isSignedIn() { return request.auth != null; }
+    function isOwner(uid) { return isSignedIn() && request.auth.uid == uid; }
+    function userDoc(uid) { return get(/databases/$(database)/documents/usuarios/$(uid)); }
+    function roleOf(uid)  { return userDoc(uid).data.role; }
+    
+    // Roles Específicos
+    
+    // --- BACKDOOR DE DESARROLLADOR ---
+    function isDev() { 
+      return request.auth.uid == 'G7HRuNnlePNLYr26z9ad5jBgHA82'; 
+    }
+
+    function isSalud() { 
+      let data = userDoc(request.auth.uid).data;
+      let esp = data.get('especialidad', '').toUpper();
+      let espAlt = data.get('specialty', '').toUpper();
+      return isSignedIn() && (data.role == 'medico' || data.role == 'psicologo' || esp == 'PSICOLOGO' || espAlt == 'PSICOLOGO'); 
+    }
+    function isBiblio() { return isSignedIn() && (roleOf(request.auth.uid) == 'biblio' || roleOf(request.auth.uid) == 'bibliotecario' || roleOf(request.auth.uid) == 'biblio_admin'); }
+    function isAula()   { return isSignedIn() && roleOf(request.auth.uid) == 'aula'; }
+    function isForo()   { return isSignedIn() && (roleOf(request.auth.uid) == 'foro' || roleOf(request.auth.uid) == 'foro_admin'); }
+    
+    // Validar si es Admin de Lactario (Calidad o permiso específico)
+    function isLactarioAdmin() {
+        let data = userDoc(request.auth.uid).data;
+        let perm = data.get('permissions', {});
+        return isSignedIn() && (data.role == 'department_admin' && perm.get('lactario', '') == 'admin');
+    }
+
+    // Al incluir isDev() aquí, tienes acceso a TODO lo que permite SuperAdmin
+    function isSuperAdmin() { return isSignedIn() && (roleOf(request.auth.uid) == 'superadmin' || isDev()); }
+
+
+    // [NUEVO] Helper para Desarrollo Académico (Reportes)
+    function isDesarrollo() {
+        let data = userDoc(request.auth.uid).data;
+        let perm = data.get('permissions', {});
+        return isSignedIn() && (
+            request.auth.token.email == 'desarrolloacademico@loscabos.tecnm.mx' ||
+            request.auth.token.email == 'biblioteca@loscabos.tecnm.mx' ||
+            isSuperAdmin() ||
+            (data.role == 'department_admin' && perm.get('reportes', '') == 'admin')
+        );
+    }
+
+    // ==== USUARIOS ====
+    match /usuarios/{uid} {
+      allow read: if isSignedIn(); // Desarrollo necesita leer nombres para reportes
+      allow create: if isOwner(uid);
+      allow update: if isOwner(uid) || isSuperAdmin() || isBiblio();
+      
+      match /notificaciones/{notifId} {
+        allow create: if isSalud() || isSuperAdmin() || isBiblio() || isLactarioAdmin();
+        allow read, update, delete: if isOwner(uid);
+      }
+
+      // [NEW] Perfiles de Usuario (Multi-perfil / Psicología)
+      match /profiles/{profileId} {
+        allow read, write: if isOwner(uid) || isSuperAdmin();
+      }
+    }
+
+    // ==== LACTARIO (NUEVO) ====
+    match /lactario-bookings/{id} {
+      allow read: if isSignedIn(); // Lectura para checkear slots, se filtra por query en cliente
+      allow create: if isSignedIn(); // Usuario crea su reserva
+      allow update: if isOwner(resource.data.userId) || isLactarioAdmin() || isSuperAdmin();
+      allow delete: if isLactarioAdmin() || isSuperAdmin();
+    }
+    
+    match /lactario-spaces/{id} {
+      allow read: if isSignedIn();
+      allow write: if isLactarioAdmin() || isSuperAdmin();
+    }
+    
+    match /lactario_fridges/{id} {
+      allow read: if isSignedIn();
+      allow write: if isLactarioAdmin() || isSuperAdmin();
+    }
+    
+    match /lactario-config/{id} {
+      allow read: if isSignedIn();
+      allow write: if isLactarioAdmin() || isSuperAdmin();
+    }
+
+    // ==== BIBLIO ====
+    match /biblio-visitas/{id} {
+      allow read: if isBiblio() || isSuperAdmin() || isDesarrollo() || (isSignedIn() && resource.data.studentId == request.auth.uid); 
+      allow create: if isSignedIn();
+      allow update: if isBiblio() || isSuperAdmin() || (isSignedIn() && resource.data.studentId == request.auth.uid);
+    }
+
+    match /biblio-catalogo/{bookId} {
+      allow read: if isSignedIn();
+      allow update: if isSignedIn(); 
+      allow create, delete: if isBiblio() || isSuperAdmin();
+      
+      match /waitlist/{uid} {
+        allow read, write: if isSignedIn() && request.auth.uid == uid;
+      }
+    }
+    
+    match /biblio-solicitudes/{id} {
+      allow create: if isSignedIn();
+      allow read: if isBiblio() || isSuperAdmin() || (isSignedIn() && resource.data.uid == request.auth.uid);
+    }
+    
+    match /prestamos-biblio/{id} {
+      allow read: if isSignedIn() && (isOwner(resource.data.studentId) || isBiblio() || isSuperAdmin() || isDesarrollo());
+      allow create: if isSignedIn() && (request.resource.data.studentId == request.auth.uid || isBiblio() || isSuperAdmin());
+      allow update: if isBiblio() || isSuperAdmin() || (isOwner(resource.data.studentId) && request.resource.data.estado == 'cancelado');
+      allow delete: if isOwner(resource.data.studentId) && resource.data.estado == 'pendiente'; 
+    }
+
+    match /biblio-wishlist/{id} {
+      allow read: if isSignedIn(); 
+      allow create: if isSignedIn() && request.resource.data.uid == request.auth.uid;
+      allow delete: if isSignedIn() && resource.data.uid == request.auth.uid;
+    }
+
+    match /biblio-reservas/{id} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && (request.resource.data.studentId == request.auth.uid || isBiblio() || isSuperAdmin());
+      allow update: if isBiblio() || isSuperAdmin();
+      allow delete: if isOwner(resource.data.studentId) || isBiblio() || isSuperAdmin();
+    }
+
+    match /biblio-activos/{id} {
+      allow read: if true;
+      allow write: if isBiblio() || isSuperAdmin();
+    }
+
+    // ==== MEDI ====
+    match /citas-medi/{id} {
+      allow read: if isSignedIn() && (isOwner(resource.data.studentId) || isSalud() || isSuperAdmin() || isDesarrollo()); 
+      allow create: if isSignedIn() && (request.resource.data.studentId == request.auth.uid || isSalud() || isSuperAdmin());
+      allow update: if isSalud() || isSuperAdmin() || (isOwner(resource.data.studentId) && resource.data.estado == 'pendiente');
+    }
+    match /expedientes-clinicos/{docId} {
+      allow create: if isSalud() || isSuperAdmin();
+      allow read: if isSuperAdmin() || (isOwner(resource.data.studentId) && resource.data.visiblePaciente == true) || isSalud() || isDesarrollo(); // Legacy + Root + Reportes
+      allow update: if (isSalud() && (resource.data.autorId == request.auth.uid || docId == resource.data.studentId)) || isSuperAdmin();
+      
+      // Nueva Estructura: Subcolección de Consultas
+      match /consultas/{consultaId} {
+        allow read: if isSalud() || isSuperAdmin() || isOwner(docId) || isDesarrollo();
+        allow write: if isSalud() || isSuperAdmin();
+      }
+    }
+    match /medi-consultas/{id} { allow read, write: if isSalud() || isSuperAdmin(); }
+    match /medi-slots/{slotId} { allow read, write: if isSignedIn(); }
+    match /medi-config/{docId} { allow read: if isSignedIn(); allow write: if isSuperAdmin() || isSalud(); }
+
+    // [NEW] MEDI CHAT RULES (C5+E1)
+    match /medi-conversations/{convId} {
+      // Helper function to check participation
+      function isChatParticipant() {
+        return isSignedIn() && (
+          resource.data.studentId == request.auth.uid || 
+          resource.data.profesionalId == request.auth.uid || 
+          isOwner(resource.data.profesionalProfileId)
+        );
+      }
+      
+      allow read: if isChatParticipant() || isSuperAdmin();
+      allow create: if isSignedIn(); // Allow creation (service handles logic)
+      allow update: if isChatParticipant() || isSuperAdmin();
+      
+      match /messages/{msgId} {
+        allow read: if get(/databases/$(database)/documents/medi-conversations/$(convId)).data.studentId == request.auth.uid ||
+                     get(/databases/$(database)/documents/medi-conversations/$(convId)).data.profesionalId == request.auth.uid ||
+                     isSuperAdmin();
+        allow create: if isSignedIn();
+      }
+    }
+
+    // [FIX] Collection Group for Dashboard
+    match /{path=**}/consultas/{consultaId} {
+      allow read: if isSalud() || isSuperAdmin();
+    }
+
+    // ==== AULA ====
+    match /aula-avisos/{id} {
+      allow read: if isSignedIn();
+      allow write: if isAula() || isSuperAdmin();
+    }
+    match /aula-cursos/{id} {
+      allow read: if true; 
+      allow write: if isAula() || isSuperAdmin();
+    }
+    match /aula-inscripciones/{id} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && request.resource.data.studentId == request.auth.uid;
+      allow delete: if isOwner(resource.data.studentId) || isAula() || isSuperAdmin();
+    }
+    match /aula-cursos/{cursoId}/lessons/{lessonId} {
+      allow read: if isSignedIn();
+      allow write: if isAula() || isSuperAdmin();
+    }
+    match /aula-cursos/{cursoId}/quizzes/{quizId} {
+      allow read: if isSignedIn();
+      allow write: if isAula() || isSuperAdmin();
+    }
+    match /aula-progress/{docId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn() && (request.resource.data.uid == request.auth.uid || isAula() || isSuperAdmin());
+      allow delete: if isSignedIn() && (isAula() || isSuperAdmin());
+    }
+    match /aula-intentos/{docId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && (request.resource.data.uid == request.auth.uid || isAula() || isSuperAdmin());
+      allow update, delete: if isSignedIn() && (isAula() || isSuperAdmin());
+    }
+    match /aula-certificados/{certId} {
+      allow read: if true;
+      allow write: if isAula() || isSuperAdmin();
+    }
+    
+    match /aula-badges/{badgeId} {
+      // Permitir leer si eres dueño, superadmin o aula admin
+      allow read: if isSignedIn() && (resource.data.uid == request.auth.uid || isSuperAdmin() || isAula());
+      // Permitir crear/actualizar si es para uno mismo (el sistema lo hace a nombre del usuario) o admin
+      allow create, update: if isSignedIn() && (request.resource.data.uid == request.auth.uid || isSuperAdmin() || isAula());
+      allow delete: if isSuperAdmin() || isAula();
+    }
+    
+    // ==== FORO ====
+    match /foro_events/{eventId} {
+      allow read: if isSignedIn();
+      allow write: if isForo() || isSuperAdmin();
+    }
+    match /foro_notices/{noticeId} {
+      allow read: if isSignedIn();
+      allow write: if isForo() || isSuperAdmin();
+    }
+    match /foro_tickets/{ticketId} {
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isForo() || isSuperAdmin());
+      allow create: if isSignedIn() && (request.resource.data.userId == request.auth.uid || isForo() || isSuperAdmin());
+      allow update, delete: if isForo() || isSuperAdmin();
+    }
+    match /foro_registrations/{ticketId} {
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isForo() || isSuperAdmin());
+      allow create: if isSignedIn() && (request.resource.data.userId == request.auth.uid || isForo() || isSuperAdmin());
+      allow update, delete: if isForo() || isSuperAdmin();
+    }
+
+    // ==== QUEJAS ====
+    function isQuejasAdmin() {
+        let data = userDoc(request.auth.uid).data;
+        let perm = data.get('permissions', {});
+        return isSignedIn() && ((data.role == 'department_admin' && perm.get('quejas', '') == 'admin') || request.auth.token.email == 'calidad@loscabos.tecnm.mx');
+    }
+
+    match /quejas/{ticketId} {
+      allow create: if isSignedIn();
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isQuejasAdmin() || isSuperAdmin());
+      allow update: if isQuejasAdmin() || isSuperAdmin();
+    }
+    
+    // ==== ENCUESTAS ====
+function isEncuestasAdmin() {
+    let data = userDoc(request.auth.uid).data;
+    let perm = data.get('permissions', {});
+    return isSignedIn() && ((data.role == 'department_admin' && perm.get('encuestas', '') == 'admin') 
+           || request.auth.token.email == 'calidad@loscabos.tecnm.mx');
+}
+
+    // ==== ENCUESTAS DE SERVICIO (NUEVO) ====
+    match /encuestas-servicio/{id} {
+      // Configuración de encuestas: Lectura auth, Escritura admin
+      allow read: if isSignedIn();
+      allow write: if isEncuestasAdmin() || isSuperAdmin();
+    }
+
+    match /encuestas-servicio-respuestas/{id} {
+        // Respuestas: Crear auth, Leer admin
+        allow create: if isSignedIn();
+        allow read: if isEncuestasAdmin() || isSuperAdmin();
+    }
+
+    match /encuestas-servicio-triggers/{id} {
+        // Triggers (estado por usuario): Leer/Escribir su propio registro o admin
+        allow read, write: if isSignedIn() && (
+            id.matches(request.auth.uid + '_.*') || 
+            (resource != null && isOwner(resource.data.userId)) ||
+            isBiblio() || isSalud() || isEncuestasAdmin() || isSuperAdmin()
+        );
+    }
+
+    // ==== ENCUESTAS DE SATISFACCIÓN (LIGADAS A TRÁMITES/GENERAL) ====
+    match /encuestas/{surveyId} {
+      allow read: if true;  // Públicas necesitan lectura sin auth
+      allow create, update, delete: if isEncuestasAdmin() || isSuperAdmin();
+    }
+    
+    match /encuestas-respuestas/{responseId} {
+      // Lectura: solo admin o el propio usuario
+      allow read: if isEncuestasAdmin() || isSuperAdmin() 
+                   || (isSignedIn() && resource.data.userId == request.auth.uid);
+      // Creación: autenticados O anónimos (para encuestas públicas)
+      allow create: if true;
+      allow update, delete: if false;
+    }
+
+    
+
+    // ==== AVISOS INSTITUCIONALES ====
+    function isAvisosAdmin() {
+        let data = userDoc(request.auth.uid).data;
+        let perm = data.get('permissions', {});
+        return isSignedIn() && (
+            (data.role == 'department_admin' && perm.get('avisos', '') == 'admin') || 
+            request.auth.token.email == 'difusion@loscabos.tecnm.mx'
+        );
+    }
+
+    match /avisos/{avisoId} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isAvisosAdmin() || isSuperAdmin();
+    }
+    
+    // [NEW] Shift Profiles for Medi
+    match /medi-shift-profiles/{id} {
+      allow read: if isSignedIn();
+      allow write: if isSalud() || isSuperAdmin();
+    }
+  }
+}

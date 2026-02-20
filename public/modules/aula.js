@@ -1,1809 +1,1080 @@
+/* ============================================================
+   Aula — Modulo principal · Vista Catalogo + Admin
+   Mobile-first · Bootstrap 5 · Dark-mode compatible
+   Modulos > Lecciones · Gamificacion basica
+   ============================================================ */
 (function (global) {
   const AulaModule = (function () {
+
     const CURS = 'aula-cursos';
     const INSC = 'aula-inscripciones';
-    let _ctx = null;
     const PROG = 'aula-progress';
     const CERT = 'aula-certificados';
+
+    let _ctx = null;
     let _studentState = null;
+    let _adminCourseCache = [];
 
-    let _adminCourseCache = []; // Cache para el dropdown de reportes
-    function wireOnce(id, type, handler) {
-      const el = document.getElementById(id);
-      if (!el || el.dataset.wired) return el;
-      el.addEventListener(type, handler);
-      el.dataset.wired = '1';
-      return el;
-    }
-
-    // ===== STUDENT =====
-    // ===== STUDENT =====
-    async function initStudent(ctx) {
-      _ctx = ctx;
-
-      const uid = _ctx.auth && _ctx.auth.currentUser ? _ctx.auth.currentUser.uid : null;
-      const root = document.getElementById('aula-student-home');
-      if (!uid || !root) return;
-
-      const AVISOS_SEED = [
-        "📅 Las inscripciones a cursos de verano cierran el próximo viernes.",
-        "🎓 Recuerda descargar tus constancias al finalizar cada curso.",
-        "📢 Nuevo curso de 'Seguridad e Higiene' ya disponible para todos.",
-        "🔧 Mantenimiento programado de la plataforma: Sábado 23:00 hrs.",
-        "🏆 ¡Felicidades a los graduados de la generación 2025!"
-      ];
-      const RECOS_SEED = [
-        "Completa al menos un curso este mes.",
-        "Reserva un bloque de tiempo fijo para estudiar cada semana.",
-        "Revisa los materiales adicionales en cada lección.",
-        "Toma notas breves mientras ves cada módulo.",
-        "Vuelve a repasar los temas clave antes del quiz final."
-      ];
-
-      const db = _ctx.db;
-      const [cursosSnap, inscSnap, progSnap, certSnap] = await Promise.all([
-        db.collection(CURS).get(),
-        // Inscripciones -> studentId (así están las reglas y los docs)
-        db.collection(INSC)
-          .where('studentId', '==', uid)
-          .get(),
-        // Progreso -> uid (así está AulaService y las reglas)
-        db.collection(PROG)
-          .where('uid', '==', uid)
-          .get(),
-        // Certificados -> uid (así los crea AulaService.issueCertificate)
-        db.collection(CERT)
-          .where('uid', '==', uid)
-          .get()
-      ]);
-
-
-      const cursos = [];
-      cursosSnap.forEach(doc => {
-        const data = doc.data() || {};
-
-        // Sólo cursos publicados y visibles para estudiantes
-        const publicado = data.publicado !== false;
-        const publico = data.publico || 'todos';
-        const visibleParaStudent = publico === 'todos' || publico === 'estudiantes';
-
-        if (!publicado || !visibleParaStudent) return;
-
-        cursos.push({
-          id: doc.id,
-          ...data
-        });
-      });
-
-      const inscByCourse = {};
-      inscSnap.forEach(doc => {
-        const data = doc.data() || {};
-        if (!data.cursoId) return;
-        inscByCourse[data.cursoId] = {
-          id: doc.id,
-          ...data
-        };
-      });
-
-      const progByCourse = {};
-      progSnap.forEach(doc => {
-        const data = doc.data() || {};
-        if (!data.cursoId) return;
-        progByCourse[data.cursoId] = {
-          id: doc.id,
-          ...data
-        };
-      });
-
-      const certByCourse = {};
-      certSnap.forEach(doc => {
-        const data = doc.data() || {};
-        if (!data.cursoId) return;
-        certByCourse[data.cursoId] = {
-          id: doc.id,
-          ...data
-        };
-      });
-
-
-      const recommended = [];
-      const inProgress = [];
-      const completed = [];
-
-      cursos.forEach(curso => {
-        const insc = inscByCourse[curso.id] || null;
-        const prog = progByCourse[curso.id] || null;
-        const cert = certByCourse[curso.id] || null;
-
-        const progressPct = prog && typeof prog.progressPct === 'number' ? prog.progressPct : 0;
-        const hasCertificate = !!cert;
-        const isEnrolled = !!insc;
-        const isCompleted = hasCertificate || progressPct >= 100;
-
-        const viewModel = {
-          id: curso.id,
-          title: curso.titulo || '',
-          description: curso.descripcion || '',
-          hours: curso.duracionHoras || curso.horas || null,
-          level: curso.nivel || null,
-          progressPct,
-          isEnrolled,
-          isCompleted,
-          certificateFolio: cert && (cert.folio || cert.folioId || cert.id),
-          enrollmentId: insc ? insc.id : null
-        };
-
-
-        if (!isEnrolled) {
-          recommended.push(viewModel);
-        } else if (isCompleted) {
-          completed.push(viewModel);
-        } else {
-          inProgress.push(viewModel);
-        }
-      });
-
-      _studentState = {
-        recommended,
-        inProgress,
-        completed,
-        avisosSeed: AVISOS_SEED,
-        recosSeed: RECOS_SEED
-      };
-
-      renderStudentHome(root, _studentState);
-      bindStudentHomeEvents(root);
-      bindSearchEvents();
-    }
-
-    // --- Lógica de Búsqueda y Filtrado (Fase 4) ---
-    function bindSearchEvents() {
-      const searchInput = document.getElementById('aula-search-input');
-      const levelSelect = document.getElementById('aula-filter-level');
-
-      if (searchInput) {
-        searchInput.addEventListener('input', (e) => {
-          applyFilters(e.target.value, levelSelect?.value);
-        });
-      }
-
-      if (levelSelect) {
-        levelSelect.addEventListener('change', (e) => {
-          applyFilters(searchInput?.value, e.target.value);
-        });
-      }
-    }
-
-    function applyFilters(text = '', level = 'all') {
-      if (!_studentState) return;
-
-      const term = text.toLowerCase().trim();
-      const lvl = level === 'all' ? '' : level;
-
-      // Función helper de filtrado
-      const filterFn = (c) => {
-        const matchText = (c.title || '').toLowerCase().includes(term) || 
-                          (c.description || '').toLowerCase().includes(term);
-        const matchLevel = !lvl || (c.level === lvl);
-        return matchText && matchLevel;
-      };
-
-      // Creamos un estado temporal filtrado
-      const filteredState = {
-        ..._studentState,
-        recommended: _studentState.recommended.filter(filterFn),
-        inProgress: _studentState.inProgress.filter(filterFn),
-        completed: _studentState.completed.filter(filterFn)
-      };
-
-      // Actualizamos contador
-      const total = filteredState.recommended.length + filteredState.inProgress.length + filteredState.completed.length;
-      const countEl = document.getElementById('aula-result-count');
-      if (countEl) countEl.textContent = term || lvl ? `${total} resultados` : 'Mostrando todo';
-
-      // Re-renderizamos solo las listas (el Hero y Stats no cambian)
-      // Nota: Usamos la misma función de renderizado pero con los datos filtrados
-      renderStudentGridsOnly(filteredState);
-    }
-
-    function renderStudentGridsOnly(state) {
-      const sections = [
-        { id: 'aula-student-recommended', list: state.recommended, mode: 'recommended' },
-        { id: 'aula-student-inprogress', list: state.inProgress, mode: 'inprogress' }, // Renderizamos todos los filtrados
-        { id: 'aula-student-completed', list: state.completed, mode: 'completed' }
-      ];
-
-      // Ocultar Hero si hay búsqueda activa para no distraer (opcional, aquí lo mantenemos simple)
-      // const hero = document.getElementById('aula-student-hero');
-      // if(hero) hero.classList.toggle('d-none', isSearching);
-
-      sections.forEach(({ id, list, mode }) => {
-        const section = document.getElementById(id);
-        if (!section) return;
-
-        const grid = section.querySelector('[data-role="course-grid"]');
-        const emptyMsg = section.querySelector('[data-role="empty-msg"]');
-        
-        // Si estamos filtrando y no hay resultados en esta sección, mostramos vacío
-        if (!list.length) {
-          if(grid) grid.innerHTML = '';
-          if(emptyMsg) {
-             emptyMsg.classList.remove('d-none');
-             // Cambiamos mensaje si es búsqueda vs vacío original
-             if(document.getElementById('aula-search-input')?.value) {
-                 emptyMsg.innerHTML = '<i class="bi bi-search me-2"></i>No hay coincidencias.';
-             }
-          }
-          section.classList.add('d-none'); // Ocultar sección completa si vacía al filtrar
-          return;
-        }
-        
-        section.classList.remove('d-none');
-        if(emptyMsg) emptyMsg.classList.add('d-none');
-        if(grid) grid.innerHTML = list.map(c => renderCourseCard(c, mode)).join('');
-      });
-      
-      // Caso especial: Si la búsqueda filtra el curso que estaba en el Hero, 
-      // el Hero sigue visible (estático). Para hacerlo dinámico se requiere más lógica,
-      // pero para UX es mejor dejar el Hero fijo como "acceso rápido" independiente de la búsqueda.
-    }
-
-    function escapeHtml(str) {
-      return String(str == null ? "" : str)
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;");
-    }
-
-    function renderStudentHome(root, state) {
-      if (!root) return;
-
-      const recommended = state.recommended || [];
-      const inProgress = state.inProgress || [];
-      const completed = state.completed || [];
-
-      // 1. Renderizar Stats (Logros)
-      const statsBar = document.getElementById('aula-stats-bar');
-      if (statsBar) {
-        const totalHours = completed.reduce((acc, c) => acc + (Number(c.hours) || 0), 0);
-        statsBar.innerHTML = `
-          <div class="aula-stat-pill">
-            <div class="rounded-circle bg-success-subtle text-success p-2"><i class="bi bi-award-fill"></i></div>
-            <div class="lh-1">
-              <div class="h5 fw-bold mb-0">${completed.length}</div>
-              <span class="text-muted" style="font-size:0.7rem;">Certificados</span>
-            </div>
-          </div>
-          <div class="aula-stat-pill">
-            <div class="rounded-circle bg-warning-subtle text-warning p-2"><i class="bi bi-lightning-charge-fill"></i></div>
-            <div class="lh-1">
-              <div class="h5 fw-bold mb-0">${inProgress.length}</div>
-              <span class="text-muted" style="font-size:0.7rem;">En curso</span>
-            </div>
-          </div>
-        `;
-      }
-
-      // 2. Renderizar Hero (Curso principal)
-      const heroContainer = document.getElementById('aula-student-hero');
-      const inProgressSection = document.getElementById('aula-student-inprogress');
-
-      let heroCourse = null;
-      let remainingInProgress = [];
-
-      if (inProgress.length > 0) {
-        // Tomamos el primero como Hero
-        heroCourse = inProgress[0];
-        remainingInProgress = inProgress.slice(1);
-
-        if (heroContainer) {
-          const pct = Math.round(heroCourse.progressPct || 0);
-          heroContainer.innerHTML = `
-            <div class="aula-hero-card d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-4">
-              <div style="max-width: 600px; position: relative; z-index: 2;">
-                <span class="badge bg-white bg-opacity-25 border border-white border-opacity-25 mb-3">
-                  <i class="bi bi-play-circle-fill me-1"></i> Reanudar aprendizaje
-                </span>
-                <h2 class="display-6 fw-bold mb-2">${esc(heroCourse.title)}</h2>
-                <p class="text-white-50 mb-4 text-truncate">${esc(heroCourse.description)}</p>
-                
-                <div class="d-flex align-items-center gap-3">
-                  <button class="btn btn-lg aula-hero-btn rounded-pill px-4 shadow-sm" 
-                          data-action="aula-open-course" data-course-id="${heroCourse.id}">
-                    Continuar <i class="bi bi-arrow-right ms-2"></i>
-                  </button>
-                  <div class="flex-grow-1" style="max-width: 200px;">
-                    <div class="d-flex justify-content-between small text-white-50 mb-1">
-                      <span>Progreso</span>
-                      <span>${pct}%</span>
-                    </div>
-                    <div class="progress bg-white bg-opacity-25" style="height: 6px;">
-                      <div class="progress-bar bg-white" style="width: ${pct}%"></div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div class="d-none d-md-block text-white opacity-50" style="font-size: 8rem; line-height: 0; z-index: 1;">
-                <i class="bi bi-mortarboard-fill"></i>
-              </div>
-            </div>
-          `;
-          heroContainer.classList.remove('d-none');
-        }
-      } else {
-        if (heroContainer) heroContainer.classList.add('d-none');
-      }
-
-      // 3. Renderizar Grids (Listas)
-      const sections = [
-        { id: 'aula-student-recommended', list: recommended, mode: 'recommended' },
-        { id: 'aula-student-inprogress', list: remainingInProgress, mode: 'inprogress' }, // Solo los restantes
-        { id: 'aula-student-completed', list: completed, mode: 'completed' }
-      ];
-
-      // Mostrar/Ocultar sección "Otros en curso" según si hay restantes
-      if (inProgressSection) {
-        if (remainingInProgress.length > 0) inProgressSection.classList.remove('d-none');
-        else inProgressSection.classList.add('d-none');
-      }
-
-      sections.forEach(({ id, list, mode }) => {
-        const section = root.querySelector('#' + id);
-        if (!section) return;
-
-        const grid = section.querySelector('[data-role="course-grid"]');
-        const emptyMsg = section.querySelector('[data-role="empty-msg"]');
-        if (!grid) return;
-
-        if (!list.length) {
-          grid.innerHTML = '';
-          if (emptyMsg) emptyMsg.classList.remove('d-none');
-          return;
-        }
-
-        if (emptyMsg) emptyMsg.classList.add('d-none');
-        grid.innerHTML = list.map(c => renderCourseCard(c, mode)).join('');
-      });
-    }
-
-    function buildCourseCard(course, context) {
-      const pctRaw = typeof course.progressPct === 'number' ? course.progressPct : 0;
-      const pct = Math.max(0, Math.min(100, Math.round(pctRaw)));
-
-      let badgeText = '';
-      let badgeClass = 'text-bg-secondary';
-      let primaryBtn = '';
-
-      const hours = course.hours ? course.hours + ' h' : '';
-      const level = course.level || '';
-      let meta = '';
-      if (hours && level) meta = hours + ' • ' + level;
-      else if (hours) meta = hours;
-      else if (level) meta = level;
-
-      if (context === 'recommended') {
-        badgeText = 'Disponible';
-        primaryBtn =
-          '<button type="button" class="btn btn-sm btn-primary" ' +
-          'data-aula-action="enroll" ' +
-          'data-course-id="' + course.id + '" ' +
-          'data-course-title="' + escapeHtml(course.title || '') + '">' +
-          'Inscribirme</button>';
-      } else if (context === 'inprogress') {
-        badgeText = 'En curso';
-        badgeClass = 'text-bg-info';
-        primaryBtn =
-          '<button type="button" class="btn btn-sm btn-primary" ' +
-          'data-aula-action="continue" ' +
-          'data-course-id="' + course.id + '">' +
-          'Continuar</button>';
-      } else if (context === 'completed') {
-        badgeText = 'Completado';
-        badgeClass = 'text-bg-success';
-
-        if (course.certificateFolio) {
-          secondaryAction = `
-    <button type="button"
-            class="btn btn-sm btn-success w-100 mt-2"
-            data-action="aula-ver-constancia"
-            data-course-id="${course.id}"
-            data-course-title="${esc(course.title || '')}"
-            data-cert-id="${course.certificateFolio}">
-      <i class="bi bi-award-fill me-1"></i> Ver constancia
-    </button>`;
-        }
-
-      }
-
-      const hasProgressBar = context === 'inprogress' || context === 'completed';
-      const progressBar = hasProgressBar
-        ? '<div class="mb-2">' +
-        '<div class="progress" style="height:5px;">' +
-        '<div class="progress-bar" role="progressbar" style="width:' + pct + '%"></div>' +
-        '</div>' +
-        '<div class="d-flex justify-content-between align-items-center mt-1 small text-muted">' +
-        '<span>' + pct + '% completado</span>' +
-        (meta ? '<span>' + meta + '</span>' : '') +
-        '</div>' +
-        '</div>'
-        : '';
-
-      const metaFallback = !hasProgressBar && meta
-        ? '<p class="small text-muted mb-0">' + meta + '</p>'
-        : '';
-
-      return (
-        '<div class="col">' +
-        '<article class="card h-100 shadow-sm border-0">' +
-        '<div class="card-body d-flex flex-column">' +
-        '<div class="d-flex justify-content-between align-items-start mb-2">' +
-        '<div>' +
-        '<h3 class="card-title h6 mb-1">' + escapeHtml(course.title || '') + '</h3>' +
-        '<p class="card-text text-muted small mb-1">' + escapeHtml(course.description || '') + '</p>' +
-        metaFallback +
-        '</div>' +
-        '<span class="badge rounded-pill ' + badgeClass + ' ms-2">' + badgeText + '</span>' +
-        '</div>' +
-        progressBar +
-        '<div class="mt-auto d-flex gap-2">' +
-        primaryBtn +
-        '</div>' +
-        '</div>' +
-        '</article>' +
-        '</div>'
-      );
-    }
-
-
-
-    function onStudentHomeClick(ev) {
-      const btn = ev.target.closest('[data-aula-action]');
-      if (!btn) return;
-
-      const action = btn.dataset.aulaAction;
-      const courseId = btn.dataset.courseId;
-      if (!action || !courseId) return;
-
-      if (action === 'enroll') {
-        const titulo = btn.dataset.courseTitle || '';
-        inscribirse(courseId, titulo);
-      } else if (action === 'continue') {
-        openCourseFromStudent(courseId);
-      } else if (action === 'certificate') {
-        const titulo = btn.dataset.courseTitle || '';
-        verConstancia(courseId, titulo);
-      }
-    }
-
-    function openCourseFromStudent(courseId) {
-      if (!_ctx || !courseId) return;
-
-      if (typeof _ctx.showView === 'function') {
-        _ctx.showView('view-aula-course');
-      }
-
-      if (global.AulaContent && typeof global.AulaContent.initCourse === 'function') {
-        global.AulaContent.initCourse(_ctx, courseId);
-      }
-    }
-
-    // === Helpers de render para Aula Student ===
+    // ── Helpers ──
     function esc(str) {
-      return String(str || '').replace(/[&<>"']/g, function (ch) {
-        switch (ch) {
-          case '&': return '&amp;';
-          case '<': return '&lt;';
-          case '>': return '&gt;';
-          case '"': return '&quot;';
-          default: return ch;
-        }
+      return String(str || '').replace(/[&<>"']/g, ch => {
+        const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
+        return map[ch] || ch;
       });
     }
-
-    function truncate(str, max) {
-      const s = String(str || '').trim();
-      if (s.length <= max) return s;
-      return s.slice(0, max - 1) + '…';
+    function trunc(str, max) { const s = String(str || '').trim(); return s.length <= max ? s : s.slice(0, max - 1) + '\u2026'; }
+    function $id(id) { return document.getElementById(id); }
+    function wireOnce(id, type, handler) {
+      const el = $id(id); if (!el || el.dataset.wired) return el;
+      el.addEventListener(type, handler); el.dataset.wired = '1'; return el;
     }
 
-    function renderStudentHome(root, state) {
-      if (!root) return;
-
-      const sections = [
-        { id: 'aula-student-recommended', list: state.recommended || [], mode: 'recommended' },
-        { id: 'aula-student-inprogress', list: state.inProgress || [], mode: 'inprogress' },
-        { id: 'aula-student-completed', list: state.completed || [], mode: 'completed' }
-      ];
-
-      sections.forEach(({ id, list, mode }) => {
-        const section = root.querySelector('#' + id);
-        if (!section) return;
-
-        const grid = section.querySelector('[data-role="course-grid"]');
-        const emptyMsg = section.querySelector('[data-role="empty-msg"]');
-        if (!grid || !emptyMsg) return;
-
-        if (!list.length) {
-          grid.innerHTML = '';
-          emptyMsg.classList.remove('d-none');
-          return;
-        }
-
-        emptyMsg.classList.add('d-none');
-        grid.innerHTML = list.map(c => renderCourseCard(c, mode)).join('');
-      });
-    }
-
-    function renderCourseCard(course, mode) {
-      const title = esc(course.title || '(Sin título)');
-      const desc = truncate(course.description || 'Sin descripción.', 80); // Descripción más corta
-      const hours = course.hours || course.duracionHoras || null;
-      const pct = Math.max(0, Math.min(100, Number(course.progressPct || 0)));
-
-      let actionBtn = '';
-      let statusIcon = '';
-
-      if (mode === 'recommended') {
-        statusIcon = '<i class="bi bi-plus-circle text-primary"></i>';
-        actionBtn = `
-          <button class="btn btn-sm btn-light border text-primary w-100 fw-bold"
-                  data-action="aula-enroll" data-course-id="${course.id}" data-course-title="${title}">
-            Inscribirme
-          </button>`;
-      } else if (mode === 'inprogress') {
-        statusIcon = '<i class="bi bi-play-circle text-info"></i>';
-        actionBtn = `
-          <button class="btn btn-sm btn-primary w-100 fw-bold"
-                  data-action="aula-open-course" data-course-id="${course.id}">
-            Continuar
-          </button>`;
-      } else if (mode === 'completed') {
-        statusIcon = '<i class="bi bi-check-circle-fill text-success"></i>';
-        actionBtn = `
-           <button class="btn btn-sm btn-outline-success w-100 fw-bold"
-                  data-action="aula-ver-constancia" data-course-id="${course.id}" 
-                  data-course-title="${title}" data-cert-id="${course.certificateFolio}">
-            <i class="bi bi-award"></i> Constancia
-          </button>`;
+    // ══════════════════════════════════════════════════════════
+    //  INIT
+    // ══════════════════════════════════════════════════════════
+    function _injectTemplate() {
+      const root = $id('view-aula');
+      if (!root) {
+        console.warn('[Aula] Root element #view-aula not found');
+        return;
       }
 
-      // Progress bar condicional
-      const progressHTML = (mode !== 'recommended')
-        ? `<div class="mt-3">
-             <div class="d-flex justify-content-between extra-small text-muted mb-1">
-               <span>Avance</span>
-               <span>${pct}%</span>
-             </div>
-             <div class="progress" style="height:4px;">
-               <div class="progress-bar ${mode === 'completed' ? 'bg-success' : 'bg-primary'}" style="width:${pct}%"></div>
-             </div>
-           </div>`
-        : `<div class="mt-3 extra-small text-muted">
-             <i class="bi bi-clock me-1"></i> ${hours ? hours + 'h contenido' : 'Duración variable'}
-           </div>`;
+      const existing = $id('aula-student');
+      if (existing) {
+        // Template already injected - check if it's the correct one
+        const hasTemplateMarker = root.hasAttribute('data-aula-injected');
+        if (hasTemplateMarker) {
+          console.log('[Aula] Template already injected');
+          return;
+        }
+        // Wrong structure detected - force re-inject
+        console.warn('[Aula] Detected old template structure - re-injecting...');
+      }
 
-      return `
-        <div class="col">
-          <div class="course-card-minimal h-100">
-            <div class="d-flex justify-content-between align-items-start mb-3">
-               <div class="course-icon-box rounded-3 bg-surface-muted text-primary">
-                 <i class="bi bi-mortarboard-fill"></i>
+      console.log('[Aula] Injecting UI Template...');
+      root.innerHTML = ''; // Force clear
+      root.setAttribute('data-aula-injected', 'true'); // Mark as injected
+      root.innerHTML = `
+        <!-- STUDENT VIEW -->
+        <div id="aula-student" class="d-block">
+          <div class="row mb-4 align-items-center">
+             <div class="col">
+               <h2 class="fw-bold mb-0">Aula Virtual</h2>
+               <p class="text-muted small">Tus cursos y progreso</p>
+             </div>
+             <div class="col-auto d-flex gap-2">
+               <div id="aula-streak-pill" class="d-none badge bg-warning-subtle text-warning border border-warning-subtle rounded-pill px-3 d-flex align-items-center gap-2">
+                 <i class="bi bi-fire"></i> <span id="aula-streak-count">0</span>
                </div>
-               ${statusIcon}
-            </div>
-            
-            <h5 class="fw-bold mb-1 text-truncate" title="${title}">${title}</h5>
-            <p class="text-muted small mb-0 flex-grow-1" style="line-height: 1.4;">${desc}</p>
-            
-            ${progressHTML}
+               <div id="aula-badges-pill" class="d-none badge bg-info-subtle text-info border border-info-subtle rounded-pill px-3 d-flex align-items-center gap-2" role="button" data-action="aula-show-badges">
+                 <i class="bi bi-award-fill"></i> <span id="aula-badges-count">0</span>
+               </div>
+             </div>
+          </div>
 
-            <div class="mt-3 pt-3 border-top">
-              ${actionBtn}
+          <div class="row g-3 mb-4">
+            <div class="col-md-6">
+               <div class="input-group">
+                 <span class="input-group-text bg-transparent border-end-0"><i class="bi bi-search"></i></span>
+                 <input type="text" id="aula-search-input" class="form-control border-start-0 ps-0" placeholder="Buscar cursos...">
+               </div>
+            </div>
+            <div class="col-md-3">
+               <select id="aula-filter-level" class="form-select">
+                 <option value="all">Todos los niveles</option>
+                 <option value="General">General</option>
+                 <option value="Principiante">Principiante</option>
+                 <option value="Intermedio">Intermedio</option>
+                 <option value="Avanzado">Avanzado</option>
+               </select>
+            </div>
+          </div>
+
+          <div id="aula-filter-tags" class="d-flex flex-wrap gap-2 mb-4"></div>
+          <div id="aula-student-hero" class="mb-5 d-none"></div>
+
+          <ul class="nav nav-pills mb-4" role="tablist">
+            <li class="nav-item"><button class="nav-link active rounded-pill px-4" id="tab-aula-mis-cursos-btn" data-bs-toggle="pill" data-bs-target="#tab-aula-mis-cursos">En Progreso</button></li>
+            <li class="nav-item"><button class="nav-link rounded-pill px-4" data-bs-toggle="pill" data-bs-target="#tab-aula-explorar">Explorar</button></li>
+            <li class="nav-item"><button class="nav-link rounded-pill px-4" id="tab-aula-logros-btn" data-bs-toggle="pill" data-bs-target="#tab-aula-logros">Logros</button></li>
+            <li class="nav-item"><button class="nav-link rounded-pill px-4" data-bs-toggle="pill" data-bs-target="#tab-aula-completados">Completados</button></li>
+          </ul>
+
+          <div class="tab-content">
+            <div class="tab-pane fade show active" id="tab-aula-mis-cursos">
+               <div id="aula-student-inprogress" class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4"></div>
+               <div id="aula-empty-inprogress" class="text-center py-5 text-muted d-none"><i class="bi bi-journal-x mb-2 fs-1 opacity-50"></i><p>No tienes cursos en curso.</p></div>
+            </div>
+            <div class="tab-pane fade" id="tab-aula-explorar">
+               <div id="aula-student-recommended" class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4"></div>
+               <div id="aula-empty-recommended" class="text-center py-5 text-muted d-none"><p>No hay cursos nuevos.</p></div>
+            </div>
+            <div class="tab-pane fade" id="tab-aula-logros">
+               <div id="aula-stats-bar" class="d-flex gap-3 mb-4 justify-content-center"></div>
+               <div id="aula-badges-grid" class="d-flex flex-wrap gap-3 justify-content-center"></div>
+               <div id="aula-badges-empty" class="text-center py-5 text-muted d-none"><p>Aún no has desbloqueado insignias.</p></div>
+            </div>
+            <div class="tab-pane fade" id="tab-aula-completados">
+               <div class="bg-success-subtle text-success p-4 rounded-4 text-center mb-4"><h1 class="display-3 fw-bold mb-0" id="aula-cert-count-big">0</h1><p class="mb-0 fw-medium">Certificaciones</p><div class="d-none" id="aula-total-certs"></div></div>
+               <div id="aula-student-completed" class="list-group list-group-flush rounded-4 overflow-hidden border"></div>
+               <div id="aula-empty-completed" class="text-center py-5 text-muted d-none"><p>Sin completados.</p></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ADMIN VIEW -->
+        <div id="aula-admin" class="d-none">
+          <div class="d-flex justify-content-between align-items-center mb-4">
+            <h3 class="fw-bold">Gestión de Aula</h3>
+            <button class="btn btn-primary rounded-pill shadow-sm" id="btn-quick-create-course"><i class="bi bi-plus-lg me-1"></i>Nuevo Curso</button>
+          </div>
+          <div class="row g-4 mb-4">
+             <div class="col-md-4"><div class="card border-0 shadow-sm p-3 text-center h-100"><h2 class="fw-bold text-primary mb-0" id="kpi-total-alumnos">0</h2><small class="text-muted">Total Alumnos</small></div></div>
+             <div class="col-md-4"><div class="card border-0 shadow-sm p-3 text-center h-100"><h2 class="fw-bold text-success mb-0" id="kpi-tasa-finalizacion">0%</h2><small class="text-muted">Tasa Finalización</small></div></div>
+             <div class="col-md-4"><div class="card border-0 shadow-sm p-3 text-center h-100"><h2 class="fw-bold text-info mb-0" id="kpi-promedio-general">0%</h2><small class="text-muted">Promedio General</small></div></div>
+          </div>
+          <div class="row g-4">
+            <div class="col-lg-8">
+               <div class="card border-0 shadow-sm rounded-4 h-100">
+                 <div class="card-header bg-white py-3 fw-bold">Mis Cursos</div>
+                 <div class="card-body p-3"><div id="aula-adm-cursos"></div></div>
+               </div>
+            </div>
+            <div class="col-lg-4">
+               <div class="card border-0 shadow-sm rounded-4 h-100">
+                 <div class="card-header bg-white py-3 fw-bold d-flex justify-content-between align-items-center"><span>Avisos</span><button class="btn btn-sm btn-light border py-0 px-2" id="btn-quick-aviso">+</button></div>
+                 <div class="card-body p-0"><div id="aula-adm-avisos-list" class="list-group list-group-flush"></div></div>
+                 <div class="card-footer bg-white border-top-0">
+                    <div class="input-group input-group-sm">
+                       <input class="form-control" id="aula-adm-aviso-input" placeholder="Aviso rápido...">
+                       <button class="btn btn-outline-secondary" type="submit" form="aula-adm-avisos-form">Enviar</button>
+                    </div>
+                     <form id="aula-adm-avisos-form"></form>
+                 </div>
+               </div>
+            </div>
+          </div>
+          <div class="card border-0 shadow-sm rounded-4 mt-4">
+              <div class="card-header bg-white py-3 fw-bold">Reportes</div>
+              <div class="card-body">
+                 <form id="aula-admin-report-form" class="row g-3 align-items-end">
+                     <div class="col-md-4"><label class="form-label small">Tipo</label><select id="report-type-select" class="form-select"><option value="calificaciones_curso">Calificaciones por Curso</option><option value="progreso_general">Progreso General</option></select></div>
+                     <div class="col-md-5" id="report-curso-select-group"><label class="form-label small">Curso</label><select id="report-curso-select" class="form-select"></select></div>
+                     <div class="col-md-3"><button type="submit" class="btn btn-outline-primary w-100"><i class="bi bi-download me-1"></i> Descargar CSV</button></div>
+                 </form>
+              </div>
+          </div>
+        </div>
+
+        <!-- SUPERADMIN VIEW -->
+        <div id="aula-superadmin" class="d-none">
+          <div class="alert alert-info">Panel de Superadmin de Aula</div>
+          <div id="aula-sa-list"></div>
+        </div>
+      `;
+    }
+
+    // ══════════════════════════════════════════════════════════
+    //  INIT
+    // ══════════════════════════════════════════════════════════
+    function init(ctx) {
+      console.log('[Aula] init called', ctx);
+
+      // [FIX] Ensure HTML Structure exists
+      _injectTemplate();
+
+      const profile = ctx?.profile || ctx?.currentUserProfile;
+      console.log('[Aula] Profile:', profile);
+
+      if (!ctx || !profile) {
+        console.warn('[Aula] Missing context or profile', { ctx, profile });
+        return;
+      }
+      _ctx = ctx;
+      _ctx.profile = profile;
+      const role = profile.role;
+      console.log('[Aula] Role:', role);
+
+      if (role === 'docente' || role === 'superadmin' || role === 'admin' || role === 'aula_admin' || role === 'aula') {
+        console.log('[Aula] Initializing Admin View');
+        initAdmin(ctx);
+      } else {
+        console.log('[Aula] Initializing Student View');
+        initStudent(ctx).then(() => console.log('[Aula] initStudent finished'))
+          .catch(e => console.error('[Aula] initStudent failed', e));
+      }
+    }
+
+    // ══════════════════════════════════════════════════════════
+    //  ESTUDIANTE
+    // ══════════════════════════════════════════════════════════
+    async function initStudent(ctx) {
+      console.log('[Aula] initStudent started. CTX:', ctx);
+      _ctx = ctx;
+      const uid = ctx.auth.currentUser?.uid;
+      const root = $id('view-aula');
+
+      console.log('[Aula] Root element:', root, 'Classes:', root?.className);
+
+      if (!uid || !root) {
+        console.error('[Aula] initStudent aborted. UID or Root missing.', { uid, root });
+        return;
+      }
+
+      const stuEl = $id('aula-student');
+      const admEl = $id('aula-admin');
+      const saEl = $id('aula-superadmin');
+
+      console.log('[Aula] DOM Elements:', { stuEl, admEl, saEl });
+
+      if (stuEl) {
+        stuEl.className = 'd-block'; // FORCE RESET CLASSES
+        stuEl.style.display = 'block'; // FORCE INLINE STYLE
+      }
+      if (admEl) admEl.classList.add('d-none');
+      if (saEl) saEl.classList.add('d-none');
+
+      const db = ctx.db;
+      console.log('[Aula] Fetching data for UID:', uid);
+
+      try {
+        const [cursosSnap, inscSnap, progSnap, certSnap, badges] = await Promise.all([
+          db.collection(CURS).where('publicado', '==', true).get(),
+          db.collection(INSC).where('studentId', '==', uid).get(),
+          db.collection(PROG).where('uid', '==', uid).get(),
+          db.collection(CERT).where('uid', '==', uid).get(),
+          AulaService.getUserBadges(ctx, uid)
+        ]);
+
+        console.log('[Aula] Data fetched.', {
+          cursos: cursosSnap.size,
+          inscripciones: inscSnap.size,
+          progreso: progSnap.size,
+          certificados: certSnap.size,
+          badges: badges.length
+        });
+
+        const inscMap = new Map(inscSnap.docs.map(d => [d.data().cursoId, d.id]));
+        const progMap = new Map(progSnap.docs.map(d => [d.data().cursoId, d.data()]));
+        const certMap = new Map(certSnap.docs.map(d => [d.data().cursoId, d.data()]));
+
+        let bestStreak = 0;
+        progSnap.docs.forEach(d => {
+          const s = d.data().streak;
+          if (s && s.current > bestStreak) bestStreak = s.current;
+        });
+
+        const recommended = [], inProgress = [], completed = [];
+        const allTags = new Set();
+
+        cursosSnap.forEach(doc => {
+          const c = doc.data(), cid = doc.id;
+          const publico = c.publico || 'todos';
+          if (publico !== 'todos' && publico !== 'estudiantes') return;
+          if (Array.isArray(c.tags)) c.tags.forEach(t => allTags.add(t.toLowerCase()));
+
+          const enrollmentId = inscMap.get(cid);
+          const progData = progMap.get(cid);
+          const certData = certMap.get(cid);
+          const progressPct = progData?.progressPct ?? 0;
+
+          const vm = {
+            id: cid,
+            title: c.titulo || '(Sin titulo)',
+            description: c.descripcion || '',
+            hours: c.duracionHoras || c.horas || null,
+            level: c.nivel || 'General',
+            tags: Array.isArray(c.tags) ? c.tags : [],
+            imagen: c.imagen || '',
+            progressPct,
+            isEnrolled: !!enrollmentId,
+            isCompleted: !!certData,
+            certificateFolio: certData ? (certData.folio || certData.id) : null,
+            enrollmentId,
+            score: certData?.score ?? null
+          };
+
+          if (certData) completed.push(vm);
+          else if (enrollmentId) inProgress.push(vm);
+          else recommended.push(vm);
+        });
+
+        console.log('[Aula] Processed Courses:', {
+          recommended: recommended.length,
+          inProgress: inProgress.length,
+          completed: completed.length
+        });
+
+        _studentState = { recommended, inProgress, completed, badges, allTags: Array.from(allTags), bestStreak };
+        renderStudentGamification(_studentState);
+        renderStudentTabs(_studentState);
+        bindStudentEvents();
+
+      } catch (err) {
+        console.error('[Aula] Error fetching data:', err);
+      }
+    }
+
+    // ── Gamification header ──
+    function renderStudentGamification(state) {
+      const streakPill = $id('aula-streak-pill');
+      const streakCount = $id('aula-streak-count');
+      if (streakPill && state.bestStreak > 0) {
+        streakPill.classList.remove('d-none');
+        if (streakCount) streakCount.textContent = state.bestStreak;
+      } else if (streakPill) { streakPill.classList.add('d-none'); }
+
+      const badgesPill = $id('aula-badges-pill');
+      const badgesCount = $id('aula-badges-count');
+      if (badgesPill && state.badges.length > 0) {
+        badgesPill.classList.remove('d-none');
+        if (badgesCount) badgesCount.textContent = state.badges.length;
+      } else if (badgesPill) { badgesPill.classList.add('d-none'); }
+
+      const statsEl = $id('aula-stats-bar');
+      if (statsEl) {
+        statsEl.innerHTML = `
+          <span class="d-flex align-items-center gap-1 border rounded-pill px-2 py-1 shadow-sm small">
+            <i class="bi bi-book-half text-primary"></i><strong>${state.inProgress.length}</strong> Activos
+          </span>
+          <span class="d-flex align-items-center gap-1 border rounded-pill px-2 py-1 shadow-sm small">
+            <i class="bi bi-trophy-fill text-success"></i><strong>${state.completed.length}</strong> Logros
+          </span>`;
+      }
+
+      renderBadgesGrid(state.badges);
+      renderTagsFilter(state.allTags);
+    }
+
+    function renderBadgesGrid(userBadges) {
+      const grid = $id('aula-badges-grid');
+      const empty = $id('aula-badges-empty');
+      if (!grid) return;
+      const defs = AulaService.getBadgeDefs();
+      const userTypes = new Set(userBadges.map(b => b.type));
+      grid.innerHTML = defs.map(def => {
+        const unlocked = userTypes.has(def.type);
+        const cls = unlocked ? '' : 'aula-badge-locked';
+        return `<div class="aula-badge-item ${cls}" style="border-color:${def.color};color:${def.color};background:${def.color}10;" title="${def.label}${unlocked ? ' (Desbloqueado)' : ' (Bloqueado)'}"><i class="bi ${def.icon}"></i></div>`;
+      }).join('');
+      if (empty) empty.classList.toggle('d-none', defs.length > 0);
+    }
+
+    function renderTagsFilter(allTags) {
+      const container = $id('aula-filter-tags');
+      if (!container || !allTags.length) return;
+      container.innerHTML = allTags.slice(0, 8).map(t =>
+        `<button class="aula-tag-pill border-0" data-action="aula-filter-tag" data-tag="${esc(t)}" style="cursor:pointer">${esc(t)}</button>`
+      ).join('');
+    }
+
+    // ── Tabs render ──
+    function renderStudentTabs(state) {
+      const heroEl = $id('aula-student-hero');
+      if (state.inProgress.length > 0 && heroEl) {
+        heroEl.innerHTML = renderHero(state.inProgress[0]);
+        heroEl.classList.remove('d-none');
+      } else if (heroEl) { heroEl.classList.add('d-none'); }
+
+      const ipGrid = $id('aula-student-inprogress');
+      const ipEmpty = $id('aula-empty-inprogress');
+      const others = state.inProgress.slice(state.inProgress.length > 0 ? 1 : 0);
+      if (ipGrid) {
+        ipGrid.innerHTML = others.map(c => renderCard(c, 'inprogress')).join('');
+        ipEmpty?.classList.toggle('d-none', others.length > 0 || state.inProgress.length > 0);
+      }
+
+      const recGrid = $id('aula-student-recommended');
+      const recEmpty = $id('aula-empty-recommended');
+      if (recGrid) {
+        recGrid.innerHTML = state.recommended.map(c => renderCard(c, 'recommended')).join('');
+        recEmpty?.classList.toggle('d-none', state.recommended.length > 0);
+      }
+
+      const compList = $id('aula-student-completed');
+      const compEmpty = $id('aula-empty-completed');
+      const certBadge = $id('aula-total-certs');
+      const certBig = $id('aula-cert-count-big');
+      if (certBadge) certBadge.textContent = state.completed.length;
+      if (certBig) certBig.textContent = state.completed.length;
+      if (compList) {
+        compList.innerHTML = state.completed.map(renderCompletedRow).join('');
+        compEmpty?.classList.toggle('d-none', state.completed.length > 0);
+      }
+    }
+
+    function renderHero(c) {
+      const pct = Math.round(c.progressPct || 0);
+      const label = pct >= 100 ? 'Realizar Quiz' : 'Continuar';
+      const badge = pct >= 100 ? 'Examen Pendiente' : 'En Curso';
+      const tags = c.tags.slice(0, 3).map(t => `<span class="aula-tag-pill" style="background:rgba(255,255,255,.15);color:#fff;border-color:rgba(255,255,255,.25);">${esc(t)}</span>`).join(' ');
+      return `
+        <div class="aula-hero-card position-relative">
+          <div class="position-relative" style="z-index:1;">
+            <div class="d-flex flex-wrap gap-2 mb-2">
+              <span class="badge bg-white bg-opacity-25 border border-white border-opacity-25 small">${badge}</span>
+              ${tags}
+            </div>
+            <h3 class="fw-bold mb-1" style="font-size:clamp(1.2rem,4vw,1.8rem)">${esc(c.title)}</h3>
+            <p class="text-white-50 mb-3 small text-truncate">${esc(c.description)}</p>
+            <div class="d-flex flex-wrap align-items-center gap-3">
+              <button class="btn aula-hero-btn btn-sm rounded-pill px-4 fw-bold shadow-sm" data-action="aula-open-course" data-course-id="${c.id}">
+                <i class="bi bi-play-circle-fill me-1"></i> ${label}
+              </button>
+              <div class="flex-grow-1" style="max-width:200px;min-width:100px;">
+                <div class="d-flex justify-content-between small text-white-50 mb-1"><span>Avance</span><span>${pct}%</span></div>
+                <div class="progress bg-black bg-opacity-25 rounded-pill" style="height:6px;"><div class="progress-bar bg-warning rounded-pill" style="width:${pct}%"></div></div>
+              </div>
             </div>
           </div>
         </div>`;
     }
 
-    // --- Eventos en home de Aula (estudiante) ---
-    function bindStudentHomeEvents(root) {
-      // Usamos el contenedor raíz del home
-      wireOnce('aula-student-home', 'click', (ev) => {
-        const btn = ev.target.closest('[data-action]');
-        if (!btn) return;
-
-        const action = btn.dataset.action;
-        const courseId = btn.dataset.courseId || null;
-
-        // 1) Inscribirse
-        if (action === 'aula-enroll' && courseId) {
-          ev.preventDefault();
-          const titulo = btn.dataset.courseTitle || '';
-          inscribirse(courseId, titulo);
-          return;
-        }
-
-
-        // 2) Abrir curso (ver / continuar)
-        if (action === 'aula-open-course' && courseId) {
-          ev.preventDefault();
-
-          // Preferimos usar el router global de app.js
-          if (typeof global.SIA_navToCourse === 'function') {
-            global.SIA_navToCourse(courseId);
-            return;
-          }
-
-          // Fallback por si no existe SIA_navToCourse (muy raro)
-          if (global.AulaContent && typeof global.AulaContent.initCourse === 'function') {
-            global.AulaContent.initCourse(_ctx, courseId);
-
-            // Mostrar manualmente la vista del curso
-            const views = document.querySelectorAll('.app-view');
-            views.forEach(v => v.classList.add('d-none'));
-            const courseView = document.getElementById('view-aula-course');
-            if (courseView) courseView.classList.remove('d-none');
-          } else {
-            console.warn('[Aula] No se encontró manejador para abrir curso', courseId);
-          }
-
-          return;
-        }
-
-        if (action === 'aula-leave-course' && courseId) {
-          ev.preventDefault();
-          const enrollmentId = btn.dataset.enrollmentId || '';
-          if (!enrollmentId) return;
-          abandonarCurso(enrollmentId, courseId);
-          return;
-        }
-
-
-        // 3) Ver constancia (si existe)
-        if (action === 'aula-ver-constancia' && courseId) {
-          ev.preventDefault();
-          const titulo = btn.dataset.courseTitle || '';
-          verConstancia(courseId, titulo);
-        }
-      });
+    function renderCard(c, mode) {
+      const pct = Math.round(c.progressPct || 0);
+      let btn = '', statusIcon = '';
+      if (mode === 'recommended') {
+        statusIcon = '<i class="bi bi-plus-circle text-primary"></i>';
+        btn = `<button class="btn btn-sm btn-outline-primary w-100 rounded-pill fw-bold" data-action="aula-enroll" data-course-id="${c.id}" data-course-title="${esc(c.title)}">Inscribirme</button>`;
+      } else {
+        statusIcon = '<i class="bi bi-play-circle text-info"></i>';
+        btn = `<button class="btn btn-sm btn-primary w-100 rounded-pill fw-bold" data-action="aula-open-course" data-course-id="${c.id}">Continuar</button>`;
+      }
+      const tags = c.tags.slice(0, 2).map(t => `<span class="aula-tag-pill">${esc(t)}</span>`).join(' ');
+      const progress = mode !== 'recommended'
+        ? `<div class="mt-2"><div class="d-flex justify-content-between small text-muted mb-1"><span>Avance</span><span>${pct}%</span></div><div class="progress rounded-pill" style="height:4px;"><div class="progress-bar rounded-pill" style="width:${pct}%"></div></div></div>`
+        : `<div class="mt-2 small text-muted"><i class="bi bi-clock me-1"></i>${c.hours ? c.hours + 'h' : 'Variable'}${c.level !== 'General' ? ' <span class="badge bg-light text-dark border ms-1">' + esc(c.level) + '</span>' : ''}</div>`;
+      return `
+        <div class="col">
+          <div class="card h-100 shadow-sm aula-course-card border-0 rounded-4 p-3 d-flex flex-column">
+            <div class="d-flex justify-content-between align-items-start mb-2">
+              <div class="bg-primary-subtle text-primary rounded-3 p-2 d-inline-flex"><i class="bi bi-journal-text fs-5"></i></div>
+              ${statusIcon}
+            </div>
+            <h6 class="fw-bold text-truncate mb-1" title="${esc(c.title)}">${esc(c.title)}</h6>
+            <p class="text-muted small mb-1 flex-grow-1" style="line-height:1.4;">${esc(trunc(c.description, 70))}</p>
+            <div class="d-flex gap-1 flex-wrap mb-1">${tags}</div>
+            ${progress}
+            <div class="mt-2 pt-2 border-top">${btn}</div>
+          </div>
+        </div>`;
     }
 
+    function renderCompletedRow(c) {
+      const safeTitle = esc(c.title).replace(/'/g, "\\'");
+      return `
+        <div class="list-group-item p-3 d-flex flex-column flex-sm-row align-items-center gap-3 border-0 border-bottom">
+          <div class="bg-success-subtle text-success p-2 rounded-circle d-flex align-items-center justify-content-center" style="width:44px;height:44px;"><i class="bi bi-check-lg fs-5"></i></div>
+          <div class="flex-grow-1 text-center text-sm-start">
+            <h6 class="mb-0 fw-bold small">${esc(c.title)}</h6>
+            <div class="small text-muted">
+              <span class="me-2"><i class="bi bi-star-fill text-warning me-1"></i>${c.score || 'N/A'}%</span>
+              <span><i class="bi bi-upc-scan me-1"></i>${c.certificateFolio || '---'}</span>
+            </div>
+          </div>
+          <button class="btn btn-sm btn-outline-success rounded-pill px-3" data-action="aula-ver-constancia" data-course-id="${c.id}" data-course-title="${safeTitle}">
+            <i class="bi bi-file-earmark-pdf-fill me-1"></i>Descargar
+          </button>
+        </div>`;
+    }
 
+    // ── Student events ──
+    function bindStudentEvents() {
+      const home = $id('aula-student-home');
+      const hero = $id('aula-student-hero');
+      [home, hero].forEach(container => {
+        if (!container || container.dataset.wired) return;
+        container.dataset.wired = '1';
+        container.addEventListener('click', handleStudentClick);
+      });
 
-    async function inscribirse(cursoId, cursoTitulo) {
-      if (_ctx.currentUserProfile?.role !== 'student') {
-        showToast('Los administradores no pueden inscribirse.', 'warning');
-        return;
+      const searchInput = $id('aula-search-input');
+      if (searchInput && !searchInput.dataset.wired) {
+        searchInput.dataset.wired = '1';
+        searchInput.addEventListener('input', filterExplore);
       }
+      const levelFilter = $id('aula-filter-level');
+      if (levelFilter && !levelFilter.dataset.wired) {
+        levelFilter.dataset.wired = '1';
+        levelFilter.addEventListener('change', filterExplore);
+      }
+      const tagsContainer = $id('aula-filter-tags');
+      if (tagsContainer && !tagsContainer.dataset.wired) {
+        tagsContainer.dataset.wired = '1';
+        tagsContainer.addEventListener('click', e => {
+          const btn = e.target.closest('[data-action="aula-filter-tag"]');
+          if (!btn) return;
+          btn.classList.toggle('active');
+          btn.style.background = btn.classList.contains('active') ? 'var(--aula)' : '';
+          btn.style.color = btn.classList.contains('active') ? '#fff' : '';
+          filterExplore();
+        });
+      }
+    }
+
+    function filterExplore() {
+      if (!_studentState) return;
+      const term = ($id('aula-search-input')?.value || '').toLowerCase().trim();
+      const level = $id('aula-filter-level')?.value || 'all';
+      const activeTags = [];
+      $id('aula-filter-tags')?.querySelectorAll('.active').forEach(b => activeTags.push(b.dataset.tag));
+
+      const filter = c => {
+        if (term && !c.title.toLowerCase().includes(term) && !c.description.toLowerCase().includes(term)) return false;
+        if (level !== 'all' && c.level !== level) return false;
+        if (activeTags.length && !activeTags.some(t => c.tags.map(x => x.toLowerCase()).includes(t))) return false;
+        return true;
+      };
+      const filtered = { recommended: _studentState.recommended.filter(filter), inProgress: _studentState.inProgress, completed: _studentState.completed };
+      renderStudentTabs(filtered);
+    }
+
+    function handleStudentClick(ev) {
+      const btn = ev.target.closest('[data-action]');
+      if (!btn) return;
+      ev.preventDefault();
+      const action = btn.dataset.action;
+      const courseId = btn.dataset.courseId;
+      if (action === 'aula-enroll' && courseId) inscribirse(courseId, btn.dataset.courseTitle || '');
+      else if (action === 'aula-open-course' && courseId) openCourseFromStudent(courseId);
+      else if (action === 'aula-ver-constancia' && courseId) verConstancia(courseId, btn.dataset.courseTitle || '');
+      else if (action === 'aula-show-badges') { const tab = $id('tab-aula-logros-btn'); if (tab) new bootstrap.Tab(tab).show(); }
+    }
+
+    function openCourseFromStudent(courseId) {
+      if (!_ctx || !courseId) return;
+      if (typeof global.SIA_navToCourse === 'function') { global.SIA_navToCourse(courseId); return; }
+      if (global.AulaContent) {
+        global.AulaContent.initCourse(_ctx, courseId);
+        document.querySelectorAll('.app-view').forEach(v => v.classList.add('d-none'));
+        $id('view-aula-course')?.classList.remove('d-none');
+      }
+    }
+
+    // ── Inscripcion ──
+    async function inscribirse(cursoId, cursoTitulo) {
+      if (_ctx.profile?.role !== 'student') { showToast('Los administradores no pueden inscribirse.', 'warning'); return; }
       const uid = _ctx.auth.currentUser.uid;
       const email = _ctx.auth.currentUser.email;
-      const exists = await _ctx.db.collection(INSC).where('studentId', '==', uid).where('cursoId', '==', cursoId).limit(1).get();
-      if (!exists.empty) { showToast('Ya estás inscrito', 'info'); return; }
-      await _ctx.db.collection(INSC).add({ studentId: uid, studentEmail: email, cursoId, cursoTitulo, fechaInscripcion: firebase.firestore.FieldValue.serverTimestamp() });
-      showToast('Inscripción exitosa', 'success');
-      
-      if(window.Notify) {
-         window.Notify.send(uid, {
-            title: 'Inscripción Exitosa',
-            message: `Bienvenido al curso "${cursoTitulo}". ¡Comienza a aprender ahora!`,
-            type: 'aula',
-            link: `/aula/curso/${cursoId}`
-         });
+      try {
+        await AulaService.enroll(_ctx, uid, email, cursoId, cursoTitulo);
+        showToast('Inscripcion exitosa!', 'success');
+        if (window.Notify) window.Notify.send(uid, { title: 'Inscripcion Exitosa', message: `Bienvenido al curso "${cursoTitulo}".`, type: 'aula' });
+        await initStudent(_ctx);
+        const tabBtn = $id('tab-aula-mis-cursos-btn');
+        if (tabBtn) new bootstrap.Tab(tabBtn).show();
+      } catch (e) {
+        if (e.message === 'YA_INSCRITO') showToast('Ya estas inscrito en este curso.', 'info');
+        else { console.error(e); showToast('Error al inscribirse.', 'danger'); }
       }
-      await initStudent(_ctx); // ⬅️ refrescar home de Aula Student
-
     }
 
     async function abandonarCurso(enrollmentId, courseId) {
-      if (!confirm('¿Abandonar curso? Se borrará el progreso.')) return;
-
-      const uid = _ctx.auth.currentUser.uid;
-
+      if (!confirm('Abandonar curso? Se borrara el progreso.')) return;
       try {
-        await AulaService.removeStudent(_ctx, enrollmentId, uid, courseId);
+        await AulaService.unenroll(_ctx, enrollmentId, _ctx.auth.currentUser.uid, courseId);
         showToast('Has abandonado el curso', 'info');
-        await initStudent(_ctx); // ⬅️ volver a cargar cursos del alumno
-      } catch (e) {
-        console.error(e);
-        showToast('Error al abandonar', 'danger');
-      }
+        await initStudent(_ctx);
+      } catch (e) { console.error(e); showToast('Error al abandonar', 'danger'); }
     }
 
-
-    // ===== ADMIN (FASE 3) =====
+    // ══════════════════════════════════════════════════════════
+    //  ADMIN
+    // ══════════════════════════════════════════════════════════
     function initAdmin(ctx) {
-      const AulaService = global.AulaService;
-
       _ctx = ctx;
-      const myUid = _ctx.auth.currentUser.uid;
+      const myUid = ctx.auth.currentUser.uid;
+      _adminCourseCache = [];
 
-      // Contenedores del Dashboard
-      const listCursos = document.getElementById('aula-adm-cursos');
-      const kpiAlumnos = document.getElementById('kpi-total-alumnos');
-      const kpiTasa = document.getElementById('kpi-tasa-finalizacion');
-      const kpiPromedio = document.getElementById('kpi-promedio-general');
-      const feedContainer = document.getElementById('aula-admin-feed');
+      const stuEl = $id('aula-student');
+      const admEl = $id('aula-admin');
+      const saEl = $id('aula-superadmin');
+      if (stuEl) stuEl.classList.add('d-none');
+      if (admEl) admEl.classList.remove('d-none');
+      if (saEl) saEl.classList.add('d-none');
 
-      let _currentAdminCourseId = null;
-      let _unsubAdminLessons = null, _unsubAdminQuizzes = null;
-      _adminCourseCache = []; // Limpiar caché al iniciar
+      const kpiAlumnos = $id('kpi-total-alumnos');
+      const kpiTasa = $id('kpi-tasa-finalizacion');
+      const kpiPromedio = $id('kpi-promedio-general');
+      const feedContainer = $id('aula-admin-feed');
 
-      // --- Carga Asíncrona del Dashboard (KPIs y Feed) ---
-      async function loadDashboard() {
-        // Cargar KPIs
+      (async () => {
         try {
           const stats = await AulaService.getAdminDashboardStats(_ctx, myUid);
           if (kpiAlumnos) kpiAlumnos.textContent = stats.totalAlumnos;
           if (kpiTasa) kpiTasa.textContent = `${stats.tasaFinalizacion}%`;
           if (kpiPromedio) kpiPromedio.textContent = `${stats.promedioGeneral}%`;
-        } catch (e) { console.error("Error KPIs", e); }
-
-        // Cargar Feed
+        } catch (_) { }
         try {
           const feed = await AulaService.getAdminActivityFeed(_ctx, myUid);
           if (feedContainer) {
-            if (feed.length === 0) {
-              feedContainer.innerHTML = '<div class="list-group-item text-center p-4 text-muted small">No hay actividad reciente.</div>';
-            } else {
-              feedContainer.innerHTML = feed.map(item => {
+            feedContainer.innerHTML = feed.length === 0
+              ? '<div class="list-group-item text-center p-4 text-muted small">No hay actividad reciente.</div>'
+              : feed.map(item => {
                 const icon = item.type === 'insc' ? 'bi-person-plus-fill text-primary' : 'bi-file-earmark-check-fill text-info';
-                return `<div class="list-group-item d-flex gap-3 py-3">
-                    <i class="bi ${icon} fs-5 mt-1"></i>
-                    <div class="small">${item.text} <br><span class="text-muted" style="font-size: 0.8em;">${item.date.toLocaleString()}</span></div>
-                  </div>`;
+                return `<div class="list-group-item d-flex gap-3 py-3"><i class="bi ${icon} fs-5 mt-1"></i><div class="small">${item.text}<br><span class="text-muted" style="font-size:.8em;">${item.date.toLocaleString()}</span></div></div>`;
               }).join('');
-            }
           }
-        } catch (e) { console.error("Error Feed", e); }
-      }
-      loadDashboard(); // Ejecutar al inicio
+        } catch (_) { }
+      })();
 
-      // --- Carga de "Mis Cursos" (Suscripción) ---
+      const listCursos = $id('aula-adm-cursos');
+      let _currentAdminCourseId = null;
+      let _currentAdminModuleId = null;
+      let _unsubAdminModules = null, _unsubAdminLessons = null, _unsubAdminQuizzes = null;
+
       const uCursos = _ctx.db.collection(CURS).where('creadoPor', '==', myUid).orderBy('createdAt', 'desc')
         .onSnapshot(snap => {
           _adminCourseCache = snap.docs.map(d => ({ id: d.id, titulo: d.data().titulo }));
-          renderAdminTable(snap.docs);
-          updateReportDropdown(); // Actualizar el <select> de reportes
+          renderAdminCourses(snap.docs, listCursos);
+          updateReportDropdown();
         });
       _ctx.activeUnsubs.push(uCursos);
 
-      function renderAdminTable(docs) {
-        if (!listCursos) return;
-        if (docs.length === 0) {
-          listCursos.innerHTML = `
-              <div class="text-center p-4 text-muted">
-                <i class="bi bi-folder2-open mb-2 d-block fs-4"></i>
-                No has creado cursos aún.
-              </div>`;
-          return;
-        }
-
-        listCursos.innerHTML = `
-            <table class="table table-hover align-middle mb-0">
-              <thead class="table-light">
-                <tr>
-                  <th>Título</th>
-                  <th>Público</th>
-                  <th>Estado</th>
-                  <th class="text-end">Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${docs.map(d => {
-          const c = d.data();
-          const publicoRaw = c.publico || 'todos';
-          const publicoLabel = (() => {
-            switch (publicoRaw) {
-              case 'estudiantes': return 'Estudiantes';
-              case 'docentes': return 'Docentes';
-              case 'estudiantes_docentes': return 'Estudiantes y Docentes';
-              default: return 'Todos';
-            }
-          })();
-
-          const published = c.publicado !== false; // por defecto true
-          const estadoBadge = published
-            ? '<span class="badge bg-success-subtle text-success border border-success-subtle">Publicado</span>'
-            : '<span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle">Borrador</span>';
-
-          const toggleLabel = published ? 'Ocultar' : 'Publicar';
-
-          return `
-                    <tr>
-                      <td>${c.titulo || '(Sin título)'}</td>
-                      <td>${publicoLabel}</td>
-                      <td>${estadoBadge}</td>
-                      <td class="text-end">
-                        <div class="btn-group">
-                          <button class="btn btn-outline-secondary btn-sm"
-                                  title="${toggleLabel}"
-                                  onclick="Aula.toggleCursoPublicado('${d.id}', ${published})">
-                            <i class="bi ${published ? 'bi-eye-slash' : 'bi-eye'}"></i>
-                          </button>
-                          <button class="btn btn-outline-info btn-sm"
-                                  title="Alumnos"
-                                  onclick="Aula.openStudentsModal('${d.id}', '${(c.titulo || '').replace(/'/g, "\\'")}')">
-                            <i class="bi bi-people"></i>
-                          </button>
-                          <button class="btn btn-outline-primary btn-sm"
-                                  title="Editar contenido"
-                                  onclick="Aula.openContentModal('${d.id}')">
-                            <i class="bi bi-pencil-square"></i>
-                          </button>
-                          <button class="btn btn-outline-danger btn-sm"
-                                  title="Borrar curso"
-                                  onclick="Aula.eliminarCurso('${d.id}')">
-                            <i class="bi bi-trash"></i>
-                          </button>
-                        </div>
-                      </td>
-                    </tr>`;
-        }).join('')}
-              </tbody>
-            </table>`;
-      }
-
-
-      // --- Accesos Rápidos (Fase 3) ---
-      wireOnce('btn-quick-create-course', 'click', (e) => {
-        e.preventDefault();
-        openCourseModal(null); // nuevo modal de curso
-      });
-
-      wireOnce('btn-quick-aviso', 'click', (e) => {
-        e.preventDefault();
-        const modalEl = document.getElementById('modalAulaAdmAviso');
-        if (!modalEl || typeof bootstrap === 'undefined') return;
-
-        const txt = document.getElementById('adm-aviso-text');
-        const tipoSel = document.getElementById('adm-aviso-tipo');
-        const durSel = document.getElementById('adm-aviso-duracion');
-        if (txt) txt.value = '';
-        if (tipoSel) tipoSel.value = 'aviso';
-        if (durSel) durSel.value = '1440';
-
-        const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
-        modal.show();
-      });
-
-      // FAB de crear curso
-      const fabAddCourse = document.getElementById('aula-add-course-fab');
-      fabAddCourse?.addEventListener('click', (e) => {
-        e.preventDefault();
-        openCourseModal(null);
-      });
-
-
-
-      // --- Generador de Reportes (Fase 3) ---
-      const reportForm = document.getElementById('aula-admin-report-form');
-      const reportTypeSelect = document.getElementById('report-type-select');
-      const reportCursoGroup = document.getElementById('report-curso-select-group');
-      const reportCursoSelect = document.getElementById('report-curso-select');
-
-      function updateReportDropdown() {
-        if (!reportCursoSelect) return;
-        reportCursoSelect.innerHTML = '<option value="">Todos mis cursos</option>' +
-          _adminCourseCache.map(c => `<option value="${c.id}">${c.titulo}</option>`).join('');
-      }
-
-      reportTypeSelect?.addEventListener('change', (e) => {
-        const showCursoSelect = e.target.value === 'calificaciones_curso';
-        reportCursoGroup?.classList.toggle('d-none', !showCursoSelect);
-      });
-
-      reportForm?.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const btn = e.target.querySelector('button[type="submit"]');
-        btn.disabled = true;
-        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Generando...';
-
-        const type = reportTypeSelect.value;
-        const cursoId = (type === 'calificaciones_curso') ? reportCursoSelect.value : null;
-
-        try {
-          const data = await AulaService.generateReportData(_ctx, myUid, type, cursoId || undefined);
-          if (data.length === 0) {
-            showToast('No se encontraron datos para este reporte', 'info');
-          } else {
-            // Usamos el helper global que definiremos fuera de esta función
-            Aula.downloadCSV(data, `${type}_${cursoId || 'global'}.csv`);
-          }
-        } catch (err) {
-          console.error("Error generando reporte", err);
-          showToast('Error al generar el reporte', 'danger');
-        } finally {
-          btn.disabled = false;
-          btn.innerHTML = '<i class="bi bi-download me-1"></i> Generar y Descargar (CSV)';
-        }
-      });
-
-      // --- Gestión de Avisos (Fase 1 - Sin cambios) ---
-      const listAvisos = document.getElementById('aula-adm-avisos-list');
-      const uAvisos = AulaService.streamAvisos(_ctx, (snap) => {
+      const listAvisos = $id('aula-adm-avisos-list');
+      const uAvisos = AulaService.streamAvisos(_ctx, snap => {
         if (!listAvisos) return;
-        if (snap.empty) {
-          listAvisos.innerHTML = `
-              <div class="p-3 text-muted small text-center">
-                <i class="bi bi-bell-slash mb-2 d-block fs-5"></i>
-                Sin avisos publicados.
-              </div>`;
-          return;
-        }
-
+        if (snap.empty) { listAvisos.innerHTML = '<div class="p-3 text-muted small text-center"><i class="bi bi-bell-slash mb-2 d-block fs-5"></i>Sin avisos.</div>'; return; }
         listAvisos.innerHTML = snap.docs.map(d => {
           const a = d.data();
-          const createdAt = a.createdAt && a.createdAt.toDate ? a.createdAt.toDate() : null;
-          const hasta = a.activaHasta && a.activaHasta.toDate ? a.activaHasta.toDate() : null;
+          const createdAt = a.createdAt?.toDate?.();
           const tipo = a.tipo || 'aviso';
-
-          const dateStr = createdAt ? createdAt.toLocaleDateString() : 'Reciente';
-          const expStr = hasta ? `Hasta ${hasta.toLocaleDateString()}` : 'Sin fecha de término';
-
-          const badgeClass =
-            tipo === 'urgente'
-              ? 'badge bg-danger-subtle text-danger border border-danger-subtle'
-              : tipo === 'recomendacion'
-                ? 'badge bg-success-subtle text-success border border-success-subtle'
-                : 'badge bg-light text-dark border';
-
-          const label =
-            tipo === 'urgente'
-              ? 'Urgente'
-              : tipo === 'recomendacion'
-                ? 'Recomendación'
-                : 'Aviso';
-
-          return `
-              <div class="list-group-item d-flex justify-content-between align-items-start p-2 small">
-                <div class="me-3">
-                  <div class="d-flex align-items-center gap-2 mb-1">
-                    <span class="${badgeClass}">${label}</span>
-                    <span class="text-muted">${dateStr}</span>
-                  </div>
-                  <div class="lh-sm">${a.texto || ''}</div>
-                  <div class="text-muted mt-1" style="font-size: .75rem;">${expStr}</div>
-                </div>
-                <button class="btn btn-sm text-danger p-0 ms-2"
-                        title="Eliminar aviso"
-                        onclick="Aula.borrarAviso('${d.id}')">
-                  <i class="bi bi-x-lg"></i>
-                </button>
-              </div>`;
+          const badgeCls = tipo === 'urgente' ? 'bg-danger-subtle text-danger' : tipo === 'recomendacion' ? 'bg-success-subtle text-success' : 'bg-light text-dark';
+          const label = tipo === 'urgente' ? 'Urgente' : tipo === 'recomendacion' ? 'Recomendacion' : 'Aviso';
+          return `<div class="list-group-item d-flex justify-content-between align-items-start p-2 small"><div class="me-2"><div class="d-flex align-items-center gap-2 mb-1"><span class="badge ${badgeCls} border">${label}</span><span class="text-muted">${createdAt ? createdAt.toLocaleDateString() : ''}</span></div><div class="lh-sm">${a.texto || ''}</div></div><button class="btn btn-sm text-danger p-0 ms-2" onclick="Aula.borrarAviso('${d.id}')"><i class="bi bi-x-lg"></i></button></div>`;
         }).join('');
       });
       _ctx.activeUnsubs.push(uAvisos);
 
-
-      wireOnce('aula-adm-avisos-form', 'submit', async (e) => {
+      wireOnce('btn-quick-create-course', 'click', e => { e.preventDefault(); openCourseModal(null); });
+      wireOnce('btn-quick-aviso', 'click', e => {
         e.preventDefault();
-        const inp = document.getElementById('aula-adm-aviso-input');
-        const txt = inp.value.trim();
+        const m = $id('modalAulaAdmAviso'); if (!m) return;
+        const txt = $id('adm-aviso-text'); if (txt) txt.value = '';
+        const tip = $id('adm-aviso-tipo'); if (tip) tip.value = 'aviso';
+        const dur = $id('adm-aviso-duracion'); if (dur) dur.value = '1440';
+        bootstrap.Modal.getOrCreateInstance(m).show();
+      });
+
+      $id('aula-add-course-fab')?.addEventListener('click', e => { e.preventDefault(); openCourseModal(null); });
+
+      const selCurso = $id('ac-curso-select');
+      selCurso?.addEventListener('change', e => { _currentAdminCourseId = e.target.value; loadAdminModules(e.target.value); loadAdminQuizzes(e.target.value); });
+
+      const selModulo = $id('ac-module-select');
+      selModulo?.addEventListener('change', e => { _currentAdminModuleId = e.target.value; loadAdminLessons(_currentAdminCourseId, e.target.value); });
+
+      wireOnce('aula-adm-avisos-form', 'submit', async e => {
+        e.preventDefault();
+        const inp = $id('aula-adm-aviso-input'); const txt = inp?.value.trim();
         if (!txt) return;
-        try { await AulaService.addAviso(_ctx, txt); showToast('Aviso publicado', 'success'); inp.value = ''; }
-        catch (err) { showToast('Error', 'danger'); }
+        try { await AulaService.addAviso(_ctx, txt); showToast('Aviso publicado', 'success'); if (inp) inp.value = ''; }
+        catch (_) { showToast('Error', 'danger'); }
       });
 
-      // Formulario del modal "Publicar aviso"
-      wireOnce('aula-adm-aviso-modal-form', 'submit', async (e) => {
+      wireOnce('aula-adm-aviso-modal-form', 'submit', async e => {
         e.preventDefault();
-        const modalEl = document.getElementById('modalAulaAdmAviso');
-        const txtEl = document.getElementById('adm-aviso-text');
-        const tipoSel = document.getElementById('adm-aviso-tipo');
-        const durSel = document.getElementById('adm-aviso-duracion');
-
-        const mensaje = txtEl?.value.trim() || '';
-        if (!mensaje) {
-          showToast('Escribe un mensaje para el aviso.', 'warning');
-          return;
-        }
-
-        const tipo = tipoSel?.value || 'aviso';
-        const durMin = parseInt(durSel?.value || '0', 10) || 0;
-
-        let prioridad = 2;
-        if (tipo === 'urgente') prioridad = 1;
-        else if (tipo === 'recomendacion') prioridad = 3;
-
+        const mensaje = $id('adm-aviso-text')?.value.trim() || '';
+        if (!mensaje) { showToast('Escribe un mensaje.', 'warning'); return; }
+        const tipo = $id('adm-aviso-tipo')?.value || 'aviso';
+        const durMin = parseInt($id('adm-aviso-duracion')?.value || '0', 10) || 0;
+        let prioridad = tipo === 'urgente' ? 1 : tipo === 'recomendacion' ? 3 : 2;
         try {
-          await AulaService.addAviso(_ctx, mensaje, {
-            tipo,
-            prioridad,
-            modulo: 'global',
-            duracionMin: durMin
-          });
+          await AulaService.addAviso(_ctx, mensaje, { tipo, prioridad, modulo: 'global', duracionMin: durMin });
           showToast('Aviso publicado', 'success');
-          if (modalEl && typeof bootstrap !== 'undefined') {
-            bootstrap.Modal.getInstance(modalEl)?.hide();
-          }
-        } catch (err) {
-          console.error('Error publicando aviso', err);
-          showToast('Error al publicar el aviso', 'danger');
-        }
+          bootstrap.Modal.getInstance($id('modalAulaAdmAviso'))?.hide();
+        } catch (_) { showToast('Error al publicar', 'danger'); }
       });
 
-      // Formulario "Crear / editar curso"
-      wireOnce('aula-course-form', 'submit', async (e) => {
+      wireOnce('aula-course-form', 'submit', async e => {
         e.preventDefault();
-
-        const form = e.target; // el <form id="aula-course-form">
-        const idEl = form.querySelector('#aula-course-id');
-        const titleEl = form.querySelector('#aula-course-title');
-        const descEl = form.querySelector('#aula-course-desc');
-        const hoursEl = form.querySelector('#aula-course-hours');
-        const modalEl = document.getElementById('modalAulaCourse');
-
-        if (!titleEl) {
-          console.error('No se encontró #aula-course-title dentro del formulario');
-          showToast('Error interno al leer el título.', 'danger');
-          return;
-        }
-
-        const titulo = (titleEl.value || '').trim();
-        const descripcion = (descEl?.value || '').trim();
-        const horas = parseInt(hoursEl?.value || '1', 10) || 1;
-
-        if (!titulo) {
-          showToast('El curso debe tener un título.', 'warning');
-          return;
-        }
-
-        const user = _ctx.auth.currentUser;
-        if (!user) {
-          showToast('Sesión no válida.', 'danger');
-          return;
-        }
-
-        // === NUEVO: calcular "publico" a partir de los checkboxes ===
+        const form = e.target;
+        const titulo = ($id('aula-modal-course-title')?.value || '').trim();
+        if (!titulo) { showToast('El curso debe tener titulo.', 'warning'); return; }
         const checked = form.querySelectorAll('#course-publico-group .course-publico-chk:checked');
         const values = Array.from(checked).map(el => el.value);
-
-        let publico;
-        if (values.length === 0) {
-          publico = 'todos';
-        } else if (values.includes('todos') || values.length > 1) {
-          publico = 'todos';
-        } else {
-          publico = values[0];
-        }
-
-        const ahora = firebase.firestore.FieldValue.serverTimestamp();
-        const baseData = {
-          titulo,
-          descripcion,
-          duracionHoras: horas,
-          publico,
-        };
-
+        let publico = 'todos';
+        if (values.length === 1 && !values.includes('todos')) publico = values[0];
+        const rawTags = ($id('aula-modal-course-tags')?.value || '').split(',').map(t => t.trim().toLowerCase()).filter(Boolean);
+        const data = { titulo, descripcion: ($id('aula-modal-course-desc')?.value || '').trim(), duracionHoras: parseInt($id('aula-modal-course-hours')?.value || '1', 10) || 1, nivel: $id('aula-modal-course-level')?.value || 'General', imagen: ($id('aula-modal-course-image')?.value || '').trim(), tags: rawTags, publico };
         try {
-          if (!idEl.value) {
-            // Crear curso nuevo
-            await _ctx.db.collection(CURS).add({
-              ...baseData,
-              creadoPor: user.uid,
-              creadoEmail: user.email || null,
-              createdAt: ahora,
-              updatedAt: ahora,
-              publicado: true
-            });
-            showToast('Curso creado correctamente', 'success');
-          } else {
-            // Actualizar metadatos (posible uso futuro)
-            await _ctx.db.collection(CURS).doc(idEl.value).update({
-              ...baseData,
-              updatedAt: ahora
-            });
-            showToast('Curso actualizado', 'success');
-          }
-
-        } catch (err) {
-          console.error('Error guardando curso', err);
-          showToast('No se pudo guardar el curso', 'danger');
-        } finally {
-          if (modalEl && typeof bootstrap !== 'undefined') {
-            bootstrap.Modal.getInstance(modalEl)?.hide();
-          }
-        }
+          const idEl = $id('aula-course-id');
+          if (!idEl?.value) { await AulaService.createCourse(_ctx, data); showToast('Curso creado', 'success'); }
+          else { await AulaService.updateCourse(_ctx, idEl.value, data); showToast('Curso actualizado', 'success'); }
+        } catch (err) { console.error(err); showToast('Error guardando curso', 'danger'); }
+        finally { bootstrap.Modal.getInstance($id('modalAulaCourse'))?.hide(); }
       });
 
+      // Modulos
+      wireOnce('ac-save-module', 'click', async () => {
+        if (!_currentAdminCourseId) return showToast('Selecciona un curso', 'warning');
+        const mid = $id('ac-module-id').value;
+        const data = { titulo: $id('ac-module-title').value.trim(), descripcion: $id('ac-module-desc').value.trim(), order: Number($id('ac-module-order').value) || 1 };
+        if (!data.titulo) return showToast('El modulo necesita titulo', 'warning');
+        try {
+          if (mid) await AulaService.updateModule(_ctx, _currentAdminCourseId, mid, data);
+          else await AulaService.addModule(_ctx, _currentAdminCourseId, data);
+          showToast('Modulo guardado', 'success'); resetModuleForm();
+        } catch (_) { showToast('Error', 'danger'); }
+      });
+      wireOnce('ac-btn-cancel-module', 'click', resetModuleForm);
 
+      // Lecciones
+      wireOnce('ac-save-lesson', 'click', async () => {
+        if (!_currentAdminCourseId || !_currentAdminModuleId) return showToast('Selecciona curso y modulo', 'warning');
+        const lid = $id('ac-lesson-id').value;
+        const text = $id('ac-lesson-text').value.trim();
+        const html = text ? `<div class="prose"><p>${text.replace(/\n{2,}/g, '</p><p>').replace(/\n/g, '<br>')}</p></div>` : '';
+        const resources = [];
+        $id('ac-resources-list')?.querySelectorAll('.ac-resource-row').forEach(row => {
+          const type = row.querySelector('select')?.value || 'link';
+          const url = row.querySelector('input[type="url"]')?.value?.trim() || '';
+          const lbl = row.querySelector('input[type="text"]')?.value?.trim() || '';
+          if (url) resources.push({ type, url, label: lbl });
+        });
+        const data = { title: $id('ac-lesson-title').value.trim(), order: Number($id('ac-lesson-order').value) || 1, html, resources };
+        try {
+          if (lid) await AulaService.updateLesson(_ctx, _currentAdminCourseId, _currentAdminModuleId, lid, data);
+          else await AulaService.addLesson(_ctx, _currentAdminCourseId, _currentAdminModuleId, data);
+          showToast('Leccion guardada', 'success'); resetLessonForm();
+        } catch (_) { showToast('Error', 'danger'); }
+      });
+      wireOnce('ac-btn-cancel-edit', 'click', resetLessonForm);
+      wireOnce('ac-add-resource', 'click', () => addResourceRow());
 
+      // Quizzes
+      wireOnce('ac-quiz-add', 'click', () => addQuizCard());
+      wireOnce('ac-save-quiz', 'click', async () => {
+        const courseId = $id('ac-curso-select')?.value;
+        if (!courseId) return showToast('Selecciona un curso', 'warning');
+        const qid = $id('ac-quiz-id').value;
+        const items = [...$id('ac-quiz-items').children].map(card => {
+          const enunciado = card.querySelector('.q-text')?.value?.trim() || '';
+          const opciones = [...card.querySelectorAll('.q-opt')].map(inp => inp.value.trim());
+          const okEl = card.querySelector('.q-ok:checked');
+          return { enunciado, opciones, correctaIndex: okEl ? Number(okEl.value) : 0 };
+        }).filter(q => q.enunciado && q.opciones.some(o => o));
+        if (!items.length) return showToast('Agrega preguntas validas', 'warning');
+        const quizData = { title: $id('ac-quiz-title').value.trim() || 'Quiz', minScore: Number($id('ac-quiz-min').value) || 70, timeLimit: Number($id('ac-quiz-time').value) || 0, maxAttempts: Number($id('ac-quiz-tries').value) || 3, items };
+        try {
+          if (qid) await AulaService.updateQuiz(_ctx, courseId, qid, quizData);
+          else await AulaService.addQuiz(_ctx, courseId, quizData);
+          showToast('Quiz guardado', 'success'); resetQuizForm();
+        } catch (_) { showToast('Error', 'danger'); }
+      });
+      wireOnce('ac-btn-cancel-quiz', 'click', resetQuizForm);
 
+      // Reportes
+      const reportTypeSelect = $id('report-type-select');
+      const reportCursoGroup = $id('report-curso-select-group');
+      reportTypeSelect?.addEventListener('change', e => { reportCursoGroup?.classList.toggle('d-none', e.target.value !== 'calificaciones_curso'); });
+      $id('aula-admin-report-form')?.addEventListener('submit', async e => {
+        e.preventDefault();
+        const btn = e.target.querySelector('button[type="submit"]');
+        btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Generando...';
+        const type = reportTypeSelect.value;
+        const cursoId = type === 'calificaciones_curso' ? $id('report-curso-select')?.value : null;
+        try {
+          const data = await AulaService.generateReportData(_ctx, myUid, type, cursoId || undefined);
+          if (!data.length) showToast('Sin datos', 'info');
+          else downloadCSV(data, `${type}_${cursoId || 'global'}.csv`);
+        } catch (_) { showToast('Error generando reporte', 'danger'); }
+        finally { btn.disabled = false; btn.innerHTML = '<i class="bi bi-download me-1"></i> Descargar CSV'; }
+      });
 
-      // --- Gestión de Contenido (Modals - Fase 2 - Sin cambios) ---
-      const selCurso = document.getElementById('ac-curso-select');
-      selCurso?.addEventListener('change', (e) => { loadAdminLessons(e.target.value); loadAdminQuizzes(e.target.value); });
-
-      function loadAdminLessons(courseId) {
+      // ── Admin load helpers ──
+      function loadAdminModules(courseId) {
         _currentAdminCourseId = courseId;
-        const host = document.getElementById('ac-lessons-list');
+        const host = $id('ac-modules-list');
+        const modSelect = $id('ac-module-select');
+        resetModuleForm();
+        if (_unsubAdminModules) _unsubAdminModules();
+        if (!courseId) { if (host) host.innerHTML = '<div class="p-3 text-muted small">Selecciona un curso.</div>'; if (modSelect) modSelect.innerHTML = '<option value="">Selecciona modulo...</option>'; return; }
+        _unsubAdminModules = AulaService.streamModules(_ctx, courseId, snap => {
+          if (!host) return;
+          if (snap.empty) host.innerHTML = '<div class="p-3 text-muted small">Sin modulos aun.</div>';
+          else host.innerHTML = snap.docs.map(d => {
+            const m = d.data();
+            return `<div class="list-group-item d-flex justify-content-between align-items-center p-2"><div><span class="badge bg-secondary me-2">#${m.order}</span><span class="fw-semibold small">${m.titulo}</span></div><div><button class="btn btn-sm btn-link text-primary p-0 me-2" onclick="Aula.editModule('${d.id}', '${(m.titulo || '').replace(/'/g, "\\'")}', ${m.order}, '${(m.descripcion || '').replace(/'/g, "\\'")}')"><i class="bi bi-pencil"></i></button><button class="btn btn-sm btn-link text-danger p-0" onclick="Aula.deleteModule('${d.id}')"><i class="bi bi-trash"></i></button></div></div>`;
+          }).join('');
+          if (modSelect) modSelect.innerHTML = '<option value="">Selecciona modulo...</option>' + snap.docs.map(d => `<option value="${d.id}">${d.data().titulo}</option>`).join('');
+        }, err => console.error(err));
+      }
+
+      function loadAdminLessons(courseId, moduleId) {
+        const host = $id('ac-lessons-list');
         resetLessonForm();
         if (_unsubAdminLessons) _unsubAdminLessons();
-        if (!courseId) { if (host) host.innerHTML = '<div class="p-3 text-muted">Selecciona un curso.</div>'; return; }
-        _unsubAdminLessons = AulaService.streamLessons(_ctx, courseId, snap => {
+        if (!courseId || !moduleId) { if (host) host.innerHTML = '<div class="p-3 text-muted small">Selecciona un modulo.</div>'; return; }
+        _unsubAdminLessons = AulaService.streamLessons(_ctx, courseId, moduleId, snap => {
           if (!host) return;
-          if (snap.empty) { host.innerHTML = '<div class="p-3 text-muted small">Sin lecciones aún.</div>'; return; }
+          if (snap.empty) { host.innerHTML = '<div class="p-3 text-muted small">Sin lecciones.</div>'; return; }
           host.innerHTML = snap.docs.map(d => {
-            const l = d.data(); const safeRes = encodeURIComponent(l.resource || '');
-            return `<div class="list-group-item d-flex justify-content-between align-items-center"><div><span class="badge bg-secondary me-2">#${l.order}</span><span class="fw-semibold">${l.title}</span></div><div><button class="btn btn-sm btn-link text-primary p-0 me-2" onclick="Aula.editLesson('${d.id}', '${l.title.replace(/'/g, "\\'")}', ${l.order}, '${encodeURIComponent(l.html || '')}', '${safeRes}')"><i class="bi bi-pencil"></i></button><button class="btn btn-sm btn-link text-danger p-0" onclick="Aula.deleteLesson('${d.id}')"><i class="bi bi-trash"></i></button></div></div>`;
+            const l = d.data();
+            const resJson = encodeURIComponent(JSON.stringify(l.resources || []));
+            return `<div class="list-group-item d-flex justify-content-between align-items-center p-2"><div><span class="badge bg-secondary me-2">#${l.order}</span><span class="fw-semibold small">${l.title}</span></div><div><button class="btn btn-sm btn-link text-primary p-0 me-2" onclick="Aula.editLesson('${d.id}', '${(l.title || '').replace(/'/g, "\\'")}', ${l.order}, '${encodeURIComponent(l.html || '')}', '${resJson}')"><i class="bi bi-pencil"></i></button><button class="btn btn-sm btn-link text-danger p-0" onclick="Aula.deleteLesson('${d.id}')"><i class="bi bi-trash"></i></button></div></div>`;
           }).join('');
         }, err => console.error(err));
       }
 
-      wireOnce('ac-save-lesson', 'click', async () => {
-        if (!_currentAdminCourseId) return showToast('Selecciona un curso', 'warning');
-        const lid = document.getElementById('ac-lesson-id').value;
-        const data = { title: document.getElementById('ac-lesson-title').value.trim(), order: Number(document.getElementById('ac-lesson-order').value) || 1, text: document.getElementById('ac-lesson-text').value.trim(), resource: document.getElementById('ac-lesson-resource').value.trim() };
-        data.html = data.text ? `<div class="prose"><p>${data.text.replace(/\n{2,}/g, '</p><p>').replace(/\n/g, '<br>')}</p></div>` : '';
-        try { if (lid) await AulaService.updateLesson(_ctx, _currentAdminCourseId, lid, data); else await AulaService.addLesson(_ctx, _currentAdminCourseId, data); showToast('Lección guardada', 'success'); resetLessonForm(); }
-        catch (e) { console.error(e); showToast('Error', 'danger'); }
-      });
-
-      wireOnce('ac-btn-cancel-edit', 'click', resetLessonForm);
-      function resetLessonForm() { document.getElementById('ac-lesson-form').reset(); document.getElementById('ac-lesson-id').value = ''; document.getElementById('ac-lesson-resource').value = ''; document.getElementById('ac-btn-cancel-edit')?.classList.add('d-none'); }
-
       function loadAdminQuizzes(courseId) {
-        const host = document.getElementById('ac-quizzes-list');
-        resetQuizForm(); if (_unsubAdminQuizzes) _unsubAdminQuizzes();
+        const host = $id('ac-quizzes-list'); resetQuizForm();
+        if (_unsubAdminQuizzes) _unsubAdminQuizzes();
         if (!courseId) { if (host) host.innerHTML = '<div class="p-3 text-muted">Selecciona un curso.</div>'; return; }
         _unsubAdminQuizzes = AulaService.streamQuizzes(_ctx, courseId, snap => {
-          if (!host) return; if (snap.empty) { host.innerHTML = '<div class="p-3 text-muted small">Sin evaluaciones.</div>'; return; }
+          if (!host) return;
+          if (snap.empty) { host.innerHTML = '<div class="p-3 text-muted small">Sin evaluaciones.</div>'; return; }
           host.innerHTML = snap.docs.map(d => {
             const q = d.data(); const safeJson = encodeURIComponent(JSON.stringify(q));
-            return `<div class="list-group-item d-flex justify-content-between align-items-center p-2"><div><span class="fw-bold">${q.title}</span> <span class="badge bg-light text-dark border ms-2">${q.timeLimit || '∞'} min</span> <span class="badge bg-light text-dark border">${q.maxAttempts || 3} intentos</span></div><div><button class="btn btn-sm btn-link text-primary p-0 me-2" onclick="Aula.editQuiz('${d.id}', '${safeJson}')"><i class="bi bi-pencil"></i></button><button class="btn btn-sm btn-link text-danger p-0" onclick="Aula.deleteQuiz('${d.id}')"><i class="bi bi-trash"></i></button></div></div>`;
+            return `<div class="list-group-item d-flex justify-content-between align-items-center p-2"><div><span class="fw-bold small">${q.title}</span> <span class="badge bg-light text-dark border ms-1">${q.timeLimit || '\u221E'} min</span></div><div><button class="btn btn-sm btn-link text-primary p-0 me-2" onclick="Aula.editQuiz('${d.id}', '${safeJson}')"><i class="bi bi-pencil"></i></button><button class="btn btn-sm btn-link text-danger p-0" onclick="Aula.deleteQuiz('${d.id}')"><i class="bi bi-trash"></i></button></div></div>`;
           }).join('');
         });
       }
 
-      wireOnce('ac-quiz-add', 'click', () => addQuizCard());
-      function addQuizCard(data = null) {
-        const host = document.getElementById('ac-quiz-items'); const idx = host.children.length;
-        const enunciado = data ? data.enunciado : ''; const correcta = data ? data.correctaIndex : 0; const opts = data ? data.opciones : ['', '', '', ''];
-        host.insertAdjacentHTML('beforeend', `<div class="card border-0 shadow-sm mb-2" id="qcard-${idx}"><div class="card-body position-relative"><button type="button" class="btn-close position-absolute top-0 end-0 m-2" onclick="this.closest('.card').remove()"></button><div class="mb-2"><label class="form-label small fw-bold">Enunciado</label><input class="form-control form-control-sm q-text" value="${enunciado.replace(/"/g, '&quot;')}"></div><div class="row g-2">${['A', 'B', 'C', 'D'].map((lbl, j) => `<div class="col-md-6"><div class="input-group input-group-sm"><div class="input-group-text"><input class="form-check-input mt-0 q-ok" type="radio" name="q${idx}-ok" value="${j}" ${Number(correcta) === j ? 'checked' : ''}></div><input class="form-control q-opt" placeholder="Opción ${lbl}" value="${opts[j].replace(/"/g, '&quot;')}"></div></div>`).join('')}</div></div></div>`);
+      function updateReportDropdown() {
+        const sel = $id('report-curso-select');
+        if (sel) sel.innerHTML = '<option value="">Todos mis cursos</option>' + _adminCourseCache.map(c => `<option value="${c.id}">${c.titulo}</option>`).join('');
       }
 
-      wireOnce('ac-save-quiz', 'click', async () => {
-        const courseId = document.getElementById('ac-curso-select').value; if (!courseId) return showToast('Selecciona un curso', 'warning');
-        const qid = document.getElementById('ac-quiz-id').value;
-        const items = [...document.getElementById('ac-quiz-items').children].map((card, i) => {
-          const enunciado = card.querySelector('.q-text')?.value?.trim() || ''; const opciones = [...card.querySelectorAll('.q-opt')].map(inp => inp.value.trim()); const okEl = card.querySelector('.q-ok:checked'); const correctaIndex = okEl ? Number(okEl.value) : 0; return { enunciado, opciones, correctaIndex };
-        }).filter(q => q.enunciado && q.opciones.some(o => o));
-        if (items.length === 0) return showToast('Agrega preguntas válidas', 'warning');
+      function resetModuleForm() {
+        $id('ac-module-form')?.reset(); const mid = $id('ac-module-id'); if (mid) mid.value = '';
+        $id('ac-btn-cancel-module')?.classList.add('d-none');
+        const btn = $id('ac-save-module'); if (btn) { btn.innerHTML = '<i class="bi bi-plus-lg me-1"></i>Guardar Modulo'; btn.classList.remove('btn-primary'); btn.classList.add('btn-success'); }
+      }
 
-        const quizData = {
-          title: document.getElementById('ac-quiz-title').value.trim() || 'Quiz',
-          minScore: Number(document.getElementById('ac-quiz-min').value) || 70,
-          timeLimit: Number(document.getElementById('ac-quiz-time').value) || 0,
-          maxAttempts: Number(document.getElementById('ac-quiz-tries').value) || 3,
-          items
-        };
-        try { if (qid) await AulaService.updateQuiz(_ctx, courseId, qid, quizData); else await AulaService.addQuiz(_ctx, courseId, quizData); showToast('Quiz guardado', 'success'); resetQuizForm(); }
-        catch (e) { console.error(e); showToast('Error', 'danger'); }
-      });
+      function resetLessonForm() {
+        $id('ac-lesson-form')?.reset(); const lid = $id('ac-lesson-id'); if (lid) lid.value = '';
+        const rl = $id('ac-resources-list'); if (rl) rl.innerHTML = '';
+        $id('ac-btn-cancel-edit')?.classList.add('d-none');
+        const btn = $id('ac-save-lesson'); if (btn) { btn.textContent = 'Guardar Leccion'; btn.classList.remove('btn-primary'); btn.classList.add('btn-success'); }
+      }
 
-      wireOnce('ac-btn-cancel-quiz', 'click', resetQuizForm);
-      function resetQuizForm() { document.getElementById('ac-quiz-form').reset(); document.getElementById('ac-quiz-id').value = ''; document.getElementById('ac-quiz-items').innerHTML = ''; document.getElementById('ac-btn-cancel-quiz')?.classList.add('d-none'); }
-    } // --- Fin de initAdmin ---
+      function resetQuizForm() {
+        $id('ac-quiz-form')?.reset(); const qid = $id('ac-quiz-id'); if (qid) qid.value = '';
+        const items = $id('ac-quiz-items'); if (items) items.innerHTML = '';
+        $id('ac-btn-cancel-quiz')?.classList.add('d-none');
+        const btn = $id('ac-save-quiz'); if (btn) { btn.textContent = 'Guardar Quiz'; btn.classList.remove('btn-primary'); btn.classList.add('btn-success'); }
+      }
+    }
 
-    // --- Modal de Curso (alta / edición básica) ---
+    // ── Admin courses render ──
+    function renderAdminCourses(docs, host) {
+      if (!host) return;
+      if (!docs.length) { host.innerHTML = '<div class="text-center p-4 text-muted"><i class="bi bi-folder2-open mb-2 d-block fs-4"></i>No has creado cursos aun.</div>'; return; }
+      host.innerHTML = docs.map(d => {
+        const c = d.data(); const pub = c.publicado !== false;
+        const pubLabel = { estudiantes: 'Estudiantes', docentes: 'Docentes' }[c.publico] || 'Todos';
+        const tags = (c.tags || []).slice(0, 3).map(t => `<span class="aula-tag-pill">${esc(t)}</span>`).join(' ');
+        const estadoBadge = pub ? '<span class="badge bg-success-subtle text-success border border-success-subtle">Publicado</span>' : '<span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle">Borrador</span>';
+        return `<div class="card border-0 shadow-sm mb-2 rounded-3"><div class="card-body p-3 d-flex flex-column flex-sm-row justify-content-between align-items-start gap-2"><div class="flex-grow-1"><h6 class="fw-bold mb-1 small">${c.titulo || '(Sin titulo)'}</h6><div class="d-flex flex-wrap gap-1 mb-1">${estadoBadge}<span class="badge bg-light text-dark border">${pubLabel}</span></div><div class="d-flex gap-1 flex-wrap">${tags}</div></div><div class="btn-group btn-group-sm"><button class="btn btn-outline-secondary" title="${pub ? 'Ocultar' : 'Publicar'}" onclick="Aula.toggleCursoPublicado('${d.id}', ${pub})"><i class="bi ${pub ? 'bi-eye-slash' : 'bi-eye'}"></i></button><button class="btn btn-outline-info" title="Alumnos" onclick="Aula.openStudentsModal('${d.id}', '${(c.titulo || '').replace(/'/g, "\\'")}')"><i class="bi bi-people"></i></button><button class="btn btn-outline-primary" title="Contenido" onclick="Aula.openContentModal('${d.id}')"><i class="bi bi-pencil-square"></i></button><button class="btn btn-outline-danger" title="Borrar" onclick="Aula.eliminarCurso('${d.id}')"><i class="bi bi-trash"></i></button></div></div></div>`;
+      }).join('');
+    }
+
+    // ── Modals ──
     function openCourseModal(courseId) {
-      const modalEl = document.getElementById('modalAulaCourse');
-      if (!modalEl || typeof bootstrap === 'undefined') return;
-      const publicoChecks = document.querySelectorAll('#course-publico-group .course-publico-chk');
-      publicoChecks.forEach(chk => {
-        chk.checked = (chk.value === 'todos');
-      });
-      const idEl = document.getElementById('aula-course-id');
-      const titleEl = document.getElementById('aula-course-title');
-      const descEl = document.getElementById('aula-course-desc');
-      const hoursEl = document.getElementById('aula-course-hours');
-      const publicoEl = document.getElementById('aula-course-publico');
-      const titleModal = document.getElementById('aula-course-modal-title');
-
-      if (idEl) idEl.value = courseId || '';
-
-      // Por ahora sólo soportamos "nuevo curso" desde los accesos rápidos.
-      // Si en el futuro queremos editar metadatos, aquí podríamos cargar el curso por ID.
+      const m = $id('modalAulaCourse'); if (!m) return;
+      const checks = document.querySelectorAll('#course-publico-group .course-publico-chk');
+      checks.forEach(chk => { chk.checked = chk.value === 'todos'; });
+      const idEl = $id('aula-course-id'); if (idEl) idEl.value = courseId || '';
+      const titleModal = $id('aula-course-modal-title');
       if (!courseId) {
-        if (titleModal) titleModal.innerHTML = '<i class="bi bi-journal-plus me-2"></i> Crear curso';
-        if (titleEl) titleEl.value = '';
-        if (descEl) descEl.value = '';
-        if (hoursEl) hoursEl.value = '1';
-        if (publicoEl) publicoEl.value = 'todos';
+        if (titleModal) titleModal.innerHTML = '<i class="bi bi-journal-plus me-2"></i>Crear curso';
+        [$id('aula-modal-course-title'), $id('aula-modal-course-desc'), $id('aula-modal-course-tags'), $id('aula-modal-course-image')].forEach(el => { if (el) el.value = ''; });
+        const h = $id('aula-modal-course-hours'); if (h) h.value = '1';
+        const l = $id('aula-modal-course-level'); if (l) l.value = 'General';
       }
-
-      bootstrap.Modal.getOrCreateInstance(modalEl).show();
+      bootstrap.Modal.getOrCreateInstance(m).show();
     }
 
-    // --- Helpers Globales (Exportados) ---
     async function openContentModal(courseId) {
-      // Llenamos el dropdown con el caché que ya tenemos
-      const sel = document.getElementById('ac-curso-select');
+      const sel = $id('ac-curso-select');
       if (sel) {
-        sel.innerHTML = '<option value="">Selecciona curso...</option>' +
-          _adminCourseCache.map(c => `<option value="${c.id}">${c.titulo}</option>`).join('');
+        sel.innerHTML = '<option value="">Selecciona curso...</option>' + _adminCourseCache.map(c => `<option value="${c.id}">${c.titulo}</option>`).join('');
+        if (courseId) { sel.value = courseId; sel.dispatchEvent(new Event('change')); }
       }
-      // Si se pasó un ID (para editar), lo seleccionamos
-      if (courseId && sel) {
-        sel.value = courseId;
-        sel.dispatchEvent(new Event('change')); // Disparamos el 'change' para cargar lecciones/quizzes
-      }
-      bootstrap.Modal.getOrCreateInstance(document.getElementById('modalAulaContent')).show();
+      bootstrap.Modal.getOrCreateInstance($id('modalAulaContent')).show();
     }
 
-    function editLesson(id, t, o, h, r) {
-      document.getElementById('ac-lesson-id').value = id;
-      document.getElementById('ac-lesson-title').value = t;
-      document.getElementById('ac-lesson-order').value = o;
-      document.getElementById('ac-lesson-resource').value = decodeURIComponent(r || '');
+    async function openStudentsModal(cid, tit) {
+      const m = new bootstrap.Modal($id('modalAulaStudents'));
+      $id('aula-students-course-title').textContent = tit;
+      const lst = $id('aula-students-list'); const ldg = $id('aula-students-loading'); const emp = $id('aula-students-empty'); const tbl = $id('aula-students-table');
+      if (lst) lst.innerHTML = ''; ldg?.classList.remove('d-none'); emp?.classList.add('d-none'); tbl?.classList.add('d-none');
+      m.show();
+      try {
+        const s = await AulaService.getCourseStudents(_ctx, cid);
+        ldg?.classList.add('d-none');
+        if (!s.length) { emp?.classList.remove('d-none'); return; }
+        tbl?.classList.remove('d-none');
+        if (lst) lst.innerHTML = s.map(x => `<tr><td class="ps-3 small">${x.email}</td><td class="small">${x.date ? x.date.toDate().toLocaleDateString() : '-'}</td><td class="small">${x.pct}%</td><td class="text-end pe-3"><button class="btn btn-sm btn-outline-danger" onclick="Aula.kickStudent('${x.enrollmentId}','${x.uid}','${cid}')">Baja</button></td></tr>`).join('');
+      } catch (_) { ldg?.classList.add('d-none'); if (emp) { emp.innerHTML = 'Error'; emp.classList.remove('d-none'); } }
+    }
+
+    async function kickStudent(eid, uid, cid) {
+      if (!confirm('Dar de baja?')) return;
+      try { await AulaService.unenroll(_ctx, eid, uid, cid); showToast('Baja exitosa', 'success'); bootstrap.Modal.getInstance($id('modalAulaStudents'))?.hide(); }
+      catch (_) { showToast('Error', 'danger'); }
+    }
+
+    async function eliminarCurso(id) {
+      if (!confirm('Eliminar curso?')) return;
+      try { await AulaService.deleteCourse(_ctx, id); showToast('Curso eliminado', 'success'); }
+      catch (e) { if (e.message === 'TIENE_ALUMNOS') showToast('Tiene alumnos inscritos.', 'warning'); else { console.error(e); showToast('Error al eliminar', 'danger'); } }
+    }
+
+    async function toggleCursoPublicado(id, current) {
+      try { const n = await AulaService.togglePublished(_ctx, id, current); showToast(n ? 'Publicado' : 'Borrador', 'info'); }
+      catch (_) { showToast('Error', 'danger'); }
+    }
+
+    async function borrarAviso(id) {
+      if (!confirm('Eliminar aviso?')) return;
+      try { await AulaService.deleteAviso(_ctx, id); showToast('Eliminado', 'info'); }
+      catch (_) { showToast('Error', 'danger'); }
+    }
+
+    function editModule(id, t, o, desc) {
+      $id('ac-module-id').value = id; $id('ac-module-title').value = t; $id('ac-module-order').value = o; $id('ac-module-desc').value = desc || '';
+      const btn = $id('ac-save-module'); if (btn) { btn.textContent = 'Actualizar modulo'; btn.classList.replace('btn-success', 'btn-primary'); }
+      $id('ac-btn-cancel-module')?.classList.remove('d-none');
+    }
+
+    async function deleteModule(id) {
+      if (!confirm('Eliminar modulo y sus lecciones?')) return;
+      try { await AulaService.deleteModule(_ctx, $id('ac-curso-select').value, id); showToast('Eliminado', 'info'); }
+      catch (_) { showToast('Error', 'danger'); }
+    }
+
+    function editLesson(id, t, o, h, resJson) {
+      $id('ac-lesson-id').value = id; $id('ac-lesson-title').value = t; $id('ac-lesson-order').value = o;
       const div = document.createElement('div'); div.innerHTML = decodeURIComponent(h);
-      document.getElementById('ac-lesson-text').value = (div.innerText || div.textContent || "").trim();
-      const btn = document.getElementById('ac-save-lesson'); btn.textContent = 'Actualizar lección'; btn.classList.replace('btn-success', 'btn-primary');
-      document.getElementById('ac-btn-cancel-edit').classList.remove('d-none');
+      $id('ac-lesson-text').value = (div.innerText || div.textContent || '').trim();
+      const rl = $id('ac-resources-list'); if (rl) rl.innerHTML = '';
+      try { JSON.parse(decodeURIComponent(resJson || '[]')).forEach(r => addResourceRow(r)); } catch (_) { }
+      const btn = $id('ac-save-lesson'); if (btn) { btn.textContent = 'Actualizar leccion'; btn.classList.replace('btn-success', 'btn-primary'); }
+      $id('ac-btn-cancel-edit')?.classList.remove('d-none');
+    }
+
+    async function deleteLesson(id) {
+      if (!confirm('Eliminar?')) return;
+      const cid = $id('ac-curso-select')?.value; const mid = $id('ac-module-select')?.value;
+      if (!cid || !mid) return;
+      try { await AulaService.deleteLesson(_ctx, cid, mid, id); showToast('Eliminado', 'info'); }
+      catch (_) { showToast('Error', 'danger'); }
     }
 
     function editQuiz(id, json) {
       const q = JSON.parse(decodeURIComponent(json));
-      document.getElementById('ac-quiz-id').value = id;
-      document.getElementById('ac-quiz-title').value = q.title;
-      document.getElementById('ac-quiz-min').value = q.minScore || 70;
-      document.getElementById('ac-quiz-time').value = q.timeLimit || 20;
-      document.getElementById('ac-quiz-tries').value = q.maxAttempts || 3;
-
-      const host = document.getElementById('ac-quiz-items');
-      host.innerHTML = '';
-      (q.items || []).forEach((item, idx) => { // Re-usamos la lógica local de addQuizCard
-        const en = item.enunciado; const op = item.opciones; const co = item.correctaIndex;
-        host.insertAdjacentHTML('beforeend', `<div class="card border-0 shadow-sm mb-2" id="qcard-${idx}"><div class="card-body position-relative"><button type="button" class="btn-close position-absolute top-0 end-0 m-2" onclick="this.closest('.card').remove()"></button><div class="mb-2"><label class="form-label small fw-bold">Enunciado</label><input class="form-control form-control-sm q-text" value="${en.replace(/"/g, '&quot;')}"></div><div class="row g-2">${['A', 'B', 'C', 'D'].map((lbl, j) => `<div class="col-md-6"><div class="input-group input-group-sm"><div class="input-group-text"><input class="form-check-input mt-0 q-ok" type="radio" name="q${idx}-ok" value="${j}" ${Number(co) === j ? 'checked' : ''}></div><input class="form-control q-opt" placeholder="Opción ${lbl}" value="${opts[j].replace(/"/g, '&quot;')}"></div></div>`).join('')}</div></div></div>`);
-      });
-
-      const btn = document.getElementById('ac-save-quiz');
-      btn.textContent = 'Actualizar quiz';
-      btn.classList.replace('btn-success', 'btn-primary');
-      document.getElementById('ac-btn-cancel-quiz').classList.remove('d-none');
+      $id('ac-quiz-id').value = id; $id('ac-quiz-title').value = q.title; $id('ac-quiz-min').value = q.minScore || 70;
+      $id('ac-quiz-time').value = q.timeLimit || 20; $id('ac-quiz-tries').value = q.maxAttempts || 3;
+      const host = $id('ac-quiz-items'); host.innerHTML = '';
+      (q.items || []).forEach(item => addQuizCard(item));
+      const btn = $id('ac-save-quiz'); if (btn) { btn.textContent = 'Actualizar quiz'; btn.classList.replace('btn-success', 'btn-primary'); }
+      $id('ac-btn-cancel-quiz')?.classList.remove('d-none');
     }
 
-    async function deleteQuiz(id) { if (!confirm('¿Eliminar?')) return; const sel = document.getElementById('ac-curso-select'); try { await AulaService.deleteQuiz(_ctx, sel.value, id); showToast('Eliminado', 'info'); } catch (e) { showToast('Error', 'danger'); } }
-    async function deleteLesson(id) { if (!confirm('¿Eliminar?')) return; const sel = document.getElementById('ac-curso-select'); try { await AulaService.deleteLesson(_ctx, sel.value, id); showToast('Eliminado', 'info'); } catch (e) { showToast('Error', 'danger'); } }
-    async function eliminarCurso(id) {
-      if (!confirm('¿Eliminar curso? Esta acción no se puede deshacer.')) return;
-
-      try {
-        // Verificamos si tiene alumnos inscritos
-        const inscSnap = await _ctx.db.collection(INSC)
-          .where('cursoId', '==', id)
-          .limit(1)
-          .get();
-
-        if (!inscSnap.empty) {
-          showToast('Este curso tiene alumnos inscritos. No se puede eliminar.', 'warning');
-          return;
-        }
-
-        await _ctx.db.collection(CURS).doc(id).delete();
-        showToast('Curso eliminado', 'success');
-      } catch (e) {
-        console.error('Error eliminando curso', e);
-        showToast('Error al eliminar el curso', 'danger');
-      }
-    }
-    async function toggleCursoPublicado(id, currentValue) {
-      try {
-        const nuevo = !currentValue;
-        await _ctx.db.collection(CURS).doc(id).update({ publicado: nuevo });
-        showToast(nuevo ? 'Curso publicado' : 'Curso marcado como borrador', 'info');
-      } catch (e) {
-        console.error('Error cambiando estado de publicación', e);
-        showToast('No se pudo cambiar el estado del curso', 'danger');
-      }
+    async function deleteQuiz(id) {
+      if (!confirm('Eliminar?')) return;
+      try { await AulaService.deleteQuiz(_ctx, $id('ac-curso-select').value, id); showToast('Eliminado', 'info'); }
+      catch (_) { showToast('Error', 'danger'); }
     }
 
-    async function borrarAviso(id) { if (!confirm('¿Eliminar aviso?')) return; try { await AulaService.deleteAviso(_ctx, id); showToast('Aviso eliminado', 'info'); } catch (e) { showToast('Error', 'danger'); } }
-
-    // ===== CONSTANCIA =====
-    // ===== CONSTANCIA =====
-    async function verConstancia(cursoId, cursoTituloRaw) {
-      if (!_ctx || !_ctx.auth || !_ctx.db) {
-        showToast('No se pudo generar la constancia (contexto inválido).', 'danger');
-        return;
-      }
-
-      const user = _ctx.auth.currentUser;
-      if (!user) {
-        showToast('Debes iniciar sesión para ver la constancia.', 'warning');
-        return;
-      }
-
-      // Helper para escapar HTML en cadenas dinámicas
-      function esc(str) {
-        return String(str || '')
-          .replace(/&/g, '&amp;')
-          .replace(/</g, '&lt;')
-          .replace(/>/g, '&gt;')
-          .replace(/"/g, '&quot;');
-      }
-
-      try {
-        showToast('Generando constancia...', 'info');
-
-        const uid = user.uid;
-        let cursoTitulo = cursoTituloRaw || '';
-        const alumnoName =
-          _ctx.currentUserProfile?.displayName ||
-          user.displayName ||
-          user.email ||
-          'Alumno/a';
-
-        const campus = 'TecNM Campus Los Cabos';
-        const proyecto = 'Sistema de Integración Académico (SIA)';
-
-        // 1) Intentar obtener certificado ya emitido
-        let cert = await AulaService.getCertificate(_ctx, uid, cursoId);
-
-        // Valores por defecto (borrador)
-        let folio = 'BORRADOR';   // Texto que se muestra
-        let folioId = null;         // ID real del doc (si existe)
-        let issuedDate = new Date();
-        let score = '—';
-        let horas = null;
-        let matricula = _ctx.currentUserProfile?.matricula || '';
-
-        if (cert) {
-          // Tomamos como folio principal el ID del documento (case-sensitive)
-          folioId = (cert.id || cert.folio || '').toString();
-
-          if (folioId) {
-            folio = folioId;
-
-            // Guardamos alias auxiliares (NO cambian lo que se muestra)
-            try {
-              await _ctx.db
-                .collection('aula-certificados')
-                .doc(folioId)
-                .set(
-                  {
-                    folio: folioId,
-                    folioUpper: folioId.toUpperCase()
-                  },
-                  { merge: true }
-                );
-            } catch (e) {
-              console.warn('No se pudo actualizar folio/folioUpper en el certificado:', e);
-            }
-          }
-
-          if (cert.issuedAt && typeof cert.issuedAt.toDate === 'function') {
-            issuedDate = cert.issuedAt.toDate();
-          }
-          if (typeof cert.score !== 'undefined' && cert.score !== null) {
-            score = cert.score;
-          }
-          if (cert.horas || cert.duracionHoras) {
-            horas = cert.horas || cert.duracionHoras;
-          }
-          if (cert.matricula) {
-            matricula = cert.matricula;
-          }
-        }
-
-        // Si el certificado aún no tiene calificación,
-        // intentamos obtener el MEJOR intento registrado del quiz
-        if (score === '—') {
-          try {
-            const quiz = await AulaService.getFirstQuiz(_ctx, cursoId);
-            if (quiz) {
-              const attempts = await AulaService.getAttempts(_ctx, uid, cursoId, quiz.id);
-              if (attempts.length) {
-                const bestScore = attempts.reduce(
-                  (max, a) => Math.max(max, a.score || 0),
-                  0
-                );
-                if (bestScore > 0) {
-                  score = bestScore;
-                }
-              }
-            }
-          } catch (e) {
-            console.warn('No se pudo calcular la calificación para la constancia', e);
-          }
-        }
-
-
-        // 2) Completar datos del curso desde Firestore
-        try {
-          const cursoSnap = await _ctx.db.collection('aula-cursos').doc(cursoId).get();
-          if (cursoSnap.exists) {
-            const cdata = cursoSnap.data();
-            if (!cursoTitulo && cdata.titulo) cursoTitulo = cdata.titulo;
-            if (!horas && cdata.duracionHoras) horas = cdata.duracionHoras;
-          }
-        } catch (e) {
-          console.warn('No se pudo complementar datos del curso para la constancia', e);
-        }
-
-        const horasStr = horas ? `${horas} hora${horas === 1 ? '' : 's'}` : '—';
-        const fechaStr = issuedDate.toLocaleDateString('es-MX');
-
-        // 3) Construir URL del QR
-        const isDraft = !cert || !folioId;
-
-        const qrData = isDraft
-          ? 'https://sia-tecnm.web.app/verify/BORRADOR'
-          : `https://sia-tecnm.web.app/verify/${encodeURIComponent(folioId)}`;
-
-        const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(
-          qrData
-        )}`;
-
-        // 4) HTML de la constancia
-        const html = `<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="UTF-8">
-  <title>Constancia - ${esc(cursoTitulo)}</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-  <style>
-    /* (el mismo CSS que ya tenías) */
-    body {
-      background: #f0f2f5;
-      margin: 0;
-      padding: 2rem;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      min-height: 100vh;
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    }
-    .diploma {
-      background: #ffffff;
-      width: 960px;
-      max-width: 100%;
-      padding: 48px 56px;
-      border-radius: 24px;
-      box-shadow: 0 24px 60px rgba(15, 23, 42, 0.25);
-      position: relative;
-      overflow: hidden;
-    }
-    .diploma::before {
-      content: "";
-      position: absolute;
-      inset: 16px;
-      border-radius: 20px;
-      border: 2px solid rgba(15, 23, 42, 0.06);
-      pointer-events: none;
-    }
-    .brand-bar {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 2rem;
-    }
-    .brand-title {
-      font-size: 0.85rem;
-      letter-spacing: .18em;
-      text-transform: uppercase;
-      color: #64748b;
-      font-weight: 600;
-    }
-    .badge-folio {
-      font-size: 0.75rem;
-      border-radius: 999px;
-      padding: 0.35rem 0.9rem;
-      border: 1px solid rgba(148, 163, 184, 0.5);
-      color: #475569;
-      background: rgba(248, 250, 252, 0.85);
-      backdrop-filter: blur(6px);
-    }
-    .title-main {
-      font-size: 2.25rem;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      font-weight: 800;
-      color: #0f172a;
-      text-align: center;
-      margin-bottom: .5rem;
-    }
-    .subtitle {
-      text-align: center;
-      color: #64748b;
-      font-size: 0.95rem;
-      margin-bottom: 2.5rem;
-    }
-    .student-name {
-      font-size: 2rem;
-      text-align: center;
-      font-weight: 700;
-      color: #0f172a;
-      padding-bottom: .4rem;
-      border-bottom: 2px solid #e5e7eb;
-      display: inline-block;
-      margin: 0 auto 0.5rem;
-    }
-    .student-block {
-      text-align: center;
-      margin-bottom: 2.25rem;
-    }
-    .student-meta {
-      font-size: .9rem;
-      color: #94a3b8;
-    }
-    .course-title {
-      font-size: 1.25rem;
-      font-weight: 600;
-      color: #0f172a;
-      margin-bottom: .25rem;
-    }
-    .course-meta {
-      font-size: 0.9rem;
-      color: #64748b;
-      margin-bottom: 1rem;
-    }
-    .pill {
-      display: inline-flex;
-      align-items: center;
-      gap: .4rem;
-      padding: 0.25rem 0.8rem;
-      border-radius: 999px;
-      border: 1px solid rgba(148, 163, 184, 0.45);
-      font-size: 0.78rem;
-      text-transform: uppercase;
-      letter-spacing: .12em;
-      color: #475569;
-      background: #f8fafc;
-    }
-    .grid-meta {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 1.5rem;
-      margin: 2rem 0 2.5rem;
-      font-size: 0.9rem;
-      color: #0f172a;
-    }
-    .meta-label {
-      font-size: 0.75rem;
-      text-transform: uppercase;
-      letter-spacing: .14em;
-      color: #94a3b8;
-      margin-bottom: 0.35rem;
-    }
-    .meta-value {
-      font-weight: 600;
-    }
-    .footer-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-end;
-      gap: 2rem;
-      margin-top: 1.5rem;
-      font-size: 0.8rem;
-      color: #64748b;
-    }
-    .sign-block {
-      text-align: center;
-      min-width: 220px;
-    }
-    .sign-line {
-      border-top: 1px solid #e2e8f0;
-      margin-bottom: 0.25rem;
-    }
-    .qr-block {
-      text-align: center;
-    }
-    .qr-block img {
-      border-radius: 12px;
-      border: 3px solid #e5e7eb;
-      background: white;
-      padding: 4px;
-    }
-    .draft-badge {
-      position: absolute;
-      inset: auto auto 32px 32px;
-      display: inline-flex;
-      align-items: center;
-      gap: .4rem;
-      padding: .25rem .75rem;
-      border-radius: 999px;
-      font-size: 0.78rem;
-      text-transform: uppercase;
-      letter-spacing: .16em;
-      background: rgba(248, 250, 252, 0.9);
-      color: #f97316;
-      border: 1px dashed rgba(249, 115, 22, 0.4);
-    }
-  </style>
-</head>
-<body>
-  <div class="diploma">
-    <div class="brand-bar">
-      <div>
-        <div class="brand-title">Sistema de Integración Académico</div>
-        <div class="text-muted small">${esc(campus)}</div>
-      </div>
-      <div class="badge-folio">
-        Folio: <strong>${esc(folio)}</strong>
-      </div>
-    </div>
-
-    <h1 class="title-main">Constancia</h1>
-    <p class="subtitle">
-      Por medio de la presente se hace constar que la persona que se indica ha completado satisfactoriamente
-      el siguiente curso de formación académica:
-    </p>
-
-    <div class="student-block">
-      <div class="student-name">${esc(alumnoName)}</div>
-      <div class="student-meta">
-        ${matricula ? `Matrícula ${esc(matricula)} · ` : ''}${esc(campus)}
-      </div>
-    </div>
-
-    <div class="text-center mb-3">
-      <div class="course-title">${esc(cursoTitulo) || '(Curso sin título)'}</div>
-      <div class="course-meta">
-        Otorgado a través de ${esc(proyecto)}.
-      </div>
-      <span class="pill">
-        Promedio final:
-        <strong>${esc(score)}</strong>
-      </span>
-    </div>
-
-    <div class="grid-meta">
-      <div>
-        <div class="meta-label">Duración estimada del curso</div>
-        <div class="meta-value">${esc(horasStr)}</div>
-      </div>
-      <div>
-        <div class="meta-label">Fecha de emisión</div>
-        <div class="meta-value">${esc(fechaStr)}</div>
-      </div>
-      <div>
-        <div class="meta-label">Verificación</div>
-        <div class="meta-value">Escaneando el código QR o en línea</div>
-      </div>
-    </div>
-
-    <div class="footer-row">
-      <div class="qr-block">
-        <img src="${qrUrl}" alt="QR Verificación">
-        <div class="mt-2">
-          <div class="small">Verificar en:</div>
-          <div class="small text-primary">
-            sia-tecnm.web.app/verify/${esc(folio)}
-          </div>
-        </div>
-      </div>
-
-      <div class="sign-block">
-        <div class="sign-line"></div>
-        <div class="fw-semibold">Coordinación de SIA</div>
-        <div class="text-muted">TecNM Campus Los Cabos</div>
-      </div>
-    </div>
-
-    ${isDraft ? `
-    <div class="draft-badge">
-      <span>Estado: Borrador (no verificable)</span>
-    </div>` : ''}
-
-  </div>
-</body>
-</html>`;
-
-        const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-        const url = URL.createObjectURL(blob);
-        window.open(url, '_blank');
-      } catch (err) {
-        console.error('Error generando constancia', err);
-        showToast('No se pudo generar la constancia.', 'danger');
-      }
+    function addQuizCard(data) {
+      const host = $id('ac-quiz-items'); const idx = host.children.length;
+      const en = data?.enunciado || ''; const co = data?.correctaIndex ?? 0;
+      const opts = data?.opciones || ['', '', '', ''];
+      host.insertAdjacentHTML('beforeend', `<div class="card border-0 shadow-sm mb-2"><div class="card-body position-relative p-2"><button type="button" class="btn-close position-absolute top-0 end-0 m-2" onclick="this.closest('.card').remove()"></button><div class="mb-2"><label class="form-label small fw-bold">Enunciado</label><input class="form-control form-control-sm q-text" value="${en.replace(/"/g, '&quot;')}"></div><div class="row g-2">${['A', 'B', 'C', 'D'].map((lbl, j) => `<div class="col-6"><div class="input-group input-group-sm"><div class="input-group-text"><input class="form-check-input mt-0 q-ok" type="radio" name="q${idx}-ok" value="${j}" ${Number(co) === j ? 'checked' : ''}></div><input class="form-control q-opt" placeholder="${lbl}" value="${(opts[j] || '').replace(/"/g, '&quot;')}"></div></div>`).join('')}</div></div></div>`);
     }
 
-
-
-
-
-
-    async function openStudentsModal(cid, tit) { const m = new bootstrap.Modal(document.getElementById('modalAulaStudents')); document.getElementById('aula-students-course-title').textContent = tit; const lst = document.getElementById('aula-students-list'); const ldg = document.getElementById('aula-students-loading'); const emp = document.getElementById('aula-students-empty'); const tbl = document.getElementById('aula-students-table'); lst.innerHTML = ''; ldg.classList.remove('d-none'); emp.classList.add('d-none'); tbl.classList.add('d-none'); m.show(); try { const s = await AulaService.getCourseStudents(_ctx, cid); ldg.classList.add('d-none'); if (s.length === 0) { emp.classList.remove('d-none'); return; } tbl.classList.remove('d-none'); lst.innerHTML = s.map(x => `<tr><td class="ps-4">${x.email}</td><td>${x.date ? x.date.toDate().toLocaleDateString() : '-'}</td><td>${x.pct}%</td><td class="text-end pe-4"><button class="btn btn-sm btn-outline-danger" onclick="Aula.kickStudent('${x.enrollmentId}','${x.uid}','${cid}')">Baja</button></td></tr>`).join(''); } catch (e) { ldg.classList.add('d-none'); emp.innerHTML = 'Error'; emp.classList.remove('d-none'); } }
-    async function kickStudent(eid, uid, cid) { if (!confirm('¿Baja?')) return; try { await AulaService.removeStudent(_ctx, eid, uid, cid); showToast('Baja exitosa', 'success'); bootstrap.Modal.getInstance(document.getElementById('modalAulaStudents')).hide(); } catch (e) { showToast('Error', 'danger'); } }
-
-    // --- Helper CSV (Fase 3) ---
-    function downloadCSV(data, filename) {
-      if (!data || data.length === 0) return;
-
-      const headers = Object.keys(data[0]);
-      // Crear fila de cabecera
-      const csvRows = [headers.join(',')];
-
-      // Crear filas de datos
-      for (const row of data) {
-        const values = headers.map(header => {
-          const escaped = ('' + (row[header] || '')).replace(/"/g, '""'); // Escapar comillas
-          return `"${escaped}"`; // Envolver todo en comillas
-        });
-        csvRows.push(values.join(','));
-      }
-
-      const csvContent = "data:text/csv;charset=utf-8," + csvRows.join('\n');
-      const encodedUri = encodeURI(csvContent);
-      const link = document.createElement("a");
-      link.setAttribute("href", encodedUri);
-      link.setAttribute("download", filename || 'reporte.csv');
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+    function addResourceRow(data) {
+      const host = $id('ac-resources-list'); if (!host) return;
+      const type = data?.type || 'youtube'; const url = data?.url || ''; const label = data?.label || '';
+      host.insertAdjacentHTML('beforeend', `<div class="ac-resource-row"><select class="form-select form-select-sm"><option value="youtube" ${type === 'youtube' ? 'selected' : ''}>YouTube</option><option value="pdf" ${type === 'pdf' ? 'selected' : ''}>PDF</option><option value="image" ${type === 'image' ? 'selected' : ''}>Imagen</option><option value="slides" ${type === 'slides' ? 'selected' : ''}>Slides</option><option value="link" ${type === 'link' ? 'selected' : ''}>Enlace</option></select><input type="url" class="form-control form-control-sm flex-grow-1" placeholder="URL" value="${esc(url)}"><input type="text" class="form-control form-control-sm" style="width:120px" placeholder="Etiqueta" value="${esc(label)}"><button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest('.ac-resource-row').remove()"><i class="bi bi-x"></i></button></div>`);
     }
 
+    // ══════════════════════════════════════════════════════════
+    //  SUPERADMIN
+    // ══════════════════════════════════════════════════════════
     async function initSuperAdmin(ctx) {
       _ctx = ctx;
-      const listEl = document.getElementById('aula-sa-list');
-      
+      [$id('aula-student'), $id('aula-admin')].forEach(el => el?.classList.add('d-none'));
+      $id('aula-superadmin')?.classList.remove('d-none');
+      const listEl = $id('aula-sa-list');
       try {
-        // Obtener TODOS los cursos (sin filtrar por creador)
-        const snap = await _ctx.db.collection(CURS).orderBy('createdAt', 'desc').get();
-        const cursos = snap.docs.map(d => ({id: d.id, ...d.data()}));
-        
-        // Guardamos para exportar CSV
-        window._saAulaData = cursos.map(c => ({
-           ID: c.id,
-           Titulo: c.titulo,
-           Instructor: c.creadoEmail,
-           Publicado: c.publicado ? 'SI' : 'NO',
-           Fecha_Creacion: c.createdAt ? c.createdAt.toDate().toLocaleDateString() : '-'
-        }));
+        const snap = await ctx.db.collection(CURS).orderBy('createdAt', 'desc').get();
+        const cursos = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        window._saAulaData = cursos.map(c => ({ ID: c.id, Titulo: c.titulo, Instructor: c.creadoEmail, Publicado: c.publicado ? 'SI' : 'NO', Fecha: c.createdAt ? c.createdAt.toDate().toLocaleDateString() : '-' }));
+        if (!cursos.length) { if (listEl) listEl.innerHTML = '<p class="text-center p-4">No hay cursos.</p>'; return; }
+        if (listEl) listEl.innerHTML = `<div class="table-responsive"><table class="table table-hover align-middle mb-0 small"><thead class="table-light"><tr><th>Curso</th><th>Instructor</th><th>Estado</th><th>Fecha</th></tr></thead><tbody>${cursos.map(c => { const est = c.publicado ? '<span class="badge bg-success-subtle text-success">Publicado</span>' : '<span class="badge bg-secondary-subtle text-secondary">Borrador</span>'; return `<tr><td class="fw-bold">${c.titulo}</td><td>${c.creadoEmail || '?'}</td><td>${est}</td><td class="text-muted">${c.createdAt ? c.createdAt.toDate().toLocaleDateString() : '-'}</td></tr>`; }).join('')}</tbody></table></div>`;
+      } catch (e) { console.error(e); if (listEl) listEl.innerHTML = '<div class="alert alert-danger m-3">Error.</div>'; }
+    }
 
-        if(cursos.length === 0) {
-           listEl.innerHTML = '<p class="text-center p-4">No hay cursos en la plataforma.</p>';
-           return;
+    // ══════════════════════════════════════════════════════════
+    //  CONSTANCIA
+    // ══════════════════════════════════════════════════════════
+    async function verConstancia(cursoId, cursoTituloRaw) {
+      if (!_ctx?.db) { showToast('Contexto invalido.', 'danger'); return; }
+      const user = _ctx.auth.currentUser;
+      if (!user) { showToast('Inicia sesion.', 'warning'); return; }
+      try {
+        showToast('Generando constancia...', 'info');
+        const uid = user.uid;
+        let cursoTitulo = cursoTituloRaw || '';
+        const prof = _ctx.profile || _ctx.currentUserProfile || {};
+        const alumnoName = prof.displayName || user.displayName || user.email || 'Alumno/a';
+        const campus = 'TecNM Campus Los Cabos';
+        let cert = await AulaService.getCertificate(_ctx, uid, cursoId);
+        let folio = 'BORRADOR', folioId = null, issuedDate = new Date(), score = '\u2014', horas = null;
+        let matricula = prof.matricula || '';
+        if (cert) {
+          folioId = (cert.id || cert.folio || '').toString(); if (folioId) folio = folioId;
+          if (cert.issuedAt?.toDate) issuedDate = cert.issuedAt.toDate();
+          if (cert.score != null) score = cert.score;
+          if (cert.horas || cert.duracionHoras) horas = cert.horas || cert.duracionHoras;
+          if (cert.matricula) matricula = cert.matricula;
         }
+        if (score === '\u2014') {
+          try { const quiz = await AulaService.getFirstQuiz(_ctx, cursoId); if (quiz) { const att = await AulaService.getAttempts(_ctx, uid, cursoId, quiz.id); if (att.length) { const best = att.reduce((m, a) => Math.max(m, a.score || 0), 0); if (best > 0) score = best; } } } catch (_) { }
+        }
+        try { const cs = await _ctx.db.collection('aula-cursos').doc(cursoId).get(); if (cs.exists) { const cd = cs.data(); if (!cursoTitulo && cd.titulo) cursoTitulo = cd.titulo; if (!horas && cd.duracionHoras) horas = cd.duracionHoras; } } catch (_) { }
+        const horasStr = horas ? `${horas} hora${horas === 1 ? '' : 's'}` : '\u2014';
+        const fechaStr = issuedDate.toLocaleDateString('es-MX');
+        const isDraft = !cert || !folioId;
+        const qrData = isDraft ? 'https://sia-tecnm.web.app/verify/BORRADOR' : `https://sia-tecnm.web.app/verify/${encodeURIComponent(folioId)}`;
+        const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(qrData)}`;
+        const html = buildConstanciaHTML({ campus, folio, alumnoName, matricula, cursoTitulo, score, horasStr, fechaStr, qrUrl, isDraft });
+        window.open(URL.createObjectURL(new Blob([html], { type: 'text/html;charset=utf-8' })), '_blank');
+      } catch (err) { console.error(err); showToast('Error generando constancia.', 'danger'); }
+    }
 
-        let html = `<table class="table table-hover align-middle"><thead class="table-light">
-          <tr><th>Curso</th><th>Instructor</th><th>Estado</th><th>Fecha Creación</th></tr></thead><tbody>`;
-        
-        cursos.forEach(c => {
-           const estado = c.publicado 
-             ? '<span class="badge bg-success-subtle text-success">Publicado</span>' 
-             : '<span class="badge bg-secondary-subtle text-secondary">Borrador</span>';
-           
-           html += `<tr>
-             <td class="fw-bold">${c.titulo}</td>
-             <td>${c.creadoEmail || 'Desconocido'}</td>
-             <td>${estado}</td>
-             <td class="text-muted small">${c.createdAt ? c.createdAt.toDate().toLocaleDateString() : '-'}</td>
-           </tr>`;
-        });
-        html += '</tbody></table>';
-        listEl.innerHTML = html;
+    function buildConstanciaHTML(d) {
+      return `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Constancia - ${esc(d.cursoTitulo)}</title><style>*{box-sizing:border-box;margin:0;padding:0}body{background:#f0f2f5;padding:1.5rem;display:flex;justify-content:center;align-items:center;min-height:100vh;font-family:system-ui,-apple-system,sans-serif}.diploma{background:#fff;width:960px;max-width:100%;padding:2.5rem;border-radius:1.5rem;box-shadow:0 24px 60px rgba(15,23,42,.25);position:relative;overflow:hidden}.diploma::before{content:"";position:absolute;inset:12px;border-radius:1.25rem;border:2px solid rgba(15,23,42,.06);pointer-events:none}.brand-bar{display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;flex-wrap:wrap;gap:.5rem}.brand-title{font-size:.8rem;letter-spacing:.15em;text-transform:uppercase;color:#64748b;font-weight:600}.badge-folio{font-size:.7rem;border-radius:999px;padding:.3rem .8rem;border:1px solid rgba(148,163,184,.5);color:#475569;background:#f8fafc}.title-main{font-size:1.8rem;letter-spacing:.06em;text-transform:uppercase;font-weight:800;color:#0f172a;text-align:center;margin-bottom:.4rem}.subtitle{text-align:center;color:#64748b;font-size:.85rem;margin-bottom:2rem;line-height:1.5}.student-name{font-size:1.6rem;text-align:center;font-weight:700;color:#0f172a;padding-bottom:.3rem;border-bottom:2px solid #e5e7eb;display:inline-block;margin:0 auto .4rem}.student-block{text-align:center;margin-bottom:1.75rem}.student-meta{font-size:.85rem;color:#94a3b8}.course-title{font-size:1.15rem;font-weight:600;color:#0f172a;margin-bottom:.2rem}.pill{display:inline-flex;align-items:center;gap:.3rem;padding:.2rem .7rem;border-radius:999px;border:1px solid rgba(148,163,184,.45);font-size:.75rem;text-transform:uppercase;letter-spacing:.1em;color:#475569;background:#f8fafc}.grid-meta{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:1rem;margin:1.5rem 0 2rem;font-size:.85rem;color:#0f172a}.meta-label{font-size:.7rem;text-transform:uppercase;letter-spacing:.12em;color:#94a3b8;margin-bottom:.25rem}.meta-value{font-weight:600}.footer-row{display:flex;justify-content:space-between;align-items:flex-end;gap:1.5rem;margin-top:1.25rem;font-size:.78rem;color:#64748b;flex-wrap:wrap}.sign-block{text-align:center;min-width:180px}.sign-line{border-top:1px solid #e2e8f0;margin-bottom:.2rem}.qr-block{text-align:center}.qr-block img{border-radius:10px;border:3px solid #e5e7eb;background:#fff;padding:3px;max-width:100px}.draft-badge{position:absolute;bottom:1.5rem;left:1.5rem;display:inline-flex;align-items:center;gap:.3rem;padding:.2rem .6rem;border-radius:999px;font-size:.7rem;text-transform:uppercase;letter-spacing:.14em;background:rgba(248,250,252,.9);color:#f97316;border:1px dashed rgba(249,115,22,.4)}@media(max-width:600px){.diploma{padding:1.25rem}.title-main{font-size:1.3rem}.student-name{font-size:1.2rem}.footer-row{flex-direction:column;align-items:center}}@media print{body{background:#fff;padding:0}.diploma{box-shadow:none;border-radius:0}}</style></head><body><div class="diploma"><div class="brand-bar"><div><div class="brand-title">Sistema de Integracion Academico</div><div style="font-size:.8rem;color:#94a3b8">${esc(d.campus)}</div></div><div class="badge-folio">Folio: <strong>${esc(d.folio)}</strong></div></div><h1 class="title-main">Constancia</h1><p class="subtitle">Por medio de la presente se hace constar que la persona indicada ha completado satisfactoriamente el siguiente curso de formacion academica:</p><div class="student-block"><div class="student-name">${esc(d.alumnoName)}</div><div class="student-meta">${d.matricula ? 'Matricula ' + esc(d.matricula) + ' &middot; ' : ''}${esc(d.campus)}</div></div><div style="text-align:center;margin-bottom:.75rem"><div class="course-title">${esc(d.cursoTitulo) || '(Curso sin titulo)'}</div><div style="font-size:.85rem;color:#64748b;margin-bottom:.75rem">Otorgado a traves del Sistema de Integracion Academico (SIA).</div><span class="pill">Promedio final: <strong>${esc(String(d.score))}</strong></span></div><div class="grid-meta"><div><div class="meta-label">Duracion</div><div class="meta-value">${esc(d.horasStr)}</div></div><div><div class="meta-label">Emision</div><div class="meta-value">${esc(d.fechaStr)}</div></div><div><div class="meta-label">Verificacion</div><div class="meta-value">Escanea el codigo QR</div></div></div><div class="footer-row"><div class="qr-block"><img src="${d.qrUrl}" alt="QR"><div style="margin-top:.4rem;font-size:.7rem">sia-tecnm.web.app/verify/${esc(d.folio)}</div></div><div class="sign-block"><div class="sign-line"></div><div style="font-weight:600">Coordinacion de SIA</div><div style="color:#94a3b8">TecNM Campus Los Cabos</div></div></div>${d.isDraft ? '<div class="draft-badge">Estado: Borrador (no verificable)</div>' : ''}</div></body></html>`;
+    }
 
-      } catch(e) {
-        console.error(e);
-        listEl.innerHTML = '<div class="alert alert-danger m-3">Error cargando auditoría de cursos.</div>';
-      }
+    // ── CSV ──
+    function downloadCSV(data, filename) {
+      if (!data?.length) return;
+      const headers = Object.keys(data[0]);
+      const rows = [headers.join(',')];
+      for (const row of data) rows.push(headers.map(h => `"${('' + (row[h] || '')).replace(/"/g, '""')}"`).join(','));
+      const link = document.createElement('a');
+      link.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(rows.join('\n'));
+      link.download = filename || 'reporte.csv';
+      document.body.appendChild(link); link.click(); document.body.removeChild(link);
     }
 
     return {
-      initStudent,
-      initAdmin,
-      initSuperAdmin,
-      inscribirse,
-      eliminarCurso,
-      toggleCursoPublicado,
-      openCourseModal,
-      openContentModal,
-      verConstancia,
-      editLesson,
-      deleteLesson,
-      editQuiz,
-      deleteQuiz,
-      abandonarCurso,
-      openStudentsModal,
-      kickStudent,
-      borrarAviso,
-      downloadCSV // Exportamos el helper de CSV
+      init, initStudent, initAdmin, initSuperAdmin,
+      inscribirse, abandonarCurso,
+      eliminarCurso, toggleCursoPublicado,
+      openCourseModal, openContentModal, openStudentsModal,
+      verConstancia, kickStudent, borrarAviso,
+      editModule, deleteModule,
+      editLesson, deleteLesson,
+      editQuiz, deleteQuiz,
+      downloadCSV, addQuizCard, addResourceRow,
+      renderStudentTabs, buildCourseCard: renderCard
     };
-
-
 
   })();
 

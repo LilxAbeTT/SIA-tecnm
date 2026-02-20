@@ -1,18 +1,18 @@
 // utils/ui.js
 // Toast 2.0 + modal de detalle de consulta
 
-(function(global){
+(function (global) {
 
-  function showToast(message, variant='info'){
-    const container = document.getElementById('toast-container'); 
-    if(!container) return;
+  function showToast(message, variant = 'info') {
+    const container = document.getElementById('toast-container');
+    if (!container) return;
 
     // Iconos según variante
     const icons = {
       success: 'bi-check-lg',
-      danger:  'bi-x-octagon-fill',
+      danger: 'bi-x-octagon-fill',
       warning: 'bi-exclamation-triangle-fill',
-      info:    'bi-info-circle-fill',
+      info: 'bi-info-circle-fill',
       primary: 'bi-bell-fill'
     };
     const iconClass = icons[variant] || icons.info;
@@ -24,10 +24,10 @@
     const el = document.createElement('div');
     // Agregamos 'toast-custom' y 'toast-animate-enter'
     el.className = `toast toast-custom align-items-center ${bgClass} border-0 show toast-animate-enter`;
-    el.role = 'alert'; 
-    el.ariaLive = 'assertive'; 
+    el.role = 'alert';
+    el.ariaLive = 'assertive';
     el.ariaAtomic = 'true';
-    
+
     // Estructura interna flexible (Pill shape)
     el.innerHTML = `
       <div class="d-flex w-100 py-2 px-3 align-items-center justify-content-between">
@@ -45,7 +45,7 @@
 
     // Lógica de cierre manual y automático con animación de salida
     const closeBtn = el.querySelector('.btn-close');
-    
+
     const removeToast = () => {
       el.classList.remove('toast-animate-enter');
       el.classList.add('toast-animate-exit');
@@ -57,20 +57,46 @@
 
     // Auto-cierre a los 3.5 segundos
     setTimeout(() => {
-      if(document.body.contains(el)) {
+      if (document.body.contains(el)) {
         removeToast();
       }
     }, 3500);
   }
 
-  function openConsultaModal(html){
-    const body = document.getElementById('modal-consulta-body'); if(!body) return;
+  function openConsultaModal(html) {
+    const body = document.getElementById('modal-consulta-body'); if (!body) return;
     body.innerHTML = html;
     const mdl = new bootstrap.Modal(document.getElementById('modal-consulta'));
     mdl.show();
   }
+  // Agregar a public/utils/ui.js
+  function initTooltips() {
+    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    tooltipTriggerList.map(function (tooltipTriggerEl) {
+      return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+  }
+
+  
+
+
+  // --- HTML SANITIZATION ---
+  // Prevents XSS when inserting user-controlled data into innerHTML
+  function escapeHtml(str) {
+    if (str == null) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  global.UI = global.UI || {};
+  global.UI.initTooltips = initTooltips;
 
   global.showToast = showToast;
   global.openConsultaModal = openConsultaModal;
+  global.escapeHtml = escapeHtml;
 
 })(window);

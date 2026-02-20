@@ -1,12 +1,22 @@
-/* SIA - Main Stylesheet 
+/* SIA - Main Stylesheet
   Desarrollado por SIA-Dev v2.1 (Responsive Update)
 */
 
+/* === DARK MODE FORCE (Override Bootstrap defaults) === */
+html[data-bs-theme="dark"] {
+    color-scheme: dark;
+}
+
+html[data-bs-theme="dark"] body {
+    background-color: #0f1114 !important;
+    color: #cbd5e1 !important;
+}
+
 :root {
-    /* PALETA DE COLORES OFICIAL */
-    --primary: #0A2540;
-    /* Azul Oscuro Profundo */
-    --primary-hover: #06182a;
+    /* PALETA DE COLORES OFICIAL TecNM */
+    --primary: #1B396A;
+    /* Pantone 294 */
+    --primary-hover: #142d54;
     --accent: #00D0FF;
     /* Cian Eléctrico */
 
@@ -14,15 +24,86 @@
     --biblio: #FFD24D;
     --med: #00D0FF;
     --aula: #4e1bda;
+    --reportes: #6610f2;
+    /* Indigo - Desarrollo Académico */
 
-    /* Superficies */
-    --surface: #FFFFFF;
-    --surface-muted: #F6F7F8;
-    --text-body: #4A5568;
+    /* Superficies y Textos (Dark Default) */
+    /* Superficies y Textos (Light Mode Default) */
+    --surface: #ffffff;
+    --surface-muted: #f8f9fa;
+    --bg-body: #f3f4f6;
+    --bg-card: #ffffff;
+    --text-body: #334155;
+    --text-main: #1e293b;
+    --text-heading: #0f172a;
+    --text-muted: #64748b;
+    --border-color: #e2e8f0;
+
+    /* Navbar Variables (Default Light) */
+    --nav-bg: rgba(255, 255, 255, 0.9);
+    --nav-text: #1e293b;
+    --nav-border: #e2e8f0;
+    --search-bg: #f1f5f9;
+    --accent-color: #3b82f6;
+    --accent-primary: #1B396A;
+}
+
+html[data-bs-theme="light"] {
+    color-scheme: light;
+}
+
+/* Force Light Mode Styles specifically for light theme */
+html[data-bs-theme="light"] body {
+    background-color: var(--bg-body);
+    color: var(--text-body);
+}
+
+html[data-bs-theme="light"] .card,
+html[data-bs-theme="light"] .modal-content,
+html[data-bs-theme="light"] .dropdown-menu {
+    color: var(--text-body);
+}
+
+html[data-bs-theme="light"] h1,
+html[data-bs-theme="light"] h2,
+html[data-bs-theme="light"] h3,
+html[data-bs-theme="light"] h4,
+html[data-bs-theme="light"] h5,
+html[data-bs-theme="light"] h6 {
+    color: var(--text-heading) !important;
+}
+
+/* Ensure links are visible in light mode */
+html[data-bs-theme="light"] a:not(.btn):not(.nav-link):not(.dropdown-item):not(.badge) {
+    color: var(--primary);
+}
+
+html[data-bs-theme="dark"] {
+    /* PALETA DE COLORES OFICIAL TecNM (Dark Mode Override) */
+    --primary: #1B396A;
+    --accent: #00D0FF;
+
+    /* Superficies y Textos (Dark Mode) */
+    --surface: #1a1d23;
+    --surface-muted: #0f1114;
+    --bg-body: #0f1114;
+    --bg-card: #1a1d23;
+    --text-body: #cbd5e1;
+    --text-main: #cbd5e1;
+    --text-heading: #f0f2f5;
+    --border-color: rgba(255, 255, 255, 0.08);
+
+    color-scheme: dark;
 }
 
 html {
     scroll-behavior: smooth;
+}
+
+.no-scroll {
+    overflow: hidden !important;
+    height: 100vh !important;
+    touch-action: none;
 }
 
 /* Utilidades de color por módulo */
@@ -41,20 +122,166 @@ html {
 
 /* Tipografía Base */
 body {
-    font-family: 'Inter', sans-serif;
-    color: var(--text-body);
-    background-color: var(--surface-muted);
+    font-family: 'Noto Sans', 'Inter', sans-serif;
+    color: var(--text-body) !important;
+    background-color: var(--surface-muted) !important;
     overflow-x: hidden;
     /* Evita scroll horizontal accidental en móvil */
+}
+
+/* === FORZAR DARK MODE EN TODOS LOS ELEMENTOS BOOTSTRAP === */
+html[data-bs-theme="dark"] [class*="bg-white"],
+html[data-bs-theme="dark"] [class*="bg-light"],
+html[data-bs-theme="dark"] .bg-white,
+html[data-bs-theme="dark"] .bg-light,
+html[data-bs-theme="dark"] .card,
+html[data-bs-theme="dark"] .modal-content,
+html[data-bs-theme="dark"] .dropdown-menu,
+html[data-bs-theme="dark"] .list-group-item,
+html[data-bs-theme="dark"] .nav-tabs,
+html[data-bs-theme="dark"] .nav-pills,
+html[data-bs-theme="dark"] .accordion,
+html[data-bs-theme="dark"] .accordion-item,
+html[data-bs-theme="dark"] .offcanvas,
+html[data-bs-theme="dark"] .popover,
+html[data-bs-theme="dark"] .toast,
+html[data-bs-theme="dark"] .alert,
+html[data-bs-theme="dark"] .breadcrumb {
+    background-color: #1a1d23 !important;
+    color: #cbd5e1 !important;
+    border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+/* Cards específicamente */
+html[data-bs-theme="dark"] .card-body,
+html[data-bs-theme="dark"] .card-header,
+html[data-bs-theme="dark"] .card-footer {
+    background-color: transparent !important;
+    color: #cbd5e1 !important;
+    border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+/* Bootstrap List Groups */
+html[data-bs-theme="dark"] .list-group {
+    --bs-list-group-bg: #1a1d23 !important;
+    --bs-list-group-color: #cbd5e1 !important;
+    --bs-list-group-border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+/* Badges */
+.badge {
+    --bs-badge-color: #fff !important;
+}
+
+html[data-bs-theme="dark"] .text-dark,
+html[data-bs-theme="dark"] .text-body,
+html[data-bs-theme="dark"] .text-secondary {
+    color: var(--text-body, #cbd5e1) !important;
+}
+
+html[data-bs-theme="dark"] .text-muted {
+    color: #94a3b8 !important;
+}
+
+html[data-bs-theme="dark"] .form-control,
+html[data-bs-theme="dark"] .form-select,
+html[data-bs-theme="dark"] input:not([type="checkbox"]):not([type="radio"]),
+html[data-bs-theme="dark"] textarea,
+html[data-bs-theme="dark"] select {
+    background-color: var(--surface, #1a1d23) !important;
+    color: var(--text-body, #cbd5e1) !important;
+    border-color: rgba(255, 255, 255, 0.2) !important;
+}
+
+html[data-bs-theme="dark"] .form-control::placeholder {
+    color: rgba(255, 255, 255, 0.4) !important;
+}
+
+html[data-bs-theme="dark"] .btn-light {
+    background-color: rgba(255, 255, 255, 0.1) !important;
+    color: var(--text-body, #cbd5e1) !important;
+    border-color: rgba(255, 255, 255, 0.2) !important;
+}
+
+.btn-close {
+    filter: invert(1) grayscale(100%) brightness(200%);
 }
 
 h1,
 h2,
 h3,
 h4,
+h5,
+h6 {
+    color: var(--text-heading, #0f172a) !important;
+}
+
+html[data-bs-theme="dark"] .table {
+    --bs-table-bg: transparent !important;
+    --bs-table-color: #cbd5e1 !important;
+    color: #cbd5e1 !important;
+}
+
+html[data-bs-theme="dark"] .table thead {
+    background-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+html[data-bs-theme="dark"] .modal-header,
+html[data-bs-theme="dark"] .modal-footer {
+    border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+html[data-bs-theme="dark"] .border,
+html[data-bs-theme="dark"] .border-top,
+html[data-bs-theme="dark"] .border-bottom,
+html[data-bs-theme="dark"] .border-start,
+html[data-bs-theme="dark"] .border-end {
+    border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+/* Forzar navbar oscuro */
+.navbar,
+.sia-navbar {
+    background-color: rgba(15, 17, 20, 0.95) !important;
+}
+
 h5 {
-    color: var(--primary);
     font-weight: 700;
+}
+
+/* --- LACTARIO SPECIFIC --- */
+.text-maternal {
+    color: #E83E8C;
+}
+
+.bg-maternal {
+    background-color: #E83E8C;
+}
+
+.btn-maternal {
+    background-color: #E83E8C;
+    border-color: #E83E8C;
+    color: #fff;
+}
+
+.btn-maternal:hover,
+.btn-maternal:active,
+.btn-maternal.active {
+    background-color: #d63384;
+    border-color: #d63384;
+    color: #fff;
+}
+
+.btn-outline-maternal {
+    color: #E83E8C;
+    border-color: #E83E8C;
+    background-color: transparent;
+}
+
+.btn-outline-maternal:hover,
+.btn-outline-maternal.active {
+    background-color: #E83E8C;
+    color: #fff;
 }
 
 /* --- COMPONENTES DE INTERFAZ --- */
@@ -303,7 +530,7 @@ h5 {
 
 /* Icono del toggler en blanco */
 .landing-navbar .navbar-toggler {
-    border-color: rgba(255, 255, 255, 0.7);
+    border-color: rgba(107, 101, 101, 0.7);
 }
 
 .landing-navbar .navbar-toggler-icon {
@@ -439,10 +666,25 @@ h5 {
     font-weight: 500;
     position: relative;
     z-index: 1;
-    text-decoration: none;
-    text-transform: uppercase;
     padding: 0.25rem 0;
     margin: 0 0.75rem;
+}
+
+/* Fix for Light Mode Landing Nav */
+html[data-bs-theme="light"] #mainMenu li>a {
+    color: var(--text-heading) !important;
+}
+
+html[data-bs-theme="light"] #mainMenu li>a::before {
+    background: var(--primary);
+}
+
+html[data-bs-theme="light"] .main-header .navbar-brand {
+    color: var(--text-heading);
+}
+
+html[data-bs-theme="light"] .main-header .navbar-toggler .icon-bar {
+    background-color: var(--text-heading);
 }
 
 #mainMenu li:not(:last-of-type) {
@@ -762,8 +1004,8 @@ html {
 
 .icon-box:hover {
     transform: scale(1.1) rotate(-5deg);
-    background-color: #fff !important;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    background-color: rgba(255, 255, 255, 0.1) !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
 /* Laptop Mockup (CSS Pure) */
@@ -1013,12 +1255,11 @@ html {
 
 .slot-btn {
     flex: 0 0 auto;
-    border: 1px solid #dee2e6;
-    background: white;
-    color: #495057;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: var(--bg-card);
+    color: var(--text-main);
     padding: 0.5rem 1.2rem;
     border-radius: 50rem;
-    /* Pill shape */
     font-weight: 500;
     transition: all 0.2s ease;
     cursor: pointer;
@@ -1142,7 +1383,8 @@ html {
 
 /* Forzar fondo oscuro (asegura contraste) */
 .hero-forced-dark {
-    background-color: #051525 !important;
+    background-color: #1B396A !important;
+    /* ACTUALIZADO */
     color: #ffffff;
 }
 
@@ -1347,136 +1589,594 @@ html {
    Unifica el fondo con el Hero (#051525) y adapta componentes.
    ============================================================ */
 
-/* 1. Forzar Fondo Oscuro en todas las secciones y Footer */
-#landing-view section,
-#landing-view footer,
-#landing-view .bg-surface-muted,
-#landing-view .bg-white,
-#landing-view .bg-light {
-    background-color: #051525 !important;
-    /* Azul Profundo del Hero */
-    background-image: none !important;
-    /* Quita patrones viejos */
-    color: #ffffff !important;
+/* ============================================================
+   LANDING V4.0 - COLORES OFICIALES TecNM
+   Pantone 294: #1B396A | Cool Gray 10C: #807E82 | Negro: #000
+   Tipografía: Noto Sans (body) + Source Serif 4 / Patria (headings)
+   ============================================================ */
+
+/* --- Variables del Landing --- */
+#landing-view {
+    --landing-bg: #0f1114;
+    --landing-bg-alt: #161a1e;
+    --landing-primary: #1B396A;
+    --landing-primary-light: #2a5298;
+    --landing-gray: #807E82;
+    --landing-text: #ffffff;
+    --landing-text-muted: rgba(255, 255, 255, 0.55);
+    --landing-text-soft: rgba(255, 255, 255, 0.75);
+    --landing-border: rgba(255, 255, 255, 0.08);
+    --landing-card-bg: rgba(255, 255, 255, 0.04);
+    --landing-font-body: 'Noto Sans', sans-serif;
+    --landing-font-heading: 'Source Serif 4', 'Patria', Georgia, serif;
 }
 
-/* 2. Adaptar Textos */
+/* =============================================
+   OVERRIDE BOOTSTRAP LIGHT/DARK THEME INSIDE LANDING
+   El landing SIEMPRE es oscuro, sin importar el tema del navegador.
+   ============================================= */
+
+/* Force dark context on the landing root */
+#landing-view,
+#landing-view *:not(i):not(span.bi) {
+    color-scheme: dark;
+}
+
+/* 1. Tipografía global del landing */
+#landing-view {
+    font-family: var(--landing-font-body);
+    color: var(--landing-text) !important;
+    background-color: var(--landing-bg) !important;
+}
+
 #landing-view h1,
 #landing-view h2,
-#landing-view h3,
+#landing-view h3 {
+    font-family: var(--landing-font-heading);
+    color: var(--landing-text) !important;
+    font-weight: 800;
+}
+
 #landing-view h4,
 #landing-view h5,
 #landing-view h6,
-#landing-view .text-dark,
-#landing-view .text-body {
-    color: #ffffff !important;
+#landing-view p,
+#landing-view span,
+#landing-view li,
+#landing-view small,
+#landing-view div {
+    color: inherit;
+}
+
+#landing-view h4,
+#landing-view h5,
+#landing-view h6 {
+    font-family: var(--landing-font-body);
+    color: var(--landing-text) !important;
+    font-weight: 700;
 }
 
 #landing-view .text-muted {
-    color: rgba(255, 255, 255, 0.6) !important;
+    color: var(--landing-text-muted) !important;
 }
 
 #landing-view .lead {
-    color: rgba(255, 255, 255, 0.8) !important;
+    color: var(--landing-text-soft) !important;
 }
 
-/* 3. Tarjetas (Testimonios, Widgets, Contacto) -> Efecto Cristal Oscuro */
-#landing-view .card,
-#landing-view .accordion-item {
-    background-color: rgba(255, 255, 255, 0.03) !important;
-    /* Transparente sutil */
+#landing-view .text-dark,
+#landing-view .text-body {
+    color: var(--landing-text) !important;
+}
+
+/* 2. Forzar fondos oscuros en TODAS las secciones */
+#landing-view,
+#landing-view main,
+#landing-view section,
+#landing-view footer {
+    background-color: var(--landing-bg) !important;
+    background-image: none !important;
+    color: var(--landing-text) !important;
+}
+
+#landing-view .landing-section-alt {
+    background-color: var(--landing-bg-alt) !important;
+}
+
+/* 3. Cards de Bootstrap: forzar fondo oscuro (override --bs-card-bg) */
+#landing-view .card {
+    --bs-card-bg: rgba(15, 17, 20, 0.7);
+    --bs-card-color: #fff;
+    --bs-card-border-color: rgba(255, 255, 255, 0.08);
+    --bs-card-cap-bg: transparent;
+    background-color: rgba(15, 17, 20, 0.7) !important;
+    background: rgba(15, 17, 20, 0.7) !important;
+    border-color: rgba(255, 255, 255, 0.08) !important;
+    color: var(--landing-text) !important;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3) !important;
+}
+
+#landing-view .card-body,
+#landing-view .card-header,
+#landing-view .card-footer {
+    background-color: transparent !important;
+    background: transparent !important;
+    color: var(--landing-text) !important;
+    border-color: rgba(255, 255, 255, 0.06) !important;
+}
+
+/* Mockup card extra specificity */
+#landing-view main .card {
+    background: rgba(15, 17, 20, 0.7) !important;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+}
+
+#landing-view .landing-mockup-card {
+    --bs-card-bg: rgba(15, 17, 20, 0.8) !important;
+    background: rgba(15, 17, 20, 0.8) !important;
+    backdrop-filter: blur(20px) !important;
+    -webkit-backdrop-filter: blur(20px) !important;
     border: 1px solid rgba(255, 255, 255, 0.08) !important;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3) !important;
-    color: #fff;
-}
-
-/* Hover en tarjetas */
-#landing-view .hover-lift:hover {
-    background-color: rgba(255, 255, 255, 0.06) !important;
-    border-color: rgba(255, 255, 255, 0.2) !important;
-}
-
-/* 4. Acordeón (FAQ) */
-#landing-view .accordion-button {
-    background-color: rgba(255, 255, 255, 0.05) !important;
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5) !important;
     color: #fff !important;
-    box-shadow: none !important;
 }
 
-#landing-view .accordion-button:not(.collapsed) {
-    background-color: rgba(0, 208, 255, 0.1) !important;
-    /* Acento cian suave al abrir */
-    color: #00D0FF !important;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+#landing-view .landing-mockup-card * {
+    color: inherit;
 }
 
-/* 5. Iconos y Cajas de Iconos */
-#landing-view .icon-box,
-#landing-view .widget-icon,
-#landing-view .service-icon {
+/* 4. Bootstrap bg-* overrides */
+#landing-view .bg-white,
+#landing-view .bg-light,
+#landing-view .bg-surface-muted {
+    background-color: var(--landing-bg) !important;
+}
+
+/* 5. Borders Bootstrap override */
+#landing-view .border,
+#landing-view .border-top,
+#landing-view .border-bottom {
+    border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+/* 6. Dropdown/List overrides */
+#landing-view .dropdown-menu {
+    background-color: rgba(15, 17, 20, 0.95) !important;
+    border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+#landing-view .dropdown-item {
+    color: rgba(255, 255, 255, 0.7) !important;
+}
+
+#landing-view .dropdown-item:hover {
+    background-color: rgba(255, 255, 255, 0.08) !important;
+    color: #fff !important;
+}
+
+/* 7. btn-outline-light forced contrast */
+#landing-view .btn-outline-light {
+    color: rgba(255, 255, 255, 0.8) !important;
+    border-color: rgba(255, 255, 255, 0.15) !important;
+}
+
+#landing-view .btn-outline-light:hover {
     background-color: rgba(255, 255, 255, 0.1) !important;
     color: #fff !important;
-    /* Iconos blancos */
+    border-color: rgba(255, 255, 255, 0.3) !important;
 }
 
-/* Excepción: Iconos que deben mantener su color original (ej. en widgets de colores) */
-#landing-view .text-primary {
-    color: #4facfe !important;
+/* 8. hr separator */
+#landing-view hr {
+    border-color: rgba(255, 255, 255, 0.06) !important;
+    opacity: 1;
 }
 
-/* Azul brillante */
-#landing-view .text-success {
-    color: #00f2fe !important;
+/* 9. Rounded containers inside mockup card */
+#landing-view .card .rounded-3,
+#landing-view .card .rounded-4 {
+    background-color: transparent;
 }
 
-/* Cian/Verde brillante */
-#landing-view .text-warning {
-    color: #ffd700 !important;
+/* 10. Bootstrap text-white-50 override */
+#landing-view .text-white-50 {
+    color: rgba(255, 255, 255, 0.5) !important;
 }
 
-/* Amarillo */
-#landing-view .text-danger {
-    color: #ff6b6b !important;
-}
-
-/* Rojo suave */
-
-/* 6. Formulario de Contacto */
-#landing-view input.form-control,
-#landing-view textarea.form-control,
-#landing-view select.form-select {
-    background-color: rgba(0, 0, 0, 0.3) !important;
-    /* Fondo input oscuro */
-    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+#landing-view .text-white {
     color: #fff !important;
 }
 
-#landing-view input.form-control::placeholder,
-#landing-view textarea.form-control::placeholder {
-    color: rgba(255, 255, 255, 0.4);
+/* 11. Navbar pill: ensure always dark */
+.landing-nav-pill {
+    --bs-navbar-color: rgba(255, 255, 255, 0.7);
+    --bs-navbar-hover-color: #fff;
+    --bs-navbar-brand-color: #fff;
+    --bs-navbar-toggler-border-color: transparent;
 }
 
-#landing-view input.form-control:focus,
-#landing-view textarea.form-control:focus,
-#landing-view select.form-select:focus {
-    border-color: var(--accent) !important;
-    box-shadow: 0 0 0 4px rgba(0, 208, 255, 0.15) !important;
+/* 12. Override .bg-primary-subtle and similar Bootstrap contextual inside landing */
+#landing-view [class*="bg-"][class*="-subtle"] {
+    background-color: rgba(255, 255, 255, 0.08) !important;
 }
 
-/* 7. Badges (Etiquetas pequeñas) */
+/* 13. List-unstyled links in footer */
+#landing-view .list-unstyled a {
+    color: rgba(255, 255, 255, 0.4) !important;
+    text-decoration: none;
+    transition: color 0.2s;
+}
+
+#landing-view .list-unstyled a:hover {
+    color: #fff !important;
+}
+
+/* 14. Ensure bootstrap .fw-bold doesn't change color */
+#landing-view .fw-bold {
+    color: inherit;
+}
+
+/* 15. Badge override */
 #landing-view .badge {
-    background-color: rgba(255, 255, 255, 0.1) !important;
-    color: #fff !important;
-    border: 1px solid rgba(255, 255, 255, 0.2) !important;
+    color: inherit !important;
 }
 
-/* 8. Footer Links */
-#landing-view footer a.text-muted {
-    color: rgba(255, 255, 255, 0.6) !important;
+/* 16. Navbar collapse mobile - force dark */
+.landing-nav-collapse.show,
+.landing-nav-collapse.collapsing {
+    background: rgba(15, 17, 20, 0.95) !important;
 }
 
-#landing-view footer a.text-muted:hover {
+/* 3. Tarjetas landing con glass effect */
+#landing-view .landing-card {
+    background: var(--landing-card-bg) !important;
+    border: 1px solid var(--landing-border) !important;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+#landing-view .landing-card:hover {
+    background: rgba(255, 255, 255, 0.07) !important;
+    border-color: rgba(27, 57, 106, 0.4) !important;
+    transform: translateY(-4px);
+    box-shadow: 0 12px 40px rgba(27, 57, 106, 0.2);
+}
+
+/* 4. Navbar flotante del landing */
+.landing-nav-pill {
+    background: rgba(15, 17, 20, 0.8);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    transition: all 0.3s ease;
+}
+
+.landing-nav-pill .nav-link {
+    color: rgba(255, 255, 255, 0.6);
+    font-weight: 600;
+    font-size: 0.85rem;
+    padding: 0.4rem 1rem;
+    border-radius: 50rem;
+    transition: all 0.25s ease;
+    font-family: 'Noto Sans', sans-serif;
+}
+
+.landing-nav-pill .nav-link:hover {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.08);
+}
+
+/* Botón CTA del navbar */
+.btn-landing-cta {
+    background: #ffffff !important;
+    color: var(--landing-primary) !important;
+    font-weight: 700 !important;
+    font-size: 0.85rem;
+    padding: 0.5rem 1.25rem;
+    border-radius: 50rem;
+    border: none;
+    transition: all 0.25s ease;
+    font-family: 'Noto Sans', sans-serif;
+    box-shadow: 0 2px 12px rgba(255, 255, 255, 0.15);
+}
+
+.btn-landing-cta:hover {
+    background: #f0f0f0 !important;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 20px rgba(255, 255, 255, 0.25);
+}
+
+/* 5. Botón Hero principal (Acceso Institucional) */
+.btn-acceso-institucional {
+    background: linear-gradient(135deg, #ffffff 0%, #e8edf5 100%);
+    color: #1B396A;
+    font-weight: 800;
+    font-size: 1.05rem;
+    padding: 1rem 2.5rem;
+    border-radius: 50rem;
+    border: none;
+    box-shadow: 0 4px 24px rgba(255, 255, 255, 0.2), 0 0 0 1px rgba(255, 255, 255, 0.1);
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    font-family: 'Noto Sans', sans-serif;
+    letter-spacing: -0.01em;
+    position: relative;
+    overflow: hidden;
+}
+
+.btn-acceso-institucional::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(27, 57, 106, 0.05) 0%, rgba(27, 57, 106, 0.1) 100%);
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+
+.btn-acceso-institucional:hover {
+    transform: translateY(-2px) scale(1.02);
+    box-shadow: 0 8px 40px rgba(255, 255, 255, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.2);
+    color: #1B396A;
+}
+
+.btn-acceso-institucional:hover::before {
+    opacity: 1;
+}
+
+/* 6. Badge de módulo */
+.landing-module-icon {
+    width: 56px;
+    height: 56px;
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    transition: transform 0.3s ease;
+}
+
+.landing-card:hover .landing-module-icon {
+    transform: scale(1.1);
+}
+
+/* 7. Sección de avisos */
+.aviso-card {
+    background: var(--landing-card-bg);
+    border: 1px solid var(--landing-border);
+    border-radius: 16px;
+    overflow: hidden;
+    transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.aviso-card:hover {
+    border-color: rgba(27, 57, 106, 0.3);
+    transform: translateY(-3px);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
+}
+
+.aviso-badge {
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 0.25rem 0.6rem;
+    border-radius: 50rem;
+    font-family: 'Noto Sans', sans-serif;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+/* 8. Estadísticas */
+.stat-number {
+    font-family: var(--landing-font-heading);
+    font-weight: 900;
+    font-size: 2.75rem;
+    line-height: 1;
+    background: linear-gradient(135deg, #ffffff 0%, rgba(255, 255, 255, 0.7) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.stat-divider {
+    width: 1px;
+    height: 60px;
+    background: linear-gradient(to bottom, transparent, rgba(255, 255, 255, 0.15), transparent);
+}
+
+/* 9. Footer landing */
+#landing-view footer {
+    border-top: 1px solid var(--landing-border) !important;
+}
+
+#landing-view footer a {
+    color: var(--landing-text-muted) !important;
+    text-decoration: none;
+    transition: color 0.2s;
+}
+
+#landing-view footer a:hover {
     color: #fff !important;
+}
+
+/* 10. Logos con proporción oficial */
+.landing-brand-logos {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.landing-brand-logos .logo-tecnm {
+    height: 44px;
+    width: auto;
+}
+
+.landing-brand-logos .logo-ites {
+    height: 28px;
+    width: auto;
+}
+
+.landing-brand-logos .brand-divider {
+    width: 1px;
+    height: 36px;
+    background: rgba(255, 255, 255, 0.2);
+}
+
+/* 11. Animaciones del landing */
+@keyframes landingFadeUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes landingFloat {
+
+    0%,
+    100% {
+        transform: translateY(0) rotate(-1deg);
+    }
+
+    50% {
+        transform: translateY(-12px) rotate(-1deg);
+    }
+}
+
+@keyframes landingPulse {
+
+    0%,
+    100% {
+        opacity: 0.6;
+    }
+
+    50% {
+        opacity: 1;
+    }
+}
+
+.landing-fade-up {
+    opacity: 0;
+    animation: landingFadeUp 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.landing-fade-up-1 {
+    animation-delay: 0.1s;
+}
+
+.landing-fade-up-2 {
+    animation-delay: 0.2s;
+}
+
+.landing-fade-up-3 {
+    animation-delay: 0.3s;
+}
+
+.landing-fade-up-4 {
+    animation-delay: 0.4s;
+}
+
+.landing-fade-up-5 {
+    animation-delay: 0.5s;
+}
+
+.landing-float {
+    animation: landingFloat 5s ease-in-out infinite;
+}
+
+/* 12. Section labels */
+.landing-section-label {
+    font-family: 'Noto Sans', sans-serif;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--landing-gray);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.landing-section-label::before {
+    content: '';
+    width: 24px;
+    height: 2px;
+    background: var(--landing-primary);
+    border-radius: 1px;
+}
+
+/* 13. Mobile landing responsive */
+@media (max-width: 767.98px) {
+    #landing-view .landing-hero {
+        padding-top: 6rem !important;
+        padding-bottom: 3rem !important;
+        min-height: 90vh;
+    }
+
+    #landing-view .landing-hero-title {
+        font-size: 2.25rem !important;
+    }
+
+    .landing-brand-logos .logo-tecnm {
+        height: 36px;
+    }
+
+    .landing-brand-logos .logo-ites {
+        height: 22px;
+    }
+
+    .landing-brand-logos .brand-divider {
+        height: 28px;
+    }
+
+    .stat-number {
+        font-size: 2rem;
+    }
+
+    .btn-acceso-institucional {
+        padding: 0.85rem 2rem;
+        font-size: 0.95rem;
+        width: 100%;
+    }
+
+    .landing-modules-grid {
+        grid-template-columns: repeat(2, 1fr) !important;
+    }
+}
+
+/* 14. Navbar landing mobile collapse */
+@media (max-width: 991.98px) {
+    .landing-nav-collapse {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: rgba(15, 17, 20, 0.95);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        padding: 1rem;
+        margin-top: 8px;
+        border-radius: 16px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
+    }
+}
+
+/* 15. Módulos grid */
+.landing-modules-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1rem;
+}
+
+@media (max-width: 991.98px) and (min-width: 768px) {
+    .landing-modules-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
 }
 
 /* 9. Sección "Cómo funciona" (Círculos con números) */
@@ -1611,7 +2311,7 @@ html {
     overflow: hidden;
     transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s ease;
     position: relative;
-    background: #fff;
+    background: var(--bg-card);
     height: 100%;
 }
 
@@ -1645,8 +2345,8 @@ html {
 
 /* Accesos Rápidos */
 .quick-action-btn {
-    background: #fff;
-    border: 1px solid rgba(0, 0, 0, 0.05);
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
     border-radius: 1rem;
     padding: 1rem;
     text-align: center;
@@ -1663,11 +2363,11 @@ html {
 }
 
 .quick-action-btn:hover {
-    background: #fff;
-    border-color: var(--primary);
+    background: rgba(255, 255, 255, 0.06);
+    border-color: var(--accent);
     transform: translateY(-2px);
-    box-shadow: 0 8px 15px rgba(0, 0, 0, 0.05);
-    color: var(--primary);
+    box-shadow: 0 8px 15px rgba(0, 0, 0, 0.2);
+    color: var(--accent);
 }
 
 .quick-action-icon {
@@ -1736,7 +2436,7 @@ html {
     bottom: -40px;
     left: 40px;
     padding: 4px;
-    background: #fff;
+    background: var(--bg-card);
     border-radius: 50%;
 }
 
@@ -1820,8 +2520,8 @@ html {
 }
 
 .aula-hero-btn {
-    background: white;
-    color: var(--aula);
+    background: rgba(255, 255, 255, 0.15);
+    color: #fff;
     border: none;
     font-weight: 700;
     transition: transform 0.2s;
@@ -1829,27 +2529,27 @@ html {
 
 .aula-hero-btn:hover {
     transform: scale(1.05);
-    background: #f8f9fa;
-    color: var(--aula);
+    background: rgba(255, 255, 255, 0.25);
+    color: #fff;
 }
 
 /* Stats Rápidos */
 .aula-stat-pill {
-    background: white;
-    border: 1px solid rgba(0, 0, 0, 0.05);
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
     border-radius: 1rem;
     padding: 0.75rem 1.25rem;
     display: flex;
     align-items: center;
     gap: 0.75rem;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
     min-width: 160px;
 }
 
 /* Tarjetas de Curso Minimalistas */
 .course-card-minimal {
-    background: white;
-    border: 1px solid rgba(0, 0, 0, 0.04);
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
     border-radius: 1.25rem;
     padding: 1.5rem;
     transition: all 0.3s ease;
@@ -1878,6 +2578,236 @@ html {
     margin-bottom: 1rem;
 }
 
+/* --- AULA: Gamificacion & Modulos --- */
+
+.aula-nav-scroll {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    flex-wrap: nowrap;
+    display: inline-flex;
+}
+
+.aula-nav-scroll::-webkit-scrollbar {
+    display: none;
+}
+
+.aula-nav-scroll .nav-link {
+    white-space: nowrap;
+}
+
+.aula-nav-scroll .nav-link.active {
+    background: var(--primary, #1B396A) !important;
+    color: #fff !important;
+}
+
+/* Streak badge */
+.aula-streak-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: .35rem;
+    border: 1px solid rgba(255, 107, 53, .35);
+    background: rgba(255, 107, 53, .08);
+    color: #FF6B35;
+    border-radius: 999px;
+    padding: .3rem .75rem;
+    font-size: .8rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.aula-streak-badge-sm {
+    font-size: .7rem;
+    padding: .2rem .55rem;
+}
+
+/* Badge items */
+.aula-badge-item {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+    border: 2px solid;
+    transition: transform .15s;
+    cursor: default;
+    position: relative;
+}
+
+.aula-badge-item:hover {
+    transform: scale(1.15);
+}
+
+.aula-badge-locked {
+    opacity: .25;
+    filter: grayscale(1);
+    border-color: #999 !important;
+    color: #999 !important;
+    background: transparent !important;
+}
+
+/* Module accordion */
+.aula-module-header {
+    font-weight: 600;
+    font-size: .85rem;
+    padding: .6rem .75rem;
+    cursor: pointer;
+    border: none;
+    background: transparent;
+    width: 100%;
+    text-align: left;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: background .15s;
+}
+
+.aula-module-header:hover {
+    background: rgba(78, 27, 218, .04);
+}
+
+.aula-module-progress {
+    height: 3px;
+    border-radius: 2px;
+    background: #e9ecef;
+    overflow: hidden;
+}
+
+.aula-module-progress-bar {
+    height: 100%;
+    border-radius: 2px;
+    background: var(--aula, #4e1bda);
+    transition: width .3s;
+}
+
+.aula-lesson-item {
+    font-size: .82rem;
+    padding: .45rem .75rem .45rem 1.5rem;
+    cursor: pointer;
+    border: none;
+    background: transparent;
+    width: 100%;
+    text-align: left;
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    min-height: 40px;
+    transition: background .1s;
+}
+
+.aula-lesson-item:hover {
+    background: rgba(78, 27, 218, .06);
+}
+
+.aula-lesson-active {
+    background: rgba(78, 27, 218, .1) !important;
+    font-weight: 600;
+    color: var(--aula, #4e1bda);
+}
+
+.aula-lesson-done i {
+    color: #198754;
+}
+
+/* Multimedia resources */
+.aula-resource-pdf,
+.aula-resource-slides {
+    border-radius: .75rem;
+    overflow: hidden;
+    border: 1px solid var(--border-color, #dee2e6);
+}
+
+.aula-resource-image {
+    border-radius: .75rem;
+    max-width: 100%;
+    cursor: zoom-in;
+    transition: transform .15s;
+}
+
+.aula-resource-image:hover {
+    transform: scale(1.02);
+}
+
+/* Tag pills */
+.aula-tag-pill {
+    display: inline-block;
+    padding: .15rem .5rem;
+    border-radius: 999px;
+    font-size: .65rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    background: rgba(78, 27, 218, .08);
+    color: var(--aula, #4e1bda);
+    border: 1px solid rgba(78, 27, 218, .15);
+}
+
+/* Badge unlock animation */
+@keyframes aula-badge-pop {
+    0% {
+        transform: scale(0);
+        opacity: 0;
+    }
+
+    60% {
+        transform: scale(1.3);
+    }
+
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+.aula-badge-pop {
+    animation: aula-badge-pop .4s ease-out;
+}
+
+/* Streak pulse */
+@keyframes aula-streak-pulse {
+
+    0%,
+    100% {
+        box-shadow: 0 0 0 0 rgba(255, 107, 53, .4);
+    }
+
+    50% {
+        box-shadow: 0 0 0 6px rgba(255, 107, 53, 0);
+    }
+}
+
+.aula-streak-pulse {
+    animation: aula-streak-pulse .8s ease-out;
+}
+
+/* Admin resource row */
+.ac-resource-row {
+    display: flex;
+    gap: .5rem;
+    align-items: center;
+}
+
+.ac-resource-row select {
+    width: 110px;
+    flex-shrink: 0;
+}
+
+/* Mobile tweaks */
+@media (max-width: 575px) {
+    .aula-streak-badge {
+        font-size: .7rem;
+        padding: .2rem .5rem;
+    }
+
+    .aula-badge-item {
+        width: 36px;
+        height: 36px;
+        font-size: .9rem;
+    }
+}
+
 /* --- SUPER ADMIN: TORRE DE CONTROL --- */
 
 .super-admin-hero {
@@ -1891,13 +2821,13 @@ html {
 }
 
 .metric-card-huge {
-    background: #fff;
+    background: var(--bg-card);
     border-radius: 1.25rem;
     padding: 1.5rem;
     text-align: center;
     height: 100%;
-    border: 1px solid rgba(0, 0, 0, 0.04);
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.02);
+    border: 1px solid var(--border-color);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
     transition: transform 0.2s;
 }
 
@@ -1911,13 +2841,14 @@ html {
     line-height: 1;
     background: -webkit-linear-gradient(45deg, var(--primary), var(--aula));
     -webkit-background-clip: text;
+    background-clip: text;
     -webkit-text-fill-color: transparent;
     margin-bottom: 0.5rem;
 }
 
 .report-action-card {
-    background: #fff;
-    border: 1px dashed #cbd5e0;
+    background: var(--bg-card);
+    border: 1px dashed rgba(255, 255, 255, 0.15);
     border-radius: 1rem;
     padding: 1.5rem;
     display: flex;
@@ -1928,8 +2859,8 @@ html {
 }
 
 .report-action-card:hover {
-    border-color: var(--primary);
-    background: #f8fafc;
+    border-color: var(--accent);
+    background: rgba(255, 255, 255, 0.04);
 }
 
 /* --- TOASTS 2.0 (Notificaciones Superiores) --- */
@@ -2023,9 +2954,9 @@ html {
 }
 
 .btn-time-slot {
-    border: 1px solid #e2e8f0;
-    background-color: #fff;
-    color: var(--text-body);
+    border: 1px solid var(--border-color);
+    background-color: var(--bg-card);
+    color: var(--text-main);
     padding: 0.5rem 0.25rem;
     font-size: 0.85rem;
     font-weight: 600;
@@ -2083,9 +3014,9 @@ html {
 }
 
 .btn-time-slot {
-    border: 1px solid #e2e8f0;
-    background-color: #fff;
-    color: var(--text-body);
+    border: 1px solid var(--border-color);
+    background-color: var(--bg-card);
+    color: var(--text-main);
     padding: 0.5rem 0.25rem;
     font-size: 0.85rem;
     font-weight: 600;
@@ -2141,13 +3072,15 @@ html {
 
 /* Relación de aspecto vertical para libros (2:3) */
 .ratio-2x3 {
-    --bs-aspect-ratio: 150%; /* (3 / 2) * 100 */
+    --bs-aspect-ratio: 150%;
+    /* (3 / 2) * 100 */
 }
 
 /* Ajuste para el contenedor de carrusel */
 .scrollbar-hide::-webkit-scrollbar {
     display: none;
 }
+
 .scrollbar-hide {
     -ms-overflow-style: none;
     scrollbar-width: none;
@@ -2157,12 +3090,3120 @@ html {
 .book-cover-hover {
     transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
+
 .book-card:hover .book-cover-hover {
     transform: translateY(-5px);
-    box-shadow: 0 10px 20px rgba(0,0,0,0.15) !important;
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.15) !important;
 }
 
 /* Gradiente negro suave para textos sobre portada */
 .bg-gradient-to-t {
-    background: linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.4) 50%, transparent 100%) !important;
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.9) 0%, rgba(0, 0, 0, 0.4) 50%, transparent 100%) !important;
+}
+
+/* --- MOBILE BOTTOM NAVIGATION (APP FEEL) --- */
+.mobile-bottom-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-top: 1px solid rgba(0, 0, 0, 0.08);
+    display: flex;
+    justify-content: space-around;
+    padding: 0.8rem 0.5rem calc(1rem + env(safe-area-inset-bottom)) 0.5rem;
+    /* Extra padding bottom for iOS safe area */
+    z-index: 9999 !important;
+    box-shadow: 0 -5px 20px rgba(0, 0, 0, 0.03);
+}
+
+.bottom-nav-item {
+    color: #94a3b8;
+    text-decoration: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    font-size: 0.7rem;
+    font-weight: 600;
+    width: 60px;
+    transition: all 0.2s ease;
+    position: relative;
+}
+
+.bottom-nav-icon {
+    font-size: 1.4rem;
+    margin-bottom: 2px;
+    transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+/* Active States */
+.bottom-nav-item.active {
+    color: var(--primary);
+}
+
+.bottom-nav-item.active .bottom-nav-icon {
+    transform: translateY(-3px);
+}
+
+/* Indicador de módulo activo */
+.bottom-nav-item[data-module="aula"].active {
+    color: var(--aula);
+}
+
+.bottom-nav-item[data-module="medi"].active {
+    color: var(--med);
+}
+
+.bottom-nav-item[data-module="biblio"].active {
+    color: var(--biblio);
+}
+
+/* Ajuste del body para que no tape el contenido */
+@media (max-width: 991.98px) {
+    body {
+        padding-bottom: 120px;
+        /* Espacio para la bottom nav */
+    }
+
+    .nav-floating {
+        display: none !important;
+        /* Ocultar nav flotante en móvil */
+    }
+}
+
+@media (min-width: 992px) {
+    .mobile-bottom-nav {
+        display: none !important;
+    }
+}
+
+/* --- PERFIL PRO V2 --- */
+.profile-cover-image {
+    height: 200px;
+    background: linear-gradient(135deg, var(--primary), #1e1b4b);
+    position: relative;
+}
+
+.profile-user-card {
+    margin-top: -60px;
+    position: relative;
+    z-index: 2;
+}
+
+.kardex-stat-box {
+    background: var(--surface-muted);
+    border-radius: 1rem;
+    padding: 1rem;
+    text-align: center;
+    border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+/* Digital Credential Flip Effect (Opcional, por ahora estático elegante) */
+.digital-id-card {
+    background: linear-gradient(135deg, #0f172a 0%, #334155 100%);
+    color: white;
+    border-radius: 16px;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+    aspect-ratio: 1.586;
+    /* Standard ID ratio */
+}
+
+.digital-id-bg-logo {
+    position: absolute;
+    right: -20px;
+    bottom: -40px;
+    font-size: 10rem;
+    opacity: 0.05;
+    color: white;
+}
+
+
+/* public/styles.css - v3.0 (Dark Mode & Fixes) */
+
+:root {
+    /* PALETA BASE */
+    --primary: #1B396A;
+    --aula: #4e1bda;
+    --med: #00D0FF;
+    --biblio: #FFD24D;
+
+    /* VARIABLES DE TEMA (DARK DEFAULT) */
+    --bg-body: #0f1114;
+    --bg-card: #1a1d23;
+    --text-main: #cbd5e1;
+    --text-heading: #f0f2f5;
+    --border-color: rgba(255, 255, 255, 0.08);
+    --nav-bg: rgba(15, 17, 20, 0.90);
+}
+
+/* MODO CLARO (Variables redefinidas para toggle) */
+[data-bs-theme="light"] {
+    --bg-body: #F6F7F8;
+    --bg-card: #FFFFFF;
+    --text-main: #4A5568;
+    --text-heading: #1B396A;
+    --border-color: rgba(0, 0, 0, 0.08);
+    --nav-bg: rgba(255, 255, 255, 0.90);
+    --surface: #FFFFFF;
+    --surface-muted: #F6F7F8;
+    --text-body: #4A5568;
+}
+
+/* APLICACIÓN GLOBAL DE TEMA */
+body {
+    background-color: var(--bg-body);
+    color: var(--text-main);
+    transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.card,
+.list-group-item,
+.bg-white {
+    background-color: var(--bg-card) !important;
+    color: var(--text-main);
+    border-color: var(--border-color) !important;
+}
+
+/* bg-light y bg-surface-muted -> oscuro sutil */
+.bg-light,
+.bg-surface-muted,
+.course-icon-box {
+    background-color: rgba(255, 255, 255, 0.04) !important;
+    color: var(--text-main) !important;
+    border-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+/* Revertir bg-light en modo claro */
+[data-bs-theme="light"] .bg-light,
+[data-bs-theme="light"] .bg-surface-muted,
+[data-bs-theme="light"] .course-icon-box {
+    background-color: #f8f9fa !important;
+    color: var(--text-main) !important;
+    border-color: rgba(0, 0, 0, 0.05) !important;
+}
+
+[data-bs-theme="light"] .card,
+[data-bs-theme="light"] .list-group-item,
+[data-bs-theme="light"] .bg-white {
+    background-color: #ffffff !important;
+    color: var(--text-main);
+    border-color: rgba(0, 0, 0, 0.08) !important;
+}
+
+/* Dropdown items */
+.dropdown-item.bg-light {
+    background-color: rgba(255, 255, 255, 0.1) !important;
+    color: #e2e8f0 !important;
+}
+
+.dropdown-item.bg-light:hover {
+    background-color: rgba(255, 255, 255, 0.2) !important;
+}
+
+/* Badges bg-light */
+.badge.bg-light {
+    background-color: rgba(255, 255, 255, 0.15) !important;
+    color: #fff !important;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+.text-dark {
+    color: var(--text-heading) !important;
+}
+
+.text-muted {
+    color: #94a3b8 !important;
+    /* Gris claro legible en ambos modos */
+}
+
+/* === DARK DEFAULT: GLOBAL OVERRIDES === */
+
+/* Form controls */
+.form-control,
+.form-select {
+    background-color: var(--bg-card);
+    border-color: rgba(255, 255, 255, 0.1);
+    color: var(--text-main);
+}
+
+.form-control::placeholder {
+    color: rgba(0, 0, 0, 0.818);
+}
+
+.border-light {
+    border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+/* Subtle backgrounds (dark-compatible) */
+.bg-danger-subtle {
+    background-color: rgba(220, 38, 38, 0.15) !important;
+    color: #fca5a5 !important;
+}
+
+.bg-success-subtle {
+    background-color: rgba(34, 197, 94, 0.15) !important;
+    color: #86efac !important;
+}
+
+.bg-warning-subtle {
+    background-color: rgba(234, 179, 8, 0.15) !important;
+    color: #fde68a !important;
+}
+
+.bg-info-subtle {
+    background-color: rgba(59, 130, 246, 0.15) !important;
+    color: #93c5fd !important;
+}
+
+/* Revertir subtle en modo claro */
+[data-bs-theme="light"] .bg-danger-subtle {
+    background-color: #f8d7da !important;
+    color: #842029 !important;
+}
+
+[data-bs-theme="light"] .bg-success-subtle {
+    background-color: #d1e7dd !important;
+    color: #0f5132 !important;
+}
+
+[data-bs-theme="light"] .bg-warning-subtle {
+    background-color: #fff3cd !important;
+    color: #664d03 !important;
+}
+
+[data-bs-theme="light"] .bg-info-subtle {
+    background-color: #cff4fc !important;
+    color: #055160 !important;
+}
+
+/* Dropdowns */
+.dropdown-menu {
+    background-color: var(--bg-card) !important;
+    border-color: var(--border-color) !important;
+    color: var(--text-main);
+}
+
+.dropdown-item {
+    color: var(--text-main);
+}
+
+.dropdown-item:hover,
+.dropdown-item:focus {
+    background-color: rgba(255, 255, 255, 0.06);
+    color: var(--text-heading);
+}
+
+.dropdown-divider {
+    border-color: var(--border-color);
+}
+
+/* Modals */
+.modal-content {
+    background-color: var(--bg-card) !important;
+    color: var(--text-main);
+    border-color: var(--border-color) !important;
+}
+
+.modal-header,
+.modal-footer {
+    border-color: var(--border-color) !important;
+}
+
+/* Tables */
+.table {
+    color: var(--text-main);
+    --bs-table-bg: transparent;
+    --bs-table-border-color: var(--border-color);
+}
+
+thead {
+    background-color: rgba(255, 255, 255, 0.04);
+}
+
+.table-hover>tbody>tr:hover {
+    --bs-table-hover-bg: rgba(255, 255, 255, 0.04);
+}
+
+/* btn-light -> oscuro sutil */
+.btn-light {
+    background-color: rgba(255, 255, 255, 0.08) !important;
+    color: var(--text-main) !important;
+    border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+.btn-light:hover {
+    background-color: rgba(255, 255, 255, 0.15) !important;
+    color: var(--text-heading) !important;
+}
+
+/* Revertir btn-light en modo claro */
+[data-bs-theme="light"] .btn-light {
+    background-color: #f8f9fa !important;
+    color: #212529 !important;
+    border-color: #f8f9fa !important;
+}
+
+/* btn-close en dark */
+.btn-close {
+    filter: invert(1) grayscale(100%) brightness(200%);
+}
+
+[data-bs-theme="light"] .btn-close {
+    filter: none;
+}
+
+/* Tabs / Nav pills */
+.nav-pills .nav-link {
+    color: var(--text-main);
+}
+
+.nav-tabs {
+    border-color: var(--border-color);
+}
+
+.nav-tabs .nav-link {
+    color: var(--text-main);
+}
+
+/* Toast */
+.toast {
+    background-color: var(--bg-card);
+    color: var(--text-main);
+    border-color: var(--border-color);
+}
+
+/* Accordion */
+.accordion-item {
+    background-color: var(--bg-card);
+    color: var(--text-main);
+    border-color: var(--border-color);
+}
+
+.accordion-button {
+    background-color: var(--bg-card);
+    color: var(--text-main);
+}
+
+.accordion-button:not(.collapsed) {
+    background-color: rgba(255, 255, 255, 0.04);
+    color: var(--text-heading);
+}
+
+/* Progress bar background */
+.progress {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Alert overrides for dark */
+.alert {
+    border-color: var(--border-color);
+}
+
+/* Input group text */
+.input-group-text {
+    background-color: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 255, 255, 0.1);
+    color: var(--text-main);
+}
+
+/* Pagination */
+.page-link {
+    background-color: var(--bg-card);
+    border-color: var(--border-color);
+    color: var(--text-main);
+}
+
+.page-link:hover {
+    background-color: rgba(255, 255, 255, 0.08);
+    color: var(--text-heading);
+}
+
+/* Offcanvas */
+.offcanvas {
+    background-color: var(--bg-card);
+    color: var(--text-main);
+}
+
+/* Popover */
+.popover {
+    background-color: var(--bg-card);
+    border-color: var(--border-color);
+    color: var(--text-main);
+}
+
+/* Card header/footer */
+.card-header,
+.card-footer {
+    background-color: rgba(255, 255, 255, 0.03);
+    border-color: var(--border-color) !important;
+}
+
+/* --- NAVBAR ESCRITORIO MEJORADO --- */
+.nav-floating {
+    background: var(--nav-bg);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid var(--border-color);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+}
+
+.nav-floating .nav-link {
+    color: var(--text-main);
+    font-weight: 600;
+    transition: all 0.2s;
+}
+
+/* Colores distintivos en iconos Escritorio */
+.nav-icon-aula {
+    color: var(--aula);
+}
+
+.nav-icon-biblio {
+    color: var(--biblio);
+}
+
+.nav-icon-medi {
+    color: var(--med);
+}
+
+.nav-icon-home {
+    color: var(--primary);
+}
+
+.nav-floating .nav-link:hover {
+    background: rgba(var(--primary), 0.05);
+    transform: translateY(-2px);
+}
+
+/* --- NAVBAR MÓVIL (FIXED BOTTOM) --- */
+.mobile-bottom-nav {
+    background: var(--nav-bg);
+    border-top: 1px solid var(--border-color);
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
+    /* Safe area para iPhone */
+}
+
+.bottom-nav-item {
+    color: var(--text-main);
+    opacity: 0.7;
+}
+
+.bottom-nav-item.active {
+    opacity: 1;
+    font-weight: 700;
+    color: var(--text-heading);
+}
+
+/* Colores activos en móvil */
+.bottom-nav-item[data-module="aula"].active i {
+    color: var(--aula);
+}
+
+.bottom-nav-item[data-module="biblio"].active i {
+    color: var(--biblio);
+}
+
+.bottom-nav-item[data-module="medi"].active i {
+    color: var(--med);
+}
+
+.bottom-nav-item[data-view="view-dashboard"].active i {
+    color: var(--primary);
+}
+
+/* --- MODAL DIGITAL ID (QR) FIX --- */
+/* Hacemos que el contenedor del carnet sea fluido pero con límites */
+.digital-id-card {
+    max-width: 90vw;
+    /* 90% del ancho de la pantalla */
+    width: 350px;
+    /* Ancho ideal */
+    margin: 0 auto;
+    aspect-ratio: 1.586;
+    /* Proporción tarjeta crédito */
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+/* Ajuste imagen QR dentro del modal */
+#prof-qr-full {
+    width: 100%;
+    max-width: 180px;
+    height: auto;
+}
+
+/* --- PERFIL & KARDEX --- */
+.kardex-stat-box {
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-color);
+}
+
+/* Input file oculto */
+#prof-pic-input {
+    display: none;
+}
+
+/* Ajustes inputs disabled en dark mode */
+input:disabled,
+select:disabled {
+    background-color: rgba(0, 0, 0, 0.1) !important;
+    color: var(--text-muted);
+    border-color: var(--border-color);
+}
+
+/* Form controls ya manejados globalmente */
+
+
+/* === CORRECCIONES MÓVIL Y PERFIL === */
+
+/* 1. Ajuste del tamaño del QR generado (Imagen 3) */
+#profile-qr-image img {
+    max-width: 100%;
+    /* Que nunca sea más ancho que su contenedor */
+    height: auto;
+    /* Que mantenga la proporción */
+    display: block;
+    /* Elimina espacios extra debajo de la imagen */
+    margin: 0 auto;
+    /* Lo centra horizontalmente */
+    border-radius: 0.5rem;
+    /* Un pequeño borde redondeado al QR queda mejor */
+}
+
+/* 2. Contraste del contenedor QR */
+#profile-view .card .bg-surface.rounded-4.p-3.text-center {
+    background-color: rgba(255, 255, 255, 0.04) !important;
+    border: 1px solid var(--border-color);
+}
+
+/* Asegurar que los inputs se vean editables en móvil al activarlos */
+#profile-view .form-control:not(:read-only) {
+    background-color: #1e2530 !important;
+    border-color: var(--bs-primary) !important;
+    box-shadow: 0 0 0 0.25rem rgba(var(--bs-primary-rgb), 0.25);
+    color: var(--text-main);
+}
+
+[data-bs-theme="light"] #profile-view .form-control:not(:read-only) {
+    background-color: #fff !important;
+}
+
+
+/* === FIXES DEFINITIVOS V4 (QR & Mobile Edit) === */
+
+/* 1. FORZAR TARJETAS OSCURAS (Corrige QR invisible en modo claro) */
+/* Esto sobrescribe la regla global que obligaba a todo a ser blanco */
+.card.bg-dark {
+    background-color: #1e293b !important;
+    /* Gris oscuro azulado */
+    color: #fff !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+
+/* Asegura que el texto dentro de la tarjeta oscura sea legible */
+.card.bg-dark .text-white-50 {
+    color: rgba(255, 255, 255, 0.6) !important;
+}
+
+/* 2. Z-INDEX FIX PARA FORMULARIO MÓVIL */
+/* Eleva el formulario por encima de la portada para que los clicks funcionen */
+#view-profile .card {
+    position: relative;
+    z-index: 10;
+    /* Superior a la portada */
+}
+
+/* 3. MODAL QR RESPONSIVO */
+/* Asegura que el modal nunca sea más ancho que la pantalla del celular */
+
+
+/* 4. FEEDBACK VISUAL EDICIÓN */
+/* Hace muy evidente qué campos están habilitados */
+input:not(:disabled),
+select:not(:disabled) {
+    background-color: #1a1d23 !important;
+    border: 1px solid rgba(255, 255, 255, 0.15) !important;
+    color: var(--text-main);
+    cursor: text;
+}
+
+/* En modo claro, el fondo habilitado debe ser blanco */
+[data-bs-theme="light"] input:not(:disabled),
+[data-bs-theme="light"] select:not(:disabled) {
+    background-color: #fff !important;
+    border-color: var(--primary) !important;
+    color: #212529;
+}
+
+/* === FIX NAVBAR ESCRITORIO (Estilo Limpio) === */
+
+/* 1. Resetear estilo base del link activo (quitar fondo azul) */
+.nav-floating .nav-link.active {
+    background: transparent !important;
+    box-shadow: none !important;
+    border-radius: 0;
+    /* Necesario para el borde inferior */
+    border-bottom: 3px solid var(--primary);
+    color: var(--primary) !important;
+    font-weight: 700;
+}
+
+/* 2. Colores específicos por módulo activo */
+/* Inicio */
+.nav-floating .nav-link[data-view="view-dashboard"].active {
+    border-color: var(--primary);
+    color: var(--primary) !important;
+}
+
+/* Aula (Morado) */
+.nav-floating .nav-link[data-view="view-aula"].active {
+    border-color: var(--aula);
+    color: var(--aula) !important;
+}
+
+.nav-floating .nav-link[data-view="view-aula"].active i {
+    color: var(--aula) !important;
+}
+
+/* Biblio (Amarillo) */
+.nav-floating .nav-link[data-view="view-biblio"].active {
+    border-color: var(--biblio);
+    color: #d97706 !important;
+    /* Un amarillo más oscuro para texto */
+}
+
+.nav-floating .nav-link[data-view="view-biblio"].active i {
+    color: var(--biblio) !important;
+}
+
+/* Medi (Azul Cyan) */
+.nav-floating .nav-link[data-view="view-medi"].active {
+    border-color: var(--med);
+    color: var(--med) !important;
+}
+
+.nav-floating .nav-link[data-view="view-medi"].active i {
+    color: var(--med) !important;
+}
+
+/* 3. Efecto Hover sutil */
+.nav-floating .nav-link:hover {
+    background-color: rgba(255, 255, 255, 0.06);
+    transform: translateY(-1px);
+}
+
+/* === FIXES FINALES V5 (QR Responsive & Mobile Edit Touch) === */
+
+/* 1. ARREGLO Z-INDEX (Permite editar en móvil) */
+/* Elevamos el contenedor del formulario por encima de la portada */
+#view-profile .container {
+    position: relative;
+    z-index: 10;
+}
+
+/* Aseguramos que la tarjeta del formulario reciba los toques */
+#view-profile .col-lg-8 .card {
+    position: relative;
+    z-index: 20 !important;
+}
+
+/* 2. ARREGLO QR CORTADO */
+/* Hacemos que la tarjeta se adapte al ancho del modal, no a un tamaño fijo */
+#modalDigitalID .modal-body {
+    padding: 1rem;
+    /* Dar aire alrededor */
+    display: flex;
+    justify-content: center;
+}
+
+
+
+/* Forzar a la imagen del QR a obedecer al contenedor */
+#prof-qr-full {
+    width: 100% !important;
+    height: auto !important;
+    max-width: 160px !important;
+    /* Controlar tamaño máximo visual */
+    display: block;
+    margin: 0 auto;
+}
+
+/* 3. FONDO OSCURO FORZADO (Para que se vea el botón blanco de cerrar) */
+.digital-id-card {
+    background: #1e293b !important;
+    /* Color sólido oscuro */
+    color: white !important;
+}
+
+/* === FIXES V6: ANTI-BLOQUEO Y QR === */
+
+/* 1. FIX EDICIÓN MÓVIL */
+/* La portada se pinta por detrás, pero no bloquea el formulario ni el botón */
+#view-profile .profile-cover-image {
+    pointer-events: auto;
+    /* permite clicks normales */
+    z-index: 1;
+}
+
+/* El formulario del perfil va por encima de la portada en todas las resoluciones */
+#view-profile .container {
+    position: relative;
+    z-index: 50 !important;
+}
+
+/* 2. FIX QR RESPONSIVO (Forzado) */
+/* Evita que la tarjeta recorte el QR y deja que el contenido marque la altura */
+#modalDigitalID .digital-id-card {
+    width: 100% !important;
+    max-width: 320px !important;
+    margin: 0 auto;
+    padding: 1.5rem !important;
+    aspect-ratio: auto !important;
+    /* anula el aspect-ratio fijo de .digital-id-card */
+}
+
+/* El QR siempre debe entrar completo en el recuadro blanco */
+#prof-qr-full {
+    width: 100% !important;
+    max-width: 220px !important;
+    height: auto !important;
+    display: block !important;
+    margin: 0 auto !important;
+}
+
+
+/* --- ANIMACIONES HERO BLOB (Círculos Flotantes) --- */
+@keyframes floatBlob1 {
+    0% {
+        transform: translate(-30%, -30%) scale(1);
+    }
+
+    50% {
+        transform: translate(-10%, -15%) scale(1.1);
+    }
+
+    100% {
+        transform: translate(-30%, -30%) scale(1);
+    }
+}
+
+@keyframes floatBlob2 {
+    0% {
+        transform: translate(20%, 20%) scale(1);
+    }
+
+    50% {
+        transform: translate(5%, 5%) scale(1.15);
+    }
+
+    100% {
+        transform: translate(20%, 20%) scale(1);
+    }
+}
+
+.animate-blob-1 {
+    animation: floatBlob1 15s infinite ease-in-out;
+}
+
+.animate-blob-2 {
+    animation: floatBlob2 18s infinite ease-in-out;
+    /* Tiempo distinto para efecto orgánico */
+}
+
+/* --- DASHBOARD COMPACTO V4.0 --- */
+
+/* Contenedor de iconos pequeño y refinado */
+.dash-icon-box {
+    width: 42px;
+    height: 42px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.08);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+.dash-icon-img {
+    width: 28px;
+    height: 28px;
+    object-fit: contain;
+}
+
+/* Tarjetas compactas */
+.dash-card-compact {
+    border-radius: 16px;
+    padding: 1rem !important;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    transition: transform 0.2s ease;
+}
+
+.dash-card-compact:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+}
+
+/* Layout de Rejilla de Información */
+.dash-grid-layout {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+}
+
+/* Timeline lateral compacto */
+.dash-sidebar-widgets {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+/* Ajustes para Móvil */
+@media (max-width: 991.98px) {
+    .dash-grid-layout {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Barra de bienvenida minimalista */
+.dash-welcome-bar {
+    background: linear-gradient(90deg, var(--primary), #1B396A);
+    color: white;
+    padding: 1rem 1.5rem;
+    border-radius: 12px;
+}
+
+/* 1. Navbar: Logos mucho más pequeños y sutiles */
+.nav-icon-img {
+    width: 20px;
+    /* Reducido de 24px a 20px */
+    height: 20px;
+    object-fit: contain;
+    transition: transform 0.2s;
+    opacity: 0.9;
+    /* Un poco más sutil */
+}
+
+/* 2. Carrusel Móvil: Iconos más compactos */
+.mobile-carousel-icon {
+    width: 26px;
+    /* Reducido de 32px a 26px */
+    height: 26px;
+    object-fit: contain;
+    margin-bottom: 2px;
+}
+
+.mobile-carousel-item {
+    font-size: 0.7rem;
+    /* Texto más pequeño */
+}
+
+/* 3. Dashboard: Contenedor de iconos en tarjetas */
+.dash-icon-box-small {
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.dash-icon-box-small img {
+    width: 22px !important;
+    /* Forzar tamaño pequeño en cards */
+    height: 22px !important;
+}
+
+/* --- FORZADO DE ESTILOS V6 --- */
+
+/* Forzar Header Azul TecNM */
+#view-dashboard .dash-welcome-bar {
+    background-color: #1B396A !important;
+    /* Azul Oficial */
+    background-image: linear-gradient(135deg, #1B396A 0%, #0d2346 100%) !important;
+    color: #ffffff !important;
+    border-radius: 1rem !important;
+    border: none !important;
+    box-shadow: 0 8px 20px rgba(27, 57, 106, 0.25) !important;
+}
+
+/* Forzar textos blancos dentro del header */
+#view-dashboard .dash-welcome-bar h4,
+#view-dashboard .dash-welcome-bar h5,
+#view-dashboard .dash-welcome-bar p,
+#view-dashboard .dash-welcome-bar div {
+    color: #ffffff !important;
+    opacity: 1 !important;
+    /* Quitar opacidades viejas */
+}
+
+/* Arreglar Cards */
+.dash-card-compact {
+    background: var(--bg-card) !important;
+    cursor: default !important;
+    position: relative;
+    transition: transform 0.2s;
+    border: 1px solid var(--border-color) !important;
+}
+
+.dash-card-compact:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* Botones dentro de las cards */
+.dash-card-action {
+    z-index: 10;
+    position: relative;
+    cursor: pointer !important;
+}
+
+/* --- VARIABLES DE TEMA (Nav) - Consolidated in :root above --- */
+
+
+
+/* --- NAVBAR CORE --- */
+.sia-navbar {
+    background: var(--nav-bg);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--nav-border);
+    padding: 0.6rem 1.2rem;
+    transition: all 0.3s ease;
+}
+
+.search-container {
+    position: relative;
+    max-width: 350px;
+    width: 100%;
+}
+
+.search-input {
+    background: var(--search-bg);
+    border: 1px solid transparent;
+    border-radius: 12px;
+    padding: 0.5rem 1rem 0.5rem 2.5rem;
+    color: var(--nav-text);
+    transition: all 0.2s;
+    width: 100%;
+}
+
+.search-input:focus {
+    background: var(--nav-bg);
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 3px rgba(9, 132, 227, 0.1);
+    outline: none;
+}
+
+.search-icon {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #b2bec3;
+}
+
+.nav-icon-btn {
+    position: relative;
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+    color: var(--nav-text);
+    cursor: pointer;
+}
+
+.nav-icon-btn:hover {
+    background: var(--search-bg);
+}
+
+.badge-notif {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    width: 8px;
+    height: 8px;
+    background: #ff7675;
+    border-radius: 50%;
+    border: 2px solid var(--nav-bg);
+}
+
+/* --- RESPONSIVE MOBILE --- */
+@media (max-width: 768px) {
+    .sia-navbar {
+        padding: 0.5rem 0.8rem;
+    }
+
+    .search-container {
+        max-width: 100%;
+        margin: 8px 0;
+    }
+
+    .desktop-only {
+        display: none !important;
+    }
+}
+
+/* --- SIA MODERN NAVBAR & CORE THEME - Consolidated in :root above --- */
+
+
+
+/* Navbar Contenedor */
+.sia-navbar {
+    background: var(--nav-bg) !important;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--nav-border);
+    padding: 0.6rem 1rem;
+    transition: all 0.3s ease;
+}
+
+
+
+
+
+.search-icon-sia {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #94a3b8;
+    font-size: 0.9rem;
+}
+
+/* Botones de Acción Navbar */
+.nav-action-btn {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--nav-text);
+    background: transparent;
+    border: none;
+    transition: all 0.2s;
+    cursor: pointer;
+}
+
+.nav-action-btn:hover {
+    background: var(--search-bg);
+    transform: translateY(-1px);
+}
+
+.badge-dot {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 8px;
+    height: 8px;
+    background: #ef4444;
+    border: 2px solid var(--nav-bg);
+    border-radius: 50%;
+}
+
+/* Ajustes Responsive */
+@media (max-width: 991.98px) {
+
+
+    .desktop-brand-text {
+        display: none;
+    }
+}
+
+/* --- DASHBOARD: HERO BANNER --- */
+.hero-banner {
+    width: 100%;
+    min-height: 200px;
+    border-radius: 20px;
+    background: linear-gradient(135deg, #1B396A 0%, #0d6efd 100%);
+    color: white;
+    padding: 30px;
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+}
+
+.hero-content {
+    position: relative;
+    z-index: 2;
+    max-width: 600px;
+}
+
+.hero-bg-icon {
+    position: absolute;
+    right: -20px;
+    bottom: -30px;
+    font-size: 10rem;
+    opacity: 0.1;
+    transform: rotate(-15deg);
+}
+
+/* --- MÓDULOS: CARRUSEL DINÁMICO --- */
+.module-carousel-wrapper {
+    margin: 20px -15px;
+    /* Margen negativo para que el scroll llegue al borde en móvil */
+}
+
+.module-carousel {
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    gap: 15px;
+    padding: 15px;
+    scrollbar-width: none;
+    /* Firefox */
+    -webkit-overflow-scrolling: touch;
+}
+
+.module-carousel::-webkit-scrollbar {
+    display: none;
+}
+
+/* Chrome/Safari */
+
+.module-item {
+    flex: 0 0 110px;
+    /* Tamaño para móvil */
+    scroll-snap-align: center;
+    background: var(--bg-card);
+    border-radius: 18px;
+    padding: 15px;
+    text-align: center;
+    border: 1px solid var(--border-color);
+    transition: transform 0.2s, box-shadow 0.2s;
+    cursor: pointer;
+}
+
+.module-item.active,
+.module-item:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+    border-color: var(--accent-primary);
+}
+
+/* Light Mode overrides for Navbar Actions */
+html[data-bs-theme="light"] .nav-action-btn {
+    color: var(--text-main);
+}
+
+html[data-bs-theme="light"] .nav-action-btn:hover {
+    background-color: rgba(0, 0, 0, 0.05);
+    color: var(--primary);
+}
+
+html[data-bs-theme="light"] .badge-dot {
+    border-color: #fff;
+}
+
+.module-ico {
+    width: 48px;
+    height: 48px;
+    object-fit: contain;
+    margin-bottom: 10px;
+}
+
+.module-label {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--text-main);
+}
+
+/* Ajustes Escritorio */
+@media (min-width: 992px) {
+    .module-item {
+        flex: 0 0 160px;
+    }
+
+    .hero-banner {
+        min-height: 260px;
+        padding: 50px;
+    }
+}
+
+/* --- NUEVO DASHBOARD SYSTEM --- */
+.hero-banner-v2 {
+    background: linear-gradient(135deg, #1B396A 0%, #0d6efd 100%);
+    border-radius: 20px;
+    padding: 1.5rem;
+    color: white;
+    position: relative;
+    overflow: hidden;
+}
+
+.hero-bg-icon-v2 {
+    position: absolute;
+    right: -10px;
+    bottom: -20px;
+    font-size: 7rem;
+    opacity: 0.1;
+    transform: rotate(-15deg);
+}
+
+.module-carousel-container {
+    display: flex;
+    gap: 12px;
+    overflow-x: auto;
+    padding: 10px 5px;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+    /* Ocultar scroll en Firefox */
+}
+
+.module-carousel-container::-webkit-scrollbar {
+    display: none;
+}
+
+/* Ocultar scroll en Chrome */
+
+.module-item-v2 {
+    flex: 0 0 calc(33.33% - 10px);
+    /* 3 elementos exactos en móvil */
+    scroll-snap-align: center;
+    background: var(--bg-card, #ffffff);
+    border-radius: 18px;
+    padding: 1rem 0.5rem;
+    text-align: center;
+    border: 1px solid rgba(0, 0, 0, 0.05);
+    transition: transform 0.2s;
+}
+
+.module-item-v2 img {
+    width: 72px;
+    height: 72px;
+    margin-bottom: 8px;
+    object-fit: contain;
+}
+
+.module-item-v2 span {
+    display: block;
+    font-size: 0.65rem;
+    font-weight: 800;
+    color: #4a5568;
+}
+
+/* Desktop Fix */
+@media (min-width: 768px) {
+    .module-item-v2 {
+        flex: 0 0 140px;
+    }
+
+    .hero-banner-v2 {
+        padding: 3rem;
+    }
+}
+
+
+/* --- NAVBAR 2.0 & MOBILE NAV --- */
+
+/* App Drawer (Waffle Menu) */
+.app-drawer-dropdown {
+    width: 320px;
+    padding: 1rem;
+    border-radius: 16px;
+    border: none;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+}
+
+@media (max-width: 576px) {
+    .app-drawer-dropdown {
+        position: fixed !important;
+        top: 70px !important;
+        left: 50% !important;
+        right: auto !important;
+        transform: translateX(-50%) !important;
+        width: 90% !important;
+        max-width: 320px !important;
+        margin: 0 !important;
+    }
+}
+
+.app-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+}
+
+.app-icon-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 0.75rem 0.25rem;
+    border-radius: 12px;
+    transition: background-color 0.2s;
+    color: var(--text-body);
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.app-icon-item:hover {
+    background-color: var(--surface-muted);
+    color: var(--primary);
+}
+
+.app-icon-item img {
+    width: 40px;
+    height: 40px;
+    margin-bottom: 0.5rem;
+    object-fit: contain;
+}
+
+.app-icon-item span {
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+/* Bottom Navigation Bar (Mobile) */
+.bottom-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 70px;
+    /* Altura fija */
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    border-top: 1px solid rgba(0, 0, 0, 0.05);
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    z-index: 1050;
+    padding-bottom: env(safe-area-inset-bottom);
+    /* Soporte iPhone X+ */
+    box-shadow: 0 -5px 20px rgba(0, 0, 0, 0.03);
+}
+
+.bottom-nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: #94a3b8;
+    text-decoration: none;
+    font-size: 0.7rem;
+    font-weight: 600;
+    width: 100%;
+    height: 100%;
+    transition: color 0.2s;
+    background: none;
+    border: none;
+    padding: 0;
+}
+
+.bottom-nav-item i {
+    font-size: 1.4rem;
+    margin-bottom: 2px;
+    transition: transform 0.2s;
+}
+
+.bottom-nav-item.active {
+    color: var(--primary);
+}
+
+.bottom-nav-item.active i {
+    transform: translateY(-2px);
+}
+
+/* Smart Action Button (Floating) */
+.smart-fab-container {
+    position: relative;
+    width: 56px;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.smart-fab {
+    position: absolute;
+    top: -25px;
+    /* Flota sobre la barra */
+    width: 56px;
+    height: 56px;
+    background: var(--primary);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    box-shadow: 0 8px 20px rgba(10, 37, 64, 0.4);
+    border: 4px solid white;
+    /* Borde para separar del fondo */
+    z-index: 1060;
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+
+.smart-fab:hover {
+    transform: scale(1.05);
+}
+
+.smart-fab i {
+    font-size: 1.5rem;
+}
+
+/* Ajuste para que el contenido no quede tapado por la bottom nav */
+@media (max-width: 767.98px) {
+    body {
+        padding-bottom: 80px;
+    }
+}
+
+/* Dark default overrides (now base styles) */
+.smart-fab {
+    border-color: #0f1114;
+}
+
+.app-drawer-dropdown {
+    background: var(--bg-card) !important;
+    border: 1px solid var(--border-color) !important;
+}
+
+.app-icon-item:hover {
+    background-color: rgba(255, 255, 255, 0.05);
+    color: #fff;
+}
+
+/* =========================================
+   UI IMPLEMENTATIONS (Phase 2)
+   ========================================= */
+
+/* --- SKELETON LOADERS --- */
+:root {
+    --skeleton-color-start: rgba(255, 255, 255, 0.05);
+    --skeleton-color-mid: rgba(255, 255, 255, 0.1);
+}
+
+[data-bs-theme="light"] {
+    --skeleton-color-start: rgba(0, 0, 0, 0.05);
+    --skeleton-color-mid: rgba(0, 0, 0, 0.11);
+}
+
+@keyframes pulse-gray {
+    0% {
+        background-color: var(--skeleton-color-start);
+    }
+
+    50% {
+        background-color: var(--skeleton-color-mid);
+    }
+
+    100% {
+        background-color: var(--skeleton-color-start);
+    }
+}
+
+.skeleton-loader {
+    animation: pulse-gray 1.5s infinite ease-in-out;
+    border-radius: 6px;
+    color: transparent !important;
+    cursor: default;
+    user-select: none;
+    background-color: var(--skeleton-color-start);
+}
+
+.skeleton-text {
+    height: 1em;
+    width: 70%;
+    margin-bottom: 0.5rem;
+    display: inline-block;
+}
+
+.skeleton-rect {
+    width: 100%;
+    height: 100%;
+    min-height: 100px;
+}
+
+/* Backdrop Blur Fix */
+.modal-backdrop.show {
+    opacity: 0.5;
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+}
+
+/* --- PWA INSTALL PROMPT (Phase 2) --- */
+.pwa-install-sheet {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    background: var(--bg-card);
+    border-top-left-radius: 1.5rem;
+    border-top-right-radius: 1.5rem;
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.4);
+    z-index: 1090;
+    transform: translateY(100%);
+    transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+    padding: 1.5rem;
+    padding-bottom: env(safe-area-inset-bottom, 1.5rem);
+    color: var(--text-main);
+}
+
+.pwa-install-sheet.show {
+    transform: translateY(0);
+}
+
+.pwa-icon {
+    width: 64px;
+    height: 64px;
+    border-radius: 16px;
+    margin-bottom: 1rem;
+    background: rgba(255, 255, 255, 0.06);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+    color: var(--accent);
+}
+
+/* FIX: Ensure Modal is above Mobile Nav */
+.modal {
+    z-index: 1060 !important;
+}
+
+.modal-backdrop {
+    z-index: 1050 !important;
+}
+
+
+
+
+
+
+.search-icon-sia {
+    position: absolute;
+    left: 12px;
+    z-index: 2;
+    color: #94a3b8;
+    pointer-events: none;
+}
+
+/* Search styles already handled globally */
+
+/* Hide desktop brand text on small mobile */
+@media(max-width: 380px) {
+    .navbar-brand img {
+        width: 28px;
+        height: 28px;
+    }
+}
+
+
+.search-item {
+    padding: .65rem .9rem;
+    cursor: pointer;
+    display: flex;
+    gap: .6rem;
+    align-items: center;
+}
+
+.search-item:hover {
+    background: rgba(0, 0, 0, .05);
+}
+
+.search-empty {
+    padding: .9rem;
+    text-align: center;
+    font-size: .85rem;
+    color: var(--bs-secondary-color);
+}
+
+/* --- FIX NAVBAR & SEARCH --- */
+.sia-navbar {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    padding: 0.5rem 0;
+}
+
+
+
+/* Icono dentro del input */
+.search-icon-sia {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #9ca3af;
+    pointer-events: none;
+}
+
+
+
+.search-item {
+    padding: 10px 15px;
+    border-bottom: 1px solid #f3f4f6;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    transition: background 0.2s;
+}
+
+.search-item:last-child {
+    border-bottom: none;
+}
+
+.search-item:hover {
+    background-color: #f8fafc;
+}
+
+.search-empty {
+    padding: 20px;
+    text-align: center;
+    color: #6c757d;
+}
+
+
+/* =========================================
+   FIX NAVBAR & SEARCH (DEFINITIVO)
+   ========================================= */
+
+/* Navbar contenedor base (dark default) */
+.sia-navbar {
+    background: rgba(15, 17, 20, 0.95) !important;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    padding: 0.5rem 0;
+}
+
+[data-bs-theme="light"] .sia-navbar {
+    background: rgba(255, 255, 255, 0.95) !important;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+/* Wrapper: Controla el ancho y evita el "segundo piso" */
+.search-wrapper {
+    position: relative;
+    flex-grow: 1;
+    /* Esto permite que ocupe el espacio disponible sin forzar */
+    max-width: 500px;
+    min-width: 140px;
+    /* Un poco más pequeño para móviles angostos */
+    display: flex;
+    align-items: center;
+    margin: 0 0.5rem;
+    /* Margen seguro */
+}
+
+/* Input del buscador */
+.search-input-sia {
+    width: 100%;
+    height: 42px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background-color: rgba(255, 255, 255, 0.06);
+    border-radius: 50rem;
+    padding: 0 1rem 0 2.5rem;
+    font-size: 0.9rem;
+    outline: none;
+    transition: all 0.2s;
+    color: #f0f2f5;
+}
+
+[data-bs-theme="light"] .search-input-sia {
+    background-color: #f8f9fa;
+    border-color: #e5e7eb;
+    color: #1a202c;
+}
+
+.search-input-sia:focus {
+    background-color: #1a1d23;
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+
+[data-bs-theme="light"] .search-input-sia:focus {
+    background-color: #fff;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(27, 57, 106, 0.15);
+}
+
+/* Icono dentro del input */
+.search-icon-sia {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #9ca3af;
+    pointer-events: none;
+    z-index: 5;
+}
+
+/* RESULTADOS FLOTANTES (La clave para no romper el navbar) */
+.search-results-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    margin-top: 8px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    box-shadow: 0 10px 40px -5px rgba(0, 0, 0, 0.2);
+    z-index: 2000;
+    /* Por encima de todo */
+    max-height: 400px;
+    overflow-y: auto;
+    display: none;
+    /* Oculto por defecto */
+}
+
+.search-results-dropdown.active {
+    display: block;
+}
+
+.search-item {
+    padding: 12px 15px;
+    border-bottom: 1px solid var(--border-color);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    transition: background 0.2s;
+}
+
+.search-item:last-child {
+    border-bottom: none;
+}
+
+.search-item:hover {
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+[data-bs-theme="light"] .search-item:hover {
+    background-color: rgba(0, 0, 0, 0.03);
+}
+
+.search-empty {
+    padding: 20px;
+    text-align: center;
+    color: #6c757d;
+}
+
+/* Ajuste específico para móvil extremo (iPhone SE, etc) */
+@media (max-width: 380px) {
+    .navbar-brand span {
+        display: none;
+    }
+
+    /* Ocultar texto SIA si no cabe */
+    .search-wrapper {
+        max-width: 160px;
+    }
+}
+
+
+/* SIA Theme: Soporte para tarjetas de color sólido en ambos modos */
+.card.bg-danger,
+.card.bg-primary {
+    color: #ffffff !important;
+}
+
+.card.bg-danger .text-white-50,
+.card.bg-danger .opacity-75 {
+    color: rgba(255, 255, 255, 0.8) !important;
+}
+
+.card.bg-danger h6,
+.card.bg-danger .fw-bolder {
+    color: #ffffff !important;
+}
+
+[data-bs-theme="light"] .card.bg-danger {
+    box-shadow: 0 4px 15px rgba(220, 53, 69, 0.4) !important;
+}
+
+/* =========================================
+   DASHBOARD V3 (MOBILE-FIRST) STYLES
+   ========================================= */
+
+/* --- HEADER & AVATAR --- */
+.dashboard-avatar {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #1a1d23 0%, #2a2d33 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    color: var(--accent);
+    font-size: 1.2rem;
+    cursor: pointer;
+    overflow: hidden;
+    border: 2px solid rgba(255, 255, 255, 0.15);
+}
+
+.dashboard-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/* --- STORIES SECTION --- */
+.stories-container {
+    padding-left: 4px;
+    /* Margen ligero izquierdo */
+    scrollbar-width: none;
+    /* Firefox */
+}
+
+.stories-container::-webkit-scrollbar {
+    display: none;
+    /* Chrome/Safari */
+}
+
+.story-item {
+    cursor: pointer;
+    transition: transform 0.2s ease;
+}
+
+.story-item:active {
+    transform: scale(0.95);
+}
+
+.story-ring {
+    width: 68px;
+    height: 68px;
+    border-radius: 50%;
+    padding: 3px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: 2px solid #e2e8f0;
+    /* Default (visto) */
+}
+
+.story-ring.active {
+    background: linear-gradient(45deg, #f09433, #e6683c, #dc2743, #cc2366, #bc1888);
+    /* Instagram-like gradient */
+    border: none;
+}
+
+.story-circle {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    background: var(--bg-card);
+    border: 2px solid var(--bg-card);
+    overflow: hidden;
+    font-size: 1.5rem;
+}
+
+/* --- AVISO STORY RING (Green/Teal gradient) --- */
+.story-ring.aviso-ring.active {
+    background: linear-gradient(45deg, #10b981, #06b6d4, #3b82f6, #10b981);
+    border: none;
+}
+
+/* --- FULLSCREEN AVISO MODAL --- */
+/* --- FULLSCREEN GLASS AVISO MODAL --- */
+.modal-aviso-glass .modal-content {
+    background: rgba(15, 15, 15, 0.75) !important;
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 40px 80px rgba(0, 0, 0, 0.6);
+    border-radius: 24px;
+    height: 90vh;
+    /* Fixed height for consistency */
+    max-height: 800px;
+}
+
+/* Background "frame" effect: dim the backdrop slightly more */
+.modal-backdrop.show {
+    opacity: 0.7;
+    /* Make the background darker to highlight the glass modal */
+}
+
+/* Progress bar track logic */
+.modal-aviso-glass .progress-track {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+#modalAvisoFullscreen .aviso-fullscreen-img {
+    animation: avisoFadeIn 0.4s ease-out;
+}
+
+.aviso-text-card {
+    animation: avisoSlideUp 0.5s ease-out;
+}
+
+.aviso-mixed-card {
+    animation: avisoFadeIn 0.4s ease-out;
+}
+
+@keyframes avisoFadeIn {
+    from {
+        opacity: 0;
+        transform: scale(0.95);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+@keyframes avisoSlideUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Progress bars */
+.aviso-progress-fill {
+    transition: width 0.3s ease;
+}
+
+/* Navigation arrows hover */
+#aviso-nav-prev:hover,
+#aviso-nav-next:hover {
+    opacity: 1 !important;
+    transform: translateY(-50%) scale(1.2);
+    transition: all 0.2s;
+}
+
+/* Responsive: text aviso on mobile */
+@media (max-width: 576px) {
+    .aviso-text-card h1 {
+        font-size: 1.75rem !important;
+    }
+
+    .aviso-text-card .lead {
+        font-size: 1rem !important;
+    }
+}
+
+/* --- SMART CARDS --- */
+.smart-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+.smart-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3) !important;
+}
+
+.smart-card:active {
+    transform: scale(0.98);
+}
+
+.icon-box-sm {
+    width: 42px;
+    height: 42px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+}
+
+.status-dot {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    box-shadow: 0 0 0 4px rgba(0, 0, 0, 0.4);
+}
+
+/* --- BOTTOM NAVIGATION BAR --- */
+.bottom-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    background: rgba(15, 17, 20, 0.95);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    height: 65px;
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    z-index: 9999;
+    padding-bottom: env(safe-area-inset-bottom);
+    box-shadow: 0 -5px 20px rgba(0, 0, 0, 0.3);
+}
+
+.nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: #94a3b8;
+    text-decoration: none;
+    font-size: 0.7rem;
+    font-weight: 500;
+    gap: 4px;
+    width: 60px;
+    height: 100%;
+    transition: color 0.2s;
+    background: transparent;
+    border: none;
+}
+
+.nav-item i {
+    font-size: 1.35rem;
+    transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.nav-item.active {
+    color: var(--primary);
+}
+
+.nav-item.active i {
+    transform: translateY(-2px);
+}
+
+/* FAB central flotante estilo "Scan" o "Accion" */
+.nav-item-fab {
+    transform: translateY(-28px);
+    z-index: 1051;
+}
+
+.nav-item-fab button {
+    width: 56px;
+    height: 56px;
+    border: 4px solid #0f1114;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+}
+
+/* --- LIGHT MODE MOBILE NAV OVERRIDES --- */
+html[data-bs-theme="light"] .bottom-nav {
+    background: rgba(255, 255, 255, 0.90) !important;
+    border-top: 1px solid rgba(0, 0, 0, 0.05);
+    box-shadow: 0 -5px 20px rgba(0, 0, 0, 0.05);
+}
+
+html[data-bs-theme="light"] .nav-item {
+    color: var(--text-muted) !important;
+}
+
+html[data-bs-theme="light"] .nav-item.active {
+    color: var(--text-heading) !important;
+    /* Darker than primary for text visibility */
+    font-weight: 700;
+}
+
+html[data-bs-theme="light"] .nav-item.active i {
+    text-shadow: none !important;
+}
+
+html[data-bs-theme="light"] .nav-item-fab button {
+    border-color: var(--bg-body) !important;
+    background-color: var(--primary);
+    color: white !important;
+    box-shadow: 0 4px 12px rgba(27, 57, 106, 0.3);
+}
+
+html[data-bs-theme="light"] .nav-item-fab button i {
+    color: white !important;
+}
+
+/* --- RESPONSIVE ADJUSTMENTS --- */
+/* En escritorio, ocultar el bottom nav y ajustar el contenedor del dashboard */
+@media (min-width: 768px) {
+    .bottom-nav {
+        display: none !important;
+    }
+
+    /* Centrar dashboard en escritorio tipo App Shell */
+    #view-dashboard {
+        max-width: 900px;
+    }
+}
+
+/* --- MODULES DRAWER --- */
+.modules-drawer-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(4px);
+    z-index: 10000;
+    /* SUPER HIGH to cover everything including navbar */
+    /* Above Bottom Nav */
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    animation: fadeIn 0.3s forwards;
+}
+
+.modules-drawer-content {
+    background: var(--bg-card);
+    background: rgba(26, 29, 35, 0.95);
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    transform: translateY(100%);
+    animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* --- LIGHT MODE DRAWER & DROPDOWN OVERRIDES --- */
+html[data-bs-theme="light"] .modules-drawer-content {
+    background: rgba(255, 255, 255, 0.95);
+    border-top: 1px solid rgba(0, 0, 0, 0.1);
+    color: var(--text-body);
+}
+
+html[data-bs-theme="light"] .dropdown-menu,
+html[data-bs-theme="light"] .app-drawer-dropdown {
+    background-color: var(--bg-card);
+    color: var(--text-body);
+    border: 1px solid var(--border-color);
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1) !important;
+}
+
+html[data-bs-theme="light"] .dropdown-item {
+    color: var(--text-body);
+}
+
+html[data-bs-theme="light"] .dropdown-item:hover {
+    background-color: var(--surface-muted);
+    color: var(--primary);
+}
+
+@keyframes slideUp {
+    from {
+        transform: translateY(100%);
+    }
+
+    to {
+        transform: translateY(0);
+    }
+}
+
+.icon-box-md {
+    width: 60px;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.2s;
+}
+
+.icon-box-md:active {
+    transform: scale(0.90);
+}
+
+/* FAB FIX */
+.nav-item-fab button i {
+    color: white;
+}
+
+/* Module Trigger Button Animation (Desktop) */
+.module-trigger-btn {
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.module-trigger-btn:hover {
+    transform: scale(1.1);
+    background-color: var(--surface-hover);
+    box-shadow: 0 4px 12px rgba(13, 110, 253, 0.15);
+}
+
+.module-trigger-btn:active {
+    transform: scale(0.95);
+}
+
+/* =========================================
+   DARK DEFAULT REFINEMENTS
+   ========================================= */
+
+/* Force text colors in smart cards (Dark Mode Only) */
+html[data-bs-theme="dark"] .smart-card h6,
+html[data-bs-theme="dark"] .smart-card .fw-bold {
+    color: #f8f9fa !important;
+}
+
+html[data-bs-theme="dark"] .smart-card .text-muted {
+    color: rgba(255, 255, 255, 0.65) !important;
+}
+
+/* Bottom Nav (already dark by default now) */
+
+.nav-item {
+    color: rgba(255, 255, 255, 0.5);
+}
+
+html[data-bs-theme="dark"] .nav-item.active {
+    color: #fff;
+}
+
+html[data-bs-theme="dark"] .nav-item.active i {
+    color: #fff !important;
+    text-shadow: 0 0 12px var(--bs-primary);
+}
+
+html[data-bs-theme="dark"] .nav-item.active span {
+    color: #fff !important;
+    font-weight: 700;
+}
+
+/* Light Mode Overrides for Active Nav */
+html[data-bs-theme="light"] .nav-item.active i {
+    color: var(--text-heading) !important;
+    text-shadow: none !important;
+    transform: translateY(-2px);
+}
+
+html[data-bs-theme="light"] .nav-item.active span {
+    color: var(--text-heading) !important;
+    font-weight: 800 !important;
+}
+
+/* Icon Box adaptation */
+.icon-box-md.bg-dark-subtle {
+    background-color: rgba(255, 255, 255, 0.15) !important;
+    color: #fff !important;
+}
+
+/* =========================================
+   FIX: Toggle Switches Invisibles (Tema Claro)
+   ========================================= */
+/* Toggle NO activado: borde visible + fondo sutil (dark default) */
+.form-check-input[type="checkbox"] {
+    border: 2px solid rgba(255, 255, 255, 0.3) !important;
+    background-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+/* Toggle activado (checked): fondo primary + borde primary */
+.form-check-input[type="checkbox"]:checked {
+    background-color: var(--bs-primary, #0d6efd) !important;
+    border-color: var(--bs-primary, #0d6efd) !important;
+}
+
+/* Switch específico: asegurar visibilidad del thumb */
+.form-switch .form-check-input {
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='%23adb5bd'/%3e%3c/svg%3e") !important;
+}
+
+.form-switch .form-check-input:checked {
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='%23fff'/%3e%3c/svg%3e") !important;
+}
+
+/* Focus ring visible */
+.form-check-input:focus {
+    box-shadow: 0 0 0 0.2rem rgba(59, 130, 246, 0.25) !important;
+}
+
+/* Light mode toggle adjustments */
+[data-bs-theme="light"] .form-check-input[type="checkbox"] {
+    border-color: #adb5bd !important;
+    background-color: #e9ecef !important;
+}
+
+.form-check-input[type="checkbox"]:checked {
+    background-color: var(--bs-primary, #0d6efd) !important;
+    border-color: var(--bs-primary, #0d6efd) !important;
+}
+
+/* =========================================
+   FIX: Radio Buttons (Dark Default)
+   ========================================= */
+.form-check-input[type="radio"] {
+    border: 2px solid rgba(255, 255, 255, 0.3) !important;
+    background-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+.form-check-input[type="radio"]:checked {
+    background-color: var(--bs-primary, #0d6efd) !important;
+    border-color: var(--bs-primary, #0d6efd) !important;
+}
+
+[data-bs-theme="light"] .form-check-input[type="radio"] {
+    border-color: #adb5bd !important;
+    background-color: #f8f9fa !important;
+}
+
+/* =========================================
+   Escala: botones numéricos interactivos
+   ========================================= */
+.scale-btn {
+    min-width: 32px;
+    font-weight: 600;
+    transition: all 0.15s ease;
+}
+
+.scale-btn.active,
+.scale-btn.btn-primary {
+    background-color: var(--bs-primary, #0d6efd) !important;
+    border-color: var(--bs-primary, #0d6efd) !important;
+    color: #fff !important;
+    transform: scale(1.12);
+    box-shadow: 0 2px 8px rgba(13, 110, 253, 0.35);
+}
+
+/* =========================================
+   FIX: Modal scroll en móvil
+   ========================================= */
+@media (max-width: 767.98px) {
+    .modal-dialog-scrollable .modal-body {
+        max-height: 60vh !important;
+        overflow-y: auto !important;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .modal-fullscreen-md-down .modal-body {
+        overflow-y: auto !important;
+        -webkit-overflow-scrolling: touch;
+    }
+}
+
+/* =========================================
+   SPEED DIAL - Quick Actions
+   ========================================= */
+.speed-dial-action {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem;
+    background: var(--bs-body-bg);
+    border: 1px solid var(--bs-border-color);
+    border-radius: 12px;
+    transition: all 0.2s ease;
+    cursor: pointer;
+    text-align: left;
+    width: 100%;
+}
+
+.speed-dial-action:hover {
+    background: var(--bs-secondary-bg);
+    border-color: var(--bs-primary);
+    transform: translateX(4px);
+}
+
+.speed-dial-action:active {
+    transform: scale(0.98);
+}
+
+.speed-dial-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.speed-dial-text {
+    flex: 1;
+}
+
+/* =========================================
+   NAVBAR - Glass Effect (Desktop)
+   ========================================= */
+@media (min-width: 768px) {
+    .sia-navbar {
+        background: rgba(15, 17, 20, 0.85) !important;
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    }
+
+    [data-bs-theme="light"] .sia-navbar {
+        background: rgba(255, 255, 255, 0.85) !important;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    }
+}
+
+/* =========================================
+   BOTTOM NAV - Badge (Notifications)
+   ========================================= */
+.nav-badge {
+    position: absolute;
+    top: 8px;
+    right: calc(50% - 12px);
+    background: var(--bs-danger);
+    color: white;
+    font-size: 0.65rem;
+    min-width: 16px;
+    height: 16px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    border: 2px solid var(--bs-body-bg);
+    z-index: 10;
+}
+
+/* =========================================
+   SEARCH RESULTS - Category Grouping
+   ========================================= */
+.search-category {
+    margin-bottom: 0.5rem;
+}
+
+.category-label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    color: var(--bs-secondary);
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    padding: 0.25rem 0.5rem;
+    background: var(--bs-secondary-bg);
+    border-radius: 4px;
+    margin-bottom: 0.25rem;
+}
+
+.search-results-dropdown .result-item {
+    padding: 0.5rem 0.75rem;
+    cursor: pointer;
+    border-radius: 6px;
+    transition: all 0.15s;
+}
+
+.search-results-dropdown .result-item:hover {
+    background: var(--bs-primary-bg-subtle);
+    transform: translateX(2px);
+}
+
+/* =========================================
+   MODULE CARDS - Drawer Styling
+   ========================================= */
+.module-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 1rem;
+    border-radius: 12px;
+    background: var(--bs-body-bg);
+    border: 1px solid var(--bs-border-color);
+    transition: all 0.2s;
+    cursor: pointer;
+    position: relative;
+}
+
+.module-card:hover {
+    background: var(--bs-secondary-bg);
+    border-color: var(--bs-primary);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.module-card:active {
+    transform: scale(0.95);
+}
+
+.module-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 0.5rem;
+    font-size: 1.5rem;
+    color: white;
+}
+
+.module-badge {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: var(--bs-danger);
+    color: white;
+    font-size: 0.7rem;
+    padding: 2px 6px;
+    border-radius: 10px;
+    font-weight: bold;
+}
+
+.module-label {
+    font-size: 0.85rem;
+    font-weight: 500;
+    text-align: center;
+}
+
+.group-label {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    color: var(--bs-secondary);
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    letter-spacing: 0.5px;
+}
+
+.modules-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.75rem;
+}
+
+/* Gradient backgrounds for module icons */
+.bg-gradient-aula {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.bg-gradient-danger {
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+}
+
+.bg-gradient-warning {
+    background: linear-gradient(135deg, #ffa474 0%, #f7b733 100%);
+}
+
+.bg-gradient-info {
+    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+}
+
+.bg-gradient-primary {
+    background: linear-gradient(135deg, #667eea 0%, #0dcaf0 100%);
+}
+
+.bg-gradient-success {
+    background: linear-gradient(135deg, #56ab2f 0%, #a8e063 100%);
+}
+
+/* =========================================
+   PULL TO REFRESH - Animation
+   ========================================= */
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.spin {
+    animation: spin 1s linear infinite;
+}
+
+/* =========================================
+   REPORTES MODULE - Styles
+   ========================================= */
+
+.cursor-pointer {
+    cursor: pointer;
+}
+
+.hover-scale {
+    transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+}
+
+.hover-scale:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.15) !important;
+}
+
+/* Reportes Cards Grid - Sin scroll horizontal */
+#reportes-content .row {
+    margin: 0 -0.5rem;
+}
+
+#reportes-content .row>[class*="col-"] {
+    padding: 0 0.5rem;
+}
+
+/* Modal filters - Pills activos */
+#detail-modal-filters .btn.active {
+    background-color: var(--bs-primary) !important;
+    color: white !important;
+    border-color: var(--bs-primary) !important;
+}
+
+#detail-modal-filters .btn:not(.active) {
+    background-color: transparent;
+    color: var(--text-muted);
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+#detail-modal-filters .btn:not(.active):hover {
+    background-color: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.3);
+}
+
+/* Export Modal */
+#exportConfigModal .modal-content {
+    border-radius: 1rem;
+}
+
+#exportConfigModal .form-check-input:checked {
+    background-color: var(--bs-primary);
+    border-color: var(--bs-primary);
+}
+
+/* Chart containers - Prevent overflow */
+canvas {
+    max-width: 100% !important;
+    height: auto !important;
+}
+
+/* === FORO MODULE === */
+.line-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.line-clamp-3 {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.hover-brightness:hover {
+    filter: brightness(1.15);
+}
+
+.btn-check:checked+.btn-outline-primary,
+.btn-check:checked+.btn-outline-info,
+.btn-check:checked+.btn-outline-secondary {
+    transform: scale(0.97);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* ============================================
+   FORO MODULE — STUDENT VIEW ENHANCEMENTS
+   ============================================ */
+
+/* Tab buttons */
+#view-foro .foro-tab-btn {
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    font-size: 0.8rem;
+}
+
+#view-foro .foro-tab-btn.active {
+    background: var(--primary) !important;
+    color: #fff !important;
+    box-shadow: 0 2px 8px rgba(13, 110, 253, 0.25);
+}
+
+/* Filter chips */
+#view-foro .foro-filter-chip {
+    transition: all 0.15s ease;
+    cursor: pointer;
+    border: 1.5px solid transparent !important;
+    font-size: 0.75rem;
+}
+
+#view-foro .foro-filter-chip.active {
+    background: rgba(13, 110, 253, 0.15) !important;
+    border-color: #0d6efd !important;
+    color: #0d6efd !important;
+}
+
+/* Event cards */
+#view-foro .foro-event-card {
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    border: 1px solid var(--border-color) !important;
+}
+
+#view-foro .foro-event-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.15) !important;
+}
+
+#view-foro .foro-event-card .card-img-overlay-gradient {
+    background: linear-gradient(180deg, transparent 30%, rgba(0, 0, 0, 0.75) 100%);
+}
+
+#view-foro .foro-card-cover {
+    height: 180px;
+}
+
+/* Ticket cards */
+#view-foro .foro-ticket-card {
+    transition: all 0.2s ease;
+}
+
+#view-foro .foro-ticket-card:active {
+    transform: scale(0.98);
+}
+
+/* Ticket wallet - horizontal scroll on mobile */
+#view-foro .foro-ticket-wallet {
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    gap: 1rem;
+    padding-bottom: 0.5rem;
+}
+
+#view-foro .foro-ticket-wallet::-webkit-scrollbar {
+    height: 4px;
+}
+
+#view-foro .foro-ticket-wallet::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 4px;
+}
+
+#view-foro .foro-ticket-wallet-card {
+    flex: 0 0 85%;
+    max-width: 400px;
+    scroll-snap-align: start;
+}
+
+/* Pulse animation for countdown badges */
+#view-foro .foro-pulse {
+    animation: foroPulse 2s infinite;
+}
+
+@keyframes foroPulse {
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.65;
+    }
+}
+
+/* Last spots badge */
+#view-foro .foro-last-spots {
+    animation: foroPulse 1.5s infinite;
+}
+
+/* Sold out overlay */
+#view-foro .foro-sold-out {
+    font-size: 0.7rem;
+}
+
+/* Favorite button */
+#view-foro .foro-fav-btn {
+    transition: transform 0.2s ease;
+}
+
+#view-foro .foro-fav-btn:active {
+    transform: scale(1.3);
+}
+
+/* Star rating hover */
+#view-foro .foro-star,
+#modalFeedback .foro-star {
+    cursor: pointer;
+    transition: transform 0.15s ease;
+}
+
+#view-foro .foro-star:hover,
+#modalFeedback .foro-star:hover {
+    transform: scale(1.25);
+}
+
+/* Mobile optimizations */
+@media (max-width: 576px) {
+    #view-foro .foro-hero {
+        border-radius: 0 !important;
+        margin-left: -12px;
+        margin-right: -12px;
+    }
+
+    #view-foro .foro-card-cover {
+        height: 140px;
+    }
+
+    #view-foro .foro-ticket-wallet-card {
+        flex: 0 0 88%;
+    }
+}
+
+/* Desktop: ticket wallet as grid */
+@media (min-width: 768px) {
+    #view-foro .foro-ticket-wallet {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+        overflow-x: visible;
+        scroll-snap-type: none;
+    }
+
+    #view-foro .foro-ticket-wallet-card {
+        flex: none;
+        max-width: none;
+    }
+}
+
+/* ============================
+   MEDI MODULE — ADMIN 3-ZONE LAYOUT
+   ============================ */
+
+/* Desktop: 3-zone full-height columns */
+@media (min-width: 992px) {
+    .medi-admin-col {
+        height: calc(100vh - 140px);
+        overflow: hidden;
+    }
+
+    .medi-admin-col .card-body {
+        min-height: 0;
+        /* Allow flex shrink */
+    }
+}
+
+/* Tablet: 2-zone, then stack */
+@media (min-width: 768px) and (max-width: 991.98px) {
+    .medi-admin-col {
+        height: calc(50vh - 60px);
+    }
+}
+
+/* Mobile: Stack naturally */
+@media (max-width: 767.98px) {
+    .medi-admin-col {
+        max-height: 60vh;
+    }
+}
+
+/* Admin nav pills */
+#medi-workarea-tabs .nav-link,
+#medi-context-tabs .nav-link {
+    color: #6c757d;
+    font-weight: 600;
+    transition: all 0.2s ease;
+}
+
+#medi-workarea-tabs .nav-link.active,
+#medi-context-tabs .nav-link.active {
+    background-color: var(--bs-primary);
+    color: #fff !important;
+}
+
+#medi-workarea-tabs .nav-link:not(.active):hover,
+#medi-context-tabs .nav-link:not(.active):hover {
+    background-color: rgba(13, 110, 253, 0.08);
+    color: var(--bs-primary);
+}
+
+/* Dark mode: override nav pill text for non-active state */
+html[data-bs-theme="dark"] #medi-workarea-tabs .nav-link:not(.active),
+html[data-bs-theme="dark"] #medi-context-tabs .nav-link:not(.active) {
+    color: #94a3b8 !important;
+}
+
+html[data-bs-theme="dark"] .medi-wait-card:hover {
+    background-color: rgba(13, 110, 253, 0.08) !important;
+}
+
+html[data-bs-theme="dark"] .medi-wait-card.selected {
+    background-color: rgba(13, 110, 253, 0.12) !important;
+}
+
+/* Waiting room compact cards */
+.medi-wait-card {
+    transition: all 0.2s ease;
+    cursor: pointer;
+}
+
+.medi-wait-card:hover {
+    background-color: rgba(13, 110, 253, 0.04) !important;
+}
+
+.medi-wait-card.selected {
+    border-left: 3px solid var(--bs-primary) !important;
+    background-color: rgba(13, 110, 253, 0.06) !important;
+}
+
+/* Wait timer colors */
+.wait-timer-green {
+    color: #198754;
+}
+
+.wait-timer-yellow {
+    color: #fd7e14;
+}
+
+.wait-timer-red {
+    color: #dc3545;
+    font-weight: 700;
+}
+
+/* ============================
+   MEDI MODULE — RESPONSIVE
+   ============================ */
+
+/* Date selector scroll fade indicator */
+.medi-date-scroll {
+    position: relative;
+}
+
+.medi-date-scroll::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: 40px;
+    background: linear-gradient(to right, transparent, var(--bs-body-bg, #fff));
+    pointer-events: none;
+    z-index: 1;
+}
+
+/* Next appointment banner */
+.medi-next-appt {
+    background: linear-gradient(135deg, rgba(13, 110, 253, 0.06), rgba(13, 202, 240, 0.06));
+    border-left: 4px solid #0d6efd;
+    border-radius: 1rem;
+}
+
+html[data-bs-theme="dark"] .medi-next-appt {
+    background: linear-gradient(135deg, rgba(13, 110, 253, 0.12), rgba(13, 202, 240, 0.08));
+}
+
+/* Booking success animation */
+.medi-booking-success {
+    animation: medi-slideUpFade 0.4s ease-out;
+}
+
+@keyframes medi-slideUpFade {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Appointment carousel scroll snap */
+.medi-cita-carousel {
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+}
+
+.medi-cita-carousel>* {
+    scroll-snap-align: start;
+}
+
+/* Mobile responsive overrides */
+@media (max-width: 575.98px) {
+
+    /* Time grid wraps instead of scrolling */
+    #medi-time-grid {
+        flex-wrap: wrap !important;
+        justify-content: center !important;
+        overflow-x: visible !important;
+    }
+
+    #medi-time-grid .time-slot-card {
+        width: 75px !important;
+        min-width: 75px !important;
+    }
+
+    /* Emergency card - stack on small screens */
+    .medi-emergency-row {
+        flex-wrap: wrap !important;
+    }
+
+    .medi-emergency-row>.col-auto {
+        flex: 0 0 50% !important;
+        max-width: 50% !important;
+        border-right: none !important;
+    }
+
+    .medi-emergency-row>.col {
+        flex: 0 0 100% !important;
+        max-width: 100% !important;
+        padding-top: 0.5rem;
+        border-top: 1px solid rgba(255, 255, 255, 0.15);
+    }
+
+    /* Appointment cards responsive width */
+    .medi-cita-card {
+        width: 240px !important;
+        min-width: 220px !important;
+        max-width: 85vw !important;
+    }
+
+    /* Service buttons stack vertically */
+    .medi-service-btns {
+        flex-direction: column !important;
+    }
+
+    /* Date selector smaller cards */
+    .medi-date-scroll .date-option {
+        min-width: 70px !important;
+        padding: 0.5rem !important;
+    }
+
+    .medi-date-scroll .date-option .fs-4 {
+        font-size: 1.1rem !important;
+    }
+
+    /* Reschedule modal date/slot cards */
+    .medi-resched-dates .date-option {
+        min-width: 65px !important;
+    }
+}
+
+/* Tablet adjustments */
+@media (min-width: 576px) and (max-width: 991.98px) {
+    .medi-cita-card {}
+}
+
+/* --- MEDI ANIMATIONS (E4) --- */
+@keyframes medi-pulse-green {
+    0% {
+        box-shadow: 0 0 0 0 rgba(25, 135, 84, 0.7);
+        transform: scale(1);
+    }
+
+    50% {
+        box-shadow: 0 0 0 10px rgba(25, 135, 84, 0);
+        transform: scale(1.02);
+    }
+
+    100% {
+        box-shadow: 0 0 0 0 rgba(25, 135, 84, 0);
+        transform: scale(1);
+    }
+}
+
+.medi-card-confirmada {
+    animation: medi-pulse-green 2s ease-out infinite;
+    border-color: #198754 !important;
+    border-width: 2px;
+}
+
+.medi-card-reject {
+    transition: all 0.5s ease;
+    opacity: 0.5;
+    transform: translateX(100px);
 }

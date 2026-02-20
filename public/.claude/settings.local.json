@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(echo:*)",
+      "Read(//c/Users/larr_/Documents/SIA-tecnm-main/**)",
+      "Bash(powershell -Command:*)",
+      "Bash(node:*)",
+      "Bash(node -e \"try { require\\(''fs''\\).readFileSync\\(''c:\\\\Users\\\\larr_\\\\Documents\\\\SIA-tecnm-main\\\\public\\\\modules\\\\foro.js'', ''utf8''\\); new Function\\(require\\(''fs''\\).readFileSync\\(''c:\\\\Users\\\\larr_\\\\Documents\\\\SIA-tecnm-main\\\\public\\\\modules\\\\foro.js'', ''utf8''\\)\\); console.log\\(''SYNTAX OK''\\); } catch\\(e\\) { console.log\\(''ERROR:'', e.message\\); }\")",
+      "Bash(wc:*)"
+    ]
+  }
+}
