@@ -345,7 +345,7 @@ const SIA_Register = (() => {
                 healthData: {
                     discapacidad: formData.discapacidad, // Array
                     condicionSalud: formData.condicionSalud,
-                    tratamientoMedico: formData.tratamientoMedico,
+                    tratamientoMédico: formData.tratamientoMédico,
                     padecimientoMental: formData.padecimientoMental,
                     padecimientoFisico: formData.padecimientoFisico,
                     sustancias: formData.sustancias,
@@ -500,7 +500,7 @@ const SIA_Register = (() => {
             apoyoPsico: getValue('reg-apoyo-psico'),
             tipoSangre: getValue('reg-sangre'),
             condicionSalud: getDisabledOrVal('reg-condicion-salud'),
-            tratamientoMedico: getDisabledOrVal('reg-tratamiento'),
+            tratamientoMédico: getDisabledOrVal('reg-tratamiento'),
             padecimientoFisico: getDisabledOrVal('reg-padecimiento-fisico'),
             padecimientoMental: getDisabledOrVal('reg-padecimiento-mental'),
             alergia: getDisabledOrVal('reg-alergia'),

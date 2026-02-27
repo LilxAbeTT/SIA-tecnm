@@ -110,6 +110,20 @@ window.DEPARTMENT_DIRECTORY = {
         allowedViews: ['view-foro'],
         targetCareers: ['ISC']
     },
+    'departamentodeculturales@loscabos.tecnm.mx': {
+        name: 'Departamento de Actividades Extraescolares',
+        role: 'department_admin',
+        permissions: { foro: 'admin' },
+        allowedViews: ['view-foro'],
+        areas: ['CULTURALES', 'DEPORTIVAS']
+    },
+    'difusion@loscabos.tecnm.mx': {
+        name: 'Departamento de Difusión',
+        role: 'department_admin',
+        permissions: { foro: 'admin', vocacional: 'admin' },
+        allowedViews: ['view-dashboard', 'view-foro', 'view-vocacional-admin'],
+        areas: ['DIFUSION']
+    },
     'divisionturismo@loscabos.tecnm.mx': {
         name: 'Fermín Hernández Mendoza',
         role: 'department_admin',
@@ -223,20 +237,17 @@ window.DEPARTMENT_DIRECTORY = {
         allowedViews: ['view-aula', 'view-foro']
     },
 
-    // ==========================================
-    // ESPECIALES: PSICOLOGÍA Y BIBLIOTECA
-    // ==========================================
     'atencionpsicopedagogica@loscabos.tecnm.mx': {
         name: 'Atención Psicopedagógica',
-        role: 'medico',
+        role: 'department_admin',
         specialty: 'psicologo',
-        permissions: { medi: 'psicologo' },
-        allowedViews: ['view-medi']
+        permissions: { medi: 'psicologo', vocacional: 'admin' },
+        allowedViews: ['view-dashboard', 'view-medi', 'view-vocacional-admin']
     },
 
     'atencionmedica@loscabos.tecnm.mx': {
         name: 'Atención Médica',
-        role: 'medico',
+        role: 'department_admin',
         specialty: 'medico',
         permissions: { medi: 'medico' },
         allowedViews: ['view-medi']
@@ -244,7 +255,7 @@ window.DEPARTMENT_DIRECTORY = {
 
     'biblioteca@loscabos.tecnm.mx': {
         name: 'Biblioteca Escolar',
-        role: 'biblio',
+        role: 'department_admin',
         permissions: { biblio: 'biblio' },
         allowedViews: ['view-biblio']
     },

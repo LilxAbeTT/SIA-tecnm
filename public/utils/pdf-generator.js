@@ -113,9 +113,144 @@ const PDFGenerator = (() => {
     // Puedes mantener tu código anterior aquí si lo deseas
   }
 
+  /**
+   * Genera el Reporte Vocacional (Ruta Académica)
+   */
+  const generateVocationalReport = async (data) => {
+    if (!_checkLibrary()) return;
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    const margin = 20;
+    const width = doc.internal.pageSize.width;
+    const height = doc.internal.pageSize.height;
+
+    // --- ENCABEZADO ---
+    doc.setFillColor(13, 110, 253); // Azul Primario SIA
+    doc.rect(0, 0, width, 40, 'F');
+
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(22);
+    doc.setFont("helvetica", "bold");
+    doc.text("Reporte de Orientación Vocacional", margin, 20);
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "normal");
+    doc.text("SIA - TECNOLÓGICO NACIONAL DE MÉXICO CAMPUS LOS CABOS", margin, 30);
+
+    // --- DATOS DEL ASPIRANTE ---
+    doc.setTextColor(50, 50, 50);
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "bold");
+    doc.text("Datos del Perfil", margin, 55);
+
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "normal");
+    const pInfo = data.personalInfo || {};
+    doc.text(`Nombre: ${pInfo.name || 'Aspirante'}`, margin, 65);
+    doc.text(`Preparatoria: ${pInfo.highSchool || 'No especificada'}`, margin, 72);
+    if (pInfo.technicalCareer) {
+      doc.text(`Especialidad Técnica: ${pInfo.technicalCareer}`, margin, 79);
+    }
+
+    // --- RESULTADOS TOP 3 ---
+    doc.setDrawColor(13, 110, 253);
+    doc.setLineWidth(0.5);
+    doc.line(margin, 90, width - margin, 90);
+
+    doc.setFontSize(16);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(13, 110, 253);
+    doc.text("Ruta Académica Sugerida", margin, 102);
+
+    const top3 = data.recommendedCareers || [];
+    let currentY = 115;
+
+    top3.forEach((c, idx) => {
+      if (idx === 0) {
+        // Top 1 Destacado
+        doc.setFillColor(240, 248, 255); // Alice blue
+        doc.roundedRect(margin, currentY - 8, width - (margin * 2), 25, 3, 3, 'F');
+        doc.setTextColor(0, 0, 0);
+        doc.setFontSize(14);
+        doc.setFont("helvetica", "bold");
+        doc.text(`1. ${c.name}`, margin + 5, currentY);
+        doc.setFontSize(11);
+        doc.setFont("helvetica", "normal");
+        doc.text(`Área: ${c.type} | Afinidad: ${c.percentage}%`, margin + 5, currentY + 7);
+        if (c.isDirectMatch) {
+          doc.setTextColor(25, 135, 84); // Success green
+          doc.setFontSize(9);
+          doc.text("✓ Coincidencia directa con tu especialidad técnica.", margin + 5, currentY + 13);
+        }
+        currentY += 35;
+      } else {
+        doc.setTextColor(60, 60, 60);
+        doc.setFontSize(12);
+        doc.setFont("helvetica", "bold");
+        doc.text(`${idx + 1}. ${c.name}`, margin, currentY);
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "normal");
+        doc.text(`Afinidad destacada: ${c.percentage}%`, margin, currentY + 6);
+        currentY += 18;
+      }
+    });
+
+    // --- FECHAS OFICIALES Y CONTACTO ---
+    currentY += 10;
+    doc.setDrawColor(200, 200, 200);
+    doc.line(margin, currentY, width - margin, currentY);
+    currentY += 15;
+
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(0, 0, 0);
+    doc.text("Próximos Pasos - Admisión 2026", margin, currentY);
+
+    currentY += 10;
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "normal");
+
+    // Cuadro de fechas
+    doc.setFillColor(248, 249, 250);
+    doc.rect(margin, currentY, width - (margin * 2), 35, 'F');
+
+    currentY += 8;
+    doc.setFont("helvetica", "bold");
+    doc.text("Entrega de Fichas:", margin + 5, currentY);
+    doc.setFont("helvetica", "normal");
+    doc.text("09 de febrero al 30 de abril", margin + 45, currentY);
+
+    currentY += 8;
+    doc.setFont("helvetica", "bold");
+    doc.text("Examen de Admisión:", margin + 5, currentY);
+    doc.setFont("helvetica", "normal");
+    doc.text("16 de mayo", margin + 45, currentY);
+
+    currentY += 8;
+    doc.setFont("helvetica", "bold");
+    doc.text("Curso Propedéutico:", margin + 5, currentY);
+    doc.setFont("helvetica", "normal");
+    doc.text("6 al 17 de julio", margin + 45, currentY);
+
+    currentY += 8;
+    doc.setFont("helvetica", "bold");
+    doc.text("Contacto:", margin + 5, currentY);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(13, 110, 253);
+    doc.text("desarrolloacademico@loscabos.tecnm.mx", margin + 45, currentY);
+
+    // --- PIE DE PÁGINA ---
+    doc.setTextColor(150, 150, 150);
+    doc.setFontSize(9);
+    doc.text("Documento orientativo generado por SIA. Este documento no asegura la admisión al instituto.", width / 2, height - 15, { align: 'center' });
+
+    doc.save(`Ruta_Academica_${pInfo.name ? pInfo.name.replace(/\s+/g, '_') : 'Aspirante'}.pdf`);
+  };
+
   // EXPORTACIÓN CRÍTICA
   return {
     generateReceta: generateProfessionalPrescription,
+    generateVocationalReport,
     generateLactarioReport: async (stats, range) => {
       if (!_checkLibrary()) return;
       const { jsPDF } = window.jspdf;
@@ -152,3 +287,5 @@ const PDFGenerator = (() => {
 })();
 
 window.PDFGenerator = PDFGenerator;
+
+// Exportaciones omitidas para compatibilidad global

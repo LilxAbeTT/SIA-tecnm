@@ -78,10 +78,10 @@ export class DevTools extends HTMLElement {
         icon: "bi-heart-pulse",
         color: "#6f42c1",
         profile: {
-          role: 'Psicologo',
-          especialidad: 'Psicologo',
-          permissions: { medi: 'admin' },
-          allowedViews: ['view-medi'],
+          role: 'department_admin',
+          specialty: 'psicologo',
+          permissions: { medi: 'psicologo', vocacional: 'admin' },
+          allowedViews: ['view-dashboard', 'view-medi', 'view-vocacional-admin'],
           displayName: "Psicólogo en Turno"
         },
         home: '/'

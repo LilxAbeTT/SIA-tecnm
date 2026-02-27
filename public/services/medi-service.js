@@ -5,8 +5,9 @@
 const MediService = (function () {
     const C_CITAS = 'citas-medi';
     const C_EXP = 'expedientes-clinicos';
-    const SLOTS_COLL = 'medi-slots';
+    const SLOTS_COLL = 'medi-slots'; // Legacy — ya no se usa para nuevas reservas
     const CONFIG_COLL = 'medi-config';
+    const MAX_CITAS_PER_SLOT = 4; // 1 agendada + 3 en cola
 
     // Default config (fallback si no hay en Firestore)
     let config = {
@@ -15,7 +16,7 @@ const MediService = (function () {
         slotStep: 30, // Visual step (Legacy) - Now we use slotDuration
         slotDuration: 60, // [NEW] Default duration in minutes (45 or 60)
         diasHabiles: [1, 2, 3, 4, 5], // Lun-Vie
-        availableMedico: true,
+        availableMédico: true,
         availablePsicologo: true
     };
 
@@ -102,7 +103,7 @@ const MediService = (function () {
     // [NEW] Strict Resolution for Booking (Matricula + Shift Profile)
     async function resolveProfessionalForBooking(ctx, tipo, date) {
         let targetMatricula = '';
-        if (tipo === 'Medico') targetMatricula = 'atencionmedica';
+        if (tipo === 'Médico') targetMatricula = 'atencionmedica';
         else if (tipo === 'Psicologo') targetMatricula = 'atencionpsicopedagogica';
         else return null;
 
@@ -121,7 +122,7 @@ const MediService = (function () {
             // Base Result (Account Owner)
             let result = {
                 id: mainUid,
-                displayName: mainUserData.displayName || (tipo === 'Medico' ? 'Atención Médica' : 'Atención Psicopedagógica'),
+                displayName: mainUserData.displayName || (tipo === 'Médico' ? 'Atención Médica' : 'Atención Psicopedagógica'),
                 email: mainUserData.email,
                 profileId: null
             };
@@ -189,108 +190,144 @@ const MediService = (function () {
         }
     }
 
+    // [REFACTORED] getOccupiedSlots — ahora devuelve info de cola por slot
+    // Retorna: { occupiedSlots: string[], slotCounts: { [slotId]: number } }
+    // Un slot está BLOQUEADO (ocupado) si tiene >= MAX_CITAS_PER_SLOT citas activas
+    // Un slot está EN COLA si tiene >= 1 pero < MAX_CITAS_PER_SLOT citas activas
     async function getOccupiedSlots(ctx, date, tipo) {
-        // Range for the whole day
         const start = new Date(date); start.setHours(0, 0, 0, 0);
         const end = new Date(date); end.setHours(23, 59, 59, 999);
 
         let query = ctx.db.collection(C_CITAS)
             .where('fechaHoraSlot', '>=', firebase.firestore.Timestamp.fromDate(start))
             .where('fechaHoraSlot', '<=', firebase.firestore.Timestamp.fromDate(end))
-            .where('estado', 'in', ['pendiente', 'confirmada']); // Only active
+            .where('estado', 'in', ['pendiente', 'confirmada']);
 
-        // [NEW] Filter by Type if provided
         if (tipo) {
             query = query.where('tipoServicio', '==', tipo);
         }
 
         const q = await query.get();
 
-        // [NEW] Normalize IDs:
-        // If we find a legacy ID (no suffix) that belongs to this Type, we treat it as if it had the suffix.
-        // This ensures old appointments block the correct schedule.
-        return q.docs.map(d => {
+        // Contar citas por slotId normalizado
+        const slotCounts = {};
+        const occupiedSlots = [];
+
+        q.docs.forEach(d => {
             const data = d.data();
-            const sid = data.slotId;
-            if (!sid) return null;
+            let sid = data.slotId;
+            if (!sid) return;
 
-            // Check if legacy (no underscores after time part, or simple heuristic)
-            // Format: YYYY-MM-DD_HH:MM
-            // New Format: YYYY-MM-DD_HH:MM_Type
-
-            // If it already has the suffix matching the type, return it.
-            if (tipo && sid.endsWith(`_${tipo}`)) return sid;
-
-            // If it has NO suffix (Legacy) AND matches the requested type in data, 
-            // return it AS IF it had the suffix (so UI marks it occupied).
-            if (tipo && !sid.includes('_Medico') && !sid.includes('_Psicologo')) {
-                // It's a legacy ID. Since we filtered by Type, this Appointment belongs to 'tipo'.
-                // So we upgrade its ID for the UI check.
-                return `${sid}_${tipo}`;
+            // Normalizar IDs legacy
+            if (tipo && !sid.endsWith(`_${tipo}`) && !sid.includes('_Médico') && !sid.includes('_Psicologo')) {
+                sid = `${sid}_${tipo}`;
+            } else if (tipo && sid.endsWith(`_${tipo}`)) {
+                // ya tiene el sufijo correcto
             }
 
-            return sid;
-        }).filter(Boolean);
+            slotCounts[sid] = (slotCounts[sid] || 0) + 1;
+        });
+
+        // Slots bloqueados = los que ya tienen MAX_CITAS_PER_SLOT o más
+        Object.entries(slotCounts).forEach(([sid, count]) => {
+            if (count >= MAX_CITAS_PER_SLOT) {
+                occupiedSlots.push(sid);
+            }
+        });
+
+        // Para compatibilidad con UI existente, retornamos los occupiedSlots como array
+        // PERO también adjuntamos slotCounts para que la UI pueda mostrar info de cola
+        const result = occupiedSlots;
+        result._slotCounts = slotCounts; // Meta-data adjunta al array
+        return result;
     }
 
+    // [REFACTORED] reservarCita — Sistema de Cola (sin slot-locking)
+    // Primera cita a un horario → confirmada (auto-agendada)
+    // Siguientes → pendiente (cola de espera)
+    // Máximo MAX_CITAS_PER_SLOT por horario
     async function reservarCita(ctx, { user, date, slotId, tipo, motivo, replaceCitaId, profesionalId, profesionalName, profesionalProfileId }) {
-        // Matutino: 8:00 - 14:59 (< 15). Vespertino: 15:00 - 21:00 (>= 15).
         const h = date.getHours();
         const computedShift = h < 15 ? 'Matutino' : 'Vespertino';
 
-        console.log(`[MediService] Reservando cita para ${user.email} con ${profesionalName || 'General'} (${tipo})`);
+        console.log(`[MediService] Reservando cita para ${user.email} (${tipo}) — Sistema de Cola`);
 
-        return ctx.db.runTransaction(async tx => {
-            // 1. READS FIRST (Rule: All reads before any write)
+        // 1. Contar citas activas a esa hora+tipo (fuera de transacción para evitar conflictos de índice)
+        const slotStart = new Date(date);
+        slotStart.setSeconds(0, 0);
+        const slotEnd = new Date(slotStart.getTime() + 60000); // +1 min para rango exacto
 
-            // A. Check New Slot Availability
-            const slotRef = ctx.db.collection(SLOTS_COLL).doc(slotId);
-            const snap = await tx.get(slotRef);
-            if (snap.exists) throw new Error('Este horario ya no está disponible.');
+        const existingQuery = await ctx.db.collection(C_CITAS)
+            .where('fechaHoraSlot', '>=', firebase.firestore.Timestamp.fromDate(slotStart))
+            .where('fechaHoraSlot', '<', firebase.firestore.Timestamp.fromDate(slotEnd))
+            .where('estado', 'in', ['pendiente', 'confirmada'])
+            .where('tipoServicio', '==', tipo)
+            .get();
 
-            // B. If replacing...
-            let oldRef = null;
-            let oldData = null;
-            if (replaceCitaId) {
-                oldRef = ctx.db.collection(C_CITAS).doc(replaceCitaId);
-                const oldSnap = await tx.get(oldRef);
-                if (oldSnap.exists) oldData = oldSnap.data();
-            }
+        const totalActivas = existingQuery.size;
 
-            // 2. WRITES
-            tx.set(slotRef, { holder: user.uid, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+        // 2. Verificar límite
+        if (totalActivas >= MAX_CITAS_PER_SLOT) {
+            throw new Error('Este horario ya alcanzó el límite de reservas. Por favor selecciona otro horario.');
+        }
 
-            if (oldRef && oldData) {
-                if (oldData.slotId) {
-                    const oldSlotRef = ctx.db.collection(SLOTS_COLL).doc(oldData.slotId);
-                    tx.delete(oldSlotRef);
-                }
-                tx.update(oldRef, {
+        // 3. ¿Hay una confirmada a esa hora? Si no, esta será la auto-agendada
+        const hasConfirmed = existingQuery.docs.some(d => d.data().estado === 'confirmada');
+        const isAutoAgendada = !hasConfirmed;
+        const queuePosition = isAutoAgendada ? 0 : totalActivas; // 0 = agendada, 1-3 = cola
+
+        // 4. Resolver profesional si se va a auto-agendar
+        let resolvedProfesional = null;
+        if (isAutoAgendada) {
+            resolvedProfesional = await resolveProfessionalForBooking(ctx, tipo, date);
+        }
+
+        // 5. Si reemplaza una cita anterior, cancelarla
+        if (replaceCitaId) {
+            const oldRef = ctx.db.collection(C_CITAS).doc(replaceCitaId);
+            const oldSnap = await oldRef.get();
+            if (oldSnap.exists) {
+                await oldRef.update({
                     estado: 'cancelada',
-                    motivoCancelacion: 'Re-agendada por usuario (Upgrade)',
+                    motivoCancelacion: 'Re-agendada por usuario',
                     fechaCancelacion: firebase.firestore.FieldValue.serverTimestamp()
                 });
             }
+        }
 
-            const ref = ctx.db.collection(C_CITAS).doc();
-            const citaData = {
-                studentId: user.uid,
-                studentEmail: user.email,
-                studentName: user.displayName || user.email,
-                fechaSolicitud: firebase.firestore.FieldValue.serverTimestamp(),
-                fechaHoraSlot: firebase.firestore.Timestamp.fromDate(date),
-                slotId: slotId,
-                tipoServicio: tipo,
-                motivo: motivo,
-                shift: computedShift,
-                estado: 'pendiente',
-                profesionalId: profesionalId || null,
-                profesionalName: profesionalName || null,
-                profesionalProfileId: profesionalProfileId || null
-            };
-            tx.set(ref, citaData);
-            return ref.id; // Return ID for reference
-        });
+        // 6. Crear la nueva cita
+        const ref = ctx.db.collection(C_CITAS).doc();
+        const citaData = {
+            studentId: user.uid,
+            studentEmail: user.email,
+            studentName: user.displayName || user.email,
+            fechaSolicitud: firebase.firestore.FieldValue.serverTimestamp(),
+            fechaHoraSlot: firebase.firestore.Timestamp.fromDate(date),
+            slotId: slotId,
+            tipoServicio: tipo,
+            motivo: motivo,
+            shift: computedShift,
+            profesionalShift: computedShift, // Added for dashboard filtering
+            estado: isAutoAgendada ? 'confirmada' : 'pendiente',
+            autoAgendada: isAutoAgendada,
+            queuePosition: queuePosition,
+            profesionalId: isAutoAgendada && resolvedProfesional ? resolvedProfesional.id : (profesionalId || null),
+            profesionalName: isAutoAgendada && resolvedProfesional ? resolvedProfesional.displayName : (profesionalName || null),
+            profesionalProfileId: isAutoAgendada && resolvedProfesional ? resolvedProfesional.profileId : (profesionalProfileId || null)
+        };
+
+        await ref.set(citaData);
+
+        // 7. Notificar
+        if (isAutoAgendada && window.Notify) {
+            Notify.send(user.uid, {
+                title: 'Cita Agendada Automáticamente',
+                message: `Tu cita ha sido agendada con ${resolvedProfesional ? resolvedProfesional.displayName : 'un especialista'}.`,
+                type: 'medi', link: '/medi'
+            });
+        }
+
+        return { citaId: ref.id, isQueued: !isAutoAgendada, queuePosition: queuePosition };
     }
 
     // [REMOVED] Legacy reservarCitaAdmin without profileData — see refactored version at line ~637
@@ -329,15 +366,23 @@ const MediService = (function () {
         if (!snap.exists) return;
         const data = snap.data();
 
+        // Legacy: limpiar slot si existe
         if (data.slotId) {
             await ctx.db.collection(SLOTS_COLL).doc(data.slotId).delete().catch(() => { });
         }
 
-        return ref.update({
+        const wasConfirmed = data.estado === 'confirmada';
+
+        await ref.update({
             estado: 'cancelada',
             motivoCancelacion: motivo || "Cancelada por el estudiante",
             fechaCancelacion: firebase.firestore.FieldValue.serverTimestamp()
         });
+
+        // [NEW] Si la cita cancelada era confirmada (agendada), promover la siguiente en cola
+        if (wasConfirmed && data.fechaHoraSlot && data.tipoServicio) {
+            await promoteNextInQueue(ctx, data.fechaHoraSlot, data.tipoServicio);
+        }
     }
 
     function streamStudentHistory(ctx, uid, callback) {
@@ -439,6 +484,147 @@ const MediService = (function () {
 
     // [REMOVED] Old tomarPaciente (5 params, no profileData) — replaced by refactored version below
 
+    // ============================================
+    // [NEW] SISTEMA DE COLA — Promoción y consulta
+    // ============================================
+
+    // Promueve automáticamente la siguiente cita pendiente (más antigua) en cola para un horario
+    async function promoteNextInQueue(ctx, fechaHoraSlot, tipoServicio) {
+        try {
+            // Buscar la cita pendiente más antigua para ese horario+tipo
+            const tsDate = safeDate(fechaHoraSlot);
+            if (!tsDate) return null;
+
+            const slotStart = new Date(tsDate);
+            slotStart.setSeconds(0, 0);
+            const slotEnd = new Date(slotStart.getTime() + 60000);
+
+            const q = await ctx.db.collection(C_CITAS)
+                .where('fechaHoraSlot', '>=', firebase.firestore.Timestamp.fromDate(slotStart))
+                .where('fechaHoraSlot', '<', firebase.firestore.Timestamp.fromDate(slotEnd))
+                .where('estado', '==', 'pendiente')
+                .where('tipoServicio', '==', tipoServicio)
+                .get();
+
+            if (q.empty) {
+                console.log('[MediService] No hay citas en cola para promover.');
+                return null;
+            }
+
+            // Ordenar por fechaSolicitud (más antigua primero)
+            const sorted = q.docs.map(d => ({ id: d.id, ...d.data(), _safeReq: safeDate(d.data().fechaSolicitud) }))
+                .sort((a, b) => (a._safeReq || 0) - (b._safeReq || 0));
+
+            const nextInLine = sorted[0];
+            const nextRef = ctx.db.collection(C_CITAS).doc(nextInLine.id);
+
+            // Resolver profesional para asignar
+            const profesional = await resolveProfessionalForBooking(ctx, tipoServicio, tsDate);
+
+            const updateData = {
+                estado: 'confirmada',
+                autoAgendada: true,
+                queuePosition: 0,
+                promovidaDeCola: true
+            };
+
+            if (profesional) {
+                updateData.profesionalId = profesional.id;
+                updateData.profesionalName = profesional.displayName;
+                updateData.profesionalProfileId = profesional.profileId || null;
+            }
+
+            await nextRef.update(updateData);
+
+            // Notificar al estudiante promovido
+            if (window.Notify) {
+                Notify.send(nextInLine.studentId, {
+                    title: '¡Tu cita ha sido agendada!',
+                    message: `Se ha liberado un espacio y tu cita ha sido agendada automáticamente${profesional ? ' con ' + profesional.displayName : ''}.`,
+                    type: 'medi', link: '/medi'
+                });
+            }
+
+            console.log(`[MediService] Cita ${nextInLine.id} promovida a confirmada (auto-promoción de cola).`);
+            return nextInLine.id;
+
+        } catch (e) {
+            console.error('[MediService] Error promoviendo cita de cola:', e);
+            return null;
+        }
+    }
+
+    // Obtener las citas en cola para un horario específico (para selección manual del admin)
+    async function getQueueForSlot(ctx, fechaHoraSlot, tipoServicio) {
+        try {
+            const tsDate = safeDate(fechaHoraSlot);
+            if (!tsDate) return [];
+
+            const slotStart = new Date(tsDate);
+            slotStart.setSeconds(0, 0);
+            const slotEnd = new Date(slotStart.getTime() + 60000);
+
+            const q = await ctx.db.collection(C_CITAS)
+                .where('fechaHoraSlot', '>=', firebase.firestore.Timestamp.fromDate(slotStart))
+                .where('fechaHoraSlot', '<', firebase.firestore.Timestamp.fromDate(slotEnd))
+                .where('estado', '==', 'pendiente')
+                .where('tipoServicio', '==', tipoServicio)
+                .get();
+
+            return q.docs.map(d => ({
+                id: d.id,
+                ...d.data(),
+                safeDate: safeDate(d.data().fechaHoraSlot),
+                _safeReq: safeDate(d.data().fechaSolicitud)
+            })).sort((a, b) => (a._safeReq || 0) - (b._safeReq || 0));
+        } catch (e) {
+            console.error('[MediService] Error obteniendo cola:', e);
+            return [];
+        }
+    }
+
+    // Promover una cita ESPECÍFICA (seleccionada por el admin) de la cola a la agenda
+    async function promoteSpecificFromQueue(ctx, citaId, tipoServicio, fechaHoraSlot) {
+        try {
+            const ref = ctx.db.collection(C_CITAS).doc(citaId);
+            const snap = await ref.get();
+            if (!snap.exists) throw new Error('Cita no encontrada');
+            const data = snap.data();
+            if (data.estado !== 'pendiente') throw new Error('Esta cita ya no está en espera');
+
+            const tsDate = safeDate(fechaHoraSlot || data.fechaHoraSlot);
+            const profesional = await resolveProfessionalForBooking(ctx, tipoServicio || data.tipoServicio, tsDate);
+
+            const updateData = {
+                estado: 'confirmada',
+                autoAgendada: false,
+                queuePosition: 0,
+                promovidaDeCola: true
+            };
+
+            if (profesional) {
+                updateData.profesionalId = profesional.id;
+                updateData.profesionalName = profesional.displayName;
+                updateData.profesionalProfileId = profesional.profileId || null;
+            }
+
+            await ref.update(updateData);
+
+            if (window.Notify) {
+                Notify.send(data.studentId, {
+                    title: '¡Tu cita ha sido agendada!',
+                    message: `El profesional ha seleccionado tu cita de la sala de espera${profesional ? ' con ' + profesional.displayName : ''}.`,
+                    type: 'medi', link: '/medi'
+                });
+            }
+
+            return data;
+        } catch (e) {
+            console.error('[MediService] Error promoviendo cita específica:', e);
+            throw e;
+        }
+    }
+
     // NUEVO: Rechazar cita (Eliminación lógica con motivo)
     async function rechazarCita(ctx, citaId, motivo) {
         const ref = ctx.db.collection(C_CITAS).doc(citaId);
@@ -465,24 +651,23 @@ const MediService = (function () {
         });
     }
 
-    // MODIFICADO: Cancelar (Devolver a sala) con bandera de re-entrada
+    // [REFACTORED] Cancelar cita admin con soporte de promoción de cola
     async function cancelarCitaAdmin(ctx, citaId, motivo, returnToQueue = false) {
         const ref = ctx.db.collection(C_CITAS).doc(citaId);
-        const snap = await ref.get(); // Necesitamos el studentId
+        const snap = await ref.get();
+        if (!snap.exists) return;
+        const citaData = snap.data();
 
         const updateData = returnToQueue
             ? {
                 estado: 'pendiente',
                 profesionalId: null,
                 profesionalEmail: null,
-                reentrada: true, // Bandera para la UI
-                ultimoMotivo: motivo,
-                shift: returnToQueue // Si se pasa shift como 4to arg (hacky pero efectivo si cambiamos firma) o usamos un objeto opciones
+                reentrada: true,
+                ultimoMotivo: motivo
             }
             : { estado: 'cancelada', motivoCancelacion: motivo };
 
-        // FIX: returnToQueue ahora puede ser booleano O un string de turno.
-        // Ajustamos la lógica para soportar ambos casos.
         if (typeof returnToQueue === 'string') {
             updateData.shift = returnToQueue;
             updateData.estado = 'pendiente';
@@ -490,42 +675,35 @@ const MediService = (function () {
             updateData.profesionalEmail = null;
             updateData.reentrada = true;
             updateData.ultimoMotivo = motivo;
-            // Removemos 'shift' del chequeo ternario anterior para evitar errores
         } else if (returnToQueue === true) {
-            // Keep calculated updateData
-            delete updateData.shift; // No shift update if just true
+            delete updateData.shift;
         }
 
-        // [FIX] Liberar Slot si se cancela (no si se devuelve a fila)
+        // Legacy: liberar slot si se cancela definitivamente
         if (!returnToQueue) {
-            if (snap.exists && snap.data().slotId) {
-                const slotId = snap.data().slotId;
-                // Usamos SLOTS_COLL del closure (definido arriba como 'medi-slots')
-                // Como estamos dentro del modulo, tenemos acceso a SLOTS_COLL??
-                // Si, SLOTS_COLL esta en linea 8.
-                await ctx.db.collection(SLOTS_COLL).doc(slotId).delete().catch(err => console.warn("Error liberando slot:", err));
+            if (citaData.slotId) {
+                await ctx.db.collection(SLOTS_COLL).doc(citaData.slotId).delete().catch(err => console.warn("Error liberando slot:", err));
             }
         }
 
-        // 🔔 NOTIFICAR AL ESTUDIANTE
-
-        // 🔔 NOTIFICAR AL ESTUDIANTE
-        if (snap.exists) {
-            const data = snap.data();
+        // 🔔 Notificar al estudiante
+        if (window.Notify) {
             const msg = returnToQueue
                 ? `Tu cita ha sido devuelta a la fila de espera. Motivo: ${motivo}`
                 : `Tu cita ha sido cancelada. Motivo: ${motivo}`;
-
-            if (window.Notify) {
-                Notify.send(data.studentId, {
-                    title: returnToQueue ? 'Cita Re-programada' : 'Cita Cancelada',
-                    message: msg,
-                    type: 'medi'
-                });
-            }
+            Notify.send(citaData.studentId, {
+                title: returnToQueue ? 'Cita Re-programada' : 'Cita Cancelada',
+                message: msg,
+                type: 'medi'
+            });
         }
 
-        return ref.update(updateData);
+        await ref.update(updateData);
+
+        // [NEW] Si se cancela definitivamente una cita confirmada, promover siguiente en cola
+        if (!returnToQueue && citaData.estado === 'confirmada' && citaData.fechaHoraSlot && citaData.tipoServicio) {
+            await promoteNextInQueue(ctx, citaData.fechaHoraSlot, citaData.tipoServicio);
+        }
     }
 
     // [FIX] Clean pass-through to refactored version — now forwards profileId (6th arg)
@@ -648,7 +826,7 @@ const MediService = (function () {
         const end = new Date(isoDate + 'T23:59:59');
 
         // Query Citas Confirmadas
-        // Note: Ideally we filter by Role (Medico/Psicologo) if they share the same schedule/slots?
+        // Note: Ideally we filter by Role (Médico/Psicologo) if they share the same schedule/slots?
         // Or if they have different rooms.
         // Assuming shared slots for simplicity or filter by tipoServicio if needed.
         // For now, let's assume if ANYONE booked it, it's busy (Single Resource Model).
@@ -788,12 +966,13 @@ const MediService = (function () {
                 // If we have a profile ID, show appointments for this profile OR legacy appointments for this shift
                 docs = docs.filter(d => {
                     if (d.profesionalProfileId) return d.profesionalProfileId === profileId;
-                    if (shiftTag && d.profesionalShift) return d.profesionalShift === shiftTag;
+                    const shiftToCheck = d.profesionalShift || d.shift;
+                    if (shiftTag && shiftToCheck) return shiftToCheck === shiftTag;
                     return false;
                 });
             } else if (shiftTag) {
                 // Legacy strict shift filter
-                docs = docs.filter(d => d.profesionalShift === shiftTag);
+                docs = docs.filter(d => (d.profesionalShift || d.shift) === shiftTag);
             }
 
             docs.sort((a, b) => (a.safeDate || 0) - (b.safeDate || 0));
@@ -806,10 +985,10 @@ const MediService = (function () {
         let docs = [];
 
         // 1. LEGACY: Colección Plana 'expedientes-clinicos'
-        if (role === 'Medico') {
+        if (role === 'Médico') {
             const legacyMedSnap = await ctx.db.collection(C_EXP)
                 .where('studentId', '==', studentId)
-                .where('tipoServicio', '==', 'Medico')
+                .where('tipoServicio', '==', 'Médico')
                 .get();
             legacyMedSnap.forEach(d => docs.push({ id: d.id, ...d.data(), safeDate: safeDate(d.data().createdAt), source: 'legacy' }));
         }
@@ -840,8 +1019,8 @@ const MediService = (function () {
             const consultasRef = ctx.db.collection(C_EXP).doc(studentId).collection('consultas');
             let newQuery = consultasRef;
 
-            if (role === 'Medico') {
-                newQuery = newQuery.where('tipoServicio', '==', 'Medico');
+            if (role === 'Médico') {
+                newQuery = newQuery.where('tipoServicio', '==', 'Médico');
             } else if (role === 'Psicologo') {
                 // Remove strict autorId filter to allow seeing history from same department (maybe?)
                 // Or keep it strict. If strict, profiles are under same UID, so it works.
@@ -938,7 +1117,7 @@ const MediService = (function () {
                 // Strict Profile Filtering
                 q = q.where('profesionalProfileId', '==', profileId);
             } else {
-                // Legacy / General User Filtering (Medico)
+                // Legacy / General User Filtering (Médico)
                 // STRICT: Must match autorId to the current user
                 const effectiveUid = uid || (ctx.auth.currentUser ? ctx.auth.currentUser.uid : null);
 
@@ -1204,6 +1383,11 @@ const MediService = (function () {
         streamRecentConsultations,
         buscarPaciente,
         getDayStats, getFollowUps, getStudentFollowUps,
+
+        // Sistema de Cola (Nuevo)
+        promoteNextInQueue,
+        getQueueForSlot,
+        promoteSpecificFromQueue,
 
         // Shift Profile Management (Newly Added)
         getShiftProfile,

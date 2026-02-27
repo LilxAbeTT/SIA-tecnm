@@ -324,6 +324,32 @@ function isEncuestasAdmin() {
       allow create, update, delete: if isAvisosAdmin() || isSuperAdmin();
     }
     
+    // ==== TEST VOCACIONAL (DIFUSIÓN) ====
+    function isDifusionAdmin() {
+        let data = userDoc(request.auth.uid).data;
+        let perm = data.get('permissions', {});
+        return isSignedIn() && (
+            (data.role == 'department_admin' && perm.get('vocacional', '') == 'admin') || 
+            request.auth.token.email == 'difusion@loscabos.tecnm.mx' ||
+            isSuperAdmin()
+        );
+    }
+
+    match /aspirantes-registros/{aspiranteId} {
+        // Cualquiera puede crear un perfil temporal
+        allow create: if true;
+        // Solo el aspirante que conoce su ID exacto (guardado en LocalStorage) puede leer/actualizar su propio documento.
+        // No permitimos un "list" (getDocs) público para evitar que alguien descargue toda la base.
+        // El admin de difusión sí puede hacer todo.
+        allow get, update: if true; 
+        allow list, delete: if isDifusionAdmin();
+    }
+
+    match /vocacional_config/{docId} {
+        allow read: if true;
+        allow write: if isDifusionAdmin() || isSuperAdmin();
+    }
+
     // [NEW] Shift Profiles for Medi
     match /medi-shift-profiles/{id} {
       allow read: if isSignedIn();

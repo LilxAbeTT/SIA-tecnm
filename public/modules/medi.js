@@ -200,363 +200,359 @@ var Medi = (function () {
 
     container.innerHTML = `
     <style>
-      #medi-citas-tabs .nav-link {
-        color: #6c757d;
-        border-bottom: 3px solid transparent;
-        border-radius: 0;
-        transition: all 0.2s ease;
-      }
-      #medi-citas-tabs .nav-link:hover {
-        color: #0d6efd;
-        background: rgba(13, 202, 240, 0.05);
-      }
-      #medi-citas-tabs .nav-link.active {
-        color: #0d6efd !important;
-        border-bottom-color: #0d6efd;
-        background: transparent !important;
+      /* === MEDI STUDENT APP — Mobile First === */
+      #medi-student-app { --medi: #0d6efd; --medi-teal: #0dcaf0; --medi-purple: #6f42c1; --medi-surface: #f8fafb; --medi-text: #1e293b; }
+      #medi-student-app .nav-pills .nav-link.active { background-color: var(--medi) !important; color: #fff !important; font-weight: 700; }
+      #medi-student-app .nav-pills .nav-link { color: #64748b; transition: all 0.2s; font-size: 0.85rem; }
+      #medi-student-app .medi-card-stripe-success { border-left: 4px solid #198754; }
+      #medi-student-app .medi-card-stripe-warning { border-left: 4px solid #f59e0b; }
+      #medi-student-app .medi-card-stripe-danger  { border-left: 4px solid #dc3545; }
+      #medi-student-app .medi-card-stripe-info    { border-left: 4px solid var(--medi-teal); }
+      #medi-student-app .medi-card-stripe-purple  { border-left: 4px solid var(--medi-purple); }
+      #medi-student-app .medi-card-stripe-secondary { border-left: 4px solid #6c757d; }
+      @keyframes medi-queue-pulse { 0%,100%{box-shadow:0 0 0 0 rgba(255,193,7,0.4);} 50%{box-shadow:0 0 0 8px rgba(255,193,7,0);} }
+      .medi-queue-live { animation: medi-queue-pulse 2s ease-in-out infinite; }
+      #medi-student-app .medi-quick-card { transition: transform 0.15s, box-shadow 0.15s; cursor: pointer; }
+      #medi-student-app .medi-quick-card:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,0.08) !important; }
+      #medi-citas-tabs .nav-link { color: #6c757d; border-bottom: 3px solid transparent; border-radius: 0; transition: all 0.2s ease; }
+      #medi-citas-tabs .nav-link:hover { color: #0d6efd; background: rgba(13,202,240,0.05); }
+      #medi-citas-tabs .nav-link.active { color: #0d6efd !important; border-bottom-color: #0d6efd; background: transparent !important; }
+      @media (max-width: 768px) {
+        #medi-student-app .medi-hero { padding: 1.25rem !important; }
+        #medi-student-app .medi-hero h2 { font-size: 1.3rem; }
+        #medi-student-app .medi-hero-icon { display: none !important; }
+        #medi-student-app .nav-pills .nav-link { font-size: 0.72rem; padding: 0.35rem 0.5rem; }
       }
     </style>
     <section id="medi-student" class="d-none">
-      <div class="row g-4">
-        <!-- MAIN COLUMN (Left/Top on Mobile) -->
-        <div class="col-lg-8">
-          
-          <!-- 1. HEADER BANNER -->
-          <div class="card border-0 shadow-sm rounded-4 mb-3 overflow-hidden text-white"
-            style="background: linear-gradient(135deg, #0dcaf0 0%, #0d6efd 100%);">
-            <div class="card-body p-4 position-relative">
-              <div class="d-flex justify-content-between align-items-center position-relative z-1">
-                <div>
-                  <h2 class="fw-bold mb-1">Servicio Médico</h2>
-                  <p class="mb-0 opacity-75">Tu salud es lo más importante.</p>
-                </div>
-                <i class="bi bi-heart-pulse-fill display-1 opacity-25 position-absolute end-0 top-50 translate-middle-y me-3"></i>
+      <div id="medi-student-app">
+
+        <!-- HERO BANNER -->
+        <div id="medi-hero" class="medi-hero shadow-sm mb-3" style="background: linear-gradient(135deg, #1B396A 0%, #0d6efd 60%, #0dcaf0 100%); border-radius: 1rem; padding: 1.5rem; position: relative; overflow: hidden;">
+          <div class="position-relative z-1">
+            <div class="d-flex justify-content-between align-items-start mb-2">
+              <span class="badge bg-white text-dark mb-2 fw-bold shadow-sm" style="font-size: 0.7rem; color: #0d6efd !important;">
+                <i class="bi bi-heart-pulse-fill me-1"></i>Servicio Medico ITES
+              </span>
+              <button class="btn btn-sm bg-opacity-25 text-white border-0 rounded-pill px-3" id="medi-tutorial-btn" onclick="Medi.launchMediTutorial()" title="Ver tutorial">
+                <i class="bi bi-play-circle me-1"></i>Tutorial
+              </button>
+            </div>
+            <h2 class="fw-bold mb-1 text-white" id="medi-hero-greeting" style="font-size: 1.5rem;">Servicio Medico</h2>
+            <p class="small mb-2 text-white" id="medi-hero-subtitle" style="max-width: 70%; opacity: 0.85;">Tu salud es lo mas importante.</p>
+            <div id="medi-hero-next-badge" class="d-none"></div>
+          </div>
+          <i class="bi bi-heart-pulse-fill medi-hero-icon position-absolute end-0 top-50 translate-middle-y me-3 text-white" style="font-size: 6rem; opacity: 0.08;"></i>
+        </div>
+
+        <!-- EMERGENCY COMPACT CHIP -->
+        <div id="medi-emergency-chip" class="alert alert-danger border-0 shadow-sm rounded-4 mb-3 p-2 px-3">
+          <div class="d-flex align-items-center justify-content-between">
+            <div class="d-flex align-items-center gap-3 overflow-hidden flex-grow-1">
+              <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                <i class="bi bi-droplet-fill" style="font-size:0.9rem;"></i>
+                <span class="fw-bolder" id="view-sangre" style="font-size:1.1rem;">--</span>
+              </div>
+              <div class="vr opacity-25" style="height:24px;"></div>
+              <div class="text-truncate" style="min-width:0;">
+                <div class="fw-bold" style="font-size:0.6rem; letter-spacing:0.5px; opacity:0.8;">ALERGIAS</div>
+                <div class="fw-bold text-truncate" id="view-alergias" style="font-size:0.75rem;">Ninguna</div>
+              </div>
+              <div class="vr opacity-25 d-none d-sm-block" style="height:24px;"></div>
+              <div class="text-truncate d-none d-sm-block" style="min-width:0;">
+                <div class="fw-bold" style="font-size:0.6rem; letter-spacing:0.5px; opacity:0.8;">CONTACTO</div>
+                <div class="fw-bold text-truncate" id="view-contacto-nombre" style="font-size:0.75rem;">--</div>
+                <span class="font-monospace d-none" id="view-contacto-tel">--</span>
               </div>
             </div>
+            <button type="button" class="btn btn-sm btn-outline-light rounded-pill border-white border-opacity-50 flex-shrink-0 ms-2"
+                    style="font-size: 0.7rem; padding: 0.15rem 0.6rem;"
+                    data-bs-toggle="modal" data-bs-target="#modalMediEditCard">
+              <i class="bi bi-pencil me-1"></i>Editar
+            </button>
           </div>
+        </div>
 
-          <!-- 2. EMERGENCY DATA (Moved here, Compacted) -->
-          <div class="card border-0 shadow-sm rounded-4 mb-3 shadow-lg" 
-               style="background-color: #dc3545 !important; color: #ffffff !important;">
-             <div class="card-header border-0 bg-transparent py-2 d-flex justify-content-between align-items-center">
-                <h6 class="fw-bold mb-0" style="color: #ffffff !important; font-size: 0.9rem;">
-                    <i class="bi bi-file-medical-fill me-2"></i>Datos de Emergencia
+        <!-- NAV PILLS (4 tabs) -->
+        <ul class="nav nav-pills nav-fill p-1 rounded-pill shadow-sm mb-4" id="medi-student-tabs" role="tablist" style="background: var(--medi-surface);">
+          <li class="nav-item" role="presentation">
+            <button class="nav-link active rounded-pill" data-bs-toggle="pill" data-bs-target="#medi-tab-inicio" type="button" role="tab">
+              <i class="bi bi-house me-1"></i>Inicio
+            </button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button class="nav-link rounded-pill" data-bs-toggle="pill" data-bs-target="#medi-tab-agendar" type="button" role="tab">
+              <i class="bi bi-calendar-plus me-1"></i>Agendar
+            </button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button class="nav-link rounded-pill" data-bs-toggle="pill" data-bs-target="#medi-tab-citas" type="button" role="tab">
+              <i class="bi bi-calendar-week me-1"></i>Citas
+            </button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button class="nav-link rounded-pill" data-bs-toggle="pill" data-bs-target="#medi-tab-historial" type="button" role="tab">
+              <i class="bi bi-clock-history me-1"></i>Historial
+            </button>
+          </li>
+        </ul>
+
+        <!-- TAB CONTENT -->
+        <div class="tab-content">
+
+          <!-- TAB 1: INICIO -->
+          <div class="tab-pane fade show active" id="medi-tab-inicio" role="tabpanel">
+            <!-- Follow-up Banner -->
+            <div id="medi-followup-banner" class="d-none mb-3"></div>
+            <!-- Next Appointment -->
+            <div id="medi-next-appointment" class="d-none mb-3"></div>
+            <!-- Queue Card -->
+            <div id="medi-queue-card" class="d-none mb-3"></div>
+            <!-- Quick Actions -->
+            <div id="medi-quick-actions" class="row g-2 mb-4"></div>
+            <!-- Wellness Tips -->
+            <div class="card border-0 shadow-sm rounded-4">
+              <div class="card-body p-3">
+                <h6 class="fw-bold mb-3 small" style="color: var(--medi);">
+                  <i class="bi bi-lightbulb me-2 text-warning"></i>Tips de Salud
                 </h6>
-                <button type="button" class="btn btn-xs btn-outline-light rounded-pill border-white border-opacity-50" 
-                        style="font-size: 0.7rem; padding: 0.1rem 0.5rem; color: #ffffff !important;"
-                        data-bs-toggle="modal" data-bs-target="#modalMediEditCard">
-                   Editar
-                </button>
-             </div>
-             <div class="card-body pt-0 pb-3">
-                <div class="row g-2 align-items-center medi-emergency-row">
-                   <div class="col-auto border-end border-white border-opacity-25 pe-3">
-                      <div class="fw-bold" style="font-size:0.6rem; letter-spacing: 0.5px; opacity: 0.8 !important;">TIPO SANGRE</div>
-                      <div class="fw-bolder fs-5" id="view-sangre" style="color: #ffffff !important;">--</div>
-                   </div>
-                   <div class="col-auto border-end border-white border-opacity-25 pe-3">
-                      <div class="fw-bold" style="font-size:0.6rem; letter-spacing: 0.5px; opacity: 0.8 !important;">ALERGIAS</div>
-                      <div class="fw-bold text-truncate small" id="view-alergias" style="color: #ffffff !important; max-width: 150px;">Ninguna</div>
-                   </div>
-                   <div class="col ps-2">
-                       <div class="fw-bold" style="font-size:0.6rem; letter-spacing: 0.5px; opacity: 0.8 !important;">CONTACTO</div>
-                       <div class="d-flex flex-column" style="line-height:1.1;">
-                          <span class="fw-bold text-truncate small" id="view-contacto-nombre" style="color: #ffffff !important;">--</span>
-                          <span class="font-monospace extra-small" id="view-contacto-tel" style="color: rgba(255,255,255,0.9) !important;">--</span>
-                       </div>
-                   </div>
+                <div id="medi-wellness-tips">
+                  <div class="text-center py-3 text-muted small">Cargando tips...</div>
                 </div>
-             </div>
+              </div>
+            </div>
           </div>
 
-          <!-- 2.5 NEXT APPOINTMENT BANNER (Dynamic) -->
-          <div id="medi-next-appointment" class="d-none mb-3"></div>
-          <!-- E3: Follow-up Banner -->
-          <div id="medi-followup-banner" class="d-none mb-3"></div>
-
-          <!-- 3. BOOKING FORM -->
-          <div class="card border-0 shadow-sm rounded-4 mb-4">
-            <div class="card-header bg-white py-3">
-              <h6 class="fw-bold mb-0 text-primary"><i class="bi bi-calendar-plus me-2"></i>Agendar Nueva Cita</h6>
-            </div>
-            <div class="card-body p-4">
-              <!-- Success State (hidden by default) -->
-              <div id="medi-booking-success" class="d-none text-center py-4 medi-booking-success">
-                <div class="bg-success bg-opacity-10 d-inline-flex align-items-center justify-content-center rounded-circle mb-3" style="width: 72px; height: 72px;">
-                  <i class="bi bi-check-circle-fill text-success" style="font-size: 2.5rem;"></i>
+          <!-- TAB 2: AGENDAR -->
+          <div class="tab-pane fade" id="medi-tab-agendar" role="tabpanel">
+            <div class="card border-0 shadow-sm rounded-4 mb-4">
+              <div class="card-body p-4">
+                <!-- Success State -->
+                <div id="medi-booking-success" class="d-none text-center py-4 medi-booking-success">
+                  <div class="bg-success bg-opacity-10 d-inline-flex align-items-center justify-content-center rounded-circle mb-3" style="width: 72px; height: 72px;">
+                    <i class="bi bi-check-circle-fill text-success" style="font-size: 2.5rem;"></i>
+                  </div>
+                  <h5 class="fw-bold text-dark mb-2">Cita Registrada</h5>
+                  <div id="medi-success-details" class="mb-3"></div>
+                  <button class="btn btn-outline-primary rounded-pill px-4 fw-bold mt-2" onclick="Medi._switchMediTab('medi-tab-citas')">
+                    <i class="bi bi-calendar-week me-1"></i>Ver Mis Citas
+                  </button>
                 </div>
-                <h5 class="fw-bold text-dark mb-2">Cita Registrada</h5>
-                <div id="medi-success-details" class="mb-3"></div>
-              </div>
-              <form id="form-medi-nueva-cita">
-                <div class="row g-3">
-                  <div class="col-md-12">
-                    <label class="form-label small fw-bold text-muted mb-2">¿Con quién deseas atenderte?</label>
-                    <div class="d-flex flex-column flex-sm-row gap-3 medi-service-btns">
-                        <!-- Botón Médico -->
+                <form id="form-medi-nueva-cita">
+                  <div class="row g-3">
+                    <div class="col-12">
+                      <label class="form-label small fw-bold text-muted mb-2">Tipo de servicio</label>
+                      <div class="d-flex flex-column flex-sm-row gap-3 medi-service-btns">
                         <button type="button" class="btn btn-outline-light flex-fill p-3 border rounded-4 text-start position-relative overflow-hidden service-btn shadow-sm"
                             style="border-color: rgba(255,255,255,0.1);"
                             onclick="
-                                document.getElementById('medi-cita-categoria').value='Medicina General'; 
-                                document.getElementById('medi-cita-tipo').value='Medico'; 
-                                window._selectedServiceDuration = 'Medico'; // Hint for slot generation 
-                                
-                                // Reset styles
-                                document.querySelectorAll('.service-btn').forEach(b => {
-                                    b.classList.remove('active', 'border-info', 'border-primary', 'bg-info-subtle', 'bg-primary-subtle');
-                                    b.classList.add('btn-outline-light');
-                                    b.style.borderColor = 'rgba(255,255,255,0.1)';
-                                });
-
-                                // Apply active style
-                                this.classList.remove('btn-outline-light');
-                                this.classList.add('active', 'bg-info-subtle', 'border-info');
-                                this.style.borderColor = ''; // Let bootstarp handle it
-
+                                document.getElementById('medi-cita-categoria').value='Medicina General';
+                                document.getElementById('medi-cita-tipo').value='Medico';
+                                window._selectedServiceDuration = 'Medico';
+                                document.querySelectorAll('.service-btn').forEach(b => { b.classList.remove('active','border-info','border-primary','bg-info-subtle','bg-primary-subtle'); b.classList.add('btn-outline-light'); b.style.borderColor = 'rgba(255,255,255,0.1)'; });
+                                this.classList.remove('btn-outline-light'); this.classList.add('active','bg-info-subtle','border-info'); this.style.borderColor = '';
                                 document.getElementById('medi-date-container').classList.remove('d-none');
-                                document.getElementById('summary-service').textContent = 'Médico General';
+                                document.getElementById('summary-service').textContent = 'Medico General';
                                 document.getElementById('summary-service-icon').className = 'bi bi-bandaid-fill text-info';
                             ">
                             <div class="d-flex align-items-center">
-                                <div class="bg-white rounded-circle p-2 shadow-sm me-3 text-info">
-                                    <i class="bi bi-bandaid-fill fs-4"></i>
-                                </div>
-                                <div>
-                                    <h6 class="fw-bold text-body mb-0">Médico General</h6>
-                                    <span class="extra-small text-muted">Malestar, chequeo, salud física</span>
-                                </div>
+                              <div class="bg-white rounded-circle p-2 shadow-sm me-3 text-info"><i class="bi bi-bandaid-fill fs-4"></i></div>
+                              <div>
+                                <h6 class="fw-bold text-body mb-0">Medico General</h6>
+                                <span class="extra-small text-muted">Malestar, chequeo, salud fisica</span>
+                              </div>
                             </div>
                         </button>
-                        
-                        <!-- Botón Psicólogo -->
                         <button type="button" class="btn btn-outline-light flex-fill p-3 border rounded-4 text-start position-relative overflow-hidden service-btn shadow-sm"
                             style="border-color: rgba(255,255,255,0.1);"
                             onclick="
-                                document.getElementById('medi-cita-categoria').value='Salud Mental'; 
+                                document.getElementById('medi-cita-categoria').value='Salud Mental';
                                 document.getElementById('medi-cita-tipo').value='Psicologo';
-                                window._selectedServiceDuration = 'Psicologo'; // Hint for slot generation
-
-                                // Reset styles
-                                document.querySelectorAll('.service-btn').forEach(b => {
-                                    b.classList.remove('active', 'border-info', 'border-primary', 'bg-info-subtle', 'bg-primary-subtle');
-                                    b.classList.add('btn-outline-light');
-                                    b.style.borderColor = 'rgba(255,255,255,0.1)';
-                                });
-
-                                // Apply active style
-                                this.classList.remove('btn-outline-light');
-                                this.classList.add('active', 'bg-primary-subtle', 'border-primary');
-                                this.style.borderColor = ''; 
-
+                                window._selectedServiceDuration = 'Psicologo';
+                                document.querySelectorAll('.service-btn').forEach(b => { b.classList.remove('active','border-info','border-primary','bg-info-subtle','bg-primary-subtle'); b.classList.add('btn-outline-light'); b.style.borderColor = 'rgba(255,255,255,0.1)'; });
+                                this.classList.remove('btn-outline-light'); this.classList.add('active','bg-primary-subtle','border-primary'); this.style.borderColor = '';
                                 document.getElementById('medi-date-container').classList.remove('d-none');
-                                document.getElementById('summary-service').textContent = 'Psicología';
+                                document.getElementById('summary-service').textContent = 'Psicologia';
                                 document.getElementById('summary-service-icon').className = 'bi bi-chat-heart-fill text-primary';
                             ">
                             <div class="d-flex align-items-center">
-                                <div class="bg-white rounded-circle p-2 shadow-sm me-3 text-primary">
-                                    <i class="bi bi-chat-heart-fill fs-4"></i>
-                                </div>
-                                <div>
-                                    <h6 class="fw-bold text-body mb-0">Psicología</h6>
-                                    <span class="extra-small text-muted">Apoyo emocional, estrés</span>
-                                </div>
+                              <div class="bg-white rounded-circle p-2 shadow-sm me-3 text-primary"><i class="bi bi-chat-heart-fill fs-4"></i></div>
+                              <div>
+                                <h6 class="fw-bold text-body mb-0">Psicologia</h6>
+                                <span class="extra-small text-muted">Apoyo emocional, estres</span>
+                              </div>
                             </div>
                         </button>
+                      </div>
+                      <input type="hidden" id="medi-cita-categoria" required>
+                      <input type="hidden" id="medi-cita-tipo" value="Medico">
                     </div>
-                    <input type="hidden" id="medi-cita-categoria" required>
-                    <input type="hidden" id="medi-cita-tipo" value="Medico">
-                  </div>
-
-                  <div class="col-12 mt-4 d-none" id="medi-date-container">
-                    <label class="form-label small fw-bold text-muted mb-3">Selecciona el día de tu cita</label>
-                    <div id="medi-date-selector" class="d-flex gap-2 overflow-auto pb-3 medi-date-scroll" style="scrollbar-width: none; -ms-overflow-style: none;">
+                    <div class="col-12 mt-4 d-none" id="medi-date-container">
+                      <label class="form-label small fw-bold text-muted mb-3">Selecciona el dia</label>
+                      <div id="medi-date-selector" class="d-flex gap-2 overflow-auto pb-3 medi-date-scroll" style="scrollbar-width: none; -ms-overflow-style: none;"></div>
+                      <input type="hidden" id="medi-cita-fecha" required>
+                      <div class="mt-2">
+                        <label class="form-label small fw-bold text-muted">Horarios Disponibles</label>
+                        <div id="medi-time-msg" class="p-4 bg-light rounded-4 text-center text-muted small border border-dashed">
+                          <i class="bi bi-calendar-check fs-4 d-block mb-2"></i> Selecciona un dia primero
+                        </div>
+                        <input type="hidden" id="medi-cita-hora" required>
+                        <div id="medi-time-grid" class="d-none gap-2 flex-wrap mt-2"></div>
+                      </div>
                     </div>
-                    <input type="hidden" id="medi-cita-fecha" required>
-                  
-                    <div class="mt-2">
-                       <label class="form-label small fw-bold text-muted">Horarios Disponibles</label>
-                       <div id="medi-time-msg" class="p-4 bg-light rounded-4 text-center text-muted small border border-dashed">
-                          <i class="bi bi-calendar-check fs-4 d-block mb-2"></i> Selecciona un día primero
-                       </div>
-                       <input type="hidden" id="medi-cita-hora" required>
-                       <div id="medi-time-grid" class="d-none gap-2 flex-wrap mt-2"></div>
+                    <div class="col-12 mt-3">
+                      <label class="form-label small fw-bold text-muted">Motivo / Sintomas (Opcional)</label>
+                      <textarea class="form-control border-0 bg-light rounded-3" id="medi-cita-motivo" rows="2" placeholder="Describe brevemente como te sientes..."></textarea>
                     </div>
                   </div>
-
-                  <div class="col-12 mt-3">
-                    <label class="form-label small fw-bold text-muted">Motivo / Síntomas (Opcional)</label>
-                    <textarea class="form-control border-0 bg-light rounded-3" id="medi-cita-motivo" rows="2" placeholder="Describe brevemente cómo te sientes..."></textarea>
+                  <div id="medi-booking-summary" class="mt-4 p-3 rounded-4 bg-light d-none slide-up-anim">
+                    <h6 class="fw-bold small text-muted mb-3">RESUMEN DE RESERVA</h6>
+                    <div class="d-flex align-items-center mb-2">
+                      <i id="summary-service-icon" class="bi bi-bandaid-fill text-muted me-2"></i>
+                      <span id="summary-service" class="fw-bold text-dark small">--</span>
+                    </div>
+                    <div class="d-flex align-items-center">
+                      <i class="bi bi-clock-history text-muted me-2"></i>
+                      <span id="summary-datetime" class="fw-bold text-dark small">--</span>
+                    </div>
                   </div>
-                </div>
-                
-                <!-- CONFIRMATION DETAILS BLOCK -->
-                <div id="medi-booking-summary" class="mt-4 p-3 rounded-4 bg-light d-none slide-up-anim">
-                     <h6 class="fw-bold small text-muted mb-3">RESUMEN DE RESERVA</h6>
-                     <div class="d-flex align-items-center mb-2">
-                        <i id="summary-service-icon" class="bi bi-bandaid-fill text-muted me-2"></i>
-                        <span id="summary-service" class="fw-bold text-dark small">--</span>
-                     </div>
-                     <div class="d-flex align-items-center">
-                        <i class="bi bi-clock-history text-muted me-2"></i>
-                        <span id="summary-datetime" class="fw-bold text-dark small">--</span>
-                     </div>
-                </div>
-
-                <div class="d-flex justify-content-between align-items-center mt-3 pt-3 border-top">
-                   <div id="medi-cita-disponibilidad" class="small fw-bold text-primary"></div>
-                   <button type="submit" class="btn btn-primary rounded-pill px-5 fw-bold shadow-sm" id="btn-medi-confirm" disabled>
-                     <i class="bi bi-check-lg me-2"></i>Confirmar
-                   </button>
-                </div>
-              </form>
+                  <div class="d-flex justify-content-between align-items-center mt-3 pt-3 border-top">
+                    <div id="medi-cita-disponibilidad" class="small fw-bold text-primary"></div>
+                    <button type="submit" class="btn btn-primary rounded-pill px-5 fw-bold shadow-sm" id="btn-medi-confirm" disabled>
+                      <i class="bi bi-check-lg me-2"></i>Confirmar
+                    </button>
+                  </div>
+                </form>
+              </div>
             </div>
           </div>
 
-          <!-- 4. APPOINTMENTS (Moved here) -->
-          <div class="card border-0 shadow-sm rounded-4 mb-4">
-            <div class="card-header bg-white py-3 border-0">
-              <div class="d-flex justify-content-between align-items-center mb-3">
-                  <h6 class="fw-bold mb-0"><i class="bi bi-calendar-week me-2"></i>Mi Agenda</h6>
+          <!-- TAB 3: MIS CITAS -->
+          <div class="tab-pane fade" id="medi-tab-citas" role="tabpanel">
+            <div class="card border-0 shadow-sm rounded-4 mb-4">
+              <div class="card-header bg-white py-3 border-0">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                  <h6 class="fw-bold mb-0"><i class="bi bi-calendar-week me-2" style="color:var(--medi);"></i>Mi Agenda</h6>
+                </div>
+                <ul class="nav-custom-pills-2 d-flex gap-3 flex-nowrap overflow-auto pb-0" id="medi-citas-tabs" role="tablist" style="scrollbar-width: none;">
+                  <li class="nav-item" role="presentation">
+                    <button class="nav-link active rounded-pill fw-bold small px-3 py-1 text-nowrap" id="tab-pendientes" data-bs-toggle="tab" data-bs-target="#pills-pendientes" type="button" role="tab">Pendientes</button>
+                  </li>
+                  <li class="nav-item" role="presentation">
+                    <button class="nav-link rounded-pill fw-bold small px-3 py-1 text-nowrap" id="tab-confirmadas" data-bs-toggle="tab" data-bs-target="#pills-confirmadas" type="button" role="tab">Confirmadas</button>
+                  </li>
+                  <li class="nav-item" role="presentation">
+                    <button class="nav-link rounded-pill fw-bold small px-3 py-1 text-nowrap" id="tab-canceladas" data-bs-toggle="tab" data-bs-target="#pills-canceladas" type="button" role="tab">Canceladas</button>
+                  </li>
+                </ul>
               </div>
-              <ul class="nav nav-pills d-flex gap-3 flex-nowrap overflow-auto pb-0" id="medi-citas-tabs" role="tablist" style="scrollbar-width: none;">
-                <li class="nav-item" role="presentation">
-                  <button class="nav-link active rounded-pill fw-bold small px-3 py-1 text-nowrap" id="tab-pendientes" data-bs-toggle="tab" data-bs-target="#pills-pendientes" type="button" role="tab">
-                    Pendientes
-                  </button>
-                </li>
-                <li class="nav-item" role="presentation">
-                  <button class="nav-link rounded-pill fw-bold small px-3 py-1 text-nowrap" id="tab-confirmadas" data-bs-toggle="tab" data-bs-target="#pills-confirmadas" type="button" role="tab">
-                    Confirmadas
-                  </button>
-                </li>
-                <li class="nav-item" role="presentation">
-                  <button class="nav-link rounded-pill fw-bold small px-3 py-1 text-nowrap" id="tab-canceladas" data-bs-toggle="tab" data-bs-target="#pills-canceladas" type="button" role="tab">
-                    Canceladas
-                  </button>
-                </li>
-              </ul>
-            </div>
-            <div class="card-body p-3 bg-light-subtle">
-              <div class="tab-content" id="medi-citas-content">
-                <!-- Pendientes -->
-                <div class="tab-pane fade show active" id="pills-pendientes" role="tabpanel">
-                    <div id="carousel-pendientes" class="d-flex overflow-auto gap-3 pb-2 custom-scroll medi-cita-carousel" style="scroll-behavior: smooth;">
-                        <div class="text-center w-100 py-4 text-muted small"><i class="bi bi-inbox me-2"></i>No hay citas pendientes.</div>
+              <div class="card-body p-3">
+                <div class="tab-content" id="medi-citas-content">
+                  <div class="tab-pane fade show active" id="pills-pendientes" role="tabpanel">
+                    <div id="carousel-pendientes" class="d-flex flex-column gap-3">
+                      <div class="text-center w-100 py-4 text-muted small"><i class="bi bi-inbox me-2"></i>No hay citas pendientes.</div>
                     </div>
-                </div>
-                <!-- Confirmadas -->
-                <div class="tab-pane fade" id="pills-confirmadas" role="tabpanel">
-                     <div id="carousel-confirmadas" class="d-flex overflow-auto gap-3 pb-2 custom-scroll medi-cita-carousel" style="scroll-behavior: smooth;">
-                        <div class="text-center w-100 py-4 text-muted small"><i class="bi bi-journal-check me-2"></i>No hay citas confirmadas.</div>
-                     </div>
-                </div>
-                <!-- Canceladas -->
-                <div class="tab-pane fade" id="pills-canceladas" role="tabpanel">
-                     <div id="carousel-canceladas" class="d-flex overflow-auto gap-3 pb-2 custom-scroll medi-cita-carousel" style="scroll-behavior: smooth;">
-                        <div class="text-center w-100 py-4 text-muted small">Historial limpio.</div>
-                     </div>
+                  </div>
+                  <div class="tab-pane fade" id="pills-confirmadas" role="tabpanel">
+                    <div id="carousel-confirmadas" class="d-flex flex-column gap-3">
+                      <div class="text-center w-100 py-4 text-muted small"><i class="bi bi-journal-check me-2"></i>No hay citas confirmadas.</div>
+                    </div>
+                  </div>
+                  <div class="tab-pane fade" id="pills-canceladas" role="tabpanel">
+                    <div id="carousel-canceladas" class="d-flex flex-column gap-3">
+                      <div class="text-center w-100 py-4 text-muted small">Historial limpio.</div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-          
 
-
-           <!-- MODALS -->
-          <div class="modal fade" id="modalMediReschedule" tabindex="-1" aria-hidden="true">
-            <div class="modal-dialog modal-dialog-centered">
-                <div class="modal-content rounded-4 border-0 shadow-lg">
-                    <div class="modal-header border-0 pb-0">
-                        <h6 class="modal-title fw-bold"><i class="bi bi-calendar2-week me-2 text-primary"></i>Re-agendar Cita</h6>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                    </div>
-                    <div class="modal-body">
-                         <form id="form-medi-reschedule">
-                            <input type="hidden" id="resched-cita-id">
-                            <input type="hidden" id="resched-old-slot">
-                            <input type="hidden" id="resched-tipo">
-                            <input type="hidden" id="resched-date">
-                            <input type="hidden" id="resched-time">
-
-                            <label class="form-label small fw-bold text-muted mb-2">Selecciona nueva fecha</label>
-                            <div id="resched-date-selector" class="d-flex gap-2 overflow-auto pb-3 medi-date-scroll medi-resched-dates" style="scrollbar-width: none;"></div>
-
-                            <div id="resched-time-container" class="mt-2">
-                              <label class="form-label small fw-bold text-muted">Horarios Disponibles</label>
-                              <div id="resched-time-msg" class="p-3 bg-light rounded-3 text-center text-muted small border border-dashed">
-                                <i class="bi bi-calendar-check d-block mb-1"></i> Selecciona un d\u00eda primero
-                              </div>
-                              <div id="resched-time-grid" class="d-none d-flex flex-wrap gap-2 justify-content-center mt-2 p-2"></div>
-                            </div>
-
-                            <div id="resched-summary" class="d-none mt-3 p-3 rounded-4 bg-light">
-                              <div class="d-flex align-items-center gap-2">
-                                <i class="bi bi-arrow-right-circle text-primary"></i>
-                                <span class="fw-bold small text-dark" id="resched-summary-text">--</span>
-                              </div>
-                            </div>
-
-                            <div class="d-grid mt-3">
-                                <button type="submit" class="btn btn-primary rounded-pill fw-bold" id="btn-resched-confirm" disabled>Guardar Cambios</button>
-                            </div>
-                         </form>
-                    </div>
+          <!-- TAB 4: HISTORIAL -->
+          <div class="tab-pane fade" id="medi-tab-historial" role="tabpanel">
+            <div class="card border-0 shadow-sm rounded-4">
+              <div class="card-body p-3">
+                <h6 class="fw-bold mb-3" style="color: var(--medi);">
+                  <i class="bi bi-folder2-open me-2"></i>Mi Expediente Medico
+                </h6>
+                <div id="medi-stu-consultas" class="d-flex flex-column gap-2">
+                  <div class="text-center py-4 text-muted rounded-4" style="background: var(--medi-surface);">
+                    <i class="bi bi-folder2-open fs-1 d-block mb-2 opacity-50"></i>
+                    <p class="mb-0 small">Tu expediente esta vacio.</p>
+                  </div>
                 </div>
+              </div>
             </div>
           </div>
 
-          <div class="modal fade" id="modalMediCancelParams" tabindex="-1" aria-hidden="true">
-            <div class="modal-dialog modal-dialog-centered modal-sm">
-                <div class="modal-content rounded-4 border-0 shadow-lg">
-                    <div class="modal-header border-0 pb-0">
-                        <h6 class="modal-title fw-bold text-danger">Cancelar Cita</h6>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div><!-- /tab-content -->
+
+        <!-- MODALS (Student) -->
+        <div class="modal fade" id="modalMediReschedule" tabindex="-1" aria-hidden="true">
+          <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content rounded-4 border-0 shadow-lg">
+              <div class="modal-header border-0 pb-0">
+                <h6 class="modal-title fw-bold"><i class="bi bi-calendar2-week me-2 text-primary"></i>Re-agendar Cita</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+              </div>
+              <div class="modal-body">
+                <form id="form-medi-reschedule">
+                  <input type="hidden" id="resched-cita-id">
+                  <input type="hidden" id="resched-old-slot">
+                  <input type="hidden" id="resched-tipo">
+                  <input type="hidden" id="resched-date">
+                  <input type="hidden" id="resched-time">
+                  <label class="form-label small fw-bold text-muted mb-2">Selecciona nueva fecha</label>
+                  <div id="resched-date-selector" class="d-flex gap-2 overflow-auto pb-3 medi-date-scroll medi-resched-dates" style="scrollbar-width: none;"></div>
+                  <div id="resched-time-container" class="mt-2">
+                    <label class="form-label small fw-bold text-muted">Horarios Disponibles</label>
+                    <div id="resched-time-msg" class="p-3 bg-light rounded-3 text-center text-muted small border border-dashed">
+                      <i class="bi bi-calendar-check d-block mb-1"></i> Selecciona un dia primero
                     </div>
-                    <div class="modal-body">
-                         <p class="small text-muted mb-3">¿Podrías decirnos el motivo? Esto nos ayuda a mejorar.</p>
-                         <form id="form-medi-cancel-reason">
-                            <input type="hidden" id="cancel-cita-id">
-                            <div class="d-grid gap-2 mb-3">
-                                <button type="button" class="btn btn-outline-secondary btn-sm text-start" onclick="document.getElementById('cancel-other').value='Conflicto de horario'; this.form.dispatchEvent(new Event('submit'))">📅 Conflicto de horario</button>
-                                <button type="button" class="btn btn-outline-secondary btn-sm text-start" onclick="document.getElementById('cancel-other').value='Ya me siento mejor'; this.form.dispatchEvent(new Event('submit'))">😊 Ya me siento mejor</button>
-                                <button type="button" class="btn btn-outline-secondary btn-sm text-start" onclick="document.getElementById('cancel-other').value='Emergencia personal'; this.form.dispatchEvent(new Event('submit'))">🚨 Emergencia personal</button>
-                            </div>
-                            <input type="text" class="form-control form-control-sm mb-3" id="cancel-other" placeholder="Otro motivo..." required>
-                            <div class="d-grid">
-                                <button type="submit" class="btn btn-danger rounded-pill fw-bold">Cancelar Cita</button>
-                            </div>
-                         </form>
+                    <div id="resched-time-grid" class="d-none d-flex flex-wrap gap-2 justify-content-center mt-2 p-2"></div>
+                  </div>
+                  <div id="resched-summary" class="d-none mt-3 p-3 rounded-4 bg-light">
+                    <div class="d-flex align-items-center gap-2">
+                      <i class="bi bi-arrow-right-circle text-primary"></i>
+                      <span class="fw-bold small text-dark" id="resched-summary-text">--</span>
                     </div>
-                </div>
+                  </div>
+                  <div class="d-grid mt-3">
+                    <button type="submit" class="btn btn-primary rounded-pill fw-bold" id="btn-resched-confirm" disabled>Guardar Cambios</button>
+                  </div>
+                </form>
+              </div>
             </div>
           </div>
-
         </div>
 
-        <!-- 6. SECONDARY COLUMN (Right on Desktop, Bottom on Mobile) -->
-        <div class="col-lg-4">
-          <div class="card border-0 shadow-sm rounded-4">
-             <div class="card-header bg-white py-3">
-               <h6 class="fw-bold mb-0"><i class="bi bi-folder2-open me-2"></i>Expediente Médico</h6>
-             </div>
-             <div class="card-body p-3 bg-light">
-                <div id="medi-stu-consultas" class="scroll-container" style="max-height: 400px;">
-                    <div class="text-center py-3 text-muted small">Sin consultas registradas.</div>
-                </div>
-             </div>
-          </div>
-
-          <!-- WELLNESS TIPS -->
-          <div class="card border-0 shadow-sm rounded-4 mt-3">
-             <div class="card-header bg-white py-3">
-               <h6 class="fw-bold mb-0"><i class="bi bi-lightbulb me-2 text-warning"></i>Tips de Salud</h6>
-             </div>
-             <div class="card-body p-3" id="medi-wellness-tips">
-                <div class="text-center py-3 text-muted small">Cargando tips...</div>
-             </div>
+        <div class="modal fade" id="modalMediCancelParams" tabindex="-1" aria-hidden="true">
+          <div class="modal-dialog modal-dialog-centered modal-sm">
+            <div class="modal-content rounded-4 border-0 shadow-lg">
+              <div class="modal-header border-0 pb-0">
+                <h6 class="modal-title fw-bold text-danger">Cancelar Cita</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+              </div>
+              <div class="modal-body">
+                <p class="small text-muted mb-3">Cuentanos el motivo. Esto nos ayuda a mejorar.</p>
+                <form id="form-medi-cancel-reason">
+                  <input type="hidden" id="cancel-cita-id">
+                  <div class="d-grid gap-2 mb-3">
+                    <button type="button" class="btn btn-outline-secondary btn-sm text-start" onclick="document.getElementById('cancel-other').value='Conflicto de horario'; this.form.dispatchEvent(new Event('submit'))"><i class="bi bi-calendar-x me-2"></i>Conflicto de horario</button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm text-start" onclick="document.getElementById('cancel-other').value='Ya me siento mejor'; this.form.dispatchEvent(new Event('submit'))"><i class="bi bi-emoji-smile me-2"></i>Ya me siento mejor</button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm text-start" onclick="document.getElementById('cancel-other').value='Emergencia personal'; this.form.dispatchEvent(new Event('submit'))"><i class="bi bi-exclamation-triangle me-2"></i>Emergencia personal</button>
+                  </div>
+                  <input type="text" class="form-control form-control-sm mb-3" id="cancel-other" placeholder="Otro motivo..." required>
+                  <div class="d-grid">
+                    <button type="submit" class="btn btn-danger rounded-pill fw-bold">Cancelar Cita</button>
+                  </div>
+                </form>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
+
+      </div><!-- /medi-student-app -->
     </section>
 
     <section id="medi-admin" class="d-none"> <!-- MARKER -->
@@ -896,6 +892,11 @@ var Medi = (function () {
                             <div class="extra-small text-muted fw-bold">Peso</div>
                             <div class="fw-bold text-dark" id="detail-peso">--</div>
                         </div>
+                        <div class="vr opacity-10"></div>
+                        <div>
+                            <div class="extra-small text-muted fw-bold">Talla</div>
+                            <div class="fw-bold text-dark" id="detail-talla">--</div>
+                        </div>
                     </div>
                 </div>
 
@@ -1177,14 +1178,14 @@ var Medi = (function () {
             <div class="modal-body">
                 <!-- 1. Habilitar Servicio -->
                 <!-- 1. Habilitar Servicio (Role Specific) -->
-                ${_myRole === 'Medico' ? `
+                ${_myRole === 'Médico' ? `
                 <div class="d-flex justify-content-between align-items-center p-3 bg-light rounded-3 mb-3">
                     <div>
                         <div class="fw-bold text-dark">Habilitar Agenda Médica</div>
                         <div class="small text-muted">Permitir reservas para medicina general</div>
                     </div>
                     <div class="form-check form-switch">
-                        <input class="form-check-input fs-4" type="checkbox" id="cfg-available-medico" ${(_ctx.config && _ctx.config.medi && _ctx.config.medi.availableMedico !== false) ? 'checked' : ''}>
+                        <input class="form-check-input fs-4" type="checkbox" id="cfg-available-medico" ${(_ctx.config && _ctx.config.medi && _ctx.config.medi.availableMédico !== false) ? 'checked' : ''}>
                     </div>
                 </div>` : ''}
 
@@ -1236,7 +1237,7 @@ var Medi = (function () {
     document.getElementById('btn-save-cfg').onclick = async function () {
       const btn = this;
       const valDuration = document.querySelector('input[name="slotDur"]:checked').value;
-      const chkMedico = document.getElementById('cfg-available-medico');
+      const chkMédico = document.getElementById('cfg-available-medico');
       const chkPsicologo = document.getElementById('cfg-available-psicologo');
 
 
@@ -1250,7 +1251,7 @@ var Medi = (function () {
       }
 
       // Only update what is visible/editable
-      if (chkMedico) updateData.availableMedico = chkMedico.checked;
+      if (chkMédico) updateData.availableMédico = chkMédico.checked;
       if (chkPsicologo) updateData.availablePsicologo = chkPsicologo.checked;
 
       btn.disabled = true;
@@ -1272,7 +1273,7 @@ var Medi = (function () {
         const banner = document.getElementById('medi-service-status');
         if (banner) {
           let isEnabled = true;
-          if (_myRole === 'Medico' && updateData.availableMedico === false) isEnabled = false;
+          if (_myRole === 'Médico' && updateData.availableMédico === false) isEnabled = false;
           else if (_myRole === 'Psicologo' && updateData.availablePsicologo === false) isEnabled = false;
 
           if (!isEnabled) {
@@ -1443,7 +1444,7 @@ var Medi = (function () {
     // Determine type based on category or _myRole if admin
     // In manual booking, category gives context. If category is 'Salud Mental' -> Psicologo?
     // Let's infer type from category logic
-    let typeForSlot = 'Medico';
+    let typeForSlot = 'Médico';
     if (cat === 'Salud Mental' || cat === 'Psicología' || _myRole === 'Psicologo') typeForSlot = 'Psicologo';
 
     const slotId = `${baseId}_${typeForSlot}`;
@@ -1602,10 +1603,14 @@ var Medi = (function () {
 
       SLOT_START = cfg.slotStart || 8;
       SLOT_END = cfg.slotEnd || 22;
-      SLOT_START = cfg.slotStart || 8;
-      SLOT_END = cfg.slotEnd || 22;
-      SLOT_STEP = cfg.slotStep || 30; // Legacy visual step
-      SLOT_DURATION = cfg.slotDuration || 60; // [NEW] Actual logic duration
+      SLOT_STEP = cfg.slotStep || 30;
+      SLOT_DURATION = cfg.slotDuration || 60;
+
+      // [NEW] Hero personalizado
+      _updateHeroGreeting(user);
+
+      // [NEW] Quick Actions grid
+      _renderQuickActions();
 
       // Inicializar componentes
       loadEmergencyCard(user);
@@ -1616,10 +1621,11 @@ var Medi = (function () {
       // [NEW] Student Chat
       renderStudentChat(user.uid, user.displayName || user.email);
 
+      // [NEW] Tutorial en primera visita
+      initMediTutorial(user.uid);
+
       // [ENCUESTAS] Verificar encuesta de servicio (Médico o Psicología)
       if (window.Encuestas && window.Encuestas.checkAndShowServiceSurvey) {
-        // Check both, start with medico. The internal logic handles if one is pending.
-        // Or we can randomize? Let's check 'servicio-medico' first.
         setTimeout(() => window.Encuestas.checkAndShowServiceSurvey('servicio-medico'), 1500);
         setTimeout(() => window.Encuestas.checkAndShowServiceSurvey('psicologia'), 5000);
       }
@@ -1787,15 +1793,15 @@ var Medi = (function () {
           msg.classList.remove('d-none');
 
           // [NEW] Check Availability Config
-          const selectedType = document.getElementById('medi-cita-tipo').value || 'Medico';
+          const selectedType = document.getElementById('medi-cita-tipo').value || 'Médico';
           const cfg = _ctx.config?.medi || {};
 
           let isServiceAvailable = true;
-          if (selectedType === 'Medico' && cfg.availableMedico === false) isServiceAvailable = false;
+          if (selectedType === 'Médico' && cfg.availableMédico === false) isServiceAvailable = false;
           if (selectedType === 'Psicologo' && cfg.availablePsicologo === false) isServiceAvailable = false;
 
           if (!isServiceAvailable) {
-            msg.innerHTML = `<i class="bi bi-cone-striped me-2"></i> La agenda de <b>${selectedType === 'Medico' ? 'Medicina' : 'Psicología'}</b> no está disponible por el momento.`;
+            msg.innerHTML = `<i class="bi bi-cone-striped me-2"></i> La agenda de <b>${selectedType === 'Médico' ? 'Medicina' : 'Psicología'}</b> no está disponible por el momento.`;
             msg.classList.remove('d-none');
             return;
           }
@@ -1806,8 +1812,8 @@ var Medi = (function () {
           let occupied = [];
 
           try {
-            const currentType = document.getElementById('medi-cita-tipo').value || 'Medico';
-            occupied = await MediService.getOccupiedSlots(_ctx, targetDate, currentType);
+            const currentType = document.getElementById('medi-cita-tipo').value || 'Médico';
+            occupied = await MediService.getOccupiedSlots(_ctx, currentType, card.dataset.date);
           } catch (e) { console.error("Error fetching occupied:", e); }
 
           // Render Time Grid
@@ -1815,31 +1821,43 @@ var Medi = (function () {
           timeGrid.className = 'd-flex overflow-auto gap-2 py-2 px-1 mb-3 no-scrollbar';
           timeGrid.innerHTML = '';
 
+          // [NEW] Slot counts for queue badges
+          const slotCounts = occupied._slotCounts || {};
+
           const validSlots = slots.map(slot => {
             const tStr = `${slot.getHours().toString().padStart(2, '0')}:${slot.getMinutes().toString().padStart(2, '0')}`;
-            const currentType = document.getElementById('medi-cita-tipo').value || 'Medico';
+            const currentType = document.getElementById('medi-cita-tipo').value || 'Médico';
             const baseId = MediService.slotIdFromDate(slot);
             const slotId = `${baseId}_${currentType}`;
             const isTaken = occupied.includes(slotId);
+            const count = slotCounts[slotId] || 0;
 
-            return {
-              tStr, isTaken
-            };
+            return { tStr, isTaken, count };
           });
 
           if (validSlots.length === 0) {
             timeGrid.innerHTML = '<div class="text-muted small w-100 text-center fst-italic">No hay horarios.</div>';
           } else {
-            validSlots.forEach(({ tStr, isTaken }) => {
+            validSlots.forEach(({ tStr, isTaken, count }) => {
               const btn = document.createElement('div');
               const isDisabled = isTaken;
+
+              // Queue badge logic: 0 = green "Libre", 1-3 = yellow "Cola (N)", 4+ = red "Lleno"
+              let statusLabel, statusClass;
+              if (isDisabled) {
+                statusLabel = 'Lleno'; statusClass = 'text-danger';
+              } else if (count > 0) {
+                statusLabel = `Cola (${count})`; statusClass = 'text-warning';
+              } else {
+                statusLabel = 'Libre'; statusClass = 'text-success';
+              }
 
               btn.className = `flex-shrink-0 text-center border rounded-3 shadow-sm p-3 time-slot-card ${isDisabled ? 'bg-light text-muted opacity-50 pe-none' : 'bg-white cursor-pointer hover-lift'}`;
               btn.style.width = '85px';
 
               btn.innerHTML = `
                      <div class="fw-bold fs-5 lh-1 mb-1 ${isDisabled ? 'text-decoration-line-through' : 'text-dark'}">${tStr}</div>
-                     <div class="extra-small text-uppercase fw-bold ${isDisabled ? 'text-muted' : 'text-success'}">${isDisabled ? 'Ocupado' : 'Libre'}</div>
+                     <div class="extra-small text-uppercase fw-bold ${statusClass}">${statusLabel}</div>
                  `;
 
               if (!isDisabled) {
@@ -1903,7 +1921,7 @@ var Medi = (function () {
           const [hh, mm] = timeInput.value.split(':').map(Number);
           const localDate = new Date(y, m - 1, d, hh, mm);
           // [FIX] Generate Type-Specific ID for Booking
-          const selectedType = document.getElementById('medi-cita-tipo').value || 'Medico'; // Should match value set by buttons
+          const selectedType = document.getElementById('medi-cita-tipo').value || 'Médico'; // Should match value set by buttons
           const baseSlotId = MediService.slotIdFromDate(localDate);
           const newSlotId = `${baseSlotId}_${selectedType}`;
 
@@ -1964,7 +1982,7 @@ var Medi = (function () {
 
       try {
         // [NEW] Resolve Professional (Strict Logic)
-        const tipo = (form.querySelector('#medi-cita-categoria').value === 'Salud Mental') ? 'Psicologo' : 'Medico';
+        const tipo = (form.querySelector('#medi-cita-categoria').value === 'Salud Mental') ? 'Psicologo' : 'Médico';
 
         let profData = await MediService.resolveProfessionalForBooking(_ctx, tipo, localDate);
 
@@ -2038,6 +2056,13 @@ var Medi = (function () {
             successEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
           }, 100);
 
+          // [NEW] Auto-navigate to "Mis Citas" tab after 2.5s
+          setTimeout(() => {
+            _switchMediTab('medi-tab-citas');
+            form.classList.remove('d-none');
+            successEl.classList.add('d-none');
+          }, 2500);
+
           // [FIX] Immediate Refresh of Dashboard (Banner + Agenda)
           // Listener should handle this automatically. Manual restart caused race conditions.
           // if (typeof loadStudentHistory === 'function') {
@@ -2082,9 +2107,9 @@ var Medi = (function () {
   }
 
   // E2: Load queue position for a pending appointment (async, updates DOM)
-  async function _loadQueuePosition(citaId, tipoServicio, citaDate) {
+  async function _loadQueuePosition(citaId, tipoServicio, citaDate, targetElId) {
     try {
-      const el = document.getElementById('queue-pos-' + citaId);
+      const el = document.getElementById(targetElId || ('queue-pos-' + citaId));
       if (!el) return;
 
       // Count pending citas of same type with earlier fechaSolicitud
@@ -2158,6 +2183,17 @@ var Medi = (function () {
         const activas = allCitas.filter(c => ['pendiente', 'confirmada'].includes(c.estado));
         const countEl = document.getElementById('cita-count');
         if (countEl) countEl.textContent = activas.length;
+
+        // [NEW] Hero next appointment badge
+        const now2 = new Date();
+        const upcomingAll = activas
+          .filter(c => c.safeDate && c.safeDate > now2)
+          .sort((a, b) => a.safeDate - b.safeDate);
+        _renderHeroNextAppointment(upcomingAll.length > 0 ? upcomingAll[0] : null);
+
+        // [NEW] Queue card on Tab Inicio — show first pending
+        const firstPending = allCitas.find(c => c.estado === 'pendiente' && c.safeDate && c.safeDate > now2);
+        _renderQueueCard(firstPending || null);
 
         // Categorize
         const pending = allCitas.filter(c => c.estado === 'pendiente');
@@ -2423,12 +2459,295 @@ var Medi = (function () {
               ${latest.followUp.notes ? '<br>' + escapeHtml(latest.followUp.notes) : ''}
             </div>
           </div>
-          <button class="btn btn-sm ${isOverdue ? 'btn-danger' : 'btn-warning'} rounded-pill px-3 fw-bold flex-shrink-0" onclick="document.getElementById('medi-booking-section')?.scrollIntoView({behavior:'smooth'})">
-            <i class="bi bi-calendar-plus me-1"></i>Agendar
-          </button>
+          <div class="d-flex gap-2 flex-shrink-0">
+            <button class="btn btn-sm ${isOverdue ? 'btn-danger' : 'btn-warning'} rounded-pill px-3 fw-bold" onclick="Medi._switchMediTab('medi-tab-agendar')">
+              <i class="bi bi-calendar-plus me-1"></i>Agendar
+            </button>
+            <button class="btn btn-sm btn-outline-secondary rounded-pill px-2" title="Ocultar"
+                    onclick="document.getElementById('medi-followup-banner').classList.add('d-none');">
+              <i class="bi bi-x-lg"></i>
+            </button>
+          </div>
         </div>
       </div>`;
     banner.classList.remove('d-none');
+  }
+
+  // ============================================================
+  // NEW FUNCTIONS — Hero, Quick Actions, Tab Switch, Queue, Tour
+  // ============================================================
+
+  /** Personaliza el hero banner con nombre del usuario */
+  function _updateHeroGreeting(user) {
+    const greetEl = document.getElementById('medi-hero-greeting');
+    const subEl = document.getElementById('medi-hero-subtitle');
+    if (!greetEl) return;
+
+    const hour = new Date().getHours();
+    let saludo = 'Buenos dias';
+    if (hour >= 12 && hour < 18) saludo = 'Buenas tardes';
+    else if (hour >= 18) saludo = 'Buenas noches';
+
+    const nombre = (user.displayName || '').split(' ')[0] || 'Estudiante';
+    greetEl.textContent = `${saludo}, ${nombre}`;
+
+    if (subEl) {
+      const frases = [
+        'Tu salud es lo mas importante.',
+        'Estamos aqui para cuidarte.',
+        'Agenda tu cita en segundos.'
+      ];
+      subEl.textContent = frases[Math.floor(Math.random() * frases.length)];
+    }
+  }
+
+  /** Badge en hero mostrando proxima cita */
+  function _renderHeroNextAppointment(cita) {
+    const badge = document.getElementById('medi-hero-next-badge');
+    if (!badge) return;
+
+    if (!cita || !cita.safeDate) {
+      badge.classList.add('d-none');
+      badge.innerHTML = '';
+      return;
+    }
+
+    const now = new Date();
+    const diff = Math.ceil((cita.safeDate - now) / (1000 * 60 * 60 * 24));
+    let label = '';
+    if (diff <= 0) label = 'Hoy';
+    else if (diff === 1) label = 'Manana';
+    else label = `En ${diff} dias`;
+
+    const timeStr = cita.safeDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const icon = cita.tipoServicio === 'Psicologo' ? 'chat-heart' : 'bandaid';
+
+    badge.innerHTML = `
+      <span class="badge bg-white text-dark shadow-sm rounded-pill px-3 py-2" style="font-size:0.75rem;">
+        <i class="bi bi-${icon}-fill me-1 text-primary"></i>
+        <strong>${label}</strong> · ${timeStr}
+      </span>`;
+    badge.classList.remove('d-none');
+  }
+
+  /** Card en Tab Inicio con posicion en cola y tiempo estimado */
+  function _renderQueueCard(pendingCita) {
+    const container = document.getElementById('medi-queue-card');
+    if (!container) return;
+
+    if (!pendingCita) {
+      container.classList.add('d-none');
+      container.innerHTML = '';
+      return;
+    }
+
+    const fecha = pendingCita.safeDate || new Date();
+    const dateStr = fecha.toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' });
+    const timeStr = fecha.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const encoded = encodeURIComponent(JSON.stringify(pendingCita));
+
+    container.innerHTML = `
+      <div class="card border-0 shadow-sm rounded-4 medi-queue-live" style="border-left: 4px solid #f59e0b !important;">
+        <div class="card-body p-3">
+          <div class="d-flex align-items-center gap-2 mb-2">
+            <span class="badge bg-warning text-dark rounded-pill">
+              <i class="bi bi-hourglass-split me-1"></i>En Sala de Espera
+            </span>
+            <div id="queue-pos-home-${pendingCita.id}" class="small"></div>
+          </div>
+          <div class="fw-bold text-dark mb-1">${dateStr}</div>
+          <div class="d-flex align-items-center gap-3 text-muted small mb-2">
+            <span><i class="bi bi-clock me-1"></i>${timeStr}</span>
+            <span><i class="bi bi-${pendingCita.tipoServicio === 'Psicologo' ? 'chat-heart' : 'bandaid'} me-1"></i>${pendingCita.tipoServicio}</span>
+          </div>
+          <div class="d-flex gap-2">
+            <button class="btn btn-sm btn-outline-warning rounded-pill flex-fill fw-bold" onclick="Medi.prepararEdicion('${encoded}')">
+              <i class="bi bi-pencil me-1"></i>Re-agendar
+            </button>
+            <button class="btn btn-sm btn-outline-danger rounded-pill flex-fill fw-bold" onclick="Medi.solicitarCancelacion('${pendingCita.id}')">
+              <i class="bi bi-x-lg me-1"></i>Cancelar
+            </button>
+          </div>
+        </div>
+      </div>`;
+    container.classList.remove('d-none');
+
+    // Load queue position into the home card too
+    _loadQueuePosition(pendingCita.id, pendingCita.tipoServicio, pendingCita.safeDate, `queue-pos-home-${pendingCita.id}`);
+  }
+
+  /** Grid 2x2 de acciones rapidas */
+  function _renderQuickActions() {
+    const container = document.getElementById('medi-quick-actions');
+    if (!container) return;
+
+    const actions = [
+      { icon: 'calendar-plus-fill', label: 'Nueva Cita', color: '#0d6efd', bg: 'rgba(13,110,253,0.08)', tab: 'medi-tab-agendar' },
+      { icon: 'calendar-week', label: 'Mis Citas', color: '#0dcaf0', bg: 'rgba(13,202,240,0.08)', tab: 'medi-tab-citas' },
+      { icon: 'chat-dots-fill', label: 'Mensajes', color: '#6f42c1', bg: 'rgba(111,66,193,0.08)', action: 'chat' },
+      { icon: 'clipboard2-pulse-fill', label: 'Expediente', color: '#198754', bg: 'rgba(25,135,84,0.08)', tab: 'medi-tab-historial' }
+    ];
+
+    container.innerHTML = actions.map(a => {
+      const onclick = a.action === 'chat'
+        ? `Medi.toggleStudentChat()`
+        : `Medi._switchMediTab('${a.tab}')`;
+      return `
+      <div class="col-6">
+        <div class="medi-quick-card card border-0 shadow-sm rounded-4 text-center p-3" onclick="${onclick}">
+          <div class="mx-auto mb-2 d-flex align-items-center justify-content-center rounded-circle" style="width:44px;height:44px;background:${a.bg};">
+            <i class="bi bi-${a.icon}" style="font-size:1.2rem;color:${a.color};"></i>
+          </div>
+          <div class="fw-bold small text-dark">${a.label}</div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  /** Cambio programatico de tab principal */
+  function _switchMediTab(tabPaneId) {
+    const tabsContainer = document.getElementById('medi-student-tabs');
+    if (!tabsContainer) return;
+
+    const targetBtn = tabsContainer.querySelector(`[data-bs-target="#${tabPaneId}"]`);
+    if (targetBtn && window.bootstrap) {
+      const tab = new bootstrap.Tab(targetBtn);
+      tab.show();
+      // Scroll to top of tabs area
+      const app = document.getElementById('medi-student-app');
+      if (app) app.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }
+
+  /** Badge de mensajes no leidos en Quick Actions */
+  function _updateChatBadgeOnTab(count) {
+    // Update the quick action card for messages
+    const quickActions = document.getElementById('medi-quick-actions');
+    if (!quickActions) return;
+    const msgBadge = quickActions.querySelector('.medi-chat-badge-qa');
+    if (count > 0 && !msgBadge) {
+      const msgCard = quickActions.querySelectorAll('.medi-quick-card')[2];
+      if (msgCard) {
+        const badge = document.createElement('span');
+        badge.className = 'medi-chat-badge-qa position-absolute top-0 end-0 translate-middle badge rounded-pill bg-danger';
+        badge.style.fontSize = '0.6rem';
+        badge.textContent = count > 9 ? '9+' : count;
+        msgCard.style.position = 'relative';
+        msgCard.appendChild(badge);
+      }
+    } else if (msgBadge) {
+      if (count === 0) msgBadge.remove();
+      else msgBadge.textContent = count > 9 ? '9+' : count;
+    }
+  }
+
+  /** Helper: timestamp relativo ("hace 5 min", "ayer", etc.) */
+  function _relativeTime(date) {
+    const now = new Date();
+    const diff = Math.floor((now - date) / 1000);
+    if (diff < 60) return 'ahora';
+    if (diff < 3600) return `hace ${Math.floor(diff / 60)} min`;
+    if (diff < 86400) return `hace ${Math.floor(diff / 3600)}h`;
+    if (diff < 172800) return 'ayer';
+    return date.toLocaleDateString('es-MX', { day: 'numeric', month: 'short' });
+  }
+
+  /** Verifica localStorage y lanza tutorial en primera visita */
+  function initMediTutorial(uid) {
+    // Usamos la misma clave que usa internamente el componente sia-onboarding-tour (_markCompleted)
+    // para que no reaparezca tras haber sido completado.
+    const SIA_TOUR_VERSION = 'v2';
+    const componentKey = `sia_tutorial_done_${SIA_TOUR_VERSION}_${uid}`;
+    // Clave adicional especifica del modulo medico
+    const mediKey = `sia_medi_tour_v1_${uid}`;
+
+    if (localStorage.getItem(componentKey) || localStorage.getItem(mediKey)) return;
+    // Delay para que el DOM este listo
+    setTimeout(() => launchMediTutorial(), 800);
+  }
+
+  /** Crea instancia de sia-onboarding-tour con pasos del modulo medico */
+  function launchMediTutorial() {
+    const uid = _ctx && _ctx.user ? _ctx.user.uid : '';
+    const mediKey = `sia_medi_tour_v1_${uid}`;
+
+    // Remove existing tour if any
+    const existing = document.querySelector('sia-onboarding-tour.medi-tour');
+    if (existing) existing.remove();
+
+    // Pasos del tutorial del modulo medico
+    const mediSteps = [
+      {
+        target: null,
+        title: 'Bienvenido al Servicio Medico',
+        description: 'Aqui puedes agendar citas medicas y de psicologia, ver tu historial y chatear con profesionales de salud.',
+        position: 'center'
+      },
+      {
+        target: '#medi-hero',
+        title: 'Tu Dashboard Medico',
+        description: 'Tu panel principal con informacion personalizada y acceso rapido a tu proxima cita.',
+        position: 'bottom'
+      },
+      {
+        target: '#medi-emergency-chip',
+        title: 'Datos de Emergencia',
+        description: 'Manten actualizados tu tipo de sangre, alergias y contacto de emergencia. Toca "Editar" para actualizarlos.',
+        position: 'bottom'
+      },
+      {
+        target: '#medi-quick-actions',
+        title: 'Acciones Rapidas',
+        description: 'Accede rapidamente a las funciones mas usadas: agendar cita, ver tus citas, mensajes y expediente.',
+        position: 'top'
+      },
+      {
+        target: '[data-bs-target="#medi-tab-agendar"]',
+        title: 'Agendar una Cita',
+        description: 'Selecciona el tipo de servicio, elige fecha y hora disponible, y confirma tu reservacion.',
+        position: 'bottom'
+      },
+      {
+        target: '[data-bs-target="#medi-tab-citas"]',
+        title: 'Tus Citas Activas',
+        description: 'Revisa el estado de tus citas: pendientes, confirmadas o canceladas. Puedes re-agendar o cancelar desde aqui.',
+        position: 'bottom'
+      },
+      {
+        target: '[data-bs-target="#medi-tab-historial"]',
+        title: 'Tu Historial Medico',
+        description: 'Consulta tu expediente con diagnosticos, tratamientos y notas de tus consultas anteriores.',
+        position: 'bottom'
+      },
+      {
+        target: null,
+        title: 'Todo listo!',
+        description: 'Ya conoces las herramientas del servicio medico. Si necesitas ayuda, toca el boton "Tutorial" en cualquier momento.',
+        position: 'center'
+      }
+    ];
+
+    const tour = document.createElement('sia-onboarding-tour');
+    tour.className = 'medi-tour';
+
+    // IMPORTANTE: appendChild dispara connectedCallback → _defineSteps() que sobreescribe _steps.
+    // Por eso asignamos los steps DESPUES de insertar en el DOM.
+    document.body.appendChild(tour);
+
+    // Ahora sobrescribimos los steps del dashboard con los del modulo medico
+    tour._steps = mediSteps;
+
+    // Parchamos _markCompleted para que guarde tambien nuestra clave de modulo
+    const _origMarkCompleted = tour._markCompleted.bind(tour);
+    tour._markCompleted = function () {
+      _origMarkCompleted();
+      localStorage.setItem(mediKey, 'done');
+    };
+
+    // Start tour
+    if (typeof tour.start === 'function') {
+      tour.start();
+    }
   }
 
   function loadWellnessFeed() {
@@ -2563,7 +2882,7 @@ var Medi = (function () {
       panel.style.zIndex = '2001'; // Above detail modal and everything
 
       panel.innerHTML = `
-        <div class="bg-primary text-white p-3 d-flex justify-content-between align-items-center flex-shrink-0">
+        <div class="text-white p-3 d-flex justify-content-between align-items-center flex-shrink-0" style="background: linear-gradient(135deg, #1B396A 0%, #0d6efd 100%); border-radius: 1rem 1rem 0 0;">
             <div class="fw-bold"><i class="bi bi-chat-dots me-2"></i>Mis Mensajes</div>
             <button class="btn btn-sm btn-link text-white p-0" onclick="Medi.toggleStudentChat()"><i class="bi bi-x-lg"></i></button>
         </div>
@@ -2602,6 +2921,8 @@ var Medi = (function () {
         badge.textContent = total;
         badge.classList.toggle('d-none', total === 0);
       }
+      // [NEW] Update quick action badge
+      _updateChatBadgeOnTab(total);
     });
   }
 
@@ -2620,7 +2941,7 @@ var Medi = (function () {
     list.innerHTML = convs.map(c => {
       const unread = c.unreadByStudent || 0;
       const time = c.lastMessageAt ? (typeof c.lastMessageAt.toDate === 'function' ? c.lastMessageAt.toDate() : new Date(c.lastMessageAt)) : null;
-      const timeStr = time ? time.toLocaleDateString() : '';
+      const timeStr = time ? _relativeTime(time) : '';
 
       return `
         <div class="card border-0 shadow-sm mb-2 cursor-pointer hover-bg-light transition-all" onclick="Medi.openStudentThread('${c.id}', '${escapeHtml(c.profesionalName)}', '${c.profesionalId}')">
@@ -2682,6 +3003,318 @@ var Medi = (function () {
     MediChatService.markAsRead(_ctx, convId, 'student');
   }
 
+  // --- MISSING STUDENT FUNCTIONS IMPORTED FROM ADMIN.MEDI.JS ---
+
+  function showConsultationDetails(jsonExp) {
+    const exp = JSON.parse(decodeURIComponent(jsonExp));
+
+    // Header y Doctor
+    const dateObj = exp.safeDate ? new Date(exp.safeDate) : new Date();
+    document.getElementById('detail-date-header').textContent = `${exp.tipoServicio} • ${dateObj.toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' })} `;
+    document.getElementById('detail-doctor').textContent = exp.autorEmail || 'Profesional de Salud';
+
+    // Signos Vitales — el admin guarda en campos raiz (exp.temp, exp.presion...)
+    // pero algunos registros anteriores pueden usar exp.signos. Soportamos ambos.
+    const v = exp.signos || {};
+    const temp    = exp.temp    || v.temp    || null;
+    const presion = exp.presion || v.presion || null;
+    const peso    = exp.peso    || v.peso    || null;
+    const talla   = exp.talla   || v.talla   || null;
+
+    document.getElementById('detail-temp').textContent    = temp    ? `${temp}°C` : '--';
+    document.getElementById('detail-presion').textContent = presion || '--';
+    document.getElementById('detail-peso').textContent    = peso    ? `${peso} kg` : '--';
+
+    // Mostrar talla si el elemento existe
+    const detailTalla = document.getElementById('detail-talla');
+    if (detailTalla) detailTalla.textContent = talla ? `${talla} cm` : '--';
+
+    // Contenido SOAP
+    document.getElementById('detail-subjetivo').textContent = exp.subjetivo || 'No registrado';
+    document.getElementById('detail-diagnosis').textContent = exp.diagnostico || 'No registrado';
+    document.getElementById('detail-plan').textContent = exp.plan || (exp.meds ? exp.meds : 'Seguir indicaciones generales.');
+
+    // Acción del Botón Imprimir
+    const btnPrint = document.getElementById('btn-print-receta');
+    const newBtn = btnPrint.cloneNode(true);
+    btnPrint.parentNode.replaceChild(newBtn, btnPrint);
+
+    newBtn.onclick = () => {
+      // Obtenemos perfil del alumno para la receta
+      const studentProfile = _ctx.profile || {};
+
+      // Llamada al generador profesional
+      PDFGenerator.generateProfessionalPrescription({
+        doctor: {
+          name: exp.autorEmail.split('@')[0].toUpperCase(),
+          specialty: exp.tipoServicio,
+          email: exp.autorEmail,
+          cedula: exp.cedula || '' // Usar la cedula guardada en el doc
+        },
+        student: {
+          name: studentProfile.displayName || _ctx.user.email,
+          matricula: studentProfile.matricula || '--',
+          carrera: studentProfile.carrera || '--'
+        },
+        consultation: {
+          date: dateObj,
+          signs: { temp, presion, peso, talla },
+          diagnosis: exp.diagnostico,
+          treatment: exp.plan || exp.meds
+        }
+      });
+    };
+
+    // Z-INDEX FIX: Ensure Details Modal is above Full Record
+    const detailModalEl = document.getElementById('modalDetalleConsulta');
+    detailModalEl.style.zIndex = "1061";
+
+    const dSubjetivo = document.getElementById('detail-subjetivo');
+    const dDiagnosis = document.getElementById('detail-diagnosis');
+    const dPlan = document.getElementById('detail-plan');
+    const dDate = document.getElementById('detail-date-header');
+
+    dDate.innerHTML = `<i class="bi bi-calendar-event me-1"></i> ${dateObj.toLocaleDateString()} ${dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} `;
+    dSubjetivo.textContent = exp.subjetivo || "Sin detalles subjetivos.";
+    dDiagnosis.textContent = exp.diagnostico || "Sin diagnóstico registrado.";
+    dPlan.textContent = exp.plan || "Sin plan de tratamiento.";
+
+    if (document.getElementById('detail-doctor')) {
+      document.getElementById('detail-doctor').textContent = `${exp.autorEmail || 'Profesional de Salud'} (${exp.tipoServicio || 'General'})`;
+    }
+
+    // Modal show depends on Bootstrap
+    const detailModal = new bootstrap.Modal(document.getElementById('modalDetalleConsulta'));
+    detailModal.show();
+  }
+
+  function solicitarCancelacion(citaId) {
+    const modalEl = document.getElementById('modalMediCancelParams');
+    if (!modalEl) {
+      // Fallback a modal simple si el de parametros no esta (En medi.js esta como modalCancelCita en unos lados, pero el ID principal es modalCancelCita o modalMediCancelParams)
+      const altModalEl = document.getElementById('modalCancelCita');
+      if (altModalEl) {
+        const altModal = new bootstrap.Modal(altModalEl);
+        const confirmBtn = document.getElementById('btn-confirm-cancel');
+        confirmBtn.onclick = async () => {
+          const reason = document.getElementById('cancel-reason').value.trim() || 'Cancelado por el estudiante';
+          const org = confirmBtn.innerHTML;
+          confirmBtn.disabled = true;
+          confirmBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+          try {
+            await MediService.cancelarCitaEstudiante(_ctx, citaId, reason);
+            showToast("Cita cancelada", "success");
+            altModal.hide();
+          } catch (err) {
+            console.error(err);
+            showToast("Error cancelando", "danger");
+          } finally {
+            confirmBtn.disabled = false;
+            confirmBtn.innerHTML = org;
+          }
+        };
+        altModal.show();
+        return;
+      }
+      return showToast("Modal de cancelación no encontrado", "danger");
+    }
+
+    const modal = new bootstrap.Modal(modalEl);
+
+    document.getElementById('cancel-cita-id').value = citaId;
+    document.getElementById('cancel-other').value = "";
+
+    const form = document.getElementById('form-medi-cancel-reason');
+
+    form.onsubmit = async (e) => {
+      e.preventDefault();
+      const reason = document.getElementById('cancel-other').value.trim();
+      if (!reason) return showToast("Indica un motivo", "warning");
+
+      const btn = form.querySelector('button[type="submit"]');
+      const org = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+
+      try {
+        await MediService.cancelarCitaEstudiante(_ctx, citaId, reason);
+        showToast("Cita cancelada", "success");
+        modal.hide();
+      } catch (err) {
+        console.error(err);
+        showToast("Error cancelando", "danger");
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = org;
+      }
+    };
+
+    modal.show();
+  }
+
+  function prepararEdicion(jsonCita) {
+    const cita = JSON.parse(decodeURIComponent(jsonCita));
+    const modalEl = document.getElementById('modalMediReschedule');
+    const modal = new bootstrap.Modal(modalEl);
+
+    // Fill hidden inputs
+    document.getElementById('resched-cita-id').value = cita.id;
+    document.getElementById('resched-old-slot').value = cita.slotId;
+    document.getElementById('resched-tipo').value = cita.tipoServicio || 'Médico';
+    document.getElementById('resched-date').value = '';
+    document.getElementById('resched-time').value = '';
+
+    // Reset UI
+    const btnConfirm = document.getElementById('btn-resched-confirm');
+    if (btnConfirm) btnConfirm.disabled = true;
+    const summaryEl = document.getElementById('resched-summary');
+    if (summaryEl) summaryEl.classList.add('d-none');
+    const timeGrid = document.getElementById('resched-time-grid');
+    if (timeGrid) { timeGrid.innerHTML = ''; timeGrid.classList.add('d-none'); }
+    const timeMsg = document.getElementById('resched-time-msg');
+    if (timeMsg) { timeMsg.classList.remove('d-none'); timeMsg.innerHTML = '<i class="bi bi-calendar-check d-block mb-1"></i> Selecciona un d\\u00eda primero'; }
+
+    // Render date cards
+    const dateSelector = document.getElementById('resched-date-selector');
+    const days = [];
+    let curr = new Date();
+    while (days.length < 10) {
+      if (isWeekday(curr)) days.push(new Date(curr));
+      curr.setDate(curr.getDate() + 1);
+    }
+
+    dateSelector.innerHTML = days.map(d => {
+      const isoDate = MediService.toISO(d);
+      const isToday = d.getDate() === new Date().getDate() && d.getMonth() === new Date().getMonth();
+      const displayDay = isToday ? 'HOY' : d.toLocaleDateString('es-MX', { weekday: 'short' }).toUpperCase();
+      return `
+        <div class="date-option p-2 text-center border rounded-3 bg-white shadow-sm flex-shrink-0"
+             style="min-width: 70px; cursor: pointer;" data-date="${isoDate}"
+             onclick="Medi._reschedSelectDate(this, '${isoDate}')">
+          <div class="small text-muted mb-0">${displayDay}</div>
+          <div class="fw-bold fs-5">${d.getDate()}</div>
+          <div class="small text-primary fw-bold">${d.toLocaleDateString('es-MX', { month: 'short' }).toUpperCase()}</div>
+        </div>`;
+    }).join('');
+
+    // Form submit handler
+    const form = document.getElementById('form-medi-reschedule');
+    form.onsubmit = async (e) => {
+      e.preventDefault();
+      const newDateStr = document.getElementById('resched-date').value;
+      const newTimeStr = document.getElementById('resched-time').value;
+
+      if (!newDateStr || !newTimeStr) return showToast("Selecciona fecha y hora", "warning");
+
+      const btn = document.getElementById('btn-resched-confirm');
+      const original = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+
+      try {
+        const [y, m, day] = newDateStr.split('-').map(Number);
+        const [hh, mm] = newTimeStr.split(':').map(Number);
+        const newDate = new Date(y, m - 1, day, hh, mm);
+        const tipo = document.getElementById('resched-tipo').value || cita.tipoServicio;
+
+        await MediService.modificarCita(_ctx, cita.id, {
+          date: newDate,
+          slotId: `${MediService.slotIdFromDate(newDate)}_${tipo}`,
+          tipo: tipo,
+          motivo: cita.motivo
+        });
+        showToast("Cita re-agendada con éxito", "success");
+        modal.hide();
+      } catch (err) {
+        console.error(err);
+        showToast(err.message || "Error al reagendar", "danger");
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = original;
+      }
+    };
+
+    modal.show();
+  }
+
+  // Reschedule helpers (called from onclick in modal)
+  async function _reschedSelectDate(el, dateStr) {
+    // Update hidden input
+    document.getElementById('resched-date').value = dateStr;
+    document.getElementById('resched-time').value = '';
+    document.getElementById('btn-resched-confirm').disabled = true;
+    document.getElementById('resched-summary').classList.add('d-none');
+
+    // Visual selection
+    el.closest('.medi-resched-dates').querySelectorAll('.date-option').forEach(c => {
+      c.classList.remove('bg-primary', 'text-white', 'border-primary');
+      c.classList.add('bg-white');
+    });
+    el.classList.remove('bg-white');
+    el.classList.add('bg-primary', 'text-white', 'border-primary');
+
+    // Load slots
+    const timeGrid = document.getElementById('resched-time-grid');
+    const timeMsg = document.getElementById('resched-time-msg');
+    timeGrid.classList.add('d-none');
+    timeMsg.classList.remove('d-none');
+    timeMsg.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Buscando disponibilidad...';
+
+    const targetDate = new Date(dateStr + 'T12:00:00');
+    const slots = buildSlotsForDate(targetDate);
+    const tipo = document.getElementById('resched-tipo').value || 'Médico';
+    let occupied = [];
+
+    try {
+      occupied = await MediService.getOccupiedSlots(_ctx, targetDate, tipo);
+    } catch (e) { console.error("Error fetching slots for reschedule:", e); }
+
+    timeGrid.innerHTML = '';
+    slots.forEach(slot => {
+      const tStr = `${slot.getHours().toString().padStart(2, '0')}:${slot.getMinutes().toString().padStart(2, '0')}`;
+      const baseId = MediService.slotIdFromDate(slot);
+      const slotId = `${baseId}_${tipo}`;
+      const isTaken = occupied.includes(slotId);
+
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = `btn btn-sm rounded-pill fw-bold ${isTaken ? 'btn-light text-muted pe-none opacity-50' : 'btn-outline-primary'}`;
+      btn.style.cssText = 'min-width: 70px;';
+      btn.textContent = tStr;
+      if (isTaken) btn.innerHTML = `<s>${tStr}</s>`;
+
+      if (!isTaken) {
+        btn.onclick = () => {
+          timeGrid.querySelectorAll('button').forEach(b => {
+            b.classList.remove('btn-primary', 'text-white');
+            b.classList.add('btn-outline-primary');
+          });
+          btn.classList.remove('btn-outline-primary');
+          btn.classList.add('btn-primary', 'text-white');
+
+          document.getElementById('resched-time').value = tStr;
+          document.getElementById('btn-resched-confirm').disabled = false;
+
+          // Update summary
+          const dParts = dateStr.split('-');
+          const dateObj = new Date(dParts[0], dParts[1] - 1, dParts[2]);
+          const dateTextFull = dateObj.toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' });
+          const sumText = document.getElementById('resched-summary-text');
+          sumText.textContent = `${dateTextFull.charAt(0).toUpperCase() + dateTextFull.slice(1)} • ${tStr} hrs`;
+          document.getElementById('resched-summary').classList.remove('d-none');
+        };
+      }
+      timeGrid.appendChild(btn);
+    });
+
+    if (slots.length === 0) {
+      timeGrid.innerHTML = '<div class="text-muted small w-100 text-center py-2">No hay horarios disponibles.</div>';
+    }
+
+    timeMsg.classList.add('d-none');
+    timeGrid.classList.remove('d-none');
+  }
+
   async function sendStudentMessage() {
     const input = document.getElementById('stu-chat-input');
     const text = input.value.trim();
@@ -2707,7 +3340,7 @@ var Medi = (function () {
 
     try {
       const student = _ctx.user;
-      // [FIX] Use profileIdOverride if provided to enforce distinct conversations (e.g. Medico vs Psicologo)
+      // [FIX] Use profileIdOverride if provided to enforce distinct conversations (e.g. Médico vs Psicologo)
       // even if they share the same Admin UID.
       const targetProfileId = profileIdOverride || profId;
 
@@ -2750,7 +3383,7 @@ var Medi = (function () {
         const statusColor = d.estado === 'finalizada' ? 'success' : (d.estado === 'borrador' ? 'warning' : 'secondary');
 
         return `
-  < div class="list-group-item list-group-item-action border-0 mb-1 rounded-3 px-3 py-2 cursor-pointer" onclick = "Medi.showConsultationDetails('${encodeURIComponent(JSON.stringify(d))}')" >
+            <div class="list-group-item list-group-item-action border-0 mb-1 rounded-3 px-3 py-2 cursor-pointer" onclick="Medi.showConsultationDetails('${encodeURIComponent(JSON.stringify(d))}')">
                 <div class="d-flex w-100 justify-content-between align-items-center">
                     <h6 class="mb-0 small fw-bold text-truncate" style="max-width: 180px;">${d.patientName}</h6>
                     <small class="text-muted" style="font-size:0.65rem;">${date} ${time}</small>
@@ -2761,7 +3394,7 @@ var Medi = (function () {
                     </span>
                     <small class="text-muted extra-small">${d.tipoServicio || ''}</small>
                 </div>
-            </div > `;
+            </div>`;
       }).join('');
     });
   }
@@ -2775,14 +3408,14 @@ var Medi = (function () {
       const profName = _currentProfile ? _currentProfile.displayName : (_ctx.user.displayName || 'Profesional');
 
       // [FIX] Admin Context Alignment
-      // If we are operating as 'Medico' or 'Psicologo' but distinct from the base user ID context,
+      // If we are operating as 'Médico' or 'Psicologo' but distinct from the base user ID context,
       // we must use the Composite Profile ID to match what the Student sees.
-      // E.g. If I am 'Medico', I should use 'UID_Medico' as my profileId if I don't have a specific Shift Profile.
+      // E.g. If I am 'Médico', I should use 'UID_Médico' as my profileId if I don't have a specific Shift Profile.
       // This ensures the student sees 'Atención Médica' chat, not 'Admin' chat.
 
       let profileContextId = _currentProfile ? _currentProfile.id : null;
 
-      if (!profileContextId && (_myRole === 'Medico' || _myRole === 'Psicologo')) {
+      if (!profileContextId && (_myRole === 'Médico' || _myRole === 'Psicologo')) {
         profileContextId = `${_myUid}_${_myRole} `;
         profId = _myUid; // Keep original UID as owner
       }
@@ -2836,36 +3469,35 @@ var Medi = (function () {
     if (existing) existing.remove();
 
     const html = `
-  < div class= "modal fade" id = "${modalId}" tabindex = "-1" aria - hidden="true" >
-    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
-      <div class="modal-content rounded-4 border-0 shadow-lg">
-        <div class="modal-header border-bottom-0 pb-0">
-          <div>
-            <h5 class="modal-title fw-bold text-dark mb-0"><i class="bi bi-clock-history text-primary me-2"></i>Historial Reciente</h5>
-            <p class="text-muted small mb-0">Consultas finalizadas</p>
-          </div>
-          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-        </div>
-
-        <div class="modal-body p-0">
-          <!-- Filtros -->
-          <div class="px-4 py-3 bg-light border-bottom sticky-top" style="z-index:1020;">
-            <div class="d-flex gap-2">
-              <button class="btn btn-sm btn-dark rounded-pill px-3 fw-bold filter-btn active" onclick="Medi._setRecentFilter('all', this)">Todas</button>
-              <button class="btn btn-sm btn-outline-secondary rounded-pill px-3 fw-bold filter-btn" onclick="Medi._setRecentFilter('registered', this)">Registradas</button>
-              <button class="btn btn-sm btn-outline-secondary rounded-pill px-3 fw-bold filter-btn" onclick="Medi._setRecentFilter('anonymous', this)">Anónimas</button>
+    <div class="modal fade" id="${modalId}" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
+        <div class="modal-content rounded-4 border-0 shadow-lg">
+          <div class="modal-header border-bottom-0 pb-0">
+            <div>
+              <h5 class="modal-title fw-bold text-dark mb-0"><i class="bi bi-clock-history text-primary me-2"></i>Historial Reciente</h5>
+              <p class="text-muted small mb-0">Consultas finalizadas</p>
             </div>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
           </div>
-
-          <!-- Lista -->
-          <div id="all-recent-list" class="list-group list-group-flush p-2">
-            <div class="text-center py-5"><span class="spinner-border text-primary"></span></div>
+  
+          <div class="modal-body p-0">
+            <!-- Filtros -->
+            <div class="px-4 py-3 bg-light border-bottom sticky-top" style="z-index:1020;">
+              <div class="d-flex gap-2">
+                <button class="btn btn-sm btn-dark rounded-pill px-3 fw-bold filter-btn active" onclick="Medi._setRecentFilter('all', this)">Todas</button>
+                <button class="btn btn-sm btn-outline-secondary rounded-pill px-3 fw-bold filter-btn" onclick="Medi._setRecentFilter('registered', this)">Registradas</button>
+                <button class="btn btn-sm btn-outline-secondary rounded-pill px-3 fw-bold filter-btn" onclick="Medi._setRecentFilter('anonymous', this)">Anónimas</button>
+              </div>
+            </div>
+  
+            <!-- Lista -->
+            <div id="all-recent-list" class="list-group list-group-flush p-2">
+              <div class="text-center py-5"><span class="spinner-border text-primary"></span></div>
+            </div>
           </div>
         </div>
       </div>
-    </div>
-      </div >
-  `;
+    </div>`;
 
     const d = document.createElement('div');
     d.innerHTML = html;
@@ -3108,7 +3740,14 @@ onclick = "Medi.showConsultationQuickDetail('${encoded}')" >
     showAllRecentModal,
     showConsultationQuickDetail,
     saveState,
-    restoreState
+    prepararEdicion,
+    solicitarCancelacion,
+    showConsultationDetails,
+    _reschedSelectDate,
+    restoreState,
+    // [NEW] Exported for onclick handlers
+    _switchMediTab,
+    launchMediTutorial
   };
 
 
@@ -3143,10 +3782,16 @@ onclick = "Medi.showConsultationQuickDetail('${encoded}')" >
     if (dateInput) state.selectedValues.date = dateInput.value;
     if (timeInput) state.selectedValues.time = timeInput.value;
 
-    // Guardar tab activo si hay pestañas
+    // Guardar tab activo si hay pestañas (sub-tabs de citas)
     const activeTab = document.querySelector('#medi-citas-tabs .nav-link.active');
     if (activeTab) {
       state.activeTab = activeTab.getAttribute('data-bs-target');
+    }
+
+    // [NEW] Guardar tab principal activo
+    const mainTab = document.querySelector('#medi-student-tabs .nav-link.active');
+    if (mainTab) {
+      state.activeMainTab = mainTab.getAttribute('data-bs-target');
     }
 
     // Guardar qué sección está visible
@@ -3213,9 +3858,14 @@ onclick = "Medi.showConsultationQuickDetail('${encoded}')" >
       }
     }
 
-    // Restaurar tab activo
+    // [NEW] Restaurar tab principal
+    if (state.activeMainTab) {
+      setTimeout(() => _switchMediTab(state.activeMainTab.replace('#', '')), 200);
+    }
+
+    // Restaurar sub-tab activo (citas)
     if (state.activeTab) {
-      const tabButton = document.querySelector(`[data - bs - target= "${state.activeTab}"]`);
+      const tabButton = document.querySelector(`[data-bs-target="${state.activeTab}"]`);
       if (tabButton) {
         setTimeout(() => {
           const tab = new bootstrap.Tab(tabButton);

@@ -1,16 +1,16 @@
 
 class SiaLandingView extends HTMLElement {
-   constructor() {
-      super();
-   }
+  constructor() {
+    super();
+  }
 
-   connectedCallback() {
-      this.render();
-   }
+  connectedCallback() {
+    this.render();
+  }
 
-   render() {
-      this.className = 'd-none'; // Initially hidden
-      this.innerHTML = `
+  render() {
+    this.className = 'd-none'; // Initially hidden
+    this.innerHTML = `
 
     <!-- NAVBAR FLOTANTE (Píldora con CTA prominente) -->
     <div class="fixed-top d-flex justify-content-center mt-3" style="z-index: 1030;">
@@ -250,9 +250,21 @@ class SiaLandingView extends HTMLElement {
                   <span class="aviso-badge" style="background: rgba(16,185,129,0.2); color: #34d399;">Sistema</span>
                   <span style="font-size: 0.75rem; color: rgba(255,255,255,0.35);">10 Ene 2026</span>
                 </div>
-                <h5 class="fw-bold mb-1" style="font-size: 1.05rem; color: #fff;">Nuevos M&oacute;dulos Disponibles</h5>
+                <h5 class="fw-bold mb-1" style="font-size: 1.05rem; color: #fff;">Nuevos Módulos Disponibles</h5>
                 <p class="mb-0" style="color: rgba(255,255,255,0.5); font-size: 0.85rem;">
-                  Foro Estudiantil, Encuestas y Reportes Acad&eacute;micos ahora integrados en SIA.
+                  Foro Estudiantil, Encuestas y Reportes Académicos ahora integrados en SIA.
+                </p>
+              </div>
+
+              <!-- NUEVO: TEST VOCACIONAL PROMO -->
+              <div class="aviso-card flex-grow-1 p-4" onclick="window.location.hash='#/test-vocacional'" style="cursor: pointer; border: 1px solid rgba(13,110,253,0.3); background: rgba(13,110,253,0.05);">
+                <div class="d-flex align-items-center gap-2 mb-2">
+                  <span class="aviso-badge" style="background: rgba(13,110,253,0.2); color: #4facfe;"><i class="bi bi-compass-fill me-1"></i>Nuevo Ingreso</span>
+                </div>
+                <h5 class="fw-bold mb-1" style="font-size: 1.05rem; color: #fff;">¿Aún no sabes qué estudiar?</h5>
+                <p class="mb-0" style="color: rgba(255,255,255,0.7); font-size: 0.85rem;">
+                  Realiza nuestro Test Vocacional gratuito y descubre tu carrera ideal en el ITES Los Cabos. 
+                  <span class="text-primary fw-bold d-block mt-2">Comenzar ahora &rarr;</span>
                 </p>
               </div>
 
@@ -472,42 +484,42 @@ class SiaLandingView extends HTMLElement {
     <button id="btn-login-microsoft" class="d-none"></button>
         `;
 
-      // Bind login events
-      setTimeout(() => {
-         const btnLoginNav = this.querySelector('#btn-login-hero-nav');
-         const btnLoginHero = this.querySelector('#btn-hero-cta-login');
+    // Bind login events
+    setTimeout(() => {
+      const btnLoginNav = this.querySelector('#btn-login-hero-nav');
+      const btnLoginHero = this.querySelector('#btn-hero-cta-login');
 
-         const triggerLogin = () => {
-            const btnMS = document.getElementById('btn-login-microsoft');
-            if (btnMS) btnMS.click();
-            else {
-               console.warn("Login button ref not found");
+      const triggerLogin = () => {
+        if (window.SIA && window.SIA.initiateMicrosoftLogin) {
+          window.SIA.initiateMicrosoftLogin();
+        } else {
+          console.warn("SIA.initiateMicrosoftLogin not found");
+        }
+      };
+
+      if (btnLoginNav) btnLoginNav.onclick = triggerLogin;
+      if (btnLoginHero) btnLoginHero.onclick = triggerLogin;
+
+      // Smooth scroll for anchor links
+      this.querySelectorAll('a[href^="#landing-"]').forEach(link => {
+        link.addEventListener('click', (e) => {
+          e.preventDefault();
+          const target = document.querySelector(link.getAttribute('href'));
+          if (target) {
+            target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            // Close mobile nav if open
+            const collapse = this.querySelector('#landingNavContent');
+            if (collapse && collapse.classList.contains('show')) {
+              const bsCollapse = bootstrap.Collapse.getInstance(collapse);
+              if (bsCollapse) bsCollapse.hide();
             }
-         };
-
-         if (btnLoginNav) btnLoginNav.onclick = triggerLogin;
-         if (btnLoginHero) btnLoginHero.onclick = triggerLogin;
-
-         // Smooth scroll for anchor links
-         this.querySelectorAll('a[href^="#landing-"]').forEach(link => {
-            link.addEventListener('click', (e) => {
-               e.preventDefault();
-               const target = document.querySelector(link.getAttribute('href'));
-               if (target) {
-                  target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                  // Close mobile nav if open
-                  const collapse = this.querySelector('#landingNavContent');
-                  if (collapse && collapse.classList.contains('show')) {
-                     const bsCollapse = bootstrap.Collapse.getInstance(collapse);
-                     if (bsCollapse) bsCollapse.hide();
-                  }
-               }
-            });
-         });
-      }, 100);
-   }
+          }
+        });
+      });
+    }, 100);
+  }
 }
 
 if (!customElements.get('sia-landing-view')) {
-   customElements.define('sia-landing-view', SiaLandingView);
+  customElements.define('sia-landing-view', SiaLandingView);
 }

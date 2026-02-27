@@ -14,10 +14,12 @@ export class Router {
             'view-superadmin-dashboard': '/superadmin', // [NEW]
             'view-lactario': '/lactario', // [NEW]
             'view-quejas': '/quejas',
-            'view-reportes': '/reportes',
             'view-encuestas': '/encuestas',
             'view-encuesta-publica': '/encuesta-publica',
-            'view-register': '/register'
+            'view-register': '/register',
+            'view-test-vocacional': '/test-vocacional',
+            'view-vocacional-test-active': '/vocacional/test',
+            'view-vocacional-admin': '/vocacional-admin'
         };
 
         // Reverse map for URL -> View ID
@@ -82,13 +84,15 @@ export class Router {
             else if (path.startsWith('/lactario')) viewId = 'view-lactario';
             else if (path.startsWith('/quejas')) viewId = 'view-quejas';
             else if (path.startsWith('/reportes')) viewId = 'view-reportes';
-            else if (path.startsWith('/encuesta-publica')) viewId = 'view-encuesta-publica';
             else if (path.startsWith('/encuestas')) viewId = 'view-encuestas';
             else if (path.startsWith('/superadmin')) viewId = 'view-superadmin-dashboard';
+            else if (path.startsWith('/test-vocacional')) viewId = 'view-test-vocacional';
+            else if (path.startsWith('/vocacional/test')) viewId = 'view-vocacional-test-active';
+            else if (path.startsWith('/vocacional-admin')) viewId = 'view-vocacional-admin';
         }
 
-        // Public survey route - no auth required
-        if (viewId === 'view-encuesta-publica') {
+        // Public routes - no auth required
+        if (viewId === 'view-encuesta-publica' || viewId === 'view-test-vocacional' || viewId === 'view-vocacional-test-active') {
             this._renderView(viewId);
             return;
         }
@@ -110,6 +114,18 @@ export class Router {
 
     // Separated render logic from navigate to avoid loops
     _renderView(viewId) {
+        // Ocultar landing y app-shell si es una vista publica
+        if (viewId === 'view-test-vocacional' || viewId === 'view-vocacional-test-active' || viewId === 'view-encuesta-publica') {
+            const landing = document.getElementById('landing-view');
+            const appshell = document.getElementById('app-shell');
+            if (landing) landing.classList.add('d-none');
+            // Check if it's external or inner app
+            if (viewId !== 'view-encuesta-publica') {
+                if (appshell) appshell.classList.add('d-none');
+            }
+            document.querySelectorAll('.sia-public-view').forEach(el => el.classList.add('d-none'));
+        }
+
         // Hide all views first
         document.querySelectorAll('.app-view').forEach(el => el.classList.add('d-none'));
 
@@ -117,6 +133,14 @@ export class Router {
         const target = document.getElementById(viewId);
         if (target) {
             target.classList.remove('d-none');
+
+            // Forzar refresh si es landing de vocacional
+            if (viewId === 'view-test-vocacional') {
+                const landingComp = target.querySelector('vocacional-landing');
+                if (landingComp && typeof landingComp.refresh === 'function') {
+                    setTimeout(() => landingComp.refresh(), 0);
+                }
+            }
         } else {
             console.error(`Vista no encontrada: ${viewId}`);
             return;
@@ -261,8 +285,11 @@ export class Router {
 
     async _loadModuleDependencies(viewId) {
         const role = Store && Store.userProfile ? Store.userProfile.role : null;
-        const isMediAdmin = role === 'medico' || role === 'docente_medico' || role === 'Psicologo' || role === 'superadmin';
-        const isBiblioAdmin = role === 'biblio' || role === 'bibliotecario' || role === 'biblio_admin' || role === 'superadmin';
+        const profile = Store && Store.userProfile ? Store.userProfile : null;
+        const isMediAdmin = role === 'medico' || role === 'docente_medico' || role === 'Psicologo' || role === 'superadmin' ||
+            (role === 'department_admin' && profile && profile.permissions && profile.permissions.medi);
+        const isBiblioAdmin = role === 'biblio' || role === 'bibliotecario' || role === 'biblio_admin' || role === 'superadmin' ||
+            (role === 'department_admin' && profile && profile.permissions && profile.permissions.biblio);
         const isForoAdmin = (Store && Store.userProfile && Store.userProfile.permissions && (Store.userProfile.permissions.foro === 'admin' || Store.userProfile.permissions.foro === 'superadmin')) || (Store && Store.userProfile && Store.userProfile.email === 'difusion@loscabos.tecnm.mx');
 
         const modules = {
@@ -319,6 +346,10 @@ export class Router {
             'view-encuesta-publica': [
                 '/services/encuestas-service.js',
                 '/modules/encuestas.js'
+            ],
+            'view-vocacional-admin': [
+                '/services/vocacional-service.js',
+                '/modules/vocacional-admin.js'
             ]
         };
 
@@ -429,7 +460,9 @@ export class Router {
 
         if (viewId === 'view-biblio') {
             const role = Store && Store.userProfile ? Store.userProfile.role : null;
-            const isBiblioAdmin = role === 'biblio' || role === 'bibliotecario' || role === 'biblio_admin' || role === 'superadmin';
+            const profile = Store && Store.userProfile ? Store.userProfile : null;
+            const isBiblioAdmin = role === 'biblio' || role === 'bibliotecario' || role === 'biblio_admin' || role === 'superadmin' ||
+                (role === 'department_admin' && profile && profile.permissions && profile.permissions.biblio);
 
             if (isBiblioAdmin && window.AdminBiblio && window.AdminBiblio.init) {
                 window.AdminBiblio.init(ctx);
@@ -440,7 +473,9 @@ export class Router {
 
         if (viewId === 'view-medi') {
             const role = Store && Store.userProfile ? Store.userProfile.role : null;
-            const isMediAdmin = role === 'medico' || role === 'docente_medico' || role === 'Psicologo' || role === 'superadmin';
+            const profile = Store && Store.userProfile ? Store.userProfile : null;
+            const isMediAdmin = role === 'medico' || role === 'docente_medico' || role === 'Psicologo' || role === 'superadmin' ||
+                (role === 'department_admin' && profile && profile.permissions && profile.permissions.medi);
 
             if (isMediAdmin && window.AdminMedi && window.AdminMedi.init) {
                 window.AdminMedi.init(ctx);
@@ -487,6 +522,14 @@ export class Router {
                 window.Quejas.init(ctx);
             } else {
                 console.error('[Router] Quejas module not found!');
+            }
+        }
+
+        if (viewId === 'view-vocacional-admin') {
+            if (window.AdminVocacional && window.AdminVocacional.init) {
+                window.AdminVocacional.init(ctx);
+            } else {
+                console.error('[Router] AdminVocacional module not found!');
             }
         }
 

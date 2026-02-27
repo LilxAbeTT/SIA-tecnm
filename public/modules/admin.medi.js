@@ -1,4 +1,4 @@
-// modules/admin.medi.js
+﻿// modules/admin.medi.js
 // Sistema Profesional de Gestión Médica (v4.0 - Admin Context)
 
 var AdminMedi = (function () {
@@ -103,17 +103,17 @@ var AdminMedi = (function () {
       </div>
       ${student.alergias ? `<div class="alert alert-danger border-0 py-2 px-3 small mb-3"><i class="bi bi-exclamation-triangle-fill me-1"></i><strong>Alergias:</strong> ${escapeHtml(student.alergias)}</div>` : ''}
       <div class="d-grid gap-2">
-        <button class="btn btn-sm btn-primary rounded-pill fw-bold" onclick="Medi.startWalkIn('${encodeURIComponent(JSON.stringify(student))}')">
+        <button class="btn btn-sm btn-primary rounded-pill fw-bold" onclick="AdminMedi.startWalkIn('${encodeURIComponent(JSON.stringify(student))}')">
             <i class="bi bi-lightning-charge-fill me-1"></i>Atender Ahora
         </button>
         <div class="d-flex gap-2">
-            <button class="btn btn-sm btn-outline-dark flex-fill rounded-pill fw-bold" onclick="Medi.showFullRecord('${student.id || student.uid}')">
+            <button class="btn btn-sm btn-outline-dark flex-fill rounded-pill fw-bold" onclick="AdminMedi.showFullRecord('${student.id || student.uid}')">
               <i class="bi bi-folder2-open me-1"></i>Expediente
             </button>
-            <button class="btn btn-sm btn-outline-primary flex-fill rounded-pill" onclick="Medi.openManualBooking('book','${encodeURIComponent(JSON.stringify(student))}')" title="Reservar Cita">
+            <button class="btn btn-sm btn-outline-primary flex-fill rounded-pill" onclick="AdminMedi.openManualBooking('book','${encodeURIComponent(JSON.stringify(student))}')" title="Reservar Cita">
               <i class="bi bi-calendar-plus"></i>
             </button>
-            <button class="btn btn-sm btn-outline-secondary flex-fill rounded-pill" onclick="Medi.startChatWithStudent('${student.id || student.uid}', '${escapeHtml(student.displayName || student.email)}')">
+            <button class="btn btn-sm btn-outline-secondary flex-fill rounded-pill" onclick="AdminMedi.startChatWithStudent('${student.id || student.uid}', '${escapeHtml(student.displayName || student.email)}')">
               <i class="bi bi-chat-dots"></i>
             </button>
         </div>
@@ -215,7 +215,102 @@ var AdminMedi = (function () {
         border-bottom-color: #0d6efd;
         background: transparent !important;
       }
+
+      /* ── Agenda del Día: card por cita ── */
+      .medi-agenda-card {
+        background: #fff;
+        border-radius: 14px;
+        box-shadow: 0 2px 10px rgba(0,0,0,.07);
+        margin-bottom: 10px;
+        border-left: 4px solid #dee2e6;
+        transition: transform .15s ease, box-shadow .15s ease;
+        overflow: hidden;
+      }
+      .medi-agenda-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(0,0,0,.13);
+      }
+      .medi-agenda-card.is-next  { border-left-color: #0d6efd; background: #f0f7ff; }
+      .medi-agenda-card.is-late  { border-left-color: #dc3545; background: #fff5f5; }
+      .medi-agenda-card.can-attend { border-left-color: #198754; }
+
+      /* ── Actividad Reciente: card por consulta ── */
+      .medi-recent-card {
+        background: #fff;
+        border-radius: 14px;
+        box-shadow: 0 2px 10px rgba(0,0,0,.06);
+        margin-bottom: 8px;
+        transition: transform .15s ease, box-shadow .15s ease;
+      }
+      .medi-recent-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(0,0,0,.11);
+      }
+
+      /* ── Avatar circular inicial ── */
+      .medi-avatar {
+        width: 38px; height: 38px;
+        border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        font-weight: 700; font-size: .95rem;
+        flex-shrink: 0;
+      }
+
+      /* ── Animación fade-in escalonada ── */
+      .medi-agenda-card, .medi-recent-card {
+        animation: medi-fadein .25s ease both;
+      }
+      @keyframes medi-fadein {
+        from { opacity:0; transform: translateY(6px); }
+        to   { opacity:1; transform: translateY(0); }
+      }
+
+      /* ── Sección vacía ilustrada ── */
+      .medi-empty-state {
+        display: flex; flex-direction: column;
+        align-items: center; justify-content: center;
+        padding: 2rem 1rem; color: #adb5bd;
+      }
+      .medi-empty-state i { font-size: 2.5rem; margin-bottom: .75rem; }
+      .medi-empty-state p { font-size: .8rem; margin: 0; }
+
+      /* ── Modal Consulta: pills de signos vitales ── */
+      .soap-vital-pill {
+        background: #f0f7ff; border-radius: 12px;
+        padding: .6rem .5rem; text-align: center; flex: 1;
+        min-width: 52px;
+      }
+      .soap-vital-pill label { font-size: .58rem; color: #6c757d; font-weight: 700;
+        text-transform: uppercase; display: block; margin-bottom: 4px; }
+      .soap-vital-pill input { background: transparent; border: none; text-align: center;
+        font-weight: 700; font-size: .85rem; color: #1d4ed8; width: 100%; padding: 0; }
+      .soap-vital-pill input:focus { outline: none; }
+
+      /* ── Modal Agendar: date/time cards ── */
+      .adm-date-card { cursor: pointer; transition: all .15s ease; min-width: 68px;
+        border-radius: 12px; }
+      .adm-date-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,.1); }
+      .adm-date-card.selected { background: #eff6ff !important; border-color: #0d6efd !important; }
+      .adm-date-card.selected .day-num { color: #0d6efd; }
+
+      .adm-time-pill { min-width: 68px; font-size: .8rem; transition: all .12s ease;
+        border-radius: 20px !important; }
+
+      .shift-banner { background: linear-gradient(135deg,#f0f7ff,#e8f4fd);
+        border-radius: 12px; border: 1px solid #bfdbfe; }
+
+      /* ── Expediente: sidebar items ── */
+      .fr-history-item { border-left: 3px solid #dee2e6; transition: all .15s ease;
+        border-radius: 0 8px 8px 0; }
+      .fr-history-item:hover { border-left-color: #93c5fd; background: #f8faff; }
+      .fr-history-item.active { border-left-color: #0d6efd; background: #eff6ff; }
+      .fr-history-item.psico { border-left-color: #c4b5fd; }
+      .fr-history-item.psico.active { border-left-color: #7c3aed; background: #f3f0ff; }
+
+      /* ── Animación global ── */
+      .fade-slide-in { animation: medi-fadein .22s ease both; }
     </style>
+
     <section id="medi-student" class="d-none">
       <div class="row g-4">
         <!-- MAIN COLUMN (Left/Top on Mobile) -->
@@ -298,8 +393,8 @@ var AdminMedi = (function () {
                             style="border-color: rgba(255,255,255,0.1);"
                             onclick="
                                 document.getElementById('medi-cita-categoria').value='Medicina General'; 
-                                document.getElementById('medi-cita-tipo').value='Medico'; 
-                                window._selectedServiceDuration = 'Medico'; // Hint for slot generation 
+                                document.getElementById('medi-cita-tipo').value='Médico'; 
+                                window._selectedServiceDuration = 'Médico'; // Hint for slot generation 
                                 
                                 // Reset styles
                                 document.querySelectorAll('.service-btn').forEach(b => {
@@ -364,7 +459,7 @@ var AdminMedi = (function () {
                         </button>
                     </div>
                     <input type="hidden" id="medi-cita-categoria" required>
-                    <input type="hidden" id="medi-cita-tipo" value="Medico">
+                    <input type="hidden" id="medi-cita-tipo" value="Médico">
                   </div>
 
                   <div class="col-12 mt-4 d-none" id="medi-date-container">
@@ -568,190 +663,454 @@ var AdminMedi = (function () {
                <h6 class="fw-bold mb-0">Tu Agenda está Deshabilitada</h6>
                <p class="mb-0 small opacity-75">Los alumnos no pueden agendar contigo en este momento.</p>
            </div>
-           <button class="btn btn-sm btn-light text-danger fw-bold ms-auto rounded-pill" onclick="Medi.showAdminConfigModal()">Configurar</button>
+           <button class="btn btn-sm btn-light text-danger fw-bold ms-auto rounded-pill" onclick="AdminMedi.showAdminConfigModal()">Configurar</button>
        </div>
 
-       <!-- COMPACT HEADER BAR -->
-       <div class="d-flex align-items-center justify-content-between mb-3 px-1">
-          <div class="d-flex align-items-center gap-2">
-             <div class="bg-primary bg-opacity-10 p-2 rounded-circle text-primary position-relative" style="width:40px;height:40px;display:flex;align-items:center;justify-content:center;">
-                <i class="bi bi-person-badge-fill"></i>
-                <span class="position-absolute bottom-0 end-0 p-1 bg-success border border-2 border-white rounded-circle" style="width:10px;height:10px;"></span>
+       <!-- ============================================ -->
+       <!--          DASHBOARD HEADER                    -->
+       <!-- ============================================ -->
+       <div class="d-flex justify-content-between align-items-center mb-4 animate__animated animate__fadeIn">
+          <div class="d-flex align-items-center gap-3">
+             <div class="bg-white p-3 rounded-4 shadow-sm text-center" style="min-width: 60px;">
+                <i class="bi bi-heart-pulse-fill text-primary display-6"></i>
              </div>
              <div>
-                <h6 class="fw-bold mb-0 text-dark lh-1" id="medi-pro-name">Bienvenido</h6>
-                <div class="d-flex align-items-center gap-1 mt-1">
-                    <span class="badge bg-primary bg-opacity-10 text-primary border-0 small" id="medi-pro-esp">Cargando...</span>
-                    <span class="badge text-muted border small d-none" id="medi-shift-badge"></span>
+                <h3 class="fw-bold text-dark mb-0" id="medi-pro-name">Bienvenido</h3>
+                <div class="d-flex align-items-center gap-2 mt-1">
+                    <span class="badge bg-primary bg-opacity-10 text-primary border-0" id="medi-pro-esp">Cargando...</span>
+                    <span class="badge text-muted border d-none" id="medi-shift-badge"></span>
+                    <button id="btn-shift-selector" class="btn btn-xs btn-dark rounded-pill px-2 d-none" onclick="AdminMedi.setShift(null)" title="Cambiar Turno" style="font-size:.65rem;">
+                       <i class="bi bi-arrow-repeat me-1"></i>Turno
+                    </button>
                 </div>
              </div>
           </div>
-          <!-- Search + Actions -->
-          <div class="d-flex align-items-center gap-2">
-              <div class="input-group input-group-sm" style="max-width:280px;">
-                  <span class="input-group-text text-dark text-bold bg-transparent border-end-0">Buscar:</span>
-                  <input type="text" id="medi-search-paciente" class="form-control border-start-0 bg-transparent"
-                         placeholder="Buscar paciente..." onkeydown="if(event.key==='Enter'){event.preventDefault();Medi.buscarPaciente();}">
-              </div>
-              <button class="btn btn-sm btn-light border rounded-pill px-2" onclick="Medi.refreshAdmin()" title="Actualizar">
-                  <i class="bi bi-arrow-clockwise"></i>
-              </button>
-              <button class="btn btn-sm btn-light border rounded-pill px-2" onclick="Medi.showAdminConfigModal()" title="Configuración">
-                  <i class="bi bi-gear-fill"></i>
-              </button>
-              <button id="btn-shift-selector" class="btn btn-sm btn-dark rounded-pill px-2 d-none" onclick="Medi.setShift(null)" title="Cambiar Turno">
-                 <i class="bi bi-arrow-repeat"></i>
-              </button>
+          <div class="text-end">
+              <h3 class="fw-bold text-dark mb-0 font-monospace" id="admin-clock-time">--:--:--</h3>
+              <p class="text-muted mb-0 small text-capitalize" id="admin-clock-date">Cargando fecha...</p>
           </div>
        </div>
        <input type="hidden" id="medi-pro-cedula" value="">
 
-       <!-- 3-ZONE DASHBOARD GRID -->
-       <div class="row g-3 medi-admin-grid">
+       <!-- ============================================ -->
+       <!--          ACTION CARDS (Biblio-style)         -->
+       <!-- ============================================ -->
+       <div id="admin-dashboard-content" class="container-fluid px-0 animate__animated animate__fadeInUp">
 
-          <!-- ZONA A: SALA DE ESPERA (25%) -->
-          <div class="col-lg-3">
-             <div class="card border-0 shadow-sm rounded-4 d-flex flex-column medi-admin-col">
-                <div class="card-header bg-transparent py-2 border-0 d-flex justify-content-between align-items-center px-3 pt-3">
-                   <div class="d-flex align-items-center gap-2">
-                       <i class="bi bi-people-fill text-primary"></i>
-                       <h6 class="fw-bold mb-0 small">Sala de Espera</h6>
-                   </div>
-                   <span class="badge bg-danger rounded-pill px-2" id="badge-sala-espera">0</span>
-                </div>
+           <!-- ACTION CARDS ROW (v5 Gradientes + iconos ilustrativos) -->
+           <div class="row g-3 mb-4 row-cols-2 row-cols-md-3 justify-content-center">
 
-                <!-- Filters -->
-                <div class="px-3 py-1 border-bottom">
-                    <div class="d-flex gap-1">
-                        <button class="btn btn-xs btn-dark rounded-pill px-2 active" onclick="Medi.filterWaitingRoom('all')" style="font-size:.7rem;">Todos</button>
-                        <button class="btn btn-xs btn-light rounded-pill px-2 text-muted" onclick="Medi.filterWaitingRoom('new')" style="font-size:.7rem;">Nuevos</button>
-                        <button class="btn btn-xs btn-light rounded-pill px-2 text-muted" onclick="Medi.filterWaitingRoom('returned')" style="font-size:.7rem;">Devueltos</button>
+              <!-- 1. CONSULTA RAPIDA -->
+              <div class="col">
+                 <div class="card border-0 shadow h-100 cursor-pointer rounded-4 overflow-hidden position-relative" onclick="AdminMedi.nuevaConsultaWalkIn()"
+                      style="background: linear-gradient(135deg, #00b894 0%, #00cec9 100%); transition: transform 0.2s, box-shadow 0.2s;"
+                      onmouseenter="this.style.transform='translateY(-4px)';this.style.boxShadow='0 12px 28px rgba(0,184,148,.35)'"
+                      onmouseleave="this.style.transform='';this.style.boxShadow=''">
+                    <div class="card-body p-4 text-white d-flex flex-column align-items-start justify-content-between" style="min-height:140px;">
+                       <div class="d-flex align-items-center gap-3 mb-2">
+                          <div class=" bg-opacity-25 rounded-circle d-flex align-items-center justify-content-center" style="width:52px;height:52px;">
+                             <i class="bi bi-clipboard2-pulse-fill fs-3 text-white"></i>
+                          </div>
+                          <div>
+                             <h6 class="fw-bold mb-0 text-white">Consulta Rápida</h6>
+                             <span class="small opacity-75">Walk-in directo</span>
+                          </div>
+                       </div>
+                       <i class="bi bi-clipboard2-pulse-fill position-absolute opacity-10" style="font-size:5rem;bottom:-10px;right:-5px;"></i>
                     </div>
-                </div>
+                 </div>
+              </div>
 
-                <div class="card-body p-0 flex-grow-1 overflow-auto custom-scroll">
-                   <div id="medi-muro-list" class="list-group list-group-flush p-2">
-                       <div class="text-center py-5 opacity-50">
-                           <i class="bi bi-cup-hot display-6 d-block mb-2"></i>
-                           <p class="extra-small fw-bold">Sala vacía</p>
+              <!-- 2. MI AGENDA (Prioridad visual) -->
+              <div class="col">
+                 <div class="card border-0 shadow h-100 cursor-pointer rounded-4 overflow-hidden position-relative" 
+onclick="AdminMedi.openMiAgendaModal()"
+                      style="background: linear-gradient(135deg, #0984e3 0%, #6c5ce7 100%); transition: transform 0.2s, box-shadow 0.2s;"
+                      onmouseenter="this.style.transform='translateY(-4px)';this.style.boxShadow='0 12px 28px rgba(9,132,227,.35)'"
+                      onmouseleave="this.style.transform='';this.style.boxShadow=''">
+                    <div class="card-body p-4 text-white d-flex flex-column align-items-start justify-content-between" style="min-height:140px;">
+                       <div class="d-flex align-items-center gap-3 mb-2">
+                          <div class=" bg-opacity-25 rounded-circle d-flex align-items-center justify-content-center" style="width:52px;height:52px;">
+                             <i class="bi bi-journal-medical fs-3 text-white"></i>
+                          </div>
+                          <div>
+                             <h6 class="fw-bold mb-0 text-white">Mi Agenda</h6>
+                             <span class="small opacity-75">Citas del día</span>
+                          </div>
                        </div>
+                       <span class="badge bg-opacity-25 text-white rounded-pill px-3 mt-auto" id="badge-agenda-card" style="font-size:1.5rem;">0 citas</span>
+                       <i class="bi bi-journal-medical position-absolute opacity-10" style="font-size:5rem;bottom:-10px;right:-5px;"></i>
+                    </div>
+                 </div>
+              </div>
+
+              <!-- 3. SALA DE ESPERA -->
+              <div class="col">
+                 <div class="card border-0 shadow h-100 cursor-pointer rounded-4 overflow-hidden position-relative" onclick="AdminMedi.openWaitingRoomModal()"
+                      style="background: linear-gradient(135deg, #e17055 0%, #d63031 100%); transition: transform 0.2s, box-shadow 0.2s;"
+                      onmouseenter="this.style.transform='translateY(-4px)';this.style.boxShadow='0 12px 28px rgba(214,48,49,.35)'"
+                      onmouseleave="this.style.transform='';this.style.boxShadow=''">
+                    <div class="card-body p-4 text-white d-flex flex-column align-items-start justify-content-between" style="min-height:140px;">
+                       <div class="d-flex align-items-center gap-3 mb-2">
+                          <div class=" bg-opacity-25 rounded-circle d-flex align-items-center justify-content-center" style="width:52px;height:52px;">
+                             <i class="bi bi-person-raised-hand fs-3 text-white"></i>
+                          </div>
+                          <div>
+                             <h6 class="fw-bold mb-0 text-white">Sala de Espera</h6>
+                             <span class="small opacity-75">Cola de pacientes</span>
+                          </div>
+                       </div>
+                       <span class="badge bg-opacity-25 text-white rounded-pill px-3 mt-auto" id="badge-sala-espera" style="font-size:1.5rem;">0 en espera</span>
+                       <i class="bi bi-person-raised-hand position-absolute opacity-10" style="font-size:5rem;bottom:-10px;right:-5px;"></i>
+                    </div>
+                 </div>
+              </div>
+
+              <!-- 4. BUSCAR PACIENTE -->
+              <div class="col">
+                 <div class="card border-0 shadow h-100 cursor-pointer rounded-4 overflow-hidden position-relative" onclick="AdminMedi.openSearchModal()"
+                      style="background: linear-gradient(135deg, #00b4d8 0%, #0077b6 100%); transition: transform 0.2s, box-shadow 0.2s;"
+                      onmouseenter="this.style.transform='translateY(-4px)';this.style.boxShadow='0 12px 28px rgba(0,180,216,.35)'"
+                      onmouseleave="this.style.transform='';this.style.boxShadow=''">
+                    <div class="card-body p-4 text-white d-flex flex-column align-items-start justify-content-between" style="min-height:140px;">
+                       <div class="d-flex align-items-center gap-3 mb-2">
+                          <div class="bg-opacity-25 rounded-circle d-flex align-items-center justify-content-center" style="width:52px;height:52px;">
+                             <i class="bi bi-person-vcard-fill fs-3 text-white"></i>
+                          </div>
+                          <div>
+                             <h6 class="fw-bold mb-0 text-white">Buscar Paciente</h6>
+                             <span class="small opacity-75">Expediente e historial</span>
+                          </div>
+                       </div>
+                       <i class="bi bi-person-vcard-fill position-absolute opacity-10" style="font-size:5rem;bottom:-10px;right:-5px;"></i>
+                    </div>
+                 </div>
+              </div>
+
+              <!-- 5. AGENDAR CITA -->
+              <div class="col">
+                 <div class="card border-0 shadow h-100 cursor-pointer rounded-4 overflow-hidden position-relative" onclick="AdminMedi.openManualBooking()"
+                      style="background: linear-gradient(135deg, #fdcb6e 0%, #f39c12 100%); transition: transform 0.2s, box-shadow 0.2s;"
+                      onmouseenter="this.style.transform='translateY(-4px)';this.style.boxShadow='0 12px 28px rgba(243,156,18,.35)'"
+                      onmouseleave="this.style.transform='';this.style.boxShadow=''">
+                    <div class="card-body p-4 text-white d-flex flex-column align-items-start justify-content-between" style="min-height:140px;">
+                       <div class="d-flex align-items-center gap-3 mb-2">
+                          <div class="bg-opacity-25 rounded-circle d-flex align-items-center justify-content-center" style="width:52px;height:52px;">
+                             <i class="bi bi-calendar2-plus-fill fs-3 text-white"></i>
+                          </div>
+                          <div>
+                             <h6 class="fw-bold mb-0 text-white">Agendar Cita</h6>
+                             <span class="small opacity-75">Crear cita manual</span>
+                          </div>
+                       </div>
+                       <i class="bi bi-calendar2-plus-fill position-absolute opacity-10" style="font-size:5rem;bottom:-10px;right:-5px;"></i>
+                    </div>
+                 </div>
+              </div>
+
+              <!-- 6. CONFIGURACION -->
+              <div class="col">
+                 <div class="card border-0 shadow h-100 cursor-pointer rounded-4 overflow-hidden position-relative" onclick="AdminMedi.showAdminConfigModal()"
+                      style="background: linear-gradient(135deg, #636e72 0%, #2d3436 100%); transition: transform 0.2s, box-shadow 0.2s;"
+                      onmouseenter="this.style.transform='translateY(-4px)';this.style.boxShadow='0 12px 28px rgba(45,52,54,.35)'"
+                      onmouseleave="this.style.transform='';this.style.boxShadow=''">
+                    <div class="card-body p-4 text-white d-flex flex-column align-items-start justify-content-between" style="min-height:140px;">
+                       <div class="d-flex align-items-center gap-3 mb-2">
+                          <div class="bg-opacity-25 rounded-circle d-flex align-items-center justify-content-center" style="width:52px;height:52px;">
+                             <i class="bi bi-sliders fs-3 text-white"></i>
+                          </div>
+                          <div>
+                             <h6 class="fw-bold mb-0 text-white">Configuración</h6>
+                             <span class="small opacity-75">Horarios y cédula</span>
+                          </div>
+                       </div>
+                       <i class="bi bi-sliders position-absolute opacity-10" style="font-size:5rem;bottom:-10px;right:-5px;"></i>
+                    </div>
+                 </div>
+              </div>
+
+           </div>
+
+
+          <!-- ============================================ -->
+          <!--          STATS CARDS (Live)                  -->
+          <!-- ============================================ -->
+          <div class="row g-3 mb-4 animate__animated animate__fadeInUp" style="animation-delay:0.15s;">
+
+             <!-- Stat: Atendidos Hoy -->
+             <div class="col-6 col-lg-3">
+                <div class="card border-0 shadow-sm rounded-4 h-100" style="background: linear-gradient(135deg, #e8faf0 0%, #f5fdf9 100%);">
+                   <div class="card-body p-3">
+                      <div class="d-flex align-items-center gap-2 mb-2">
+                         <div class="bg-success bg-opacity-10 rounded-circle p-2 d-flex align-items-center justify-content-center" style="width:32px;height:32px;"><i class="bi bi-check-circle-fill text-success"></i></div>
+                         <span class="fw-bold small text-dark">Atendidos</span>
+                      </div>
+                      <h2 class="fw-bold text-dark mb-0" id="stat-atendidos">0</h2>
+                      <p class="text-muted mb-0" style="font-size:.65rem;">consultas hoy</p>
                    </div>
                 </div>
              </div>
+
+             <!-- Stat: En Espera -->
+             <div class="col-6 col-lg-3">
+                <div class="card border-0 shadow-sm rounded-4 h-100" style="background: linear-gradient(135deg, #e8f4fd 0%, #f8fbff 100%);">
+                   <div class="card-body p-3">
+                      <div class="d-flex align-items-center gap-2 mb-2">
+                         <div class="bg-primary bg-opacity-10 rounded-circle p-2 d-flex align-items-center justify-content-center" style="width:32px;height:32px;"><i class="bi bi-hourglass-split text-primary"></i></div>
+                         <span class="fw-bold small text-dark">En Espera</span>
+                      </div>
+                      <h2 class="fw-bold text-dark mb-0" id="stat-en-espera">0</h2>
+                      <p class="text-muted mb-0" style="font-size:.65rem;">pacientes pendientes</p>
+                   </div>
+                </div>
+             </div>
+
+             <!-- Stat: Agenda Hoy -->
+             <div class="col-6 col-lg-3">
+                <div class="card border-0 shadow-sm rounded-4 h-100" style="background: linear-gradient(135deg, rgba(255,210,77,0.08) 0%, rgba(255,210,77,0.03) 100%);">
+                   <div class="card-body p-3">
+                      <div class="d-flex align-items-center gap-2 mb-2">
+                         <div class="bg-warning bg-opacity-10 rounded-circle p-2 d-flex align-items-center justify-content-center" style="width:32px;height:32px;"><i class="bi bi-calendar-check text-warning"></i></div>
+                         <span class="fw-bold small text-dark">Agenda</span>
+                      </div>
+                      <h2 class="fw-bold text-dark mb-0" id="stat-agenda">0</h2>
+                      <p class="text-muted mb-0" style="font-size:.65rem;">citas programadas</p>
+                   </div>
+                </div>
+             </div>
+
+             <!-- Stat: Seguimientos -->
+             <div class="col-6 col-lg-3">
+                <div class="card border-0 shadow-sm rounded-4 h-100" style="background: linear-gradient(135deg, #fce8f4 0%, #fdf5fa 100%);">
+                   <div class="card-body p-3">
+                      <div class="d-flex align-items-center gap-2 mb-2">
+                         <div class="bg-danger bg-opacity-10 rounded-circle p-2 d-flex align-items-center justify-content-center" style="width:32px;height:32px;"><i class="bi bi-arrow-repeat text-danger"></i></div>
+                         <span class="fw-bold small text-dark">Seguimientos</span>
+                      </div>
+                      <h2 class="fw-bold text-dark mb-0" id="stat-seguimientos">0</h2>
+                      <p class="text-muted mb-0" style="font-size:.65rem;">pendientes</p>
+                   </div>
+                </div>
+             </div>
+
           </div>
 
-          <!-- ZONA B: AREA DE TRABAJO (45%) -->
-          <div class="col-lg-5">
-             <div class="card border-0 shadow-sm rounded-4 d-flex flex-column medi-admin-col">
-                <!-- Tabs: Agenda / Consulta activa -->
-                <div class="card-header bg-transparent py-2 border-0 px-3 pt-3">
-                   <div class="d-flex justify-content-between align-items-center">
-                       <ul class="nav nav-pills nav-pills-sm gap-1" id="medi-workarea-tabs">
-                           <li class="nav-item">
-                               <button class="nav-link active btn-sm py-1 px-3 rounded-pill" data-tab="agenda" onclick="Medi._switchWorkTab('agenda')" style="font-size:.8rem;">
-                                   <i class="bi bi-calendar-check me-1"></i>Agenda
-                               </button>
-                           </li>
-                           <li class="nav-item">
-                               <button class="nav-link btn-sm py-1 px-3 rounded-pill" data-tab="consulta" onclick="Medi._switchWorkTab('consulta')" style="font-size:.8rem;" id="tab-btn-consulta" disabled>
-                                   <i class="bi bi-clipboard2-pulse me-1"></i>Consulta
-                               </button>
-                           </li>
-                       </ul>
-                       <button class="btn btn-outline-primary rounded-pill px-3 btn-sm fw-bold shadow-sm me-1" onclick="Medi.nuevaConsultaWalkIn()" style="font-size:.75rem;">
-                           <i class="bi bi-lightning-charge-fill me-1"></i>Consulta Rápida
-                       </button>
-                       <button class="btn btn-primary rounded-pill px-3 btn-sm fw-bold shadow-sm" onclick="Medi.openManualBooking()" style="font-size:.75rem;">
-                           <i class="bi bi-plus-lg me-1"></i>Nueva Cita
-                       </button>
-                   </div>
-                </div>
+          <!-- ============================================ -->
+          <!--          RECENT ACTIVITY + QUICK AGENDA      -->
+          <!-- ============================================ -->
+          <div class="row g-3 animate__animated animate__fadeInUp" style="animation-delay:0.3s;">
 
-                <div class="card-body p-0 flex-grow-1 overflow-auto custom-scroll">
-                   <!-- Agenda Tab -->
-                   <div id="medi-work-agenda" class="p-3">
-                       <div id="medi-agenda-list"></div>
+             <!-- Agenda del Día -->
+             <div class="col-lg-6">
+                <div class="card border-0 shadow-sm rounded-4 h-100">
+                   <div class="card-header bg-white border-0 py-3 d-flex justify-content-between align-items-center">
+                      <div class="d-flex align-items-center gap-2">
+                         <div class="bg-primary bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center" style="width:32px;height:32px;">
+                            <i class="bi bi-calendar-check text-primary" style="font-size:.9rem;"></i>
+                         </div>
+                         <div>
+                            <h6 class="fw-bold mb-0 text-dark" style="font-size:.9rem;">Agenda del Día</h6>
+                            <div class="text-muted" style="font-size:.68rem;">
+                               <span id="medi-agenda-count" class="fw-bold text-primary">0</span> citas programadas
+                            </div>
+                         </div>
+                      </div>
+                      <button class="btn btn-sm btn-light rounded-pill px-3 d-flex align-items-center gap-1" onclick="AdminMedi.refreshAdmin()" style="font-size:.7rem;">
+                         <i class="bi bi-arrow-clockwise"></i>
+                         <span class="d-none d-sm-inline">Actualizar</span>
+                      </button>
                    </div>
-                   <!-- Consulta Tab (hidden by default, shown when attending patient) -->
-                   <div id="medi-work-consulta" class="p-3 d-none">
-                       <div id="medi-inline-consulta"></div>
+                   <div class="card-body p-3" style="max-height: 370px; overflow-y: auto; scrollbar-width: thin;">
+                      <div id="medi-agenda-list">
+                         <div class="medi-empty-state">
+                            <i class="bi bi-calendar-x"></i>
+                            <p>Sin citas programadas por hoy</p>
+                         </div>
+                      </div>
                    </div>
                 </div>
              </div>
-          </div>
 
-          <!-- ZONA C: PANEL CONTEXTUAL (30%) -->
-          <div class="col-lg-4">
-             <div class="card border-0 shadow-sm rounded-4 d-flex flex-column medi-admin-col">
-                <!-- Context Tabs -->
-                <div class="card-header bg-transparent py-2 border-0 px-3 pt-3">
-                    <ul class="nav nav-pills nav-pills-sm gap-1" id="medi-context-tabs">
-                        <li class="nav-item">
-                            <button class="nav-link active btn-sm py-1 px-2 rounded-pill" data-ctx="metrics" onclick="Medi._switchContextTab('metrics')" style="font-size:.75rem;">
-                                <i class="bi bi-graph-up me-1"></i>Resumen
-                            </button>
-                        </li>
-                        <li class="nav-item">
-                            <button class="nav-link btn-sm py-1 px-2 rounded-pill" data-ctx="patient" onclick="Medi._switchContextTab('patient')" style="font-size:.75rem;">
-                                <i class="bi bi-person me-1"></i>Paciente
-                            </button>
-                        </li>
-                        <li class="nav-item d-none" id="medi-tab-messages">
-                            <button class="nav-link btn-sm py-1 px-2 rounded-pill" data-ctx="messages" onclick="Medi._switchContextTab('messages')" style="font-size:.75rem;">
-                                <i class="bi bi-chat-dots me-1"></i>Mensajes <span class="badge bg-danger rounded-pill ms-1 d-none" id="badge-unread-msgs">0</span>
-                            </button>
-                        </li>
-                        <li class="nav-item">
-                            <button class="nav-link btn-sm py-1 px-2 rounded-pill" data-ctx="recent" onclick="Medi._switchContextTab('recent')" style="font-size:.75rem;">
-                                <i class="bi bi-clock-history me-1"></i>Recientes
-                            </button>
-                        </li>
-                    </ul>
-                </div>
-
-                <div class="card-body p-0 flex-grow-1 overflow-auto custom-scroll">
-                   <!-- Metrics (Default) -->
-                   <div id="medi-ctx-metrics" class="p-3">
-                       <div id="medi-day-stats">
-                           <div class="text-center py-4 text-muted small">
-                               <i class="bi bi-bar-chart-line display-6 d-block mb-2 opacity-25"></i>
-                               <p class="extra-small">Métricas del día</p>
-                           </div>
-                       </div>
+             <!-- Actividad Reciente -->
+             <div class="col-lg-6">
+                <div class="card border-0 shadow-sm rounded-4 h-100">
+                   <div class="card-header bg-white border-0 py-3 d-flex justify-content-between align-items-center">
+                      <div class="d-flex align-items-center gap-2">
+                         <div class="bg-success bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center" style="width:32px;height:32px;">
+                            <i class="bi bi-clock-history text-success" style="font-size:.9rem;"></i>
+                         </div>
+                         <div>
+                            <h6 class="fw-bold mb-0 text-dark" style="font-size:.9rem;">Actividad Reciente</h6>
+                            <div class="text-muted" style="font-size:.68rem;">Últimas consultas registradas</div>
+                         </div>
+                      </div>
+                      <button class="btn btn-sm btn-light rounded-pill px-3 d-flex align-items-center gap-1" onclick="AdminMedi.showAllRecentModal()" style="font-size:.7rem;">
+                         <i class="bi bi-layout-text-sidebar-reverse"></i>
+                         <span class="d-none d-sm-inline">Ver todo</span>
+                      </button>
                    </div>
-                   <!-- Patient Info -->
-                   <div id="medi-ctx-patient" class="p-3 d-none">
-                       <div id="medi-patient-context">
-                           <div class="text-center py-4 text-muted small">
-                               <i class="bi bi-person-dash display-6 d-block mb-2 opacity-25"></i>
-                               <p class="extra-small">Selecciona un paciente</p>
-                           </div>
-                       </div>
-                   </div>
-                   <!-- Messages / Chat -->
-                   <div id="medi-ctx-messages" class="p-3 d-none">
-                       <div id="medi-chat-panel">
-                           <div class="text-center py-4 text-muted small">
-                               <i class="bi bi-chat-square-dots display-6 d-block mb-2 opacity-25"></i>
-                               <p class="extra-small">Sin conversaciones activas</p>
-                           </div>
-                       </div>
-                   </div>
-                   <!-- Recent Activity -->
-                   <div id="medi-ctx-recent" class="p-3 d-none">
-                       <div id="medi-recent-list" class="list-group list-group-flush">
-                           <div class="text-center py-4 text-muted small opacity-50">Esperando datos...</div>
-                       </div>
+                   <div class="card-body p-3" style="max-height: 370px; overflow-y: auto; scrollbar-width: thin;">
+                      <div id="medi-recent-list">
+                         <div class="medi-empty-state">
+                            <i class="bi bi-clock"></i>
+                            <p>Cargando actividad reciente...</p>
+                         </div>
+                      </div>
                    </div>
                 </div>
              </div>
+
           </div>
 
        </div>
+
+       <!-- ============================================ -->
+       <!--   HIDDEN DATA CONTAINERS (for JS compat)    -->
+       <!-- ============================================ -->
+       <!-- These hold data loaded by existing functions but are rendered into modals/cards -->
+       <div class="d-none">
+          <div id="medi-muro-list"></div>
+          <div id="medi-day-stats"></div>
+          <div id="medi-inline-consulta"></div>
+          <div id="medi-patient-context"></div>
+          <div id="medi-chat-panel"></div>
+          <div id="medi-search-paciente-hidden"></div>
+       </div>
+
+       <!-- ============================================ -->
+       <!--   MODAL: MI AGENDA (Full)                   -->
+       <!-- ============================================ -->
+       <div class="modal fade" id="modalMiAgenda" tabindex="-1">
+          <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+             <div class="modal-content border-0 shadow-lg rounded-4">
+                <div class="modal-header border-0 text-white py-3" style="background: linear-gradient(135deg, #0984e3 0%, #6c5ce7 100%);">
+                   <div>
+                      <h5 class="fw-bold mb-0"><i class="bi bi-calendar-week-fill me-2"></i>Mi Agenda</h5>
+                      <p class="mb-0 small opacity-75">Citas programadas para hoy</p>
+                   </div>
+                   <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-0">
+                   <div id="modal-agenda-list" class="p-3 bg-light-subtle" style="min-height: 200px;">
+                      <div class="text-center py-5 opacity-50">
+                         <i class="bi bi-calendar-x display-4 d-block mb-2"></i>
+                         <p class="fw-bold">Sin citas programadas por hoy</p>
+                      </div>
+                   </div>
+                </div>
+             </div>
+          </div>
+       </div>
+
+       <!-- ============================================ -->
+       <!--   MODAL: SALA DE ESPERA (Full)              -->
+       <!-- ============================================ -->
+       <div class="modal fade" id="modalWaitingRoom" tabindex="-1">
+          <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+             <div class="modal-content border-0 shadow-lg rounded-4">
+                <div class="modal-header border-0 bg-primary text-white py-3">
+                   <div>
+                      <h5 class="fw-bold mb-0"><i class="bi bi-people-fill me-2"></i>Sala de Espera</h5>
+                      <p class="mb-0 small opacity-75">Pacientes esperando ser atendidos</p>
+                   </div>
+                   <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-0">
+                   <!-- Filters -->
+                   <div class="px-4 py-3 bg-light border-bottom sticky-top" style="z-index:1020;">
+                      <div class="d-flex gap-2">
+                         <button class="btn btn-sm btn-dark rounded-pill px-3 fw-bold" onclick="AdminMedi.filterWaitingRoom('all')">Todos</button>
+                         <button class="btn btn-sm btn-outline-secondary rounded-pill px-3 fw-bold" onclick="AdminMedi.filterWaitingRoom('new')">Nuevos</button>
+                         <button class="btn btn-sm btn-outline-secondary rounded-pill px-3 fw-bold" onclick="AdminMedi.filterWaitingRoom('returned')">Devueltos</button>
+                      </div>
+                   </div>
+                   <div id="modal-muro-list" class="list-group list-group-flush p-3">
+                      <div class="text-center py-5 opacity-50">
+                         <i class="bi bi-cup-hot display-4 d-block mb-2"></i>
+                         <p class="fw-bold">Sala vacía</p>
+                      </div>
+                   </div>
+                </div>
+             </div>
+          </div>
+       </div>
+
+       <!-- ============================================ -->
+       <!--   MODAL: MENSAJES (Full)                    -->
+       <!-- ============================================ -->
+       <div class="modal fade" id="modalMessages" tabindex="-1">
+          <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+             <div class="modal-content border-0 shadow-lg rounded-4">
+                <div class="modal-header border-0 bg-dark text-white py-3">
+                   <div>
+                      <h5 class="fw-bold mb-0"><i class="bi bi-chat-dots-fill me-2"></i>Mensajes</h5>
+                      <p class="mb-0 small opacity-75">Conversaciones con estudiantes</p>
+                   </div>
+                   <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-0">
+                   <div id="modal-chat-panel">
+                      <div class="text-center py-5 text-muted small">
+                         <i class="bi bi-chat-square-dots display-4 d-block mb-2 opacity-25"></i>
+                         <p>Sin conversaciones activas</p>
+                      </div>
+                   </div>
+                </div>
+             </div>
+          </div>
+       </div>
+
+       <!-- ============================================ -->
+       <!--   MODAL: BÚSQUEDA DE PACIENTE               -->
+       <!-- ============================================ -->
+       <div class="modal fade" id="modalSearchPatient" tabindex="-1">
+          <div class="modal-dialog modal-dialog-centered">
+             <div class="modal-content border-0 shadow-lg rounded-4">
+                <div class="modal-header border-0 bg-info text-white py-3">
+                   <h5 class="fw-bold mb-0"><i class="bi bi-search me-2"></i>Buscar Paciente</h5>
+                   <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-4">
+                   <div class="input-group mb-3">
+                      <input type="text" id="modal-search-input" class="form-control form-control-lg border-0 bg-light rounded-start-pill" placeholder="Matrícula o nombre..." onkeydown="if(event.key==='Enter'){event.preventDefault();AdminMedi.buscarPacienteModal();}">
+                      <button class="btn btn-info text-white rounded-end-pill px-4" type="button" onclick="AdminMedi.buscarPacienteModal()">
+                         <i class="bi bi-search"></i>
+                      </button>
+                   </div>
+                   <div id="modal-search-results">
+                      <div class="text-center py-4 text-muted small opacity-50">
+                         <i class="bi bi-person-lines-fill display-6 d-block mb-2"></i>
+                         <p>Ingresa matrícula o nombre para buscar</p>
+                      </div>
+                   </div>
+                </div>
+             </div>
+          </div>
+       </div>
+
+       <!-- ============================================ -->
+       <!--   ZONA B CONSULTA (hidden, for inline SOAP) -->
+       <!-- ============================================ -->
+       <div id="medi-work-consulta" class="d-none">
+          <div id="medi-work-agenda" class="d-none"></div>
+       </div>
+
+       <!-- Workarea tabs reference (hidden, for JS compat) -->
+       <ul class="d-none" id="medi-workarea-tabs">
+          <li><button data-tab="agenda"></button></li>
+          <li><button data-tab="consulta" id="tab-btn-consulta"></button></li>
+       </ul>
+       <ul class="d-none" id="medi-context-tabs"></ul>
+       <div class="d-none" id="medi-ctx-metrics"></div>
+       <div class="d-none" id="medi-ctx-patient"></div>
+       <div class="d-none" id="medi-ctx-messages"></div>
+       <div class="d-none" id="medi-ctx-recent"></div>
+       <div class="d-none" id="medi-tab-messages"></div>
+
     </section>
 
     <div class="modal fade" id="modalConsulta" tabindex="-1" data-bs-backdrop="static">
-      <div class="modal-dialog modal-xl modal-dialog-centered">
+      <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content border-0 shadow-lg rounded-4">
           <div class="modal-header bg-primary text-white border-0 py-2 align-items-center">
              <div class="d-flex align-items-center gap-3">
@@ -763,7 +1122,7 @@ var AdminMedi = (function () {
              </div>
              <div class="d-flex gap-2">
 
-                 <button type="button" class="btn btn-sm btn-light text-primary rounded-pill px-3 fw-bold shadow-sm" onclick="Medi.confirmarFinalizacion()">
+                 <button type="button" class="btn btn-sm btn-light text-primary rounded-pill px-3 fw-bold shadow-sm" onclick="AdminMedi.confirmarFinalizacion()">
                     <i class="bi bi-check-circle-fill me-1"></i> Finalizar Consulta
                  </button>
              </div>
@@ -945,7 +1304,7 @@ var AdminMedi = (function () {
                 </div>
 
                 <div class="modal-body px-4 pt-4 pb-3 bg-white">
-                    <form onsubmit="event.preventDefault(); Medi.handlePinLogin();">
+                    <form onsubmit="event.preventDefault(); AdminMedi.handlePinLogin();">
                         <!-- PIN Input with dot indicators -->
                         <div class="mb-4">
                             <label class="form-label small fw-bold text-muted text-uppercase text-center d-block mb-2">Tu PIN de 4 dígitos</label>
@@ -1001,10 +1360,10 @@ var AdminMedi = (function () {
             <h5 class="fw-bold mb-2">¿Finalizar Consulta?</h5>
             <p class="small text-muted mb-4">La consulta se guardará en el expediente y no podrá editarse después.</p>
             <div class="d-grid gap-2">
-              <button class="btn btn-success rounded-pill fw-bold" onclick="Medi.saveConsultation(null, true)">
+              <button id="btn-finalizar-consulta" class="btn btn-success rounded-pill fw-bold" onclick="AdminMedi.saveConsultation(null, true)">
                  <i class="bi bi-check-lg me-1"></i> Confirmar
               </button>
-              <button class="btn btn-light rounded-pill" data-bs-dismiss="modal">Cancelar</button>
+              <button id="btn-cancelar-finalizar" class="btn btn-light rounded-pill" data-bs-dismiss="modal">Cancelar</button>
             </div>
           </div>
         </div>
@@ -1059,10 +1418,10 @@ var AdminMedi = (function () {
              <p class="text-muted">El expediente ha sido actualizado correctamente.</p>
              
              <div class="d-flex justify-content-center gap-3 mt-4">
-                <button class="btn btn-light rounded-pill px-4" onclick="Medi.cerrarSuccessModal()">
+                <button class="btn btn-light rounded-pill px-4" onclick="AdminMedi.cerrarSuccessModal()">
                    <i class="bi bi-x-lg me-1"></i> Cerrar
                 </button>
-                <button class="btn btn-primary rounded-pill px-4 fw-bold shadow hover-scale" onclick="Medi.printReceta()">
+                <button class="btn btn-primary rounded-pill px-4 fw-bold shadow hover-scale" onclick="AdminMedi.printReceta()">
                    <i class="bi bi-printer me-2"></i> Imprimir Receta
                 </button>
              </div>
@@ -1087,65 +1446,108 @@ var AdminMedi = (function () {
 
     <!-- MODAL ADMIN BOOKING (Manual) -->
     <div class="modal fade" id="modalAdminBooking" tabindex="-1">
-       <div class="modal-dialog modal-dialog-centered">
-          <div class="modal-content border-0 shadow rounded-4">
-             <div class="modal-header border-0">
-                <h6 class="fw-bold"><i class="bi bi-calendar-plus-fill me-2 text-primary"></i>Nueva Cita (Manual)</h6>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-             </div>
-             <div class="modal-body p-4 pt-0">
-                 <form id="adm-book-form" onsubmit="event.preventDefault(); Medi.confirmAdminBooking();">
-                     <!-- STEP 1: Search (Hidden if student pre-filled) -->
-                     <div id="adm-book-step-1" class="animate-in">
-                         <div class="mb-3">
-                             <label class="form-label small fw-bold text-muted">Buscar Estudiante</label>
-                             <div class="input-group">
-                                 <input type="text" id="adm-book-matricula" class="form-control bg-light border-0" placeholder="Matrícula...">
-                                 <button class="btn btn-primary" type="button" onclick="Medi.searchStudentForBooking()">
-                                     <i class="bi bi-search"></i>
-                                 </button>
-                             </div>
-                         <div id="adm-student-result" class="mb-3"></div>
-                     </div>
+      <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
 
-                     <!-- STEP 2: Details (Hidden until student found) -->
-                     <div id="adm-book-step-2" class="d-none animate-in">
-                         <hr class="border-light my-3">
-                         <div class="row g-2 mb-3">
-                             <div class="col-12">
-                                 <label class="form-label small fw-bold text-muted">Seleccionar Fecha</label>
-                                 <div id="adm-book-dates" class="d-flex gap-2 overflow-auto pb-2" style="scrollbar-width: thin;"></div>
-                                 <input type="hidden" id="adm-book-date" required>
-                             </div>
-                             <div class="col-12 mt-2">
-                                 <label class="form-label small fw-bold text-muted">Seleccionar Hora</label>
-                                 <div id="adm-book-time-msg" class="text-center small text-muted fst-italic py-2 bg-light rounded-3 border border-dashed">
-                                    <i class="bi bi-calendar-event me-2"></i>Selecciona un día primero
-                                 </div>
-                                 <div id="adm-book-times" class="d-flex flex-wrap gap-2 justify-content-center d-none p-2"></div>
-                                 <input type="hidden" id="adm-book-time" required>
-                             </div>
-                         </div>
-                         <div class="mb-3">
-                             <label class="form-label small fw-bold text-muted">Motivo</label>
-                             <select class="form-select bg-light border-0 mb-2" id="adm-book-category">
-                                 <option value="Consulta General">Consulta General</option>
-                                 <option value="Urgencia Menor">Urgencia Menor</option>
-                                 <option value="Seguimiento">Seguimiento</option>
-                                 <option value="Certificado Médico">Certificado Médico</option>
-                             </select>
-                             <textarea id="adm-book-reason" class="form-control bg-light border-0" rows="2" placeholder="Detalles adicionales..."></textarea>
-                         </div>
-                         <div class="d-grid">
-                             <button type="submit" class="btn btn-primary rounded-pill fw-bold shadow-sm">
-                                 <i class="bi bi-check-lg me-2"></i>Agendar Cita
-                             </button>
-                         </div>
-                     </div>
-                 </form>
-             </div>
+          <!-- Header con gradiente + info de turno -->
+          <div class="modal-header border-0 pb-2" style="background:linear-gradient(135deg,#1d4ed8,#2563eb);">
+            <div>
+              <h6 class="fw-bold text-white mb-0">
+                <i class="bi bi-calendar-plus-fill me-2"></i>Agendar Cita
+              </h6>
+              <div class="text-white-50" style="font-size:.7rem;" id="adm-book-shift-hint">
+                Turno: <span id="adm-book-shift-label" class="fw-bold text-white">Seleccionando...</span>
+              </div>
+            </div>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
           </div>
-       </div>
+
+          <div class="modal-body p-0">
+            <form id="adm-book-form" onsubmit="event.preventDefault(); AdminMedi.confirmAdminBooking();">
+
+              <!-- STEP 1: Búsqueda de paciente -->
+              <div id="adm-book-step-1" class="p-4 pb-3">
+                <div class="d-flex align-items-center gap-2 mb-3">
+                  <div class="bg-primary bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center flex-shrink-0" style="width:28px;height:28px;">
+                    <span class="fw-bold text-primary" style="font-size:.75rem;">1</span>
+                  </div>
+                  <span class="fw-bold text-dark" style="font-size:.85rem;">Buscar Paciente</span>
+                </div>
+                <div class="input-group rounded-3 overflow-hidden shadow-sm">
+                  <input type="text" id="adm-book-matricula"
+                         class="form-control border-0 bg-light fw-semibold"
+                         placeholder="Matrícula del estudiante..."
+                         onkeydown="if(event.key==='Enter'){event.preventDefault();AdminMedi.searchStudentForBooking();}">
+                  <button class="btn btn-primary px-3" type="button" onclick="AdminMedi.searchStudentForBooking()">
+                    <i class="bi bi-search"></i>
+                  </button>
+                </div>
+                <div id="adm-student-result" class="mt-2"></div>
+              </div>
+
+              <!-- STEP 2: Fecha, hora y motivo -->
+              <div id="adm-book-step-2" class="d-none">
+                <div class="border-top"></div>
+
+                <!-- Fecha -->
+                <div class="p-4 pb-2">
+                  <div class="d-flex align-items-center gap-2 mb-3">
+                    <div class="bg-success bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center flex-shrink-0" style="width:28px;height:28px;">
+                      <span class="fw-bold text-success" style="font-size:.75rem;">2</span>
+                    </div>
+                    <span class="fw-bold text-dark" style="font-size:.85rem;">Seleccionar Fecha</span>
+                  </div>
+                  <div id="adm-book-dates" class="d-flex gap-2 overflow-auto pb-2" style="scrollbar-width:thin;"></div>
+                  <input type="hidden" id="adm-book-date" required>
+                </div>
+
+                <!-- Hora -->
+                <div class="p-4 pt-2 pb-2">
+                  <div class="d-flex align-items-center gap-2 mb-2">
+                    <div class="bg-warning bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center flex-shrink-0" style="width:28px;height:28px;">
+                      <span class="fw-bold text-warning" style="font-size:.75rem;">3</span>
+                    </div>
+                    <span class="fw-bold text-dark" style="font-size:.85rem;">Seleccionar Hora</span>
+                  </div>
+                  <div id="adm-book-time-msg"
+                       class="text-center small text-muted fst-italic py-3 bg-light rounded-3 border">
+                    <i class="bi bi-calendar-event me-1"></i>Selecciona un día primero
+                  </div>
+                  <div id="adm-book-times" class="d-flex flex-wrap gap-2 d-none pt-2"></div>
+                  <input type="hidden" id="adm-book-time" required>
+                </div>
+
+                <!-- Motivo -->
+                <div class="p-4 pt-2 pb-3 border-top">
+                  <div class="d-flex align-items-center gap-2 mb-2">
+                    <div class="bg-danger bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center flex-shrink-0" style="width:28px;height:28px;">
+                      <span class="fw-bold text-danger" style="font-size:.75rem;">4</span>
+                    </div>
+                    <span class="fw-bold text-dark" style="font-size:.85rem;">Motivo de la Cita</span>
+                  </div>
+                  <select class="form-select border-0 bg-light fw-semibold mb-2 rounded-3" id="adm-book-category">
+                    <option value="Consulta General">🩺 Consulta General</option>
+                    <option value="Urgencia Menor">⚡ Urgencia Menor</option>
+                    <option value="Seguimiento">🔄 Seguimiento</option>
+                    <option value="Certificado Médico">📋 Certificado Médico</option>
+                    <option value="Salud Mental">💬 Salud Mental (Psicología)</option>
+                  </select>
+                  <textarea id="adm-book-reason" class="form-control border-0 bg-light rounded-3"
+                            rows="2" placeholder="Notas adicionales (opcional)..."></textarea>
+                </div>
+
+                <!-- Botón confirmar -->
+                <div class="p-4 pt-0">
+                  <button type="submit" class="btn btn-primary w-100 rounded-pill fw-bold py-2 shadow-sm">
+                    <i class="bi bi-check-circle-fill me-2"></i>Confirmar Cita
+                  </button>
+                </div>
+              </div>
+
+            </form>
+          </div>
+        </div>
+      </div>
     </div>
     `;
   }
@@ -1177,14 +1579,14 @@ var AdminMedi = (function () {
             <div class="modal-body">
                 <!-- 1. Habilitar Servicio -->
                 <!-- 1. Habilitar Servicio (Role Specific) -->
-                ${_myRole === 'Medico' ? `
+                ${_myRole === 'Médico' ? `
                 <div class="d-flex justify-content-between align-items-center p-3 bg-light rounded-3 mb-3">
                     <div>
                         <div class="fw-bold text-dark">Habilitar Agenda Médica</div>
                         <div class="small text-muted">Permitir reservas para medicina general</div>
                     </div>
                     <div class="form-check form-switch">
-                        <input class="form-check-input fs-4" type="checkbox" id="cfg-available-medico" ${(_ctx.config && _ctx.config.medi && _ctx.config.medi.availableMedico !== false) ? 'checked' : ''}>
+                        <input class="form-check-input fs-4" type="checkbox" id="cfg-available-medico" ${(_ctx.config && _ctx.config.medi && _ctx.config.medi.availableMédico !== false) ? 'checked' : ''}>
                     </div>
                 </div>` : ''}
 
@@ -1236,7 +1638,7 @@ var AdminMedi = (function () {
     document.getElementById('btn-save-cfg').onclick = async function () {
       const btn = this;
       const valDuration = document.querySelector('input[name="slotDur"]:checked').value;
-      const chkMedico = document.getElementById('cfg-available-medico');
+      const chkMédico = document.getElementById('cfg-available-medico');
       const chkPsicologo = document.getElementById('cfg-available-psicologo');
 
 
@@ -1250,7 +1652,7 @@ var AdminMedi = (function () {
       }
 
       // Only update what is visible/editable
-      if (chkMedico) updateData.availableMedico = chkMedico.checked;
+      if (chkMédico) updateData.availableMédico = chkMédico.checked;
       if (chkPsicologo) updateData.availablePsicologo = chkPsicologo.checked;
 
       btn.disabled = true;
@@ -1272,7 +1674,7 @@ var AdminMedi = (function () {
         const banner = document.getElementById('medi-service-status');
         if (banner) {
           let isEnabled = true;
-          if (_myRole === 'Medico' && updateData.availableMedico === false) isEnabled = false;
+          if (_myRole === 'Médico' && updateData.availableMédico === false) isEnabled = false;
           else if (_myRole === 'Psicologo' && updateData.availablePsicologo === false) isEnabled = false;
 
           if (!isEnabled) {
@@ -1359,16 +1761,27 @@ var AdminMedi = (function () {
           step2.insertBefore(infoDiv, step2.firstChild);
         }
 
-        infoDiv.innerHTML = `
-           <div class="alert alert-primary border-0 small d-flex align-items-center mb-3">
-               <i class="bi bi-person-circle fs-4 me-2"></i>
-               <div class="flex-grow-1">
-                   <div class="fw-bold">${student.displayName}</div>
-                   <div class="extra-small opacity-75">${student.matricula}</div>
-               </div>
-               <button type="button" class="btn btn-sm btn-light text-primary fw-bold" onclick="Medi.openManualBooking()">Cambiar</button>
-           </div>
-        `;
+        infoDiv.innerHTML = (() => {
+          const nm = student.displayName || student.email || 'P';
+          const ini = nm[0].toUpperCase();
+          const COLS = [['#dbeafe', '#1d4ed8'], ['#d1fae5', '#065f46'], ['#ede9fe', '#5b21b6'], ['#fce7f3', '#9d174d']];
+          const [bg, fg] = COLS[ini.charCodeAt(0) % COLS.length];
+          return `
+            <div class="d-flex align-items-center gap-3 p-3 mb-3 rounded-3 border"
+                 style="background:linear-gradient(135deg,#f0f7ff,#e8f4fd);">
+              <div class="medi-avatar flex-shrink-0"
+                   style="background:${bg};color:${fg};width:42px;height:42px;font-size:1.1rem;">${ini}</div>
+              <div class="flex-fill">
+                <div class="fw-bold text-dark" style="font-size:.88rem;">${escapeHtml(nm)}</div>
+                <div class="text-muted" style="font-size:.72rem;">${escapeHtml(student.matricula || student.email || '')}</div>
+              </div>
+              <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill"
+                      onclick="AdminMedi.openManualBooking()">
+                <i class="bi bi-arrow-left-short"></i> Cambiar
+              </button>
+            </div>`;
+        })();
+
 
         renderAdminBookingDates(); // Initialize Date Picker
 
@@ -1443,7 +1856,7 @@ var AdminMedi = (function () {
     // Determine type based on category or _myRole if admin
     // In manual booking, category gives context. If category is 'Salud Mental' -> Psicologo?
     // Let's infer type from category logic
-    let typeForSlot = 'Medico';
+    let typeForSlot = 'Médico';
     if (cat === 'Salud Mental' || cat === 'Psicología' || _myRole === 'Psicologo') typeForSlot = 'Psicologo';
 
     const slotId = `${baseId}_${typeForSlot}`;
@@ -1482,80 +1895,117 @@ var AdminMedi = (function () {
     const container = document.getElementById('adm-book-dates');
     if (!container) return;
 
+    // Mostrar turno en header del modal
+    const shiftLabelEl = document.getElementById('adm-book-shift-label');
+    if (shiftLabelEl) {
+      if (_currentShift === 'Matutino') shiftLabelEl.textContent = '☀️ Matutino (08:00-14:00)';
+      else if (_currentShift === 'Vespertino') shiftLabelEl.textContent = '🌙 Vespertino (15:00-21:00)';
+      else shiftLabelEl.textContent = '⏰ Todo el dia';
+    }
+
     const days = [];
     let curr = new Date();
-    // Start from tomorrow? Or today? Admin might want today.
-    // Let's start today.
-
     while (days.length < 10) {
       if (isWeekday(curr)) days.push(new Date(curr));
       curr.setDate(curr.getDate() + 1);
     }
 
+    const TODAY = MediService.toISO(new Date());
     container.innerHTML = days.map(d => {
       const isoDate = MediService.toISO(d);
-      const isSelected = false;
+      const isToday = isoDate === TODAY;
+      const weekday = d.toLocaleDateString('es-MX', { weekday: 'short' }).toUpperCase();
+      const dayNum = d.getDate();
+      const month = d.toLocaleDateString('es-MX', { month: 'short' }).toUpperCase();
       return `
-            <div class="adm-date-card p-2 text-center border rounded-3 bg-white shadow-sm flex-shrink-0" 
-                 style="min-width: 70px; cursor: pointer; user-select: none;" 
-                 onclick="Medi.selectAdminDate(this, '${isoDate}')">
-                <div class="extra-small text-muted mb-0 text-uppercase">${d.toLocaleDateString('es-MX', { weekday: 'short' })}</div>
-                <div class="fw-bold fs-5 lh-1">${d.getDate()}</div>
-                <div class="extra-small text-primary fw-bold">${d.toLocaleDateString('es-MX', { month: 'short' }).toUpperCase()}</div>
-            </div>`;
+        <div class="adm-date-card p-2 text-center border bg-white shadow-sm flex-shrink-0"
+             style="min-width:72px;user-select:none;"
+             onclick="AdminMedi.selectAdminDate(this,'${isoDate}')">
+          <div class="text-muted fw-bold" style="font-size:.6rem;">${weekday}</div>
+          <div class="day-num fw-bold lh-1 my-1" style="font-size:1.4rem;color:${isToday ? '#0d6efd' : '#1e293b'};">${dayNum}</div>
+          <div style="font-size:.62rem;color:${isToday ? '#0d6efd' : '#6c757d'};font-weight:600;">${month}</div>
+          ${isToday ? `<div class="bg-primary rounded-pill mx-auto mt-1" style="width:18px;height:3px;"></div>` : ''}
+        </div>`;
     }).join('');
   }
 
   function selectAdminDate(el, dateStr) {
-    // Validar input
     document.getElementById('adm-book-date').value = dateStr;
 
-    // UI Update
-    document.querySelectorAll('.adm-date-card').forEach(c => {
-      c.classList.remove('border-primary', 'bg-primary-subtle');
-      c.classList.add('border', 'bg-white');
-    });
-    el.classList.remove('border', 'bg-white');
-    el.classList.add('border-primary', 'bg-primary-subtle');
+    // UI: destacar card seleccionada
+    document.querySelectorAll('.adm-date-card').forEach(c => c.classList.remove('selected'));
+    el.classList.add('selected');
 
-    // Grid Logic
     const grid = document.getElementById('adm-book-times');
     const msg = document.getElementById('adm-book-time-msg');
     const timeInp = document.getElementById('adm-book-time');
 
-    timeInp.value = ''; // Reset time
+    timeInp.value = '';
     grid.classList.add('d-none');
     msg.classList.remove('d-none');
-    msg.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Cargando horarios...';
+    msg.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Cargando horarios...';
 
-    // Generate Slots
-    // Use local build since we can't find the other one easily
-    // SLOT_START, SLOT_END, SLOT_STEP are global
+    // Restriccion de horarios por turno
+    let slotStartH = SLOT_START || 8;
+    let slotEndH = SLOT_END || 22;
+    if (_currentShift === 'Matutino') { slotStartH = 8; slotEndH = 14; }
+    if (_currentShift === 'Vespertino') { slotStartH = 15; slotEndH = 21; }
 
-    setTimeout(() => { // Simulate async/render delay
+    const step = SLOT_DURATION || 60;
+    const shiftIcon = _currentShift === 'Matutino' ? '☀️' : _currentShift === 'Vespertino' ? '🌙' : '⏰';
+    const shiftLabel = _currentShift ? `${shiftIcon} Turno ${_currentShift}` : '⏰ Horario completo';
+    const rangeLabel = `${String(slotStartH).padStart(2, '0')}:00 - ${String(slotEndH).padStart(2, '0')}:00`;
+
+    MediService.getOccupiedSlots(_ctx, _myRole, dateStr).then(occupied => {
       const slots = [];
-      const startMin = (SLOT_START || 8) * 60;
-      const endMin = (SLOT_END || 22) * 60;
-      const step = SLOT_DURATION || 60; // [FIX] Use Duration
-
-      for (let m = startMin; m < endMin; m += step) {
+      for (let m = slotStartH * 60; m < slotEndH * 60; m += step) {
         const hh = Math.floor(m / 60);
         const mm = m % 60;
         const timeStr = `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
-        slots.push(timeStr);
+        const isTaken = Array.isArray(occupied) && occupied.some(s => s.includes(timeStr));
+        slots.push({ timeStr, isTaken });
       }
 
-      grid.innerHTML = slots.map(t => `
-            <button type="button" class="btn btn-outline-primary btn-sm rounded-pill fw-bold" 
-                    style="font-size: 0.8rem; width: 60px;"
-                    onclick="Medi.selectAdminTime(this, '${t}')">
-                ${t}
-            </button>
-          `).join('');
+      if (slots.length === 0) {
+        msg.classList.remove('d-none');
+        msg.innerHTML = '<i class="bi bi-calendar-x me-1"></i>No hay horarios disponibles para este turno.';
+        return;
+      }
+
+      grid.innerHTML = `
+        <div class="shift-banner w-100 p-2 mb-3 d-flex align-items-center justify-content-between">
+          <span class="fw-bold text-primary" style="font-size:.8rem;">${shiftLabel}</span>
+          <span class="badge bg-primary-subtle text-primary border border-primary-subtle" style="font-size:.68rem;">
+            <i class="bi bi-clock me-1"></i>${rangeLabel}
+          </span>
+        </div>
+        ${slots.map(({ timeStr, isTaken }) => `
+          <button type="button" class="adm-time-pill btn btn-sm fw-bold ${isTaken ? 'btn-secondary opacity-40' : 'btn-outline-primary'}"
+                  ${isTaken ? `disabled title="Ocupado"` : `onclick="AdminMedi.selectAdminTime(this,'${timeStr}')"`}>
+            ${timeStr}
+          </button>
+        `).join('')}
+      `;
 
       msg.classList.add('d-none');
       grid.classList.remove('d-none');
-    }, 100);
+
+    }).catch(err => {
+      console.warn('Fallback slots sin verificacion:', err);
+      let html = `
+        <div class="shift-banner w-100 p-2 mb-3">
+          <span class="fw-bold text-warning" style="font-size:.8rem;">${shiftLabel} - ${rangeLabel}</span>
+          <span class="badge bg-warning-subtle text-warning ms-2" style="font-size:.65rem;">Sin verificacion</span>
+        </div>`;
+      for (let m = slotStartH * 60; m < slotEndH * 60; m += step) {
+        const hh = Math.floor(m / 60);
+        const t = `${String(hh).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+        html += `<button type="button" class="adm-time-pill btn btn-outline-primary btn-sm fw-bold" onclick="AdminMedi.selectAdminTime(this,'${t}')">${t}</button>`;
+      }
+      grid.innerHTML = html;
+      msg.classList.add('d-none');
+      grid.classList.remove('d-none');
+    });
   }
 
   function selectAdminTime(el, timeStr) {
@@ -1595,9 +2045,9 @@ var AdminMedi = (function () {
     const espDoc = perfil.especialidad || perfil.specialty || '';
     const identity = (permMedi + espDoc).toLowerCase();
 
-    _myRole = identity.includes('psicologo') ? 'Psicologo' : 'Medico';
+    _myRole = identity.includes('psicologo') ? 'Psicologo' : 'Médico';
 
-    console.log(`[Medi] Area Identificada: ${_myRole}`);
+    console.log(`[Medi] Area Identificada: ${_myRole} `);
 
     try {
       const cfg = await MediService.loadConfig(_ctx);
@@ -1617,8 +2067,8 @@ var AdminMedi = (function () {
       SLOT_END = 22; // [FIX] Force 10 PM close
 
       // Status Banner Check (Role Specific)
-      const isMyServiceEnabled = (_myRole === 'Medico')
-        ? (cfg.availableMedico !== false)
+      const isMyServiceEnabled = (_myRole === 'Médico')
+        ? (cfg.availableMédico !== false)
         : (cfg.availablePsicologo !== false);
 
       const banner = document.getElementById('medi-service-status');
@@ -1671,7 +2121,7 @@ var AdminMedi = (function () {
             if (saved) {
               _currentProfile = saved;
               _currentShift = saved.legacyShift;
-              // showToast(`Sesión restaurada: ${saved.displayName}`, 'info');
+              // showToast(`Sesión restaurada: ${ saved.displayName } `, 'info');
               finishProfileSetup();
               restored = true;
             }
@@ -1732,7 +2182,7 @@ var AdminMedi = (function () {
         return; // Halt render until login (Handled by modal or finishProfileSetup)
       } else {
         // MEDICO FLOW (Standard)
-        if (titleEl) titleEl.textContent = `Dr(a). ${perfil.displayName?.split(' ')[0] || 'Médico'}`;
+        if (titleEl) titleEl.textContent = `Dr(a).${perfil.displayName?.split(' ')[0] || 'Médico'} `;
         if (btnShift) btnShift.classList.add('d-none');
 
         _currentShift = null;
@@ -1816,6 +2266,8 @@ var AdminMedi = (function () {
     if (btnShift) btnShift.classList.remove('d-none'); // Show Logout button
 
     refreshAdmin();
+    startClock();
+    setTimeout(updateDashboardStats, 2000);
     // [NEW] Ensure Chat Init for Profile Users
     if (typeof initAdminChat === 'function') initAdminChat();
   }
@@ -1836,7 +2288,7 @@ var AdminMedi = (function () {
     if (tabs && !document.getElementById('tab-ctx-messages')) {
       const li = document.createElement('li');
       li.className = 'nav-item';
-      li.innerHTML = `<button class="nav-link py-1 px-2" id="tab-ctx-messages" data-ctx="messages" onclick="Medi._switchContextTab('messages')"><i class="bi bi-chat-dots"></i></button>`;
+      li.innerHTML = `<button class="nav-link py-1 px-2" id = "tab-ctx-messages" data - ctx="messages" onclick = "AdminMedi._switchContextTab('messages')" > <i class="bi bi-chat-dots"></i></button> `;
       // Insert before the last item (Recent) or explicitly at index 2
       // Default tabs: Metrics (0), Patient (1), Recent (2).
       // Let's insert before Recent.
@@ -1851,7 +2303,7 @@ var AdminMedi = (function () {
       div.id = 'medi-ctx-messages';
       div.className = 'd-none h-100 d-flex flex-column position-relative';
       div.innerHTML = `
-            <div class="p-2 border-bottom d-flex justify-content-between align-items-center bg-light">
+        <div class="p-2 border-bottom d-flex justify-content-between align-items-center bg-light" >
                 <span class="fw-bold small">Mensajes</span>
                 <span class="badge bg-danger rounded-pill d-none" id="medi-chat-badge-total">0</span>
             </div>
@@ -1859,24 +2311,24 @@ var AdminMedi = (function () {
                 <div class="text-center py-4 text-muted small">Cargando conversaciones...</div>
             </div>
             
-            <!-- Conversation View Overlay -->
-            <div id="medi-chat-conversation" class="d-none h-100 d-flex flex-column bg-white position-absolute top-0 start-0 w-100" style="z-index:10;">
-                 <div class="p-2 border-bottom d-flex justify-content-between align-items-center bg-white">
-                    <button class="btn btn-sm btn-light" onclick="Medi.closeAdminConversation()"><i class="bi bi-arrow-left"></i></button>
-                    <span class="fw-bold small text-truncate" id="medi-chat-header-name">Chat</span>
-                    <div style="width:24px;"></div>
-                </div>
-                <div id="medi-chat-msgs-admin" class="flex-grow-1 overflow-auto p-2 bg-light d-flex flex-column gap-2"></div>
-                <div class="p-2 border-top bg-white">
-                    <form onsubmit="event.preventDefault(); Medi.sendAdminMessage()">
-                        <div class="input-group input-group-sm">
-                            <input type="text" id="medi-chat-input-admin" class="form-control rounded-pill bg-light" placeholder="Escribe..." autocomplete="off">
-                            <button class="btn btn-primary rounded-pill ms-1" type="submit"><i class="bi bi-send-fill"></i></button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        `;
+            <!--Conversation View Overlay-- >
+  <div id="medi-chat-conversation" class="d-none h-100 d-flex flex-column bg-white position-absolute top-0 start-0 w-100" style="z-index:10;">
+    <div class="p-2 border-bottom d-flex justify-content-between align-items-center bg-white">
+      <button class="btn btn-sm btn-light" onclick="AdminMedi.closeAdminConversation()"><i class="bi bi-arrow-left"></i></button>
+      <span class="fw-bold small text-truncate" id="medi-chat-header-name">Chat</span>
+      <div style="width:24px;"></div>
+    </div>
+    <div id="medi-chat-msgs-admin" class="flex-grow-1 overflow-auto p-2 bg-light d-flex flex-column gap-2"></div>
+    <div class="p-2 border-top bg-white">
+      <form onsubmit="event.preventDefault(); AdminMedi.sendAdminMessage()">
+        <div class="input-group input-group-sm">
+          <input type="text" id="medi-chat-input-admin" class="form-control rounded-pill bg-light" placeholder="Escribe..." autocomplete="off">
+            <button class="btn btn-primary rounded-pill ms-1" type="submit"><i class="bi bi-send-fill"></i></button>
+        </div>
+      </form>
+    </div>
+  </div>
+`;
       content.appendChild(div);
     }
 
@@ -1889,7 +2341,7 @@ var AdminMedi = (function () {
     const profId = _currentProfile ? _currentProfile.id : null;
     const uidToUse = _myUid;
 
-    _unsubAdminChat = MediChatService.streamConversations(_ctx, uidToUse, _myRole === 'Medico' ? 'profesional' : 'profesional', profId, (convs) => {
+    _unsubAdminChat = MediChatService.streamConversations(_ctx, uidToUse, _myRole === 'Médico' ? 'profesional' : 'profesional', profId, (convs) => {
       const list = document.getElementById('medi-chat-list');
       if (!list) return;
 
@@ -1904,7 +2356,7 @@ var AdminMedi = (function () {
         const time = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
         return `
-                <div class="p-2 border-bottom hover-bg-light cursor-pointer ${unread > 0 ? 'bg-primary bg-opacity-10' : ''}" onclick="Medi.openAdminConversation('${c.id}', '${escapeHtml(c.studentName)}')">
+  <div class="p-2 border-bottom hover-bg-light cursor-pointer ${unread > 0 ? 'bg-primary bg-opacity-10' : ''}" onclick = "AdminMedi.openAdminConversation('${c.id}', '${escapeHtml(c.studentName)}')" >
                     <div class="d-flex justify-content-between align-items-center mb-1">
                         <span class="fw-bold small text-truncate" style="max-width:120px;">${escapeHtml(c.studentName)}</span>
                         <span class="extra-small text-muted">${time}</span>
@@ -1914,7 +2366,7 @@ var AdminMedi = (function () {
                         ${unread > 0 ? `<span class="badge bg-danger rounded-pill">${unread}</span>` : ''}
                     </div>
                 </div>
-             `;
+  `;
       }).join('');
     });
   }
@@ -1946,13 +2398,13 @@ var AdminMedi = (function () {
         const time = m.createdAt ? (m.createdAt.toDate ? m.createdAt.toDate() : new Date(m.createdAt)) : null;
 
         return `
-                <div class="d-flex ${isMe ? 'justify-content-end' : 'justify-content-start'}">
-                    <div class="px-3 py-2 rounded-4 ${isMe ? 'bg-primary text-white rounded-bottom-end-0' : 'bg-white shadow-sm border rounded-bottom-start-0'}" style="max-width:85%; font-size:0.85rem;">
-                        <div>${escapeHtml(m.text)}</div>
-                        <div class="${isMe ? 'text-white-50' : 'text-muted'} text-end" style="font-size:0.6rem;">${time ? time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}</div>
-                    </div>
+  <div class="d-flex ${isMe ? 'justify-content-end' : 'justify-content-start'}" >
+    <div class="px-3 py-2 rounded-4 ${isMe ? 'bg-primary text-white rounded-bottom-end-0' : 'bg-white shadow-sm border rounded-bottom-start-0'}" style="max-width:85%; font-size:0.85rem;">
+      <div>${escapeHtml(m.text)}</div>
+      <div class="${isMe ? 'text-white-50' : 'text-muted'} text-end" style="font-size:0.6rem;">${time ? time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}</div>
+    </div>
                 </div>
-            `;
+  `;
       }).join('');
       container.scrollTop = container.scrollHeight;
     });
@@ -1985,8 +2437,174 @@ var AdminMedi = (function () {
     } catch (e) { console.error(e); }
   }
 
+  // ============================================
+  //   DASHBOARD MODAL OPENERS (NEW)
+  // ============================================
+
+  function openMiAgendaModal() {
+    const source = document.getElementById('medi-agenda-list');
+    const target = document.getElementById('modal-agenda-list');
+    if (source && target) {
+      target.innerHTML = source.innerHTML || '<div class="text-center py-5 opacity-50"><i class="bi bi-calendar-x display-4 d-block mb-2"></i><p class="fw-bold">Sin citas programadas por hoy</p></div>';
+    }
+    const modalEl = document.getElementById('modalMiAgenda');
+    if (modalEl) {
+      let instance = bootstrap.Modal.getInstance(modalEl);
+      if (!instance) instance = new bootstrap.Modal(modalEl);
+      instance.show();
+    }
+  }
+
+  function openWaitingRoomModal() {
+    // Always sync fresh data from the hidden muro list
+    const source = document.getElementById('medi-muro-list');
+    const target = document.getElementById('modal-muro-list');
+    if (source && target) {
+      target.innerHTML = source.innerHTML || '<div class="text-center py-5 opacity-50"><i class="bi bi-cup-hot display-4 d-block mb-2"></i><p class="fw-bold">Sala vacía</p></div>';
+    }
+    const modalEl = document.getElementById('modalWaitingRoom');
+    if (modalEl) {
+      let instance = bootstrap.Modal.getInstance(modalEl);
+      if (!instance) instance = new bootstrap.Modal(modalEl);
+      instance.show();
+    }
+  }
+
+  function openSearchModal() {
+    const modalEl = document.getElementById('modalSearchPatient');
+    if (modalEl) {
+      const m = new bootstrap.Modal(modalEl);
+      m.show();
+      setTimeout(() => {
+        const input = document.getElementById('modal-search-input');
+        if (input) input.focus();
+      }, 400);
+    }
+  }
+
+  function buscarPacienteModal() {
+    const input = document.getElementById('modal-search-input');
+    if (!input || !input.value.trim()) return;
+    // Reuse existing search logic
+    buscarPaciente(input.value.trim());
+  }
+
+  function openMessagesModal() {
+    // Build the modal content with a search bar for new conversations
+    const target = document.getElementById('modal-chat-panel');
+    if (target) {
+      // Add search/start conversation UI at top
+      const chatSource = document.getElementById('medi-chat-panel');
+      const chatContent = chatSource ? chatSource.innerHTML : '';
+      target.innerHTML = `
+  <div class="p-3 bg-light border-bottom" >
+          <div class="input-group">
+            <input type="text" id="msg-search-input" class="form-control border-0 bg-white rounded-start-pill" 
+                   placeholder="Buscar alumno para iniciar chat..." 
+                   onkeydown="if(event.key==='Enter'){event.preventDefault();AdminMedi.searchAndChat();}">
+            <button class="btn btn-dark rounded-end-pill px-3" type="button" onclick="AdminMedi.searchAndChat()">
+               <i class="bi bi-chat-plus-fill"></i>
+            </button>
+          </div>
+          <div id="msg-search-result" class="mt-2"></div>
+        </div>
+  <div class="p-3">${chatContent || '<div class="text-center py-4 text-muted small"><i class="bi bi-chat-square-dots display-5 d-block mb-2 opacity-25"></i><p>Sin conversaciones activas</p></div>'}</div>
+`;
+    }
+    const modalEl = document.getElementById('modalMessages');
+    if (modalEl) {
+      let instance = bootstrap.Modal.getInstance(modalEl);
+      if (!instance) instance = new bootstrap.Modal(modalEl);
+      instance.show();
+    }
+  }
+
+  async function searchAndChat() {
+    const input = document.getElementById('msg-search-input');
+    const resultDiv = document.getElementById('msg-search-result');
+    if (!input || !resultDiv) return;
+    const query = input.value.trim();
+    if (!query || query.length < 2) return;
+
+    resultDiv.innerHTML = '<div class="text-center py-2"><span class="spinner-border spinner-border-sm"></span></div>';
+
+    try {
+      const found = await MediService.buscarPaciente(_ctx, query);
+      if (found) {
+        found.uid = found.id;
+        resultDiv.innerHTML = `
+  <div class="d-flex align-items-center gap-3 p-2 bg-white rounded-3 shadow-sm" >
+            <div class="bg-primary bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center" style="width:38px;height:38px;">
+              <span class="fw-bold text-primary">${(found.displayName || 'E')[0].toUpperCase()}</span>
+            </div>
+            <div class="flex-grow-1">
+              <h6 class="fw-bold mb-0 small">${escapeHtml(found.displayName || found.email)}</h6>
+              <small class="text-muted">${escapeHtml(found.matricula || '')}</small>
+            </div>
+            <button class="btn btn-sm btn-primary rounded-pill px-3 fw-bold" onclick="AdminMedi.startChatWithStudent('${found.id}', '${escapeHtml(found.displayName || found.email)}'); bootstrap.Modal.getInstance(document.getElementById('modalMessages')).hide();">
+              <i class="bi bi-chat-dots me-1"></i>Chatear
+            </button>
+          </div> `;
+      } else {
+        resultDiv.innerHTML = '<div class="text-muted small text-center py-1"><i class="bi bi-person-x me-1"></i>No encontrado</div>';
+      }
+    } catch (e) {
+      console.error(e);
+      resultDiv.innerHTML = '<div class="text-danger small">Error al buscar</div>';
+    }
+  }
+
+  // ============================================
+  //   DASHBOARD CLOCK (Biblio-style)
+  // ============================================
+  let _clockInterval = null;
+  function startClock() {
+    const update = () => {
+      const now = new Date();
+      const time = document.getElementById('admin-clock-time');
+      const date = document.getElementById('admin-clock-date');
+      if (time) time.innerText = now.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      if (date) date.innerText = now.toLocaleDateString('es-MX', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    };
+    update();
+    if (_clockInterval) clearInterval(_clockInterval);
+    _clockInterval = setInterval(update, 1000);
+  }
+
+  // ============================================
+  //   DASHBOARD STATS UPDATER
+  // ============================================
+  function updateDashboardStats() {
+    // Read badge value set by loadWall stream (authoritative source)
+    const badge = document.getElementById('badge-sala-espera');
+    const waitCount = badge ? parseInt(badge.textContent) || 0 : 0;
+
+    // Update stat card: En Espera (use badge, which is set by stream)
+    const statEspera = document.getElementById('stat-en-espera');
+    if (statEspera) statEspera.textContent = waitCount;
+
+    // Update stat card: Agenda (count confirmed agenda items)
+    const agendaList = document.getElementById('medi-agenda-list');
+    const statAgenda = document.getElementById('stat-agenda');
+    if (agendaList && statAgenda) {
+      // Count distinct date-header items minus the header dividers
+      const agendaCards = agendaList.querySelectorAll('.list-group-item, .medi-wait-card');
+      statAgenda.textContent = agendaCards.length;
+    }
+
+    // Also sync the hidden muro list into the modal if it's open
+    const source = document.getElementById('medi-muro-list');
+    const target = document.getElementById('modal-muro-list');
+    if (source && target) {
+      const modalEl = document.getElementById('modalWaitingRoom');
+      if (modalEl && modalEl.classList.contains('show')) {
+        target.innerHTML = source.innerHTML;
+      }
+    }
+  }
+
   function finishInit() {
-    // Common init steps for non-profile users (Medico)
+    // Common init steps for non-profile users (Médico)
     const perfil = _ctx.profile || {};
     const elName = document.getElementById('medi-pro-name');
 
@@ -2000,14 +2618,14 @@ var AdminMedi = (function () {
 
     if (elName) elName.textContent = perfil.displayName || _ctx.user.email;
 
+    // Start dashboard clock
+    startClock();
+
     refreshAdmin();
 
-    const searchInput = document.getElementById('medi-search-paciente');
-    if (searchInput) {
-      searchInput.addEventListener('keyup', (e) => {
-        if (e.key === 'Enter') buscarPaciente();
-      });
-    }
+    // Update dashboard stats periodically
+    setTimeout(updateDashboardStats, 2000);
+    setInterval(updateDashboardStats, 15000);
 
     // [NEW] Init Admin Chat
     if (typeof initAdminChat === 'function') initAdminChat();
@@ -2021,23 +2639,40 @@ var AdminMedi = (function () {
   let _unsubRecent = null;
 
   async function loadRecentActivity() {
-    console.log("[medi] loadRecentActivity called (v4 - Limit 3 & View All)");
+    console.log("[medi] loadRecentActivity called (v5 - Visual Cards)");
 
-    // Initial check just for spinner
+    // Avatar color pool [bg, text]
+    const RECENT_COLORS = [
+      ['#e0f2fe', '#0369a1'], ['#d1fae5', '#065f46'], ['#fef3c7', '#92400e'],
+      ['#fce7f3', '#9d174d'], ['#ede9fe', '#5b21b6'], ['#fee2e2', '#991b1b']
+    ];
+    const recentAvatar = (name) => {
+      const i = (name || '?').charCodeAt(0) % RECENT_COLORS.length;
+      return RECENT_COLORS[i];
+    };
+
+    // Tiempo relativo legible
+    const timeAgo = (date) => {
+      const d = Math.floor((new Date() - date) / 86400000);
+      if (d === 0) return 'Hoy';
+      if (d === 1) return 'Ayer';
+      if (d < 7) return `Hace ${d} d\u00edas`;
+      return date.toLocaleDateString('es-MX', { day: 'numeric', month: 'short' });
+    };
+
     let list = document.getElementById('medi-recent-list');
     if (list) {
-      list.innerHTML = '<div class="text-center py-4 text-muted small"><span class="spinner-border spinner-border-sm"></span> Cargando actividad...</div>';
+      list.innerHTML = `<div class="medi-empty-state" >
+        <span class="spinner-border spinner-border-sm text-success mb-2"></span>
+        <p>Cargando actividad...</p>
+      </div> `;
     }
 
-    if (_unsubRecent) {
-      _unsubRecent();
-      _unsubRecent = null;
-    }
+    if (_unsubRecent) { _unsubRecent(); _unsubRecent = null; }
 
-    // Safety: If Psychologist and no profile, do nothing (wait for login)
     if (_myRole === 'Psicologo' && !_currentProfile) {
       console.warn("[medi] Actividad reciente omitida: Falta perfil");
-      if (list) list.innerHTML = '<div class="text-center py-4 text-muted small">Selecciona un perfil...</div>';
+      if (list) list.innerHTML = `<div class="medi-empty-state" ><i class="bi bi-person-badge"></i><p>Selecciona un perfil para continuar</p></div> `;
       return;
     }
 
@@ -2045,68 +2680,84 @@ var AdminMedi = (function () {
     const uidToUse = _myUid || _ctx.user.uid;
     console.log("[medi] Subscribing stream...", { role: _myRole, uid: uidToUse, profId });
 
-    // Fallback Timeout
+    // Badge de tipo de servicio
+    const serviceBadge = (c) => {
+      if (c.uid && c.uid.startsWith('anon_'))
+        return `<span class="badge bg-warning-subtle text-warning border border-warning" style = "font-size:.58rem;" > Walk -in</span> `;
+      const tipo = (c.tipoServicio || c.categoria || '').toLowerCase();
+      if (tipo.includes('psico') || tipo.includes('mental'))
+        return `<span class="badge bg-primary-subtle text-primary" style = "font-size:.58rem;" > <i class="bi bi-chat-heart-fill me-1"></i>Psicolog\u00eda</span> `;
+      if (tipo.includes('medic') || tipo.includes('general'))
+        return `<span class="badge bg-info-subtle text-info" style = "font-size:.58rem;" > <i class="bi bi-bandaid-fill me-1"></i>Medicina</span> `;
+      return `<span class="badge bg-secondary-subtle text-secondary" style = "font-size:.58rem;" > Consulta</span> `;
+    };
+
     const safetyTimer = setTimeout(() => {
-      const currentList = document.getElementById('medi-recent-list');
-      if (currentList && currentList.innerHTML.includes('Cargando')) {
-        currentList.innerHTML = '<div class="text-center py-4 text-danger small">Tiempo de espera agotado. <button class="btn btn-link btn-sm p-0" onclick="Medi.loadRecentActivity()">Reintentar</button></div>';
+      const el = document.getElementById('medi-recent-list');
+      if (el && el.querySelector('.spinner-border')) {
+        el.innerHTML = `<div class="medi-empty-state text-danger" >
+          <i class="bi bi-wifi-off"></i>
+          <p>Tiempo de espera agotado. <button class="btn btn-link btn-sm p-0" onclick="AdminMedi.loadRecentActivity()">Reintentar</button></p>
+        </div> `;
       }
     }, 8000);
 
-    // Limit stream to 3 for Dashboard
     _unsubRecent = MediService.streamRecentConsultations(_ctx, _myRole, uidToUse, profId, 3, (docs) => {
       clearTimeout(safetyTimer);
       const currentList = document.getElementById('medi-recent-list');
       if (!currentList) return;
 
       if (docs.length === 0) {
-        currentList.innerHTML = '<div class="text-center py-4 text-muted small fst-italic">Sin actividad reciente.</div>';
+        currentList.innerHTML = `<div class="medi-empty-state" >
+          <i class="bi bi-clipboard-x"></i>
+          <p>Sin actividad reciente registrada</p>
+        </div> `;
         return;
       }
 
-      currentList.innerHTML = docs.map(c => {
+      currentList.innerHTML = docs.map((c, idx) => {
         const fecha = c.safeDate || new Date();
-        const timeStr = fecha.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }).toLowerCase();
-        const dateStr = fecha.toLocaleDateString('es-MX', { day: 'numeric', month: 'short' });
-
-        // Encode for quick detail
+        const timeStr = fecha.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const relDate = timeAgo(fecha);
         const encoded = encodeURIComponent(JSON.stringify(c));
+        const name = c.patientName || c.studentEmail || 'Estudiante';
+        const initial = name.charAt(0).toUpperCase();
+        const [bgC, fgC] = recentAvatar(name);
+        const diag = escapeHtml(c.diagnostico || c.motivo || 'General');
 
         return `
-                <div class="list-group-item border-0 border-bottom px-1 py-2 animate-fade-in hover-bg-light transition-all rounded-3">
-                    <div class="d-flex justify-content-between align-items-center">
-                    <div class="d-flex align-items-center gap-2" style="min-width:0;">
-                            <div class="text-center rounded-3 bg-light border p-1 flex-shrink-0" style="min-width:45px;">
-                            <div class="fw-bold lh-1 text-dark" style="font-size:.65rem;">${dateStr}</div>
-                            <div class="text-muted" style="font-size:.55rem;">${timeStr}</div>
-                            </div>
-                            <div style="min-width:0;">
-                                <div class="fw-bold text-dark text-truncate" style="font-size:.75rem;">${escapeHtml(c.patientName || c.studentEmail || 'Estudiante')}</div>
-                                <div class="text-muted text-truncate" style="font-size:.65rem;">
-                                <span class="fw-bold text-primary">${escapeHtml(c.diagnostico || c.motivo || 'General')}</span>
-                                ${c.uid && c.uid.startsWith('anon_') ? '<span class="badge bg-warning text-dark ms-1" style="font-size:.5rem;">ANON</span>' : ''}
-                                </div>
-                            </div>
-                    </div>
-                    <button class="btn btn-xs btn-outline-primary rounded-pill px-2 fw-bold flex-shrink-0"
-                            onclick="Medi.showConsultationQuickDetail('${encoded}')" style="font-size:.6rem;">
-                            Ver
-                    </button>
-                    </div>
-                </div>
-            `;
+  <div class="medi-recent-card p-3" style = "animation-delay:${idx * 0.07}s;" >
+    <div class="d-flex align-items-start gap-3">
+      <div class="medi-avatar flex-shrink-0" style="background:${bgC};color:${fgC};">${initial}</div>
+      <div class="flex-fill" style="min-width:0;">
+        <div class="d-flex justify-content-between align-items-start gap-2 mb-1">
+          <div class="fw-bold text-dark text-truncate" style="font-size:.85rem;">${escapeHtml(name)}</div>
+          <div class="text-muted flex-shrink-0 text-end" style="font-size:.65rem;line-height:1.2;">
+            <div>${escapeHtml(relDate)}</div>
+            <div>${escapeHtml(timeStr)}</div>
+          </div>
+        </div>
+        <div class="fw-semibold text-primary text-truncate mb-1" style="font-size:.78rem;">${diag}</div>
+        <div class="d-flex align-items-center justify-content-between gap-2">
+          ${serviceBadge(c)}
+          <button class="btn btn-xs btn-primary rounded-pill px-3 fw-bold flex-shrink-0"
+            style="font-size:.65rem;"
+            onclick="AdminMedi.showConsultationQuickDetail('${encoded}')">
+            <i class="bi bi-eye me-1"></i>Ver
+          </button>
+        </div>
+      </div>
+    </div>
+          </div> `;
       }).join('');
 
-      // Add "View All" button at the bottom
       const btnDiv = document.createElement('div');
-      btnDiv.className = "text-center mt-2 pt-2 border-top";
+      btnDiv.className = "text-center pt-2";
       btnDiv.innerHTML = `
-        <button class="btn btn-link btn-sm text-decoration-none fw-bold small" onclick="Medi.showAllRecentModal()">
-            Ver todo el historial <i class="bi bi-arrow-right-short"></i>
-        </button>
-      `;
+  <button class="btn btn-link btn-sm text-decoration-none fw-bold small text-success" onclick = "AdminMedi.showAllRecentModal()" >
+    Ver todo el historial <i class="bi bi-arrow-right-short" ></i>
+        </button> `;
       currentList.appendChild(btnDiv);
-
     });
   }
 
@@ -2134,7 +2785,7 @@ var AdminMedi = (function () {
   // 3. Filter Waiting Room
   function filterWaitingRoom(filter) {
     // Visual feedback on buttons
-    const btns = document.querySelectorAll('[onclick^="Medi.filterWaitingRoom"]');
+    const btns = document.querySelectorAll('[onclick^="AdminMedi.filterWaitingRoom"]');
     btns.forEach(b => b.classList.replace('btn-dark', 'btn-light'));
     btns.forEach(b => b.classList.remove('active')); // if using active class
 
@@ -2157,54 +2808,97 @@ var AdminMedi = (function () {
     if (typeof termOrEvent === 'string') {
       query = termOrEvent;
     } else {
-      const input = document.getElementById('medi-search-paciente');
+      const input = document.getElementById('modal-search-input');
       query = input ? input.value.trim() : "";
     }
 
     if (!query) return;
 
-    if (query.length < 4) {
-      showToast('Ingresa al menos 4 caracteres de la matrícula.', 'warning');
+    if (query.length < 2) {
+      showToast('Ingresa al menos 2 caracteres para buscar.', 'warning');
       return;
     }
 
-    // Show searching state if using input
-    const input = document.getElementById('medi-search-paciente');
-    if (input) {
-      input.disabled = true;
-      document.body.style.cursor = 'wait';
+    // Show searching state
+    const modalResults = document.getElementById('modal-search-results');
+    if (modalResults) {
+      modalResults.innerHTML = '<div class="text-center py-4"><span class="spinner-border text-primary"></span></div>';
     }
+    document.body.style.cursor = 'wait';
 
     try {
-      const results = await _ctx.db.collection('usuarios')
-        .where('matricula', '==', query)
-        .limit(1)
-        .get();
+      // Use MediService.buscarPaciente which searches matrícula, email, and name
+      const found = await MediService.buscarPaciente(_ctx, query);
 
-      if (results.empty) {
-        showToast('No se encontró ningún alumno con esa matrícula.', 'info');
-      } else {
-        const student = results.docs[0].data();
-        student.uid = results.docs[0].id;
-        student.id = results.docs[0].id;
-        _foundPatient = student;
-        // Show in Zona C context panel (desktop) or fallback to modal
-        const ctxPanel = document.getElementById('medi-ctx-patient');
-        if (ctxPanel) {
-          _showPatientInContext(student);
-          showToast(`Paciente encontrado: ${student.displayName || student.email}`, 'success');
+      if (!found) {
+        // Also try a broader name search (case-insensitive workaround)
+        let nameResults = [];
+        try {
+          const upperQuery = query.charAt(0).toUpperCase() + query.slice(1).toLowerCase();
+          const nameSnap = await _ctx.db.collection('usuarios')
+            .where('displayName', '>=', upperQuery)
+            .where('displayName', '<=', upperQuery + '\uf8ff')
+            .limit(5)
+            .get();
+          nameResults = nameSnap.docs.map(d => ({ id: d.id, uid: d.id, ...d.data() }));
+        } catch (e) { console.warn('Name search error:', e); }
+
+        if (nameResults.length > 0) {
+          // Show multiple results
+          if (modalResults) {
+            modalResults.innerHTML = nameResults.map(s => `
+  <div class="list-group-item list-group-item-action border-0 rounded-3 mb-2 p-3 shadow-sm cursor-pointer"
+onclick = "AdminMedi.showPatientFoundModal(JSON.parse(decodeURIComponent('${encodeURIComponent(JSON.stringify(s))}')))" >
+  <div class="d-flex align-items-center gap-3">
+    <div class="bg-primary bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center" style="width:42px;height:42px;">
+      <span class="fw-bold text-primary">${(s.displayName || 'E')[0].toUpperCase()}</span>
+    </div>
+    <div>
+      <h6 class="fw-bold mb-0 text-dark">${escapeHtml(s.displayName || s.email)}</h6>
+      <small class="text-muted">${escapeHtml(s.matricula || '')} • ${escapeHtml(s.carrera || '')}</small>
+    </div>
+    <i class="bi bi-chevron-right ms-auto text-muted"></i>
+  </div>
+            </div>
+  `).join('');
+          } else {
+            showPatientFoundModal(nameResults[0]);
+          }
         } else {
-          showPatientFoundModal(student);
+          if (modalResults) {
+            modalResults.innerHTML = `
+  <div class="text-center py-4" >
+              <div class="bg-warning bg-opacity-10 d-inline-flex rounded-circle p-3 mb-2"><i class="bi bi-person-x-fill text-warning display-5"></i></div>
+              <h6 class="fw-bold">No se encontró</h6>
+              <p class="text-muted small">No hay resultados para "<strong>${escapeHtml(query)}</strong>"</p>
+            </div> `;
+          } else {
+            showToast('No se encontró ningún alumno.', 'info');
+          }
         }
+      } else {
+        found.uid = found.id;
+        _foundPatient = found;
+        // [FIX] Clear search results (stop spinner) before showing patient modal
+        if (modalResults) {
+          modalResults.innerHTML = `
+  <div class="text-center py-3 text-success" >
+              <i class="bi bi-check-circle-fill fs-2 d-block mb-1"></i>
+              <small class="fw-bold">Paciente encontrado</small>
+            </div> `;
+        }
+        // Close search modal and show patient modal
+        const searchModalEl = document.getElementById('modalSearchPatient');
+        if (searchModalEl) {
+          const searchInst = bootstrap.Modal.getInstance(searchModalEl);
+          if (searchInst) searchInst.hide();
+        }
+        showPatientFoundModal(found);
       }
     } catch (err) {
       console.error(err);
       showToast('Error al buscar paciente.', 'danger');
     } finally {
-      if (input) {
-        input.disabled = false;
-        input.focus();
-      }
       document.body.style.cursor = 'default';
     }
   }
@@ -2212,98 +2906,98 @@ var AdminMedi = (function () {
   function showPatientFoundModal(student) {
     // REDISEÑO TARJETA PACIENTE (PREMIUM)
     const html = `
-      <div class="modal-dialog modal-dialog-centered modal-lg">
-        <div class="modal-content rounded-4 shadow-lg border-0">
-          <div class="modal-header border-0 pb-0">
-             <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+  <div class="modal-dialog modal-dialog-centered modal-lg" >
+    <div class="modal-content rounded-4 shadow-lg border-0">
+      <div class="modal-header border-0 pb-0">
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body p-4 pt-0">
+
+        <!-- HEADER CONTEXTO -->
+        <div class="text-center mb-4">
+          <div class="position-relative d-inline-block">
+            <div class="rounded-circle bg-light shadow-sm d-flex align-items-center justify-content-center mx-auto mb-3"
+              style="width: 100px; height: 100px; font-size: 2.5rem; border: 4px solid white;">
+              ${student.displayName ? student.displayName.charAt(0).toUpperCase() : '?'}
+            </div>
+            <span class="position-absolute bottom-0 end-0 badge rounded-pill bg-dark border border-white">
+              ${student.matricula || 'Ext'}
+            </span>
           </div>
-          <div class="modal-body p-4 pt-0">
-             
-             <!-- HEADER CONTEXTO -->
-             <div class="text-center mb-4">
-                <div class="position-relative d-inline-block">
-                    <div class="rounded-circle bg-light shadow-sm d-flex align-items-center justify-content-center mx-auto mb-3" 
-                         style="width: 100px; height: 100px; font-size: 2.5rem; border: 4px solid white;">
-                        ${student.displayName ? student.displayName.charAt(0).toUpperCase() : '?'}
-                    </div>
-                    <span class="position-absolute bottom-0 end-0 badge rounded-pill bg-dark border border-white">
-                        ${student.matricula || 'Ext'}
-                    </span>
-                </div>
-                <h4 class="fw-bold text-dark mb-1">${student.displayName}</h4>
-                <div class="text-muted small">${student.email}</div>
-             </div>
+          <h4 class="fw-bold text-dark mb-1">${student.displayName}</h4>
+          <div class="text-muted small">${student.email}</div>
+        </div>
 
-             <!-- GRID DE DATOS -->
-             <div class="row g-3 mb-4">
-                <div class="col-md-3 col-6">
-                    <div class="p-3 bg-light-subtle rounded-4 text-center border h-100">
-                        <div class="extra-small fw-bold text-muted text-uppercase mb-1">Edad</div>
-                        <div class="fw-bold fs-5 text-dark">${student.edad || MediService.calculateAge(student.fechaNacimiento) || '--'}</div>
-                        <div class="extra-small text-muted">años</div>
-                    </div>
-                </div>
-                <div class="col-md-3 col-6">
-                    <div class="p-3 bg-light-subtle rounded-4 text-center border h-100">
-                        <div class="extra-small fw-bold text-muted text-uppercase mb-1">Sangre</div>
-                        <div class="fw-bold fs-5 text-danger">${student.tipoSangre || '--'}</div>
-                        <div class="extra-small text-muted">A+</div>
-                    </div>
-                </div>
-                <div class="col-md-3 col-6">
-                    <div class="p-3 bg-light-subtle rounded-4 text-center border h-100">
-                        <div class="extra-small fw-bold text-muted text-uppercase mb-1">Género</div>
-                        <div class="fw-bold fs-5 text-dark">${(student.genero || (student.personalData && student.personalData.genero) || student.sexo || '--').charAt(0)}</div>
-                        <div class="extra-small text-muted">${student.genero || (student.personalData && student.personalData.genero) || student.sexo || '--'}</div>
-                    </div>
-                </div>
-                <div class="col-md-3 col-6">
-                    <div class="p-3 bg-light-subtle rounded-4 text-center border h-100">
-                        <div class="extra-small fw-bold text-muted text-uppercase mb-1">Carrera</div>
-                        <div class="fw-bold fs-5 text-primary"><i class="bi bi-mortarboard-fill"></i></div>
-                        <div class="extra-small text-muted text-truncate">${student.carrera || 'General'}</div>
-                    </div>
-                </div>
-             </div>
-             
-             <!-- ALERTAS -->
-             <div class="alert alert-warning border-0 rounded-4 d-flex align-items-center mb-4 shadow-sm">
-                <div class="fs-4 me-3 text-warning"><i class="bi bi-exclamation-triangle-fill"></i></div>
-                <div>
-                    <div class="fw-bold text-dark">Alergias Detectadas</div>
-                    <div class="small text-muted">${student.alergias || 'Ninguna registrada en el sistema.'}</div>
-                </div>
-             </div>
+        <!-- GRID DE DATOS -->
+        <div class="row g-3 mb-4">
+          <div class="col-md-3 col-6">
+            <div class="p-3 bg-light-subtle rounded-4 text-center border h-100">
+              <div class="extra-small fw-bold text-muted text-uppercase mb-1">Edad</div>
+              <div class="fw-bold fs-5 text-dark">${student.edad || MediService.calculateAge(student.fechaNacimiento) || '--'}</div>
+              <div class="extra-small text-muted">años</div>
+            </div>
+          </div>
+          <div class="col-md-3 col-6">
+            <div class="p-3 bg-light-subtle rounded-4 text-center border h-100">
+              <div class="extra-small fw-bold text-muted text-uppercase mb-1">Sangre</div>
+              <div class="fw-bold fs-5 text-danger">${student.tipoSangre || '--'}</div>
+              <div class="extra-small text-muted">A+</div>
+            </div>
+          </div>
+          <div class="col-md-3 col-6">
+            <div class="p-3 bg-light-subtle rounded-4 text-center border h-100">
+              <div class="extra-small fw-bold text-muted text-uppercase mb-1">Género</div>
+              <div class="fw-bold fs-5 text-dark">${(student.genero || (student.personalData && student.personalData.genero) || student.sexo || '--').charAt(0)}</div>
+              <div class="extra-small text-muted">${student.genero || (student.personalData && student.personalData.genero) || student.sexo || '--'}</div>
+            </div>
+          </div>
+          <div class="col-md-3 col-6">
+            <div class="p-3 bg-light-subtle rounded-4 text-center border h-100">
+              <div class="extra-small fw-bold text-muted text-uppercase mb-1">Carrera</div>
+              <div class="fw-bold fs-5 text-primary"><i class="bi bi-mortarboard-fill"></i></div>
+              <div class="extra-small text-muted text-truncate">${student.carrera || 'General'}</div>
+            </div>
+          </div>
+        </div>
 
-             <!-- ACCIONES -->
-             <div class="row g-2">
-                 <div class="col-12 mb-2">
-                    <button class="btn btn-primary w-100 rounded-pill py-3 fw-bold fs-5 shadow-sm hover-scale" 
-                            onclick="Medi.startWalkIn('${encodeURIComponent(JSON.stringify(student))}')">
-                        <i class="bi bi-lightning-charge-fill me-2"></i>Atender Ahora
-                    </button>
-                 </div>
-                 <div class="col-md-6">
-                    <div class="d-flex gap-2">
-                        <button class="btn btn-outline-dark w-100 rounded-pill py-2 fw-bold" onclick='Medi.showFullRecord("${student.uid}")'>
-                            <i class="bi bi-folder2-open me-2"></i>Expediente
-                        </button>
-                        <button class="btn btn-outline-secondary rounded-pill py-2 fw-bold" onclick='Medi.verHistorialRapido("${student.uid}")' data-bs-toggle="tooltip" title="Historial Rápido">
-                            <i class="bi bi-clock-history"></i>
-                        </button>
-                    </div>
-                 </div>
-                 <div class="col-md-6">
-                    <button class="btn btn-outline-primary w-100 rounded-pill py-2 fw-bold" 
-                            onclick="bootstrap.Modal.getInstance(document.getElementById('modalPatientFound')).hide(); Medi.openManualBooking('found', '${encodeURIComponent(JSON.stringify(student))}')">
-                        <i class="bi bi-calendar-plus me-2"></i>Reservar Cita
-                    </button>
-                 </div>
-             </div>
+        <!-- ALERTAS -->
+        <div class="alert alert-warning border-0 rounded-4 d-flex align-items-center mb-4 shadow-sm">
+          <div class="fs-4 me-3 text-warning"><i class="bi bi-exclamation-triangle-fill"></i></div>
+          <div>
+            <div class="fw-bold text-dark">Alergias Detectadas</div>
+            <div class="small text-muted">${student.alergias || 'Ninguna registrada en el sistema.'}</div>
+          </div>
+        </div>
+
+        <!-- ACCIONES -->
+        <div class="row g-2">
+          <div class="col-12 mb-2">
+            <button class="btn btn-primary w-100 rounded-pill py-3 fw-bold fs-5 shadow-sm hover-scale"
+              onclick="AdminMedi.startWalkIn('${encodeURIComponent(JSON.stringify(student))}')">
+              <i class="bi bi-lightning-charge-fill me-2"></i>Atender Ahora
+            </button>
+          </div>
+          <div class="col-md-6">
+            <div class="d-flex gap-2">
+              <button class="btn btn-outline-dark w-100 rounded-pill py-2 fw-bold" onclick='AdminMedi.showFullRecord("${student.uid}")'>
+                <i class="bi bi-folder2-open me-2"></i>Expediente
+              </button>
+              <button class="btn btn-outline-secondary rounded-pill py-2 fw-bold" onclick='AdminMedi.verHistorialRapido("${student.uid}")' data-bs-toggle="tooltip" title="Historial Rápido">
+                <i class="bi bi-clock-history"></i>
+              </button>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <button class="btn btn-outline-primary w-100 rounded-pill py-2 fw-bold"
+              onclick="bootstrap.Modal.getInstance(document.getElementById('modalPatientFound')).hide(); AdminMedi.openManualBooking('found', '${encodeURIComponent(JSON.stringify(student))}')">
+              <i class="bi bi-calendar-plus me-2"></i>Reservar Cita
+            </button>
           </div>
         </div>
       </div>
-    `;
+    </div>
+      </div>
+  `;
 
     // Inject into existing modal container if checking structure, or replace innerHTML
     const modalEl = document.getElementById('modalPatientFound');
@@ -2350,7 +3044,7 @@ var AdminMedi = (function () {
       }
 
       const badge = document.getElementById('badge-sala-espera');
-      if (badge) badge.textContent = docs.length;
+      if (badge) badge.textContent = docs.length; // Sync badge with actual filtered count
 
       if (docs.length === 0) {
         list.innerHTML = '<div class="text-center py-5 text-muted small">Sin pacientes en espera.</div>';
@@ -2373,112 +3067,82 @@ var AdminMedi = (function () {
         const isLactario = c.linkedLactarioId || (c.motivo && c.motivo.includes('Lactancia'));
         const prio = c.prioridad || 'normal';
 
-        // Time logic
-        const isToday = fecha.getDate() === now.getDate() && fecha.getMonth() === now.getMonth() && fecha.getFullYear() === now.getFullYear();
-        const isTomorrow = new Date(now.getTime() + 86400000).getDate() === fecha.getDate();
+        const timeStr = fecha.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
+        const isToday = fecha.toDateString() === now.toDateString();
+        const dateLabel = isToday ? 'Hoy' : fecha.toLocaleDateString('es-MX', { day: 'numeric', month: 'short' });
 
-        let dateStr = fecha.toLocaleDateString('es-MX', { weekday: 'short', day: 'numeric', month: 'short' });
-        if (isToday) dateStr = 'Hoy';
-        else if (isTomorrow) dateStr = 'Mañana';
+        // Priority styling
+        let accentColor = '#0d6efd'; // blue default
+        let accentBg = 'bg-primary-subtle';
+        let prioLabel = '';
+        if (prio === 'urgente') { accentColor = '#dc3545'; accentBg = 'bg-danger-subtle'; prioLabel = '<span class="badge bg-danger ms-2" style="font-size:.6rem;">URGENTE</span>'; }
+        else if (prio === 'seguimiento') { accentColor = '#ffc107'; accentBg = 'bg-warning-subtle'; prioLabel = '<span class="badge bg-warning text-dark ms-2" style="font-size:.6rem;">SEGUIMIENTO</span>'; }
+        if (esReentrada) prioLabel += '<span class="badge bg-info text-white ms-1" style="font-size:.6rem;">Reingreso</span>';
+        if (isLactario) prioLabel = '<span class="badge bg-danger text-white ms-2" style="font-size:.6rem;">LACTARIO</span>';
 
-        // Remove trailing dots from short months if any, though es-MX usually ok
-        const timeStr = fecha.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }).toLowerCase();
-        const fullDateStr = `${dateStr}, ${timeStr}`;
+        const motivoPreview = (c.motivo || 'Sin motivo').substring(0, 60);
 
-        // Wait timer (diff from NOW to SLOT) - Negative means late? 
-        // Or wait timer usually means "Time since arrival"? 
-        // If it's "Sala de Espera", usually it's time waiting. 
-        // But here we rely on slot time. 
-        // If fecha is Slot Time:
-        //   If Now < Slot: "Faltan X min"
-        //   If Now > Slot: "retraso X min"
-        // The original code calculated waitMs = now - fecha (positive if late).
-        const waitMs = now - fecha;
-        const waitMin = Math.floor(waitMs / 60000); // Positive = Overdue by X mins
-
-        let waitLabel = '';
-        let waitClass = 'text-muted';
-
-        if (waitMin > 0) {
-          waitLabel = `Hace ${waitMin} min`;
-          if (waitMin >= 15) waitClass = 'text-warning fw-bold';
-          if (waitMin >= 30) waitClass = 'text-danger fw-bold';
-        } else {
-          const minsLeft = Math.abs(waitMin);
-          if (minsLeft > 120) {
-            waitLabel = '';
-            waitClass = 'text-muted';
-          } else {
-            waitLabel = `En ${minsLeft} min`;
-            waitClass = 'text-success fw-bold';
-          }
-        }
-
-        let borderClass = '';
-        if (prio === 'urgente') borderClass = 'border-start border-3 border-danger';
-        else if (isLactario) borderClass = 'border-start border-3 border-danger';
-        else if (prio === 'seguimiento') borderClass = 'border-start border-3 border-warning';
-        else if (esReentrada) borderClass = 'border-start border-3 border-info';
-
-        const motivoPreview = (c.motivo || '').substring(0, 50) + ((c.motivo || '').length > 50 ? '...' : '');
-
-        // Priority badges
-        let prioBadge = '';
-        if (prio === 'urgente') prioBadge = '<span class="badge bg-danger" style="font-size:.55rem;">Urgente</span>';
-        else if (prio === 'seguimiento') prioBadge = '<span class="badge bg-warning text-dark" style="font-size:.55rem;">Seguimiento</span>';
-
-        // Encode student data for context panel
+        // Encode data
         const studentData = encodeURIComponent(JSON.stringify({
           uid: c.studentId, email: c.studentEmail, displayName: c.studentName,
           tipoSangre: c.tipoSangre, alergias: c.alergias
         }));
 
         return `
-          <div class="medi-wait-card list-group-item border-0 border-bottom px-2 py-2 ${borderClass} animate-fade-in"
-               onclick="Medi._selectWaitingPatient(this, '${studentData}')">
-            <div class="d-flex justify-content-between align-items-center mb-1">
-              <div class="d-flex align-items-center gap-2" style="min-width:0;">
-                 <div class="bg-primary bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center flex-shrink-0" style="width:32px;height:32px;">
-                    <span class="fw-bold text-primary" style="font-size:.75rem;">${escapeHtml((c.studentName || 'E')[0])}</span>
-                 </div>
-                 <div style="min-width:0;">
-                    <div class="fw-bold small text-dark text-truncate">${escapeHtml(c.studentName || 'Estudiante')}</div>
-                     <div class="d-flex align-items-center gap-1 text-primary fw-bold" style="font-size: 0.7rem;">
-                        <i class="bi bi-clock"></i> ${fullDateStr}
-                     </div>
-                    <div class="d-flex align-items-center gap-1 flex-wrap">
-                        ${prioBadge}
-                        ${esReentrada ? '<span class="badge bg-info text-white" style="font-size:.55rem;">Reingreso</span>' : ''}
-                        ${isLactario ? '<span class="badge bg-danger text-white" style="font-size:.55rem;">Lactario</span>' : ''}
-                    </div>
-                 </div>
-              </div>
-              <div class="text-end flex-shrink-0">
-                 <div class="${waitClass}" style="font-size:.7rem;">${waitLabel}</div>
-                 <div class="text-muted" style="font-size:.6rem;">#${idx + 1}</div>
-              </div>
-            </div>
-            ${motivoPreview ? `<div class="text-muted text-truncate ps-5" style="font-size:.65rem;">${escapeHtml(motivoPreview)}</div>` : ''}
-            <div class="d-flex gap-1 mt-1 ps-5">
-              <button class="btn btn-xs btn-outline-danger rounded-pill px-2" onclick="event.stopPropagation();Medi.rechazarCita('${c.id}')" style="font-size:.6rem;">
-                <i class="bi bi-x-lg"></i>
-              </button>
-              <button class="btn btn-xs btn-outline-warning rounded-pill px-2" onclick="event.stopPropagation();Medi.togglePrioridad('${c.id}','${prio}')" style="font-size:.6rem;" title="Cambiar prioridad">
-                <i class="bi bi-arrow-up-circle"></i>
-              </button>
-              ${isLactario ?
-            `<button class="btn btn-xs btn-danger rounded-pill px-2 fw-bold" onclick="event.stopPropagation();Medi.validarAcompañamiento('${c.id}')" style="font-size:.6rem;">
-                    <i class="bi bi-check-lg me-1"></i>Validar
-                 </button>`
-            :
-            `<button class="btn btn-xs btn-primary rounded-pill px-2 fw-bold" onclick="event.stopPropagation();Medi.tomarPaciente('${c.id}')" style="font-size:.6rem;">
-                    <i class="bi bi-door-open-fill me-1"></i>Agendar
-                 </button>`
-          }
-            </div>
+  <div class="card border-0 shadow-sm rounded-4 mb-2 overflow-hidden" style = "border-left: 4px solid ${accentColor} !important;" >
+    <div class="card-body p-3">
+      <div class="d-flex align-items-start gap-3">
+
+        <!-- Avatar -->
+        <div class="${accentBg} rounded-circle d-flex align-items-center justify-content-center flex-shrink-0 shadow-sm" style="width:44px;height:44px;">
+          <span class="fw-bold" style="color:${accentColor};font-size:1.1rem;">${escapeHtml((c.studentName || 'E')[0].toUpperCase())}</span>
+        </div>
+
+        <!-- Info -->
+        <div class="flex-grow-1" style="min-width:0;">
+          <div class="d-flex align-items-center mb-1">
+            <h6 class="fw-bold text-dark mb-0 text-truncate">${escapeHtml(c.studentName || 'Estudiante')}</h6>
+            ${prioLabel}
           </div>
-        `;
+          <div class="d-flex align-items-center gap-2 text-muted small mb-1">
+            <span><i class="bi bi-clock me-1"></i>${dateLabel} ${timeStr}</span>
+            <span class="text-truncate opacity-75">• ${escapeHtml(motivoPreview)}</span>
+          </div>
+        </div>
+
+        <!-- Quick number -->
+        <div class="text-muted small fw-bold opacity-50 flex-shrink-0">#${idx + 1}</div>
+      </div>
+
+      <!-- Actions -->
+      <div class="d-flex gap-2 mt-2 pt-2 border-top">
+        ${isLactario ? `
+                  <button class="btn btn-danger btn-sm rounded-pill flex-grow-1 fw-bold" onclick="AdminMedi.validarAcompañamiento('${c.id}')">
+                    <i class="bi bi-check-circle-fill me-1"></i>Validar Acompañamiento
+                  </button>
+                ` : `
+                  <button class="btn btn-primary btn-sm rounded-pill flex-grow-1 fw-bold" onclick="AdminMedi.tomarPaciente('${c.id}')">
+                    <i class="bi bi-calendar-check me-1"></i>Agendar
+                  </button>
+                `}
+        <button class="btn btn-outline-dark btn-sm rounded-pill px-3" onclick="AdminMedi.showPatientFoundModal(JSON.parse(decodeURIComponent('${studentData}')))" title="Ver perfil">
+          <i class="bi bi-person-lines-fill"></i>
+        </button>
+        <button class="btn btn-outline-danger btn-sm rounded-pill px-3" onclick="AdminMedi.rechazarCita('${c.id}')" title="Rechazar">
+          <i class="bi bi-x-lg"></i>
+        </button>
+      </div>
+    </div>
+          </div>
+  `;
       }).join('');
+
+      // Also update the modal if it's open
+      const modalTarget = document.getElementById('modal-muro-list');
+      const modalEl = document.getElementById('modalWaitingRoom');
+      if (modalTarget && modalEl && modalEl.classList.contains('show')) {
+        modalTarget.innerHTML = list.innerHTML;
+      }
     });
     _unsubs.wall = unsub;
   }
@@ -2512,91 +3176,131 @@ var AdminMedi = (function () {
     const list = document.getElementById('medi-agenda-list');
     if (!list) return;
 
-    // Cleanup previous listener to prevent duplicates
+    // Avatar color pool [bg, text]
+    const AVATAR_COLORS = [
+      ['#dbeafe', '#1d4ed8'], ['#dcfce7', '#15803d'], ['#fef9c3', '#a16207'],
+      ['#fce7f3', '#be185d'], ['#ede9fe', '#6d28d9'], ['#ffedd5', '#c2410c']
+    ];
+    const avatarColors = (name) => {
+      const i = (name || '?').charCodeAt(0) % AVATAR_COLORS.length;
+      return AVATAR_COLORS[i];
+    };
+
     if (_unsubs.agenda) _unsubs.agenda();
 
     const unsub = MediService.streamAgenda(_ctx, _myUid, _currentShift, _currentProfile ? _currentProfile.id : null, (docs) => {
       const kpiPend = document.getElementById('kpi-pendientes-hoy');
+      const countEl = document.getElementById('medi-agenda-count');
       if (kpiPend) kpiPend.textContent = docs.length;
+      if (countEl) countEl.textContent = docs.length;
+
+      const now = new Date();
+      const todayISO = toISO(now);
+
+      // Filter docs for today only
+      docs = docs.filter(d => {
+        const fecha = d.safeDate;
+        return fecha && toISO(fecha) === todayISO;
+      });
 
       if (docs.length === 0) {
-        list.innerHTML = '<div class="p-5 text-muted text-center"><i class="bi bi-calendar-check fs-1 d-block mb-3 opacity-25"></i>No tienes citas agendadas.</div>';
+        list.innerHTML = `<div class="medi-empty-state" >
+          <i class="bi bi-calendar-x"></i>
+          <p>No tienes citas agendadas por hoy</p>
+        </div> `;
         return;
       }
 
-      // Sort by time (next appointments first)
       docs.sort((a, b) => (a.safeDate || 0) - (b.safeDate || 0));
 
-      // Group by date
-      const now = new Date();
-      const todayISO = toISO(now);
       const tomorrowISO = toISO(new Date(now.getTime() + 86400000));
-      let lastDateLabel = '';
-
-      let html = '';
-      // Find the next upcoming appointment
       const nextIdx = docs.findIndex(c => (c.safeDate || new Date()) >= new Date(now.getTime() - 15 * 60000));
+      let lastDateLabel = '';
+      let html = '';
 
       docs.forEach((c, idx) => {
         const fecha = c.safeDate || new Date();
         const dateISO = toISO(fecha);
-        const timeStr = fecha.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }).toLowerCase();
-
-        // Date group header
-        let dateLabel = fecha.toLocaleDateString('es-MX', { weekday: 'short', day: 'numeric', month: 'short' });
-        if (dateISO === todayISO) dateLabel = 'Hoy';
-        else if (dateISO === tomorrowISO) dateLabel = 'Mañana';
-
-        if (dateLabel !== lastDateLabel) {
-          html += `<div class="text-muted extra-small fw-bold text-uppercase px-1 pt-2 pb-1 ${lastDateLabel ? 'border-top mt-2' : ''}">${dateLabel}</div>`;
-          lastDateLabel = dateLabel;
-        }
-
-        const diffMinutes = (fecha - now) / (1000 * 60);
+        const timeStr = fecha.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const diffMinutes = (fecha - now) / 60000;
         const isLate = diffMinutes < -15;
         const canAttend = diffMinutes <= 15;
         const isNext = idx === nextIdx;
 
-        let statusBadge = isLate ?
-          `<span class="badge bg-danger-subtle text-danger" style="font-size:.6rem;">Retrasada</span>` :
-          `<span class="badge bg-success-subtle text-success" style="font-size:.6rem;">A Tiempo</span>`;
+        // Separador de fecha
+        let dateLabel = fecha.toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'short' });
+        if (dateISO === todayISO) dateLabel = 'Hoy';
+        else if (dateISO === tomorrowISO) dateLabel = 'Ma\u00f1ana';
 
-        const motivoShort = (c.motivo || 'Consulta General').substring(0, 60);
+        if (dateLabel !== lastDateLabel) {
+          html += `
+  <div class="d-flex align-items-center gap-2 px-1 pt-2 pb-1 ${lastDateLabel ? 'mt-2 border-top' : ''}" >
+              <span class="badge bg-secondary bg-opacity-10 text-secondary fw-bold text-uppercase" style="font-size:.6rem;letter-spacing:.4px;">${escapeHtml(dateLabel)}</span>
+              <hr class="flex-fill m-0" style="border-color:#e9ecef;">
+            </div>`;
+          lastDateLabel = dateLabel;
+        }
+
+        // Clase visual de la card seg\u00fan estado
+        const cardMod = isNext ? 'is-next' : isLate ? 'is-late' : canAttend ? 'can-attend' : '';
+
+        let statusBadge = '';
+        if (isLate)
+          statusBadge = `<span class="badge bg-danger-subtle text-danger px-2" style = "font-size:.6rem;" > <i class="bi bi-exclamation-circle-fill me-1"></i>Retrasada</span> `;
+        else if (isNext)
+          statusBadge = `<span class="badge bg-primary-subtle text-primary px-2" style = "font-size:.6rem;" > <i class="bi bi-lightning-charge-fill me-1"></i>Siguiente</span> `;
+        else if (canAttend)
+          statusBadge = `<span class="badge bg-success-subtle text-success px-2" style = "font-size:.6rem;" > <i class="bi bi-check-circle-fill me-1"></i>A Tiempo</span> `;
+        else
+          statusBadge = `<span class="badge bg-light text-muted border px-2" style = "font-size:.6rem;" > <i class="bi bi-clock me-1"></i>Programada</span> `;
+
+        const name = c.studentName || 'Estudiante';
+        const initial = name.charAt(0).toUpperCase();
+        const [bgC, fgC] = avatarColors(name);
+        const motivo = escapeHtml((c.motivo || 'Consulta General').substring(0, 55));
+        const citaEnc = encodeURIComponent(JSON.stringify(c));
 
         html += `
-          <div class="list-group-item border-0 border-bottom px-2 py-2 animate-fade-in hover-bg-light transition-all ${isNext ? 'border-start border-3 border-primary' : ''}">
-            <div class="d-flex justify-content-between align-items-center mb-1">
-              <div class="d-flex align-items-center gap-2" style="min-width:0;">
-                 <div class="bg-primary bg-opacity-10 rounded-3 text-center flex-shrink-0 px-2 py-1" style="min-width:50px;">
-                    <div class="fw-bold small text-primary lh-1">${timeStr}</div>
-                 </div>
-                 <div style="min-width:0;">
-                    <div class="fw-bold small text-dark text-truncate">${escapeHtml(c.studentName || 'Estudiante')}</div>
-                    <div class="d-flex align-items-center gap-1">
-                        ${statusBadge}
-                        ${isNext ? '<span class="badge bg-primary text-white" style="font-size:.55rem;">Siguiente</span>' : ''}
-                    </div>
-                 </div>
+  <div class="medi-agenda-card ${cardMod} p-3" style = "animation-delay:${idx * 0.05}s;" >
+            <div class="d-flex align-items-start gap-3">
+              <div class="d-flex flex-column align-items-center gap-1 flex-shrink-0" style="min-width:44px;">
+                <div class="fw-bold text-primary" style="font-size:.8rem;line-height:1;">${escapeHtml(timeStr)}</div>
+                <div class="medi-avatar" style="background:${bgC};color:${fgC};width:34px;height:34px;font-size:.85rem;">${initial}</div>
               </div>
-              <button class="btn btn-xs btn-outline-primary rounded-pill px-2" onclick="Medi.showFullRecord('${c.studentId}')" style="font-size:.65rem;">
-                <i class="bi bi-folder2-open"></i>
+              <div class="flex-fill" style="min-width:0;">
+                <div class="fw-bold text-dark text-truncate" style="font-size:.88rem;">${escapeHtml(name)}</div>
+                <div class="text-muted text-truncate mb-1" style="font-size:.72rem;">${motivo}</div>
+                <div class="d-flex flex-wrap gap-1">${statusBadge}</div>
+              </div>
+              <button class="btn btn-xs btn-link text-muted p-0 flex-shrink-0" title="Ver Expediente"
+                      onclick="AdminMedi.showFullRecord('${escapeHtml(c.studentId)}')">
+                <i class="bi bi-folder2-open" style="font-size:1.05rem;"></i>
               </button>
             </div>
-            <div class="text-muted text-truncate ps-5" style="font-size:.65rem;">${escapeHtml(motivoShort)}</div>
-            <div class="d-flex gap-1 mt-1 ps-5">
-                <button class="btn btn-xs btn-outline-danger rounded-pill px-2" onclick="Medi.cancelarCitaAdmin('${c.id}', true)" style="font-size:.6rem;">
-                    <i class="bi bi-arrow-counterclockwise me-1"></i>Devolver
-                </button>
-                <button class="btn btn-xs ${canAttend ? 'btn-primary' : 'btn-secondary'} rounded-pill px-2 fw-bold" style="font-size:.6rem;"
-                        ${canAttend ? '' : 'disabled'}
-                        onclick="Medi.iniciarConsulta('${encodeURIComponent(JSON.stringify(c))}')">
-                    <i class="bi bi-lightning-charge-fill me-1"></i>${canAttend ? 'Atender Ahora' : 'Esperar'}
-                </button>
+            <div class="d-flex gap-2 mt-2 pt-2 border-top" style="margin-left:54px;">
+              <button class="btn btn-sm btn-outline-secondary rounded-pill px-3 fw-semibold"
+                      style="font-size:.72rem;"
+                      onclick="AdminMedi.cancelarCitaAdmin('${c.id}', true)">
+                <i class="bi bi-arrow-counterclockwise me-1"></i>Devolver
+              </button>
+              <button class="btn btn-sm ${canAttend ? 'btn-primary shadow-sm' : 'btn-outline-secondary'} rounded-pill px-3 fw-bold"
+                      style="font-size:.72rem;"
+                      ${canAttend ? '' : 'disabled'}
+                      onclick="AdminMedi.iniciarConsulta('${citaEnc}')">
+                <i class="bi bi-${canAttend ? 'lightning-charge-fill' : 'hourglass-split'} me-1"></i>${canAttend ? 'Atender Ahora' : 'Esperar'}
+              </button>
             </div>
-          </div>`;
+          </div> `;
       });
 
       list.innerHTML = html;
+
+      // Also update the modal if it's open
+      const modalTarget = document.getElementById('modal-agenda-list');
+      const modalEl = document.getElementById('modalMiAgenda');
+      if (modalTarget && modalEl && modalEl.classList.contains('show')) {
+        modalTarget.innerHTML = list.innerHTML;
+      }
     });
     _unsubs.agenda = unsub;
   }
@@ -2727,17 +3431,69 @@ var AdminMedi = (function () {
     _lastConsultaData = { cita, studentId: cita.studentId };
     _consultaActive = true;
 
-    // Render inline in Zona B
+    // Render SOAP form in the modal
     renderInlineConsultationUI(student, cita);
 
-    // Switch Zona B to Consulta tab
-    const tabBtn = document.getElementById('tab-btn-consulta');
-    if (tabBtn) { tabBtn.disabled = false; tabBtn.classList.add('text-danger'); }
-    _switchWorkTab('consulta');
+    // Open the SOAP modal (fullscreen-like)
+    const soapModal = document.getElementById('modalConsulta');
+    if (soapModal) {
+      // Update modal header with patient info
+      const nameEl = document.getElementById('soap-patient-name');
+      const metaEl = document.getElementById('soap-patient-meta');
+      if (nameEl) nameEl.textContent = student.displayName || student.email || 'Paciente';
+      if (metaEl) metaEl.textContent = `${student.matricula || ''} • ${_myRole} `;
 
-    // Show patient info + history in Zona C
-    _showPatientInContext(student);
-    _switchContextTab('patient');
+      const modal = new bootstrap.Modal(soapModal);
+      modal.show();
+    }
+
+    // [FIX] Populate hidden form inputs so saveConsultation can read studentId/email/citaId
+    const hidStudentId = document.getElementById('soap-student-id');
+    const hidStudentEmail = document.getElementById('soap-student-email');
+    const hidCitaId = document.getElementById('soap-cita-id');
+    if (hidStudentId) hidStudentId.value = student.uid || cita.studentId || '';
+    if (hidStudentEmail) hidStudentEmail.value = student.email || cita.studentEmail || '';
+    if (hidCitaId) hidCitaId.value = cita.id || '';
+
+    // Populate Right Panel (Patient Info & Previous Consultations)
+    const profileEl = document.getElementById('soap-patient-profile');
+    if (profileEl) {
+      const age = student.fechaNacimiento ? MediService.calculateAge(student.fechaNacimiento) : (student.edad || '--');
+      profileEl.innerHTML = `
+        <div class="row g-2 mb-3">
+          <div class="col-4 text-center"><div class="bg-light rounded-3 p-2"><div class="extra-small text-muted">Edad</div><div class="fw-bold small">${age}</div></div></div>
+          <div class="col-4 text-center"><div class="bg-light rounded-3 p-2"><div class="extra-small text-muted">Sangre</div><div class="fw-bold small text-danger">${escapeHtml(student.tipoSangre || '--')}</div></div></div>
+          <div class="col-4 text-center"><div class="bg-light rounded-3 p-2"><div class="extra-small text-muted">Género</div><div class="fw-bold small">${escapeHtml(student.genero || '--')}</div></div></div>
+        </div>
+        ${student.alergias ? `<div class="alert alert-danger border-0 py-2 px-3 small mb-0"><i class="bi bi-exclamation-triangle-fill me-1"></i><strong>Alergias:</strong> ${escapeHtml(student.alergias)}</div>` : ''}
+      `;
+    }
+
+    const historyEl = document.getElementById('soap-history-list');
+    if (historyEl) {
+      historyEl.innerHTML = '<div class="text-center text-muted extra-small py-2"><span class="spinner-border spinner-border-sm"></span></div>';
+      const profId = _currentProfile ? _currentProfile.id : null;
+      MediService.getExpedienteHistory(_ctx, student.uid || cita.studentId, _myRole, _myUid, _currentShift, profId)
+        .then(history => {
+          if (!history || history.length === 0) {
+            historyEl.innerHTML = '<div class="text-muted extra-small py-2 text-center">Sin consultas previas</div>';
+            return;
+          }
+          historyEl.innerHTML = history.slice(0, 5).map(h => {
+            const d = h.safeDate || new Date();
+            return `<div class="list-group-item list-group-item-action px-0 py-2 border-bottom border-light bg-transparent">
+               <div class="d-flex w-100 justify-content-between mb-1">
+                 <h6 class="mb-0 fw-bold small text-truncate" style="max-width: 70%;">${escapeHtml(h.diagnostico || h.motivo || 'General')}</h6>
+                 <small class="text-muted" style="font-size: 0.65rem;">${d.toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' })}</small>
+               </div>
+               <div class="mb-0 small text-muted text-truncate">${escapeHtml(h.tipoServicio || '')}</div>
+             </div>`;
+          }).join('');
+        })
+        .catch(e => {
+          historyEl.innerHTML = '<div class="text-danger extra-small py-2">Error cargando historial</div>';
+        });
+    }
 
     // Start consultation timer
     _startConsultaTimer();
@@ -2749,227 +3505,203 @@ var AdminMedi = (function () {
   // --- B3: INLINE CONSULTATION (Zona B) ---
 
   function renderInlineConsultationUI(u, cita) {
-    const container = document.getElementById('medi-inline-consulta');
+    const container = document.getElementById('soap-fields-container') || document.getElementById('medi-inline-consulta');
     if (!container) return;
 
     const safeName = escapeHtml(u.displayName || u.email || '');
-    const safeEmail = escapeHtml(u.email || '');
     const safeMatricula = escapeHtml(u.matricula || 'Ext');
+    const initial = (u.displayName || u.email || 'P')[0].toUpperCase();
+    const COLORS = [['#dbeafe', '#1d4ed8'], ['#d1fae5', '#065f46'], ['#ede9fe', '#5b21b6'],
+    ['#fce7f3', '#9d174d'], ['#fef3c7', '#92400e'], ['#fee2e2', '#991b1b']];
+    const [bgC, fgC] = COLORS[initial.charCodeAt(0) % COLORS.length];
 
-    // --- TEMPLATE MATCHING ---
+    // --- HEADER DEL PACIENTE ---
+    const patientHeader = `
+        <div class="d-flex align-items-center gap-3 p-3 mb-3 rounded-3 border-0"
+             style="background:linear-gradient(135deg,#f0f7ff,#e8f4fd);">
+        <div class="medi-avatar flex-shrink-0" style="background:${bgC};color:${fgC};width:44px;height:44px;font-size:1.1rem;">${initial}</div>
+        <div class="flex-fill">
+          <div class="fw-bold text-dark" style="font-size:.9rem;">${safeName}</div>
+          <div class="text-muted" style="font-size:.7rem;">${safeMatricula}</div>
+        </div>
+        <div class="text-end">
+          <div class="text-muted fw-bold" style="font-size:.75rem;">
+            ${new Date().toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' })} <br>
+            <span style="font-size:.65rem; font-weight:normal;">${new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}</span>
+          </div>
+        </div>
+      </div>`;
+
     let formContent = '';
 
-    if (_myRole === 'Medico') {
-      // --- VISTA MÉDICO ---
-      // Orden: Subjetivo -> Objetivo -> Padecimiento Actual (Privado) -> Diagnóstico -> Plan
+    if (_myRole === 'Médico') {
       formContent = `
-        <!-- Vitals Section -->
-        <div class="card border-0 bg-primary-subtle mb-3">
-          <div class="card-body p-2">
-            <h6 class="fw-bold text-primary mb-2" style="font-size:.75rem;"><i class="bi bi-activity me-1"></i>SIGNOS VITALES</h6>
-            <div class="row g-2 text-center">
-              <div class="col"><label class="d-block text-muted mb-1 fw-bold" style="font-size:.65rem;">Temp (°C)</label>
-                <input type="number" id="soap-temp" class="form-control form-control-sm text-center fw-bold border-0" placeholder="--" step="0.1"></div>
-              <div class="col"><label class="d-block text-muted mb-1 fw-bold" style="font-size:.65rem;">Presion</label>
-                <input type="text" id="soap-presion" class="form-control form-control-sm text-center fw-bold border-0" placeholder="000/00"></div>
-              <div class="col"><label class="d-block text-muted mb-1 fw-bold" style="font-size:.65rem;">Peso (kg)</label>
-                <input type="number" id="soap-peso" class="form-control form-control-sm text-center fw-bold border-0" placeholder="--" step="0.1"></div>
-              <div class="col"><label class="d-block text-muted mb-1 fw-bold" style="font-size:.65rem;">Talla (cm)</label>
-                <input type="number" id="soap-talla" class="form-control form-control-sm text-center fw-bold border-0" placeholder="--"></div>
-            </div>
-          </div>
-        </div>
-
-        <!-- SOAP Fields (Medico) -->
-        <div class="mb-2">
-          <label class="form-label fw-bold text-dark mb-1" style="font-size:.75rem;">1. SUBJETIVO (Motivo)</label>
-          <textarea class="form-control form-control-sm bg-light" id="soap-subjetivo" rows="2" placeholder="Motivo de consulta..."></textarea>
-        </div>
-        <div class="mb-2">
-          <label class="form-label fw-bold text-dark mb-1" style="font-size:.75rem;">2. OBJETIVO (Exploración)</label>
-          <textarea class="form-control form-control-sm bg-light" id="soap-objetivo" rows="2" placeholder="Hallazgos clinicos..."></textarea>
-        </div>
-        
-        <!-- Padecimiento Actual (Privado) - Moved here -->
-        <div class="mb-2">
-          <label class="form-label fw-bold text-danger mb-1" style="font-size:.75rem;"><i class="bi bi-lock-fill me-1"></i>PADECIMIENTO ACTUAL (Privado)</label>
-          <textarea class="form-control form-control-sm bg-danger-subtle border-danger-subtle text-dark" id="soap-private-notes" rows="2" placeholder="Notas privadas del padecimiento..."></textarea>
-        </div>
-
-        <div class="mb-2">
-          <label class="form-label fw-bold text-dark mb-1" style="font-size:.75rem;">3. DIAGNÓSTICO</label>
-          <input type="text" class="form-control form-control-sm fw-bold" id="soap-diagnóstico" placeholder="Diagnóstico principal...">
-        </div>
-        <div class="mb-2">
-          <label class="form-label fw-bold text-dark mb-1" style="font-size:.75rem;">4. PLAN DE TRATAMIENTO</label>
-          <textarea class="form-control text-dark form-control-sm bg-success-subtle border-success-subtle" id="soap-plan" rows="3" placeholder="Indicaciones, receta..."></textarea>
-        </div>
-      `;
-    } else {
-      // --- VISTA PSICÓLOGO ---
-      // Orden: Subjetivo -> Objetivo -> Diagnóstico -> Plan -> Notas Privadas
-      // Campos Extra: Estado, Intervencion (Sin Instrumentos)
-      formContent = `
-        <!-- Psych Evaluation Section -->
-        <div class="card border-0 bg-purple-subtle mb-3" style="background: rgba(128,0,255,.07);">
-          <div class="card-body p-2">
-            <h6 class="fw-bold mb-2" style="font-size:.75rem; color:#7c3aed;"><i class="bi bi-brain me-1"></i>EVALUACION PSICOLOGICA</h6>
-            <div class="row g-2">
-              <div class="col-6">
-                <label class="d-block text-muted mb-1 fw-bold" style="font-size:.65rem;">Estado emocional</label>
-                <select id="soap-estado-emocional" class="form-select form-select-sm border-0 fw-bold">
-                  <option value="">Seleccionar...</option>
-                  <option value="Estable">Estable</option>
-                  <option value="Ansioso/a">Ansioso/a</option>
-                  <option value="Deprimido/a">Deprimido/a</option>
-                  <option value="Agitado/a">Agitado/a</option>
-                  <option value="En crisis">En crisis</option>
-                  <option value="Otro">Otro</option>
-                </select>
-              </div>
-              <div class="col-6">
-                <label class="d-block text-muted mb-1 fw-bold" style="font-size:.65rem;">Intervención</label>
-                <select id="soap-tipo-intervencion" class="form-select form-select-sm border-0 fw-bold">
-                  <option value="">Seleccionar...</option>
-                  <option value="Primera vez">Primera vez</option>
-                  <option value="Seguimiento">Seguimiento</option>
-                  <option value="Crisis">Intervencion en crisis</option>
-                  <option value="Orientacion">Orientacion</option>
-                  <option value="Canalizacion">Canalizacion</option>
-                </select>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- SOAP Fields (Psicologo) -->
-        <div class="mb-2">
-          <label class="form-label fw-bold text-dark mb-1" style="font-size:.75rem;">1. SUBJETIVO (Motivo)</label>
-          <textarea class="form-control form-control-sm bg-light" id="soap-subjetivo" rows="2" placeholder="Motivo de consulta..."></textarea>
-        </div>
-        <div class="mb-2">
-          <label class="form-label fw-bold text-dark mb-1" style="font-size:.75rem;">2. OBJETIVO (Observaciones)</label>
-          <textarea class="form-control form-control-sm bg-light" id="soap-objetivo" rows="2" placeholder="Observaciones clinicas..."></textarea>
-        </div>
-        <div class="mb-2">
-          <label class="form-label fw-bold text-dark mb-1" style="font-size:.75rem;">3. IMPRESIÓN DIAGNÓSTICA</label>
-          <input type="text" class="form-control form-control-sm fw-bold" id="soap-diagnóstico" placeholder="Impresión diagnóstica...">
-        </div>
-        <div class="mb-2">
-          <label class="form-label fw-bold text-dark mb-1" style="font-size:.75rem;">4. PLAN / ACUERDOS</label>
-          <textarea class="form-control text-dark form-control-sm bg-success-subtle border-success-subtle" id="soap-plan" rows="3" placeholder="Acuerdos, tareas, plan..."></textarea>
-        </div>
-        
-        <!-- Notas Privadas (Visible Textarea) -->
         <div class="mb-3">
-          <label class="form-label fw-bold text-primary mb-1" style="font-size:.75rem;"><i class="bi bi-shield-lock-fill me-1"></i>NOTAS PRIVADAS (Confidencial)</label>
-          <textarea class="form-control form-control-sm border-primary-subtle text-dark" id="soap-private-notes" rows="3" style="background-color:#f8faff;" placeholder="Anotaciones exclusivas para el expediente..."></textarea>
-        </div>
-
-        <!-- Follow-up Section (Only for Psicologo now) -->
-        <div class="card border-0 bg-light mb-3">
-          <div class="card-body p-2">
-            <div class="form-check form-switch mb-1">
-              <input class="form-check-input" type="checkbox" id="soap-followup-check" onchange="document.getElementById('soap-followup-fields').classList.toggle('d-none', !this.checked)">
-              <label class="form-check-label fw-bold text-dark" style="font-size:.75rem;" for="soap-followup-check">Agendar Seguimiento</label>
+          <div class="d-flex align-items-center gap-2 mb-2">
+            <span class="badge bg-primary-subtle text-primary border" style="font-size:.62rem;">
+              <i class="bi bi-activity me-1"></i>SIGNOS VITALES
+            </span>
+          </div>
+          <div class="d-flex gap-2 flex-wrap">
+            <div class="soap-vital-pill">
+              <label for="soap-temp">Temp °C</label>
+              <input type="number" id="soap-temp" placeholder="--" step="0.1">
             </div>
-            <div id="soap-followup-fields" class="d-none">
-              <div class="alert alert-info py-1 px-2 mb-2" style="font-size:.65rem;">
-                <i class="bi bi-calendar-event me-1"></i>Se creará una cita automáticamente.
-              </div>
-              <div class="row g-2 mt-1">
-                <div class="col-6">
-                  <label class="text-muted fw-bold" style="font-size:.6rem;">Fecha</label>
-                  <input type="date" id="soap-followup-date" class="form-control form-control-sm border-0 fw-bold">
-                </div>
-                <div class="col-6">
-                  <label class="text-muted fw-bold" style="font-size:.6rem;">Hora</label>
-                  <input type="time" id="soap-followup-time" class="form-control form-control-sm border-0 fw-bold">
-                </div>
-                <div class="col-12">
-                  <label class="text-muted fw-bold" style="font-size:.6rem;">Motivo / Nota</label>
-                  <input type="text" id="soap-followup-notes" class="form-control form-control-sm border-0" value="Seguimiento Psicólogico" placeholder="Motivo...">
-                </div>
-              </div>
+            <div class="soap-vital-pill">
+              <label for="soap-presion">Presion</label>
+              <input type="text" id="soap-presion" placeholder="000/00">
+            </div>
+            <div class="soap-vital-pill">
+              <label for="soap-peso">Peso kg</label>
+              <input type="number" id="soap-peso" placeholder="--" step="0.1">
+            </div>
+            <div class="soap-vital-pill">
+              <label for="soap-talla">Talla cm</label>
+              <input type="number" id="soap-talla" placeholder="--">
             </div>
           </div>
         </div>
-      `;
+
+        <!-- S - Subjetivo -->
+        <div class="mb-2">
+          <div class="d-flex align-items-center gap-2 mb-1">
+            <span class="badge rounded-pill bg-primary text-white fw-bold" style="font-size:.6rem;width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;">S</span>
+            <label class="fw-bold text-dark mb-0" style="font-size:.78rem;">Subjetivo — Motivo</label>
+          </div>
+          <textarea class="form-control form-control-sm bg-light border-0 rounded-3"
+                    id="soap-subjetivo" rows="2" placeholder="Motivo de consulta segun el paciente..."></textarea>
+        </div>
+
+        <!-- O - Objetivo -->
+        <div class="mb-2">
+          <div class="d-flex align-items-center gap-2 mb-1">
+            <span class="badge rounded-pill bg-success text-white fw-bold" style="font-size:.6rem;width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;">O</span>
+            <label class="fw-bold text-dark mb-0" style="font-size:.78rem;">Objetivo — Exploracion</label>
+          </div>
+          <textarea class="form-control form-control-sm bg-light border-0 rounded-3"
+                    id="soap-objetivo" rows="2" placeholder="Hallazgos clinicos, exploracion fisica..."></textarea>
+        </div>
+
+        <!-- Padecimiento Privado -->
+        <div class="mb-2">
+          <div class="d-flex align-items-center gap-2 mb-1">
+            <span class="badge rounded-pill bg-danger text-white fw-bold" style="font-size:.6rem;width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;"><i class="bi bi-lock-fill" style="font-size:.5rem;"></i></span>
+            <label class="fw-bold text-danger mb-0" style="font-size:.78rem;">Padecimiento Actual (Privado)</label>
+          </div>
+          <textarea class="form-control form-control-sm bg-danger-subtle border-danger-subtle rounded-3"
+                    id="soap-private-notes" rows="2" placeholder="Notas privadas del padecimiento..."></textarea>
+        </div>
+
+        <!-- A - Diagnostico -->
+        <div class="mb-2">
+          <div class="d-flex align-items-center gap-2 mb-1">
+            <span class="badge rounded-pill bg-warning text-dark fw-bold" style="font-size:.6rem;width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;">A</span>
+            <label class="fw-bold text-dark mb-0" style="font-size:.78rem;">Diagnostico (Assessment)</label>
+          </div>
+          <input type="text" class="form-control form-control-sm fw-bold rounded-3 border-0 bg-light"
+                 id="soap-diagnóstico" placeholder="Diagnostico principal...">
+        </div>
+
+        <!--P - Plan-- >
+  <div class="mb-2">
+    <div class="d-flex align-items-center gap-2 mb-1">
+      <span class="badge rounded-pill text-white fw-bold" style="font-size:.6rem;width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;background:#0f766e;">P</span>
+      <label class="fw-bold text-dark mb-0" style="font-size:.78rem;">Plan de Tratamiento</label>
+    </div>
+    <textarea class="form-control form-control-sm bg-success-subtle border-success-subtle rounded-3"
+      id="soap-plan" rows="3" placeholder="Indicaciones, medicamentos, referencias..."></textarea>
+  </div>
+`;
+    } else {
+      // VISTA PSICOLOGO
+      formContent = `
+        <div class="mb-3 p-3 rounded-3 border-0" style="background:rgba(124,58,237,.06);">
+          <div class="d-flex align-items-center gap-2 mb-3">
+            <span class="badge border fw-bold" style="font-size:.62rem;background:rgba(124,58,237,.1);color:#7c3aed;">
+              <i class="bi bi-brain me-1"></i>EVALUACION PSICOLOGICA
+            </span>
+          </div>
+          <div class="row g-2">
+            <div class="col-6">
+              <label class="d-block fw-bold mb-1" style="font-size:.68rem;color:#7c3aed;">Estado Emocional</label>
+              <select id="soap-estado-emocional" class="form-select form-select-sm border-0 fw-bold rounded-3">
+                <option value="">Seleccionar...</option>
+                <option value="Estable">Estable</option>
+                <option value="Ansioso/a">Ansioso/a</option>
+                <option value="Deprimido/a">Deprimido/a</option>
+                <option value="Agitado/a">Agitado/a</option>
+                <option value="En crisis">En crisis</option>
+                <option value="Inestable">Inestable</option>
+                <option value="Recuperacion">En recuperacion</option>
+              </select>
+            </div>
+            <div class="col-6">
+              <label class="d-block fw-bold mb-1" style="font-size:.68rem;color:#7c3aed;">Tipo de Intervencion</label>
+              <select id="soap-tipo-intervencion" class="form-select form-select-sm border-0 fw-bold rounded-3">
+                <option value="">Seleccionar...</option>
+                <option value="Orientación">Orientación</option>
+                <option value="Apoyo emocional">Apoyo emocional</option>
+                <option value="Psicoterapia breve">Psicoterapia breve</option>
+                <option value="Crisis">Intervencion en crisis</option>
+                <option value="Referencia">Referencia externa</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- S -->
+        <div class="mb-2">
+          <div class="d-flex align-items-center gap-2 mb-1">
+            <span class="badge rounded-pill text-white fw-bold" style="font-size:.6rem;width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;background:#7c3aed;">S</span>
+            <label class="fw-bold text-dark mb-0" style="font-size:.78rem;">Subjetivo — Motivo de consulta</label>
+          </div>
+          <textarea class="form-control form-control-sm bg-light border-0 rounded-3"
+                    id="soap-subjetivo" rows="2" placeholder="Motivo segun el paciente..."></textarea>
+        </div>
+
+        <!--O -->
+        <div class="mb-2">
+          <div class="d-flex align-items-center gap-2 mb-1">
+            <span class="badge rounded-pill text-white fw-bold" style="font-size:.6rem;width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;background:#0891b2;">O</span>
+            <label class="fw-bold text-dark mb-0" style="font-size:.78rem;">Objetivo — Observaciones</label>
+          </div>
+          <textarea class="form-control form-control-sm bg-light border-0 rounded-3"
+                    id="soap-objetivo" rows="2" placeholder="Comportamiento observado, lenguaje corporal..."></textarea>
+        </div>
+
+        <!--A -->
+        <div class="mb-2">
+          <div class="d-flex align-items-center gap-2 mb-1">
+            <span class="badge rounded-pill text-dark fw-bold" style="font-size:.6rem;width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;background:#fbbf24;">A</span>
+            <label class="fw-bold text-dark mb-0" style="font-size:.78rem;">Diagnostico / Evaluacion</label>
+          </div>
+          <input type="text" class="form-control form-control-sm fw-bold rounded-3 border-0 bg-light"
+                 id="soap-diagn\u00f3stico" placeholder="Diagnostico o impresion clinica...">
+        </div>
+
+        <!--P -->
+        <div class="mb-2">
+          <div class="d-flex align-items-center gap-2 mb-1">
+            <span class="badge rounded-pill text-white fw-bold" style="font-size:.6rem;width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;background:#0f766e;">P</span>
+            <label class="fw-bold text-dark mb-0" style="font-size:.78rem;">Plan de Intervencion</label>
+          </div>
+          <textarea class="form-control form-control-sm bg-success-subtle border-success-subtle rounded-3"
+                    id="soap-plan" rows="2" placeholder="Acciones, seguimiento, derivacion..."></textarea>
+        </div>
+
+        <!--Notas Privadas-- >
+  <div class="mb-2">
+    <div class="d-flex align-items-center gap-2 mb-1">
+      <span class="badge rounded-pill text-white fw-bold" style="font-size:.6rem;width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;background:#dc2626;"><i class="bi bi-shield-lock-fill" style="font-size:.5rem;"></i></span>
+      <label class="fw-bold text-dark mb-0" style="font-size:.78rem;">Notas Privadas (Confidencial)</label>
+    </div>
+    <textarea class="form-control form-control-sm border-warning bg-warning-subtle rounded-3"
+      id="soap-private-notes" rows="2" placeholder="Notas confidenciales del psicologo..."></textarea>
+  </div>
+`;
     }
 
-    container.innerHTML = `
-      <!-- Inline Consultation Header -->
-      <div class="d-flex align-items-center justify-content-between mb-3 border-bottom pb-2">
-        <div class="d-flex align-items-center gap-2">
-          <div class="rounded-circle bg-danger d-flex align-items-center justify-content-center text-white fw-bold shadow-sm" style="width:36px;height:36px;font-size:.9rem;">
-            ${safeName.charAt(0).toUpperCase() || '?'}
-          </div>
-          <div>
-            <div class="fw-bold text-dark" style="font-size:.9rem;">${safeName}</div>
-            <div class="text-muted" style="font-size:.75rem;">${safeMatricula} &bull; ${safeEmail}</div>
-          </div>
-        </div>
-        <div class="d-flex align-items-center gap-2">
-          <span class="badge bg-dark rounded-pill shadow-sm" id="consulta-timer" style="font-size:.75rem; min-width:60px;"><i class="bi bi-stopwatch me-1"></i>00:00</span>
-          <span class="badge text-muted border rounded-pill" id="autosave-indicator" style="font-size:.65rem;"></span>
-        </div>
-      </div>
-
-      <!-- Hidden inputs -->
-      <input type="hidden" id="soap-student-id" value="${u.uid || u.id || ''}">
-      <input type="hidden" id="soap-student-email" value="${u.email || ''}">
-      <input type="hidden" id="soap-cita-id" value="${cita.id || ''}">
-
-      ${formContent}
-
-      <!-- Actions -->
-      <div class="d-flex justify-content-between align-items-center pt-3 border-top mt-3">
-        <div class="d-flex gap-2">
-            <button type="button" class="btn btn-sm btn-outline-danger rounded-pill px-3 fw-bold" onclick="Medi.cancelarConsultaActiva()" title="Cancelar y borrar datos">
-              <i class="bi bi-x-circle me-1"></i>Cancelar
-            </button>
-        </div>
-        <button type="button" class="btn btn-primary rounded-pill px-4 fw-bold shadow" onclick="Medi.confirmarFinalizacion()">
-          <i class="bi bi-check-circle-fill me-2"></i>Finalizar Consulta
-        </button>
-      </div>
-
-      <!-- Auto-Populate Script -->
-      <script>
-      (function() {
-         // Common Fields
-         if(${JSON.stringify(cita.subjetivo || '')}) document.getElementById('soap-subjetivo').value = ${JSON.stringify(cita.subjetivo || '')};
-         if(${JSON.stringify(cita.objetivo || '')}) document.getElementById('soap-objetivo').value = ${JSON.stringify(cita.objetivo || '')};
-         if(${JSON.stringify(cita.diagnostico || '')}) document.getElementById('soap-diagnóstico').value = ${JSON.stringify(cita.diagnostico || '')};
-         if(${JSON.stringify(cita.plan || '')}) document.getElementById('soap-plan').value = ${JSON.stringify(cita.plan || '')};
-         if(${JSON.stringify(cita.notasPrivadas || '')}) document.getElementById('soap-private-notes').value = ${JSON.stringify(cita.notasPrivadas || '')};
-         
-         // Medico Specific
-         if(document.getElementById('soap-temp') && ${JSON.stringify(cita.temp || '')}) document.getElementById('soap-temp').value = ${JSON.stringify(cita.temp || '')};
-         if(document.getElementById('soap-presion') && ${JSON.stringify(cita.presion || '')}) document.getElementById('soap-presion').value = ${JSON.stringify(cita.presion || '')};
-         if(document.getElementById('soap-peso') && ${JSON.stringify(cita.peso || '')}) document.getElementById('soap-peso').value = ${JSON.stringify(cita.peso || '')};
-         if(document.getElementById('soap-talla') && ${JSON.stringify(cita.talla || '')}) document.getElementById('soap-talla').value = ${JSON.stringify(cita.talla || '')};
-         
-         // Psych Specific
-         if(document.getElementById('soap-estado-emocional') && ${JSON.stringify(cita.estadoEmocional || '')}) document.getElementById('soap-estado-emocional').value = ${JSON.stringify(cita.estadoEmocional || '')};
-         if(document.getElementById('soap-tipo-intervencion') && ${JSON.stringify(cita.tipoIntervencion || '')}) document.getElementById('soap-tipo-intervencion').value = ${JSON.stringify(cita.tipoIntervencion || '')};
-      })();
-      </script>
-    `;
-  }
-
-  // Legacy modal-based render (kept for compatibility with direct modal opens)
-  function renderActiveConsultationUI(modalEl, u, cita) {
-    // Redirect to inline if admin layout is present
-    const inlineContainer = document.getElementById('medi-inline-consulta');
-    if (inlineContainer) {
-      renderInlineConsultationUI(u, cita);
-      return;
-    }
-    // Fallback: render in modal body (student or legacy)
-    const modalBody = modalEl.querySelector('.modal-body');
-    if (!modalBody) return;
-    modalBody.innerHTML = '<div class="text-center p-4 text-muted">Consulta no disponible en este modo.</div>';
+    container.innerHTML = patientHeader + formContent;
   }
 
   // --- CONSULTATION TIMER ---
@@ -3067,10 +3799,10 @@ var AdminMedi = (function () {
     if (!panel) return;
 
     if (convs.length === 0) {
-      panel.innerHTML = `<div class="text-center py-4 text-muted small">
+      panel.innerHTML = `< div class="text-center py-4 text-muted small" >
         <i class="bi bi-chat-square-dots display-6 d-block mb-2 opacity-25"></i>
         <p style="font-size:.75rem;">Sin conversaciones activas</p>
-      </div>`;
+      </div > `;
       return;
     }
 
@@ -3080,14 +3812,14 @@ var AdminMedi = (function () {
     if (document.getElementById('chat-messages-list')) return;
 
     panel.innerHTML = `
-      <div class="list-group list-group-flush">
-        ${convs.map(c => {
+  < div class="list-group list-group-flush" >
+    ${convs.map(c => {
       const unread = c.unreadByProfesional || 0;
       const lastTime = c.lastMessageAt ? (typeof c.lastMessageAt.toDate === 'function' ? c.lastMessageAt.toDate() : new Date(c.lastMessageAt)) : null;
       const timeStr = lastTime ? lastTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
       return `
             <div class="list-group-item border-0 border-bottom px-2 py-2 cursor-pointer" style="cursor:pointer;"
-                 onclick="Medi.openConversation('${c.id}', '${escapeHtml(c.studentName)}')">
+                 onclick="AdminMedi.openConversation('${c.id}', '${escapeHtml(c.studentName)}')">
               <div class="d-flex justify-content-between align-items-center">
                 <div class="d-flex align-items-center gap-2" style="min-width:0;">
                   <div class="bg-primary bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center flex-shrink-0" style="width:28px;height:28px;">
@@ -3104,8 +3836,9 @@ var AdminMedi = (function () {
                 </div>
               </div>
             </div>`;
-    }).join('')}
-      </div>`;
+    }).join('')
+      }
+      </div > `;
   }
 
   function openConversation(convId, studentName) {
@@ -3114,20 +3847,20 @@ var AdminMedi = (function () {
     if (!panel) return;
 
     panel.innerHTML = `
-      <div class="d-flex flex-column h-100" style="max-height:calc(100vh - 260px);">
+  < div class="d-flex flex-column h-100" style = "max-height:calc(100vh - 260px);" >
         <div class="d-flex align-items-center gap-2 pb-2 border-bottom mb-2">
-          <button class="btn btn-sm btn-light rounded-circle" onclick="Medi.closeChatConversation()"><i class="bi bi-arrow-left"></i></button>
+          <button class="btn btn-sm btn-light rounded-circle" onclick="AdminMedi.closeChatConversation()"><i class="bi bi-arrow-left"></i></button>
           <div class="fw-bold" style="font-size:.85rem;">${escapeHtml(studentName || 'Estudiante')}</div>
         </div>
         <div id="chat-messages-list" class="flex-grow-1 overflow-auto mb-2" style="min-height:0;"></div>
         <div class="d-flex gap-1">
           <input type="text" id="chat-input" class="form-control form-control-sm rounded-pill" placeholder="Escribe un mensaje..."
-                 onkeypress="if(event.key==='Enter')Medi.sendChatMessage()">
-          <button class="btn btn-sm btn-primary rounded-circle flex-shrink-0" onclick="Medi.sendChatMessage()" style="width:32px;height:32px;">
+                 onkeypress="if(event.key==='Enter')AdminMedi.sendChatMessage()">
+          <button class="btn btn-sm btn-primary rounded-circle flex-shrink-0" onclick="AdminMedi.sendChatMessage()" style="width:32px;height:32px;">
             <i class="bi bi-send-fill" style="font-size:.7rem;"></i>
           </button>
         </div>
-      </div>`;
+      </div > `;
 
     // Stream messages
     if (_chatMsgsUnsub) _chatMsgsUnsub();
@@ -3153,12 +3886,12 @@ var AdminMedi = (function () {
       const time = m.createdAt ? (typeof m.createdAt.toDate === 'function' ? m.createdAt.toDate() : new Date(m.createdAt)) : null;
       const timeStr = time ? time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
       return `
-        <div class="d-flex ${isMe ? 'justify-content-end' : 'justify-content-start'} mb-1">
-          <div class="px-2 py-1 rounded-3 ${isMe ? 'bg-primary text-white' : 'bg-light'}" style="max-width:80%;font-size:.75rem;">
-            <div>${escapeHtml(m.text)}</div>
-            <div class="${isMe ? 'text-white-50' : 'text-muted'} text-end" style="font-size:.55rem;">${timeStr}</div>
-          </div>
-        </div>`;
+  < div class="d-flex ${isMe ? 'justify-content-end' : 'justify-content-start'} mb-1" >
+    <div class="px-2 py-1 rounded-3 ${isMe ? 'bg-primary text-white' : 'bg-light'}" style="max-width:80%;font-size:.75rem;">
+      <div>${escapeHtml(m.text)}</div>
+      <div class="${isMe ? 'text-white-50' : 'text-muted'} text-end" style="font-size:.55rem;">${timeStr}</div>
+    </div>
+        </div > `;
     }).join('');
 
     // Auto-scroll to bottom
@@ -3230,14 +3963,14 @@ var AdminMedi = (function () {
       }
 
       w.innerHTML = docs.slice(0, 3).map(d => `
-                <div class="list-group-item px-0 py-2 border-bottom-0">
+  < div class="list-group-item px-0 py-2 border-bottom-0" >
                     <div class="d-flex w-100 justify-content-between">
                         <strong class="text-primary" style="font-size:0.75rem;">${d.safeDate ? d.safeDate.toLocaleDateString() : 'N/D'}</strong>
                         <small class="badge bg-light text-dark border scale-75">${d.tipoServicio?.substring(0, 3)}</small>
                     </div>
                     <p class="mb-0 text-truncate text-muted" style="font-size: 0.75rem;">${d.diagnostico || '...'}</p>
-                </div>
-           `).join('');
+                </div >
+  `).join('');
 
     } catch (e) {
       console.error(e);
@@ -3267,22 +4000,22 @@ var AdminMedi = (function () {
         const safeExp = encodeURIComponent(JSON.stringify(exp));
 
         return `
-           <div class="card mb-2 shadow-sm ${borderClass} card-hover-effect" 
-                onclick="Medi.showConsultationDetails('${safeExp}')" 
-                style="cursor: pointer;">
-             <div class="card-body p-2">
-               <div class="d-flex justify-content-between small mb-1">
-                 <span class="fw-bold">${fecha}</span>
-                 <span class="badge bg-light text-dark border">${exp.tipoServicio}</span>
-               </div>
-               <div class="small text-muted fst-italic mb-1 text-truncate">
-                 ${exp.diagnostico || 'Sin diagnóstico'}
-               </div>
-               <div class="text-end mt-1">
-                    <small class="text-primary fw-bold" style="font-size: 0.75rem;">Ver detalles <i class="bi bi-chevron-right"></i></small>
-               </div>
-             </div>
-           </div>`;
+  < div class="card mb-2 shadow-sm ${borderClass} card-hover-effect"
+onclick = "AdminMedi.showConsultationDetails('${safeExp}')"
+style = "cursor: pointer;" >
+  <div class="card-body p-2">
+    <div class="d-flex justify-content-between small mb-1">
+      <span class="fw-bold">${fecha}</span>
+      <span class="badge bg-light text-dark border">${exp.tipoServicio}</span>
+    </div>
+    <div class="small text-muted fst-italic mb-1 text-truncate">
+      ${exp.diagnostico || 'Sin diagnóstico'}
+    </div>
+    <div class="text-end mt-1">
+      <small class="text-primary fw-bold" style="font-size: 0.75rem;">Ver detalles <i class="bi bi-chevron-right"></i></small>
+    </div>
+  </div>
+           </div > `;
       }).join('');
     } catch (e) {
       console.error("Error historial:", e);
@@ -3305,10 +4038,17 @@ var AdminMedi = (function () {
     if (_isSaving) return; // Block duplicate calls
     if (document.activeElement) document.activeElement.blur();
 
-    // Close confirmation modal if finalizing
+    // Manejo de UI: Spinner y deshabilitar botones
+    const btnFinalizar = document.getElementById('btn-finalizar-consulta');
+    const btnCancelarF = document.getElementById('btn-cancelar-finalizar');
+
     if (isFinal) {
-      const confirmModal = bootstrap.Modal.getInstance(document.getElementById('modalConfirmEnd'));
-      if (confirmModal) confirmModal.hide();
+      if (btnFinalizar) {
+        btnFinalizar.disabled = true;
+        btnFinalizar.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Guardando...';
+      }
+      if (btnCancelarF) btnCancelarF.disabled = true;
+      // Retrasamos el cierre del modal hasta que se complete (ver try/catch abajo)
     }
 
     const studentIdEl = document.getElementById('soap-student-id');
@@ -3347,7 +4087,7 @@ var AdminMedi = (function () {
     };
 
     // Role-specific fields
-    if (_myRole === 'Medico') {
+    if (_myRole === 'Médico') {
       payload.temp = document.getElementById('soap-temp')?.value || null;
       payload.presion = document.getElementById('soap-presion')?.value || null;
       payload.peso = document.getElementById('soap-peso')?.value || null;
@@ -3386,7 +4126,7 @@ var AdminMedi = (function () {
           // We need to call MediService helper or construct it manually.
           // medi-service.js: slotIdFromDate
           const pad = (n) => String(n).padStart(2, '0');
-          const slotId = `${year}-${pad(month)}-${pad(day)}_${pad(hours)}:${pad(minutes)}_${_myRole}`;
+          const slotId = `${year} -${pad(month)} -${pad(day)}_${pad(hours)}:${pad(minutes)}_${_myRole} `;
 
           // Create User Object for booking
           const studentObj = {
@@ -3433,6 +4173,16 @@ var AdminMedi = (function () {
       };
 
       if (isFinal && status === 'finalizada') {
+        const confirmModal = bootstrap.Modal.getInstance(document.getElementById('modalConfirmEnd'));
+        if (confirmModal) confirmModal.hide();
+
+        // Reset botones por si se reabre
+        if (btnFinalizar) {
+          btnFinalizar.disabled = false;
+          btnFinalizar.innerHTML = '<i class="bi bi-check-lg me-1"></i> Confirmar';
+        }
+        if (btnCancelarF) btnCancelarF.disabled = false;
+
         // Cleanup inline consultation
         _cleanupConsultation();
 
@@ -3470,6 +4220,13 @@ var AdminMedi = (function () {
     } catch (err) {
       console.error(err);
       showToast('Error al guardar consulta: ' + err.message, 'danger');
+      if (isFinal) {
+        if (btnFinalizar) {
+          btnFinalizar.disabled = false;
+          btnFinalizar.innerHTML = '<i class="bi bi-check-lg me-1"></i> Confirmar';
+        }
+        if (btnCancelarF) btnCancelarF.disabled = false;
+      }
     } finally {
       _isSaving = false; // Unlock
     }
@@ -3498,7 +4255,7 @@ var AdminMedi = (function () {
       const hist = await MediService.getExpedienteHistory(_ctx, student.uid, _myRole, _myUid, _currentShift, _currentProfile ? _currentProfile.id : null);
       if (hist && hist.length > 0) {
         // Prioritize Medical Vitals if available (Physical health source of truth)
-        let found = hist.find(h => h.tipoServicio === 'Medico' && h.signos && (h.signos.peso || h.signos.presion));
+        let found = hist.find(h => h.tipoServicio === 'Médico' && h.signos && (h.signos.peso || h.signos.presion));
 
         // Fallback: If no Medical vitals, take any available (e.g. from Psych if they took them)
         if (!found) found = hist.find(h => h.signos && (h.signos.peso || h.signos.presion));
@@ -3508,7 +4265,7 @@ var AdminMedi = (function () {
     } catch (e) { console.error("Error fetching last vitals", e); }
 
     profileDiv.innerHTML = `
-            <div class="p-3 bg-white rounded-4 shadow-sm border mb-3">
+  < div class="p-3 bg-white rounded-4 shadow-sm border mb-3" >
                  <h6 class="fw-bold text-dark small mb-2 text-uppercase ls-1">Datos Médicos Clave</h6>
                  <div class="d-flex justify-content-between border-bottom pb-2 mb-2">
                     <span class="text-muted small">Tipo Sangre</span>
@@ -3522,7 +4279,7 @@ var AdminMedi = (function () {
                     <span class="text-muted small d-block">Condiciones / Crónicos</span>
                     <span class="fw-bold text-dark small">${student.discapacidad || 'Ninguna'}</span>
                  </div>
-            </div>
+            </div >
 
             <div class="p-3 bg-primary-subtle rounded-4 border border-primary-subtle mb-3">
                  <h6 class="fw-bold text-primary small mb-2 text-uppercase ls-1"><i class="bi bi-clock-history me-1"></i> Última Visita</h6>
@@ -3553,10 +4310,10 @@ var AdminMedi = (function () {
                  ` : '<div class="text-center small text-muted fst-italic py-2">Sin registros previos de signos vitales.</div>'}
             </div>
 
-            <button class="btn btn-outline-dark btn-sm w-100 rounded-pill fw-bold" onclick="Medi.showFullRecord('${student.uid}')">
+            <button class="btn btn-outline-dark btn-sm w-100 rounded-pill fw-bold" onclick="AdminMedi.showFullRecord('${student.uid}')">
                 <i class="bi bi-folder2-open me-2"></i> Ver Expediente Completo
             </button>
-        `;
+`;
   }
 
   // --- FULL RECORD MODAL (MASTER-DETAIL) ---
@@ -3569,34 +4326,34 @@ var AdminMedi = (function () {
       div.className = 'modal fade';
       // Added modal-xl for more space
       div.innerHTML = `
-                <div class="modal-dialog modal-xl modal-dialog-scrollable">
-                    <div class="modal-content rounded-4 border-0 shadow-lg" style="height: 90vh;">
-                        <div class="modal-header bg-dark text-white py-2">
-                            <div class="d-flex align-items-center gap-3">
-                                <h5 class="modal-title filter-white fw-bold mb-0">Expediente Clínico</h5>
-                                <span class="badge bg-white text-dark rounded-pill" id="full-record-badge">--</span>
-                            </div>
-                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                        </div>
-                        <div class="modal-body p-0 bg-light">
-                             <div class="row g-0 h-100">
-                                <!-- LEFT SIDEBAR: LIST & SUMMARY (35%) -->
-                                <div class="col-lg-4 border-end bg-white h-100 overflow-auto" id="full-record-sidebar">
-                                    <div class="text-center p-5"><span class="spinner-border text-primary"></span></div>
-                                </div>
-                                
-                                <!-- RIGHT CONTENT: DETAILS (65%) -->
-                                <div class="col-lg-8 h-100 overflow-auto bg-light" id="full-record-content">
-                                    <div class="d-flex flex-column justify-content-center align-items-center h-100 text-muted opacity-50">
-                                        <i class="bi bi-arrow-left-circle display-1 mb-3"></i>
-                                        <p class="fw-bold">Selecciona una consulta para ver detalles</p>
-                                    </div>
-                                </div>
-                             </div>
-                        </div>
-                    </div>
-                </div>
-             `;
+  < div class="modal-dialog modal-xl modal-dialog-scrollable" >
+    <div class="modal-content rounded-4 border-0 shadow-lg" style="height: 90vh;">
+      <div class="modal-header bg-dark text-white py-2">
+        <div class="d-flex align-items-center gap-3">
+          <h5 class="modal-title filter-white fw-bold mb-0">Expediente Clínico</h5>
+          <span class="badge bg-white text-dark rounded-pill" id="full-record-badge">--</span>
+        </div>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body p-0 bg-light">
+        <div class="row g-0 h-100">
+          <!-- LEFT SIDEBAR: LIST & SUMMARY (35%) -->
+          <div class="col-lg-4 border-end bg-white h-100 overflow-auto" id="full-record-sidebar">
+            <div class="text-center p-5"><span class="spinner-border text-primary"></span></div>
+          </div>
+
+          <!-- RIGHT CONTENT: DETAILS (65%) -->
+          <div class="col-lg-8 h-100 overflow-auto bg-light" id="full-record-content">
+            <div class="d-flex flex-column justify-content-center align-items-center h-100 text-muted opacity-50">
+              <i class="bi bi-arrow-left-circle display-1 mb-3"></i>
+              <p class="fw-bold">Selecciona una consulta para ver detalles</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+                </div >
+  `;
       document.body.appendChild(div);
       modalEl = div;
     }
@@ -3623,79 +4380,90 @@ var AdminMedi = (function () {
       // Update Header Badge
       document.getElementById('full-record-badge').textContent = u.matricula || 'S/M';
 
+      // Update Header Badge with avatar
+      const uInitial = (u.displayName || u.email || 'P')[0].toUpperCase();
+      const UCOLORS = [['#dbeafe', '#1d4ed8'], ['#d1fae5', '#065f46'], ['#ede9fe', '#5b21b6'], ['#fce7f3', '#9d174d']];
+      const [ubg, ufg] = UCOLORS[uInitial.charCodeAt(0) % UCOLORS.length];
+      document.getElementById('full-record-badge').textContent = u.matricula || 'S/M';
+
       // RENDER SIDEBAR
       sidebar.innerHTML = `
-        <!-- MINI PROFILE -->
-        <div class="p-4 border-bottom bg-light-subtle">
-            <h5 class="fw-bold text-dark mb-1">${u.displayName}</h5>
-            <p class="text-muted small mb-3">${u.email}</p>
-            
-            <div class="d-flex gap-2 text-center mb-3">
-                <div class="bg-white border rounded p-2 flex-fill">
-                    <small class="d-block extra-small text-muted fw-bold">SANGRE</small>
-                    <span class="fw-bold text-danger">${u.tipoSangre || '--'}</span>
-                </div>
-                 <div class="bg-white border rounded p-2 flex-fill">
-                    <small class="d-block extra-small text-muted fw-bold">EDAD</small>
-                    <span class="fw-bold text-dark">${u.edad || MediService.calculateAge(u.fechaNacimiento) || '--'}</span>
-                </div>
+  < !--MINI PROFILE con avatar-- >
+        <div class="p-4 border-bottom" style="background:linear-gradient(135deg,#f8faff,#f0f7ff);">
+          <div class="d-flex align-items-center gap-3 mb-3">
+            <div class="medi-avatar flex-shrink-0" style="background:${ubg};color:${ufg};width:48px;height:48px;font-size:1.25rem;">${uInitial}</div>
+            <div>
+              <div class="fw-bold text-dark" style="font-size:.9rem;">${u.displayName}</div>
+              <div class="text-muted" style="font-size:.72rem;">${u.email}</div>
             </div>
-
-            <div class="alert alert-light border small mb-0">
-                <i class="bi bi-exclamation-circle-fill text-danger me-1"></i>
-                <span class="fw-bold text-muted">Alergias:</span> ${u.alergias || 'Ninguna'}
+          </div>
+          <div class="d-flex gap-2 mb-3">
+            <div class="flex-fill text-center p-2 rounded-3 border bg-white">
+              <div class="fw-bold text-danger" style="font-size:.95rem;">${u.tipoSangre || '--'}</div>
+              <div class="text-muted" style="font-size:.6rem;font-weight:600;">SANGRE</div>
             </div>
+            <div class="flex-fill text-center p-2 rounded-3 border bg-white">
+              <div class="fw-bold text-dark" style="font-size:.95rem;">${u.edad || MediService.calculateAge(u.fechaNacimiento) || '--'}</div>
+              <div class="text-muted" style="font-size:.6rem;font-weight:600;">EDAD</div>
+            </div>
+          </div>
+          <div class="d-flex align-items-center gap-2 p-2 rounded-3" style="background:rgba(220,38,38,.07);">
+            <i class="bi bi-exclamation-circle-fill text-danger flex-shrink-0"></i>
+            <div class="small"><span class="fw-bold text-muted">Alergias: </span>${u.alergias || 'Ninguna'}</div>
+          </div>
         </div>
 
-        <!-- HISTORY LIST -->
-        <div class="p-3 bg-white">
-            <h6 class="text-uppercase text-muted extra-small fw-bold ls-1 mb-3 px-2">Historial de Visitas</h6>
-            <div class="list-group list-group-flush" id="fr-history-list">
-                <!-- ITEMS HERE -->
-            </div>
-        </div>
-      `;
+        <!--HISTORY LIST-- >
+  <div class="p-3">
+    <div class="d-flex align-items-center justify-content-between mb-3 px-1">
+      <span class="text-uppercase text-muted fw-bold" style="font-size:.65rem;letter-spacing:.5px;">Historial de Visitas</span>
+      <span class="badge bg-light text-muted border" id="fr-visit-count" style="font-size:.65rem;"></span>
+    </div>
+    <div id="fr-history-list"></div>
+  </div>
+`;
 
       // RENDER HISTORY ITEMS
       const listContainer = document.getElementById('fr-history-list');
+      const visitBadge = document.getElementById('fr-visit-count');
 
       if (history.length === 0) {
-        listContainer.innerHTML = '<div class="text-center p-4 text-muted small fst-italic">Sin historial disponible.</div>';
-        // Show general file details on right by default
+        listContainer.innerHTML = '<div class="medi-empty-state py-4"><i class="bi bi-clipboard-x"></i><p>Sin historial disponible</p></div>';
+        if (visitBadge) visitBadge.textContent = '0 visitas';
         renderGeneralFile(content, u);
       } else {
+        if (visitBadge) visitBadge.textContent = `${history.length} visitas`;
         listContainer.innerHTML = history.map((item, index) => {
-          const dateObj = item.safeDate || new Date();
-          const isSelected = index === 0 ? 'bg-primary-subtle border-primary' : ''; // Select first? No, let's wait user or select first.
-
-          // Safe encode for click handler
+          const dateObj = item.safeDate ? new Date(item.safeDate) : new Date();
+          const isPsico = (item.tipoServicio || '').toLowerCase().includes('psico');
           const safeItem = encodeURIComponent(JSON.stringify(item));
+          const timeAgo = (() => {
+            const d = Math.floor((new Date() - dateObj) / 86400000);
+            if (d === 0) return 'Hoy'; if (d === 1) return 'Ayer';
+            if (d < 7) return `Hace ${d} dias`;
+            return dateObj.toLocaleDateString('es-MX', { day: 'numeric', month: 'short' });
+          })();
 
           return `
-                <button class="list-group-item list-group-item-action border-0 border-bottom p-3 mb-1 rounded-3 ${index === 0 ? 'active-item' : ''}" 
-                        onclick="Medi.renderConsultationDetail(this, '${safeItem}')">
-                    <div class="d-flex w-100 justify-content-between align-items-center mb-1">
-                        <small class="fw-bold text-uppercase ${item.tipoServicio === 'Psicologico' ? 'text-purple' : 'text-primary'}">
-                            ${item.tipoServicio || 'Consulta'}
-                        </small>
-                        <small class="text-muted extra-small">${dateObj.toLocaleDateString()}</small>
-                    </div>
-                    <div class="fw-bold text-dark text-truncate mb-1">${item.diagnostico || 'Sin diagnóstico'}</div>
-                    <small class="text-muted text-truncate d-block" style="font-size: 0.75rem;">
-                        ${item.subjetivo || 'Sin detalles...'}
-                    </small>
-                </button>
-              `;
+  < button class="fr-history-item ${isPsico ? 'psico' : ''} w-100 text-start bg-white border-0 p-3 mb-2 rounded-3 shadow-sm fade-slide-in"
+onclick = "AdminMedi.renderConsultationDetail(this,'${safeItem}')" >
+              <div class="d-flex justify-content-between align-items-center mb-1">
+                <span class="badge border fw-bold" style="font-size:.58rem;${isPsico ? 'background:rgba(124,58,237,.1);color:#7c3aed;' : 'background:rgba(13,110,253,.1);color:#0d6efd;'}">
+                  ${isPsico ? '<i class="bi bi-chat-heart-fill me-1"></i>Psicología' : '<i class="bi bi-bandaid-fill me-1"></i>Medicina'}
+                </span>
+                <span class="text-muted" style="font-size:.65rem;">${timeAgo}</span>
+              </div>
+              <div class="fw-bold text-dark text-truncate mb-1" style="font-size:.82rem;">${item.diagnostico || 'Sin diagnostico'}</div>
+              <div class="text-muted text-truncate" style="font-size:.7rem;">${item.subjetivo || 'Sin detalles...'}</div>
+            </button > `;
         }).join('');
 
-        // Auto-select first item if exists?
-        // Or show General File? Let's show General File by default, user clicks history to see details.
         renderGeneralFile(content, u);
       }
-
     } catch (e) {
       console.error(e);
-      sidebar.innerHTML = `<div class="alert alert-danger m-3">Error cargando datos: ${e.message}</div>`;
+      const sidebar = document.getElementById('full-record-sidebar');
+      if (sidebar) sidebar.innerHTML = `< div class="alert alert-danger m-3" > Error cargando datos: ${e.message}</div > `;
     }
   }
 
@@ -3703,59 +4471,86 @@ var AdminMedi = (function () {
 
   function renderGeneralFile(container, u) {
     container.innerHTML = `
-        <div class="p-5 animate-fade-in">
-            <div class="d-flex align-items-center justify-content-between mb-4">
-                 <h4 class="fw-bold text-dark mb-0"><i class="bi bi-person-vcard text-primary me-2"></i>Ficha General</h4>
-                 <span class="badge bg-light text-muted border">Vista General</span>
-            </div>
-            
-            <div class="row g-4">
-                <div class="col-md-6">
-                    <div class="card border-0 shadow-sm h-100">
-                        <div class="card-body">
-                            <h6 class="fw-bold text-uppercase small text-muted mb-3">Información Personal</h6>
-                            <ul class="list-unstyled small mb-0 d-flex flex-column gap-2">
-                                <li><span class="text-muted w-25 d-inline-block">Nombre:</span> <b>${u.displayName}</b></li>
-                                <li><span class="text-muted w-25 d-inline-block">Matrícula:</span> <span class="font-monospace">${u.matricula || '--'}</span></li>
-                                <li><span class="text-muted w-25 d-inline-block">Carrera:</span> ${u.carrera || '--'}</li>
-                                <li><span class="text-muted w-25 d-inline-block">Género:</span> ${u.genero || (u.personalData && u.personalData.genero) || u.sexo || '--'}</li>
-                                <li><span class="text-muted w-25 d-inline-block">Fecha Nac:</span> ${u.fechaNacimiento || '--'}</li>
-                                <li><span class="text-muted w-25 d-inline-block">Domicilio:</span> ${u.domicilio || u.direccion || '--'}</li>
-                            </ul>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-md-6">
-                    <div class="card border-0 shadow-sm h-100 border-start border-4 border-danger">
-                        <div class="card-body">
-                            <h6 class="fw-bold text-uppercase text-danger small mb-3">Antecedentes Médicos</h6>
-                             <ul class="list-unstyled small mb-0 d-flex flex-column gap-2">
-                                <li><span class="text-muted w-50 d-inline-block">Tipo Sangre:</span> <b class="text-danger">${u.tipoSangre || '--'}</b></li>
-                                <li><span class="text-muted w-50 d-inline-block">Alergias:</span> <b>${u.alergias || 'No'}</b></li>
-                                <li><span class="text-muted w-50 d-inline-block">Discapacidad:</span> ${u.discapacidad || 'Ninguna'}</li>
-                                <li><span class="text-muted w-50 d-inline-block">Enf. Crónicas:</span> ${u.enfermedades || 'No'}</li>
-                            </ul>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-12">
-                     <div class="card border-0 shadow-sm bg-light-subtle">
-                        <div class="card-body">
-                            <h6 class="fw-bold text-uppercase small text-muted mb-3">Datos de Contacto de Emergencia</h6>
-                             <div class="row">
-                                <div class="col-md-6"><small class="text-muted d-block">Nombre Contacto</small><b>${u.contactoEmergenciaName || u.contactoEmergencia || '--'}</b></div>
-                                <div class="col-md-6"><small class="text-muted d-block">Teléfono</small><b>${u.contactoEmergenciaTel || u.telefonoEmergencia || '--'}</b></div>
-                             </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="mt-5 text-center">
-                <p class="text-muted small">Selecciona una consulta del panel izquierdo para ver los detalles clínicos específicos.</p>
-            </div>
+  < div class="p-4 fade-slide-in" >
+        <div class="d-flex align-items-center justify-content-between mb-4">
+          <h5 class="fw-bold text-dark mb-0">
+            <i class="bi bi-person-vcard text-primary me-2"></i>Ficha General
+          </h5>
+          <span class="badge bg-primary-subtle text-primary border">Vista General</span>
         </div>
-      `;
+
+        <div class="row g-3">
+          <!-- Info Personal -->
+          <div class="col-md-6">
+            <div class="card border-0 shadow-sm h-100 rounded-4">
+              <div class="card-header bg-white border-0 py-3">
+                <span class="fw-bold small" style="color:#1d4ed8;">
+                  <i class="bi bi-person-fill me-1"></i>Información Personal
+                </span>
+              </div>
+              <div class="card-body pt-0">
+                <ul class="list-unstyled small mb-0 d-flex flex-column gap-2">
+                  <li class="d-flex gap-2"><span class="text-muted" style="min-width:90px;">Nombre</span><b>${u.displayName}</b></li>
+                  <li class="d-flex gap-2"><span class="text-muted" style="min-width:90px;">Matricula</span><span class="font-monospace">${u.matricula || '--'}</span></li>
+                  <li class="d-flex gap-2"><span class="text-muted" style="min-width:90px;">Carrera</span>${u.carrera || '--'}</li>
+                  <li class="d-flex gap-2"><span class="text-muted" style="min-width:90px;">Genero</span>${u.genero || (u.personalData && u.personalData.genero) || u.sexo || '--'}</li>
+                  <li class="d-flex gap-2"><span class="text-muted" style="min-width:90px;">Nacimiento</span>${u.fechaNacimiento || '--'}</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <!-- Antecedentes -->
+          <div class="col-md-6">
+            <div class="card border-0 shadow-sm h-100 rounded-4" style="border-left:3px solid #dc3545 !important;">
+              <div class="card-header bg-white border-0 py-3">
+                <span class="fw-bold small text-danger">
+                  <i class="bi bi-heart-pulse-fill me-1"></i>Antecedentes Médicos
+                </span>
+              </div>
+              <div class="card-body pt-0">
+                <ul class="list-unstyled small mb-0 d-flex flex-column gap-2">
+                  <li class="d-flex gap-2">
+                    <span class="text-muted" style="min-width:90px;">Tipo Sangre</span>
+                    <b class="text-danger">${u.tipoSangre || '--'}</b>
+                  </li>
+                  <li class="d-flex gap-2"><span class="text-muted" style="min-width:90px;">Alergias</span><b>${u.alergias || 'Ninguna'}</b></li>
+                  <li class="d-flex gap-2"><span class="text-muted" style="min-width:90px;">Discapacidad</span>${u.discapacidad || 'Ninguna'}</li>
+                  <li class="d-flex gap-2"><span class="text-muted" style="min-width:90px;">Enf. Cronicas</span>${u.enfermedades || 'No'}</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <!-- Contacto Emergencia -->
+          <div class="col-12">
+            <div class="card border-0 shadow-sm rounded-4">
+              <div class="card-header bg-white border-0 py-3">
+                <span class="fw-bold small text-warning">
+                  <i class="bi bi-telephone-fill me-1"></i>Contacto de Emergencia
+                </span>
+              </div>
+              <div class="card-body pt-0">
+                <div class="row g-3">
+                  <div class="col-md-6">
+                    <small class="text-muted d-block">Nombre</small>
+                    <b>${u.contactoEmergenciaName || u.contactoEmergencia || '--'}</b>
+                  </div>
+                  <div class="col-md-6">
+                    <small class="text-muted d-block">Telefono</small>
+                    <b>${u.contactoEmergenciaTel || u.telefonoEmergencia || '--'}</b>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-4 text-center">
+          <p class="text-muted small">Selecciona una consulta del panel izquierdo para ver los detalles clinicos.</p>
+        </div>
+      </div >
+  `;
   }
 
   function renderConsultationDetail(btnEl, encodedItem) {
@@ -3778,41 +4573,41 @@ var AdminMedi = (function () {
     const dateObj = exp.safeDate ? new Date(exp.safeDate) : new Date();
 
     const isPsicologo = exp.tipoServicio === 'Psicologo' || exp.tipoServicio === 'Psicologico';
-    const isMedico = !isPsicologo; // Assume Medico default
+    const isMédico = !isPsicologo; // Assume Médico default
 
     // --- TEMPLATE COMPONENTS ---
 
-    // A. Vitals (Medico Only)
-    const vitalsHTML = (isMedico && exp.signos) ? `
-        <div class="card border-0 shadow-sm mb-4 bg-light">
-            <div class="card-body py-3">
-                <div class="row text-center g-2">
-                    <div class="col">
-                        <small class="d-block text-muted extra-small fw-bold">TEMP</small>
-                        <span class="fw-bold text-dark">${exp.signos.temp || '--'}°C</span>
-                    </div>
-                    <div class="vr opacity-25"></div>
-                        <div class="col">
-                        <small class="d-block text-muted extra-small fw-bold">PRESIÓN</small>
-                        <span class="fw-bold text-dark">${exp.signos.presion || '--'}</span>
-                    </div>
-                    <div class="vr opacity-25"></div>
-                        <div class="col">
-                        <small class="d-block text-muted extra-small fw-bold">PESO</small>
-                        <span class="fw-bold text-dark">${exp.signos.peso || '--'}kg</span>
-                    </div>
-                        <div class="vr opacity-25"></div>
-                        <div class="col">
-                        <small class="d-block text-muted extra-small fw-bold">TALLA</small>
-                        <span class="fw-bold text-dark">${exp.signos.talla || '--'}cm</span>
-                    </div>
-                </div>
-            </div>
-        </div>` : '';
+    // A. Vitals (Médico Only)
+    const vitalsHTML = (isMédico && exp.signos) ? `
+  < div class="card border-0 shadow-sm mb-4 bg-light" >
+    <div class="card-body py-3">
+      <div class="row text-center g-2">
+        <div class="col">
+          <small class="d-block text-muted extra-small fw-bold">TEMP</small>
+          <span class="fw-bold text-dark">${exp.signos.temp || '--'}°C</span>
+        </div>
+        <div class="vr opacity-25"></div>
+        <div class="col">
+          <small class="d-block text-muted extra-small fw-bold">PRESIÓN</small>
+          <span class="fw-bold text-dark">${exp.signos.presion || '--'}</span>
+        </div>
+        <div class="vr opacity-25"></div>
+        <div class="col">
+          <small class="d-block text-muted extra-small fw-bold">PESO</small>
+          <span class="fw-bold text-dark">${exp.signos.peso || '--'}kg</span>
+        </div>
+        <div class="vr opacity-25"></div>
+        <div class="col">
+          <small class="d-block text-muted extra-small fw-bold">TALLA</small>
+          <span class="fw-bold text-dark">${exp.signos.talla || '--'}cm</span>
+        </div>
+      </div>
+    </div>
+        </div > ` : '';
 
     // B. Psych Header (Psych Only)
     const psychHeaderHTML = isPsicologo ? `
-        <div class="row g-3 mb-4">
+  < div class="row g-3 mb-4" >
              <div class="col-md-6">
                 <div class="p-3 bg-purple-subtle rounded-3 border border-purple">
                     <small class="d-block text-purple fw-bold mb-1" style="font-size:0.7rem;">ESTADO EMOCIONAL</small>
@@ -3825,49 +4620,49 @@ var AdminMedi = (function () {
                     <span class="fw-bold text-dark">${exp.tipoIntervencion || 'No registrado'}</span>
                 </div>
              </div>
-        </div>
-    ` : '';
+        </div >
+  ` : '';
 
-    // C. Padecimiento Actual (Private - Medico Only - Middle)
-    // Only visible if viewer is Medico (or Admin/Same Role)
-    const showPrivateNotesMedico = isMedico && exp.notasPrivadas && (_myRole === 'Medico');
-    const padecimientoMedicoHTML = showPrivateNotesMedico ? `
-        <div class="col-12">
+    // C. Padecimiento Actual (Private - Médico Only - Middle)
+    // Only visible if viewer is Médico (or Admin/Same Role)
+    const showPrivateNotesMédico = isMédico && exp.notasPrivadas && (_myRole === 'Médico');
+    const padecimientoMédicoHTML = showPrivateNotesMédico ? `
+  < div class="col-12" >
             <h6 class="fw-bold text-danger small mb-2"><i class="bi bi-lock-fill me-2"></i>Padecimiento Actual (Privado)</h6>
                 <div class="bg-danger-subtle p-3 rounded-3 border border-danger-subtle text-dark">
                 ${exp.notasPrivadas}
             </div>
-        </div>` : '';
+        </div > ` : '';
 
     // D. Private Notes (Psych Only - Bottom)
     // Only visible if viewer is Psicologo
     const showPrivateNotesPsych = isPsicologo && exp.notasPrivadas && (_myRole === 'Psicologo');
     const notasPsychHTML = showPrivateNotesPsych ? `
-        <div class="col-12 mt-2">
-            <div class="p-3 bg-warning-subtle border border-warning rounded-4 dashed-border">
-                <h6 class="fw-bold text-dark extra-small mb-2"><i class="bi bi-shield-lock-fill me-1"></i> NOTAS PRIVADAS (Confidencial)</h6>
-                <p class="mb-0 small text-dark" style="white-space: pre-line;">${exp.notasPrivadas}</p>
-            </div>
-        </div>` : '';
+  < div class="col-12 mt-2" >
+    <div class="p-3 bg-warning-subtle border border-warning rounded-4 dashed-border">
+      <h6 class="fw-bold text-dark extra-small mb-2"><i class="bi bi-shield-lock-fill me-1"></i> NOTAS PRIVADAS (Confidencial)</h6>
+      <p class="mb-0 small text-dark" style="white-space: pre-line;">${exp.notasPrivadas}</p>
+    </div>
+        </div > ` : '';
 
 
     // 3. Render Detail View
     container.innerHTML = `
-        <div class="p-4 animate-in">
-            <!-- HEADER -->
-            <div class="d-flex justify-content-between align-items-start mb-4 pb-3 border-bottom">
-                <div>
-                     <span class="badge ${isPsicologo ? 'bg-purple-subtle text-purple' : 'bg-primary-subtle text-primary'} mb-2 border">
-                        ${exp.tipoServicio || 'Consulta Genérica'}
-                     </span>
-                     <h4 class="fw-bold mb-0 text-dark">Detalle de Consulta</h4>
-                     <small class="text-muted">${dateObj.toLocaleDateString('es-MX', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} a las ${dateObj.toLocaleTimeString()}</small>
-                </div>
-                <div class="text-end">
-                     <div class="small fw-bold text-dark">${exp.autorEmail || 'Autor desconocido'}</div>
-                     <div class="extra-small text-muted">Cédula: ${exp.cedula || '--'}</div>
-                </div>
-            </div>
+  < div class="p-4 animate-in" >
+            < !--HEADER -->
+  <div class="d-flex justify-content-between align-items-start mb-4 pb-3 border-bottom">
+    <div>
+      <span class="badge ${isPsicologo ? 'bg-purple-subtle text-purple' : 'bg-primary-subtle text-primary'} mb-2 border">
+        ${exp.tipoServicio || 'Consulta Genérica'}
+      </span>
+      <h4 class="fw-bold mb-0 text-dark">Detalle de Consulta</h4>
+      <small class="text-muted">${dateObj.toLocaleDateString('es-MX', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} a las ${dateObj.toLocaleTimeString()}</small>
+    </div>
+    <div class="text-end">
+      <div class="small fw-bold text-dark">${exp.autorEmail || 'Autor desconocido'}</div>
+      <div class="extra-small text-muted">Cédula: ${exp.cedula || '--'}</div>
+    </div>
+  </div>
 
             ${vitalsHTML}
             ${psychHeaderHTML}
@@ -3888,7 +4683,7 @@ var AdminMedi = (function () {
                     </div>
                 </div>
 
-                ${padecimientoMedicoHTML}
+                ${padecimientoMédicoHTML}
 
                 <div class="col-12">
                     <h6 class="fw-bold text-dark small mb-2"><i class="bi bi-clipboard-pulse me-2"></i>${isPsicologo ? 'Impresión Diagnóstica' : 'Diagnóstico'}</h6>
@@ -3910,12 +4705,11 @@ var AdminMedi = (function () {
 
             <!-- FOOTER ACTIONS -->
             <div class="mt-5 pt-3 border-top d-flex justify-content-end">
-                <button class="btn btn-primary rounded-pill px-4 fw-bold shadow-sm" onclick="Medi.printRecetaFromDetail('${encodedItem}')">
+                <button class="btn btn-primary rounded-pill px-4 fw-bold shadow-sm" onclick="AdminMedi.printRecetaFromDetail('${encodedItem}')">
                     <i class="bi bi-printer-fill me-2"></i>Imprimir Receta / Nota
                 </button>
             </div>
-        </div>
-    `;
+        </div>`;
   }
 
 
@@ -3928,8 +4722,6 @@ var AdminMedi = (function () {
     // However, showFullRecord fetched 'u' (user) but didn't pass it to renderConsultationDetail directly.
     // FIX: We rely on the fact that we can re-fetch or pass it. 
     // BETTER: showFullRecord already fetched 'u'. We can store it globally or pass it.
-    // Let's assume we can fetch it again lightly or retrieve from DOM.
-
     // Let's do a quick fetch for safety or store in a temp variable when showFullRecord runs?
     // _studentForBooking is not reliable.
     // Let's execute a quick fetch using studentId from exp.
@@ -3975,8 +4767,8 @@ var AdminMedi = (function () {
     if (elEsp) elEsp.textContent = `${_myRole} (${_currentShift})`;
 
     // --- CHECK SHIFT PROFILE ---
-    // Only for Medico/Psicologo
-    if (_myRole === 'Medico' || _myRole === 'Psicologo') {
+    // Only for Médico/Psicologo
+    if (_myRole === 'Médico' || _myRole === 'Psicologo') {
       try {
         const profile = await MediService.getShiftProfile(_ctx, _myRole, _currentShift);
         if (profile && profile.name) {
@@ -4018,7 +4810,7 @@ var AdminMedi = (function () {
     if (existing) existing.remove();
 
     const html = `
-  < div class="modal fade" id = "${modalId}" data - bs - backdrop="static" data - bs - keyboard="false" tabindex = "-1" >
+  <div class="modal fade" id="${modalId}" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
       <div class="modal-content border-0 shadow-lg rounded-4">
         <div class="modal-body p-5 text-center">
@@ -4047,8 +4839,7 @@ var AdminMedi = (function () {
         </div>
       </div>
     </div>
-        </div >
-  `;
+  </div>`;
 
     const d = document.createElement('div');
     d.innerHTML = html;
@@ -4096,6 +4887,12 @@ var AdminMedi = (function () {
 
   // --- WORKFLOW: CONSULTA EXPRESS / WALK-IN ---
   async function nuevaConsultaWalkIn() {
+    // If modal already exists, clean it up to prevent DOM stacking issues
+    const existingOldModal = document.getElementById('modalWalkIn');
+    if (existingOldModal) {
+      existingOldModal.remove();
+    }
+
     // Use Bootstrap Modal instead of prompt
     const mHtml = `
   <div class="modal fade" id="modalWalkIn" tabindex="-1">
@@ -4105,17 +4902,11 @@ var AdminMedi = (function () {
           <h5 class="fw-bold text-primary"><i class="bi bi-lightning-charge-fill me-2"></i>Consulta Express</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
-        <div class="modal-body transition-all">
-          <div id="walkin-step-1">
-            <p class="text-muted small">Ingresa la matrícula del estudiante para iniciar una consulta sin cita previa.</p>
-            <input type="text" id="walkin-input" class="form-control form-control-lg text-center fw-bold" placeholder="ej. 12345678" autocomplete="off">
-          </div>
+        <div class="modal-body transition-all" id="walkin-body-container">
+          <!-- step content injected here -->
         </div>
-        <div class="modal-footer border-0 pt-0">
-          <button class="btn btn-light rounded-pill" data-bs-dismiss="modal">Cancelar</button>
-          <button class="btn btn-primary rounded-pill px-4" id="btn-walkin-go">
-            <i class="bi bi-search me-1"></i>Buscar
-          </button>
+        <div class="modal-footer border-0 pt-0" id="walkin-footer-container">
+          <!-- step footer injected here -->
         </div>
       </div>
     </div>
@@ -4132,12 +4923,50 @@ var AdminMedi = (function () {
 
     el.addEventListener('hidden.bs.modal', () => d.remove());
 
-    const input = document.getElementById('walkin-input');
-    const btnBox = document.querySelector('#modalWalkIn .modal-footer');
-    const bodyBox = document.querySelector('#modalWalkIn .modal-body');
+    const btnBox = document.getElementById('walkin-footer-container');
+    const bodyBox = document.getElementById('walkin-body-container');
+
+    // RENDER STEP 1: Search or Anonymous
+    const renderStep1 = () => {
+      bodyBox.innerHTML = `
+        <div id="walkin-step-1" class="animate-fade-in">
+          <p class="text-muted small mb-3">Ingresa la matrícula del estudiante para iniciar una consulta sin cita previa.</p>
+          <input type="text" id="walkin-input" class="form-control form-control-lg text-center fw-bold mb-4 shadow-sm" placeholder="ej. 12345678" autocomplete="off">
+          
+          <div class="d-grid mt-2 pt-3 border-top position-relative">
+             <span class="position-absolute top-0 start-50 translate-middle bg-white px-2 extra-small text-muted fw-bold">O</span>
+             <button class="btn btn-outline-secondary rounded-pill py-2 fw-bold" type="button" id="btn-walkin-anon-direct">
+               <i class="bi bi-incognito me-2"></i>Continuar como Anónimo
+             </button>
+             <div class="text-center mt-1"><small class="text-muted" style="font-size: 0.65rem;">(Para emergencias o pacientes externos)</small></div>
+          </div>
+        </div>
+      `;
+      btnBox.innerHTML = `
+        <button class="btn btn-light rounded-pill" data-bs-dismiss="modal">Cancelar</button>
+        <button class="btn btn-primary rounded-pill px-4" id="btn-walkin-go">
+          <i class="bi bi-search me-1"></i>Buscar
+        </button>
+      `;
+
+      // Setup Events for Step 1
+      const input = document.getElementById('walkin-input');
+      document.getElementById('btn-walkin-go').onclick = performSearch;
+      document.getElementById('btn-walkin-anon-direct').onclick = () => renderNotFoundUI('Anónimo');
+
+      input.onkeydown = (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          performSearch();
+        }
+      };
+
+      setTimeout(() => input.focus(), 200);
+    };
 
     // SEARCH FUNCTION
     const performSearch = async () => {
+      const input = document.getElementById('walkin-input');
       const mat = input.value.trim();
       if (!mat) return;
 
@@ -4147,9 +4976,6 @@ var AdminMedi = (function () {
         btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
       }
 
-      // Don't hide modal, just update UI state potentially
-      // showToast('Buscando...', 'info'); // Option: skip toast for cleaner UI
-
       try {
         const found = await MediService.buscarPaciente(_ctx, mat);
 
@@ -4157,7 +4983,7 @@ var AdminMedi = (function () {
           modal.hide();
           const safe = encodeURIComponent(JSON.stringify(found));
           iniciarConsulta(null, safe);
-          showToast(`Paciente identificado: ${found.displayName || found.email} `, 'success');
+          showToast(`Paciente identificado: ${found.displayName || found.email}`, 'success');
         } else {
           // NOT FOUND - SWITCH UI IN-PLACE
           renderNotFoundUI(mat);
@@ -4172,16 +4998,28 @@ var AdminMedi = (function () {
       }
     };
 
-    // RENDER NOT FOUND FORM
+    // RENDER NOT FOUND/ANONYMOUS FORM
     const renderNotFoundUI = (mat) => {
+      const isAnonMode = mat === 'Anónimo';
+      const title = isAnonMode ? 'Consulta Anónima / Externa' : 'Matrícula no encontrada';
+      const desc = isAnonMode
+        ? 'Ingresa los datos del paciente para continuar con la consulta de forma manual.'
+        : `No se encontró el alumno con matrícula <strong>${escapeHtml(mat)}</strong>.<br>Puedes continuar registrando los datos manualmente.`;
+
+      const iconHtml = isAnonMode
+        ? '<i class="bi bi-incognito text-primary display-4"></i>'
+        : '<i class="bi bi-person-x-fill text-warning display-4"></i>';
+
+      const iconBgClass = isAnonMode ? 'bg-primary' : 'bg-warning';
+
       bodyBox.innerHTML = `
-  <div class="text-center mb-3 animate-fade-in">
-                <div class="bg-warning bg-opacity-10 rounded-circle d-inline-flex p-3 mb-2">
-                    <i class="bi bi-person-x-fill text-warning display-4"></i>
+        <div class="text-center mb-3 animate-fade-in">
+                <div class="${iconBgClass} bg-opacity-10 rounded-circle d-inline-flex p-3 mb-2">
+                    ${iconHtml}
                 </div>
-                <h5 class="fw-bold text-dark">Matrícula no encontrada</h5>
-                <p class="text-muted small">No se encontró el alumno con matrícula <strong>${escapeHtml(mat)}</strong>.<br>Puedes continuar registrando los datos manualmente.</p>
-             </div>
+                <h5 class="fw-bold text-dark">${title}</h5>
+                <p class="text-muted small">${desc}</p>
+        </div>
 
   <div class="bg-light rounded-4 p-3 border animate-fade-in">
     <div class="mb-3">
@@ -4200,13 +5038,15 @@ var AdminMedi = (function () {
 `;
 
       btnBox.innerHTML = `
-  <button class="btn btn-light rounded-pill" onclick="Medi.nuevaConsultaWalkIn()">
-    <i class="bi bi-arrow-left me-1"></i>Regresar
-             </button>
+        <button class="btn btn-light rounded-pill" id="btn-walkin-back">
+          <i class="bi bi-arrow-left me-1"></i>Regresar
+        </button>
   <button class="btn btn-warning rounded-pill px-4 fw-bold shadow-sm" id="btn-anon-go">
     Continuar como Anónimo <i class="bi bi-arrow-right ms-1"></i>
   </button>
 `;
+
+      document.getElementById('btn-walkin-back').onclick = renderStep1;
 
       // Focus Name
       setTimeout(() => {
@@ -4225,7 +5065,7 @@ var AdminMedi = (function () {
           uid: 'anon_' + Date.now(),
           email: 'anonimo@tecnm.mx',
           displayName: name,
-          matricula: mat || 'EXT',
+          matricula: (isAnonMode ? 'EXT' : mat),
           genero: gender,
           personalData: { genero: gender }
         };
@@ -4235,20 +5075,10 @@ var AdminMedi = (function () {
       };
     };
 
-    // Events
-    document.getElementById('btn-walkin-go').onclick = performSearch;
-
-    // [NEW] Enter Key Support
-    input.onkeydown = (e) => {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        performSearch();
-      }
-    };
-
-    // Auto-focus
-    setTimeout(() => input.focus(), 500);
+    // Initialize the Modal with Step 1
+    renderStep1();
   }
+
 
 
   // --- HISTORIAL RÁPIDO (REDIRECCIONADO A FULL RECORD) ---
@@ -4271,7 +5101,7 @@ var AdminMedi = (function () {
     // 2. Search Mode (Generic)
     // Reuse WalkIn Modal logic but for Booking
     const mHtml = `
-  <div class="modal fade" id="modalSearchBooking" tabindex="-1">
+  < div class="modal fade" id = "modalSearchBooking" tabindex = "-1" >
     <div class="modal-dialog modal-dialog-centered">
       <div class="modal-content rounded-4 shadow">
         <div class="modal-header border-0 pb-0">
@@ -4288,7 +5118,7 @@ var AdminMedi = (function () {
         </div>
       </div>
     </div>
-      </div>`;
+      </div > `;
 
     const d = document.createElement('div');
     d.innerHTML = mHtml;
@@ -4342,7 +5172,7 @@ var AdminMedi = (function () {
     if (old) old.remove();
 
     const html = `
-  <div class="modal fade" id="${modalId}" tabindex="-1">
+  < div class="modal fade" id = "${modalId}" tabindex = "-1" >
     <div class="modal-dialog modal-dialog-centered modal-lg">
       <div class="modal-content shadow rounded-4 border-0">
         <div class="modal-header border-bottom-0 pb-0">
@@ -4424,7 +5254,7 @@ var AdminMedi = (function () {
         </div>
       </div>
     </div>
-        </div>
+        </div >
   `;
 
     const d = document.createElement('div');
@@ -4467,18 +5297,18 @@ var AdminMedi = (function () {
 
       // Compact Card Design
       return `
-  <div class="date-card p-2 text-center border rounded-3 bg-white cursor-pointer transition-all flex-shrink-0"
-onclick="Medi.selectAdminDate('${iso}', this)"
-style="min-width: 70px; user-select:none;">
+  < div class="date-card p-2 text-center border rounded-3 bg-white cursor-pointer transition-all flex-shrink-0"
+onclick = "AdminMedi.selectAdminDate('${iso}', this)"
+style = "min-width: 70px; user-select:none;" >
                  <div class="extra-small text-muted fw-bold mb-0">${dayName}</div>
                  <div class="h5 fw-bold text-dark mb-0 ls-1">${dayNum}</div>
                  <div class="extra-small text-muted">${monthName}</div>
-            </div>
+            </div >
   `;
     }).join('');
 
     // Select Date Helper
-    Medi.selectAdminDate = async (isoDate, cardEl) => {
+    AdminMedi.selectAdminDate = async (isoDate, cardEl) => {
       // Styles
       dateContainer.querySelectorAll('.date-card').forEach(c => {
         c.classList.remove('border-primary', 'bg-primary-subtle', 'ring-2');
@@ -4503,7 +5333,7 @@ style="min-width: 70px; user-select:none;">
         // Pass _myRole to allow cross-checking if we separate resources later, 
         // or null to block if ANYONE is busy (Single Room/Resource).
         // Let's assume Resource Sharing: Medic/Psych share same room/schedule? 
-        // If yes, use null. If no, use _myRole.
+        // If yes, use _myRole. If no, use null.
         // Assuming Single Resource for now as per "getOccupiedSlots" logic.
         const blockedSlots = await MediService.getOccupiedSlots(_ctx, null, isoDate);
 
@@ -4563,16 +5393,16 @@ style="min-width: 70px; user-select:none;">
         } else {
           // Render Buttons
           slotsContainer.innerHTML = slots.map((s, i) => `
-  <button type="button"
+  < button type = "button"
 class="btn btn-sm ${s.occupied ? 'btn-light text-muted border-0' : 'btn-outline-primary'} rounded-pill px-3 py-2 fw-bold" 
-                        ${s.occupied ? 'disabled style="opacity:0.6; text-decoration:line-through;"' : `onclick="Medi.selectAdminSlot(${i})"`}
-data-idx="${i}">
+                        ${s.occupied ? 'disabled style="opacity:0.6; text-decoration:line-through;"' : `onclick="AdminMedi.selectAdminSlot(${i})"`}
+data - idx="${i}" >
   ${s.occupied ? '' : '<i class="bi bi-clock me-1"></i>'}${s.label}
-                </button>
+                </button >
   `).join('');
 
           // Store slots in DOM or Closure for Click Handler
-          Medi._currentSlots = slots;
+          AdminMedi._currentSlots = slots;
         }
 
       } catch (e) {
@@ -4584,8 +5414,8 @@ data-idx="${i}">
     };
 
     // Select Slot Helper
-    Medi.selectAdminSlot = (idx) => {
-      const slot = Medi._currentSlots[idx];
+    AdminMedi.selectAdminSlot = (idx) => {
+      const slot = AdminMedi._currentSlots[idx];
       if (!slot) return;
 
       // UI
@@ -4593,7 +5423,7 @@ data-idx="${i}">
         b.classList.remove('btn-primary', 'text-white');
         if (!b.disabled) b.classList.add('btn-outline-primary');
       });
-      const btn = slotsContainer.querySelector(`button[data-idx="${idx}"]`);
+      const btn = slotsContainer.querySelector(`button[data - idx= "${idx}"]`);
       if (btn) {
         btn.classList.remove('btn-outline-primary');
         btn.classList.add('btn-primary', 'text-white');
@@ -4672,6 +5502,12 @@ data-idx="${i}">
     try {
       const stats = await MediService.getDayStats(_ctx, _myRole, _myUid, _currentProfile ? _currentProfile.id : null);
 
+      // [NEW] Feed dashboard stat cards with authoritative service data
+      const statAtendidos = document.getElementById('stat-atendidos');
+      if (statAtendidos) statAtendidos.textContent = stats.totalAtendidos || 0;
+      const statEspera = document.getElementById('stat-en-espera');
+      if (statEspera) statEspera.textContent = stats.enEspera || 0;
+
       const diagBadges = stats.topDiagnosticos.length > 0
         ? stats.topDiagnosticos.map(d =>
           '<span class="badge  text-dark border me-1 mb-1" style="font-size:.7rem;">' +
@@ -4680,7 +5516,7 @@ data-idx="${i}">
         : '<span class="text-muted" style="font-size:.7rem;">Sin datos aun</span>';
 
       container.innerHTML = `
-        <div class="row g-2 mb-3">
+  < div class="row g-2 mb-3" >
           <div class="col-6">
             <div class="card border-0 bg-primary-subtle rounded-3 text-center p-2">
               <div class="fw-bold text-primary" style="font-size:1.5rem;">${stats.totalAtendidos}</div>
@@ -4705,9 +5541,9 @@ data-idx="${i}">
               <div class="text-muted" style="font-size:.65rem;">Espera promedio</div>
             </div>
           </div>
-        </div>
+        </div >
 
-        <!--Top Diagnoses-- >
+        < !--Top Diagnoses-- >
         <div class="mb-3">
           <h6 class="text-muted fw-bold text-uppercase mb-2" style="font-size:.7rem;"><i class="bi bi-tag me-1"></i>Diagnosticos frecuentes</h6>
           <div class="d-flex flex-wrap">${diagBadges}</div>
@@ -4760,6 +5596,10 @@ data-idx="${i}">
 
       if (pending.length === 0) { container.innerHTML = ''; return; }
 
+      // [NEW] Update stat-seguimientos card
+      const statSeg = document.getElementById('stat-seguimientos');
+      if (statSeg) statSeg.textContent = pending.length;
+
       container.innerHTML = `
   < h6 class="text-muted fw-bold text-uppercase mb-2" style = "font-size:.7rem;" > <i class="bi bi-calendar-check me-1"></i>Seguimientos pendientes</h6 >
     ${pending.map(f => {
@@ -4778,7 +5618,7 @@ data-idx="${i}">
     } catch (e) { console.warn('Follow-ups load error:', e); }
   }
 
-  function refreshAdmin() { loadWall(); loadMyAgenda(); loadRecentActivity(); loadDayMetrics(); }
+  function refreshAdmin() { loadWall(); loadMyAgenda(); loadRecentActivity(); loadDayMetrics(); updateDashboardStats(); }
 
   // --- CONFIGURACIÓN ---
   async function saveConfig() {
@@ -4804,7 +5644,7 @@ data-idx="${i}">
     // Logic refactored to use role-based config
     if (!_myRole) return;
 
-    const key = _myRole === 'Medico' ? 'availableMedico' : 'availablePsicologo';
+    const key = _myRole === 'Médico' ? 'availableMédico' : 'availablePsicologo';
     // If 'enabled' arg is passed, use it, otherwise toggle
     const currentVal = (_ctx.config.medi && _ctx.config.medi[key] !== undefined) ? _ctx.config.medi[key] : true;
     const newVal = (enabled !== undefined) ? enabled : !currentVal;
@@ -4915,10 +5755,10 @@ data-idx="${i}">
     document.getElementById('detail-date-header').textContent = `${exp.tipoServicio} • ${dateObj.toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' })} `;
     document.getElementById('detail-doctor').textContent = exp.autorEmail || 'Profesional de Salud';
 
-    // Signos Vitales
-    document.getElementById('detail-temp').textContent = exp.signos?.temp ? `${exp.signos.temp}°C` : '--';
-    document.getElementById('detail-presion').textContent = exp.signos?.presion || '--';
-    document.getElementById('detail-peso').textContent = exp.signos?.peso ? `${exp.signos.peso} kg` : '--';
+    // Signos Vitales — data is stored flat: exp.temp, exp.presion, exp.peso, exp.talla
+    document.getElementById('detail-temp').textContent = exp.temp ? `${exp.temp}°C` : '--';
+    document.getElementById('detail-presion').textContent = exp.presion || '--';
+    document.getElementById('detail-peso').textContent = exp.peso ? `${exp.peso} kg` : '--';
 
     // Contenido SOAP
     document.getElementById('detail-subjetivo').textContent = exp.subjetivo || 'No registrado';
@@ -4976,9 +5816,10 @@ data-idx="${i}">
       document.getElementById('detail-temp').textContent = exp.signos.temp ? exp.signos.temp + '°C' : '--';
       document.getElementById('detail-peso').textContent = exp.signos.peso ? exp.signos.peso + 'kg' : '--';
     } else {
-      document.getElementById('detail-presion').textContent = '--';
-      document.getElementById('detail-temp').textContent = '--';
-      document.getElementById('detail-peso').textContent = '--';
+      // [FIX] Also check flat fields (data saved by saveConsultation is flat)
+      document.getElementById('detail-presion').textContent = exp.presion || '--';
+      document.getElementById('detail-temp').textContent = exp.temp ? exp.temp + '°C' : '--';
+      document.getElementById('detail-peso').textContent = exp.peso ? exp.peso + ' kg' : '--';
     }
 
     dDate.innerHTML = `< i class="bi bi-calendar-event me-1" ></i > ${dateObj.toLocaleDateString()} ${dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} `;
@@ -5004,7 +5845,7 @@ data-idx="${i}">
       pNotesEl = div;
     }
 
-    if (exp.notasPrivadas && (_myRole === 'Medico' || _myRole === 'Psicologo')) {
+    if (exp.notasPrivadas && (_myRole === 'Médico' || _myRole === 'Psicologo')) {
       pNotesEl.classList.remove('d-none');
       document.getElementById('detail-private-notes-text').textContent = exp.notasPrivadas;
     } else {
@@ -5061,7 +5902,7 @@ data-idx="${i}">
     // Fill hidden inputs
     document.getElementById('resched-cita-id').value = cita.id;
     document.getElementById('resched-old-slot').value = cita.slotId;
-    document.getElementById('resched-tipo').value = cita.tipoServicio || 'Medico';
+    document.getElementById('resched-tipo').value = cita.tipoServicio || 'Médico';
     document.getElementById('resched-date').value = '';
     document.getElementById('resched-time').value = '';
 
@@ -5091,7 +5932,7 @@ data-idx="${i}">
       return `
   < div class="date-option p-2 text-center border rounded-3 bg-white shadow-sm flex-shrink-0"
 style = "min-width: 70px; cursor: pointer;" data - date="${isoDate}"
-onclick = "Medi._reschedSelectDate(this, '${isoDate}')" >
+onclick = "AdminMedi._reschedSelectDate(this, '${isoDate}')" >
           <div class="small text-muted mb-0">${displayDay}</div>
           <div class="fw-bold fs-5">${d.getDate()}</div>
           <div class="small text-primary fw-bold">${d.toLocaleDateString('es-MX', { month: 'short' }).toUpperCase()}</div>
@@ -5163,7 +6004,7 @@ onclick = "Medi._reschedSelectDate(this, '${isoDate}')" >
 
     const targetDate = new Date(dateStr + 'T12:00:00');
     const slots = buildSlotsForDate(targetDate);
-    const tipo = document.getElementById('resched-tipo').value || 'Medico';
+    const tipo = document.getElementById('resched-tipo').value || 'Médico';
     let occupied = [];
 
     try {
@@ -5224,7 +6065,7 @@ onclick = "Medi._reschedSelectDate(this, '${isoDate}')" >
     const specialty = (ctx.profile.especialidad || ctx.profile.specialty || '').toLowerCase();
 
     // Si eres médico O si tu especialidad es psicólogo, vas a la vista profesional
-    if (role === 'medico' || role === 'psicologo' || specialty === 'psicologo') {
+    if (role === 'medico' || role === 'psicologo' || specialty === 'psicologo' || specialty === 'medico') {
       initAdmin(ctx);
     } else {
       initStudent(ctx);
@@ -5260,7 +6101,7 @@ onclick = "Medi._reschedSelectDate(this, '${isoDate}')" >
     if (match.length === 0) { list.classList.add('d-none'); return; }
 
     list.innerHTML = match.map(i => `
-  < button type = "button" class="list-group-item list-group-item-action small" onclick = "Medi.selectCIE10('${i.c} - ${i.d}')" >
+  < button type = "button" class="list-group-item list-group-item-action small" onclick = "AdminMedi.selectCIE10('${i.c} - ${i.d}')" >
     <span class="fw-bold text-primary">${i.c}</span> ${i.d}
          </button >
   `).join('');
@@ -5360,7 +6201,7 @@ onclick = "Medi._reschedSelectDate(this, '${isoDate}')" >
         const statusColor = d.estado === 'finalizada' ? 'success' : (d.estado === 'borrador' ? 'warning' : 'secondary');
 
         return `
-  < div class="list-group-item list-group-item-action border-0 mb-1 rounded-3 px-3 py-2 cursor-pointer" onclick = "Medi.showConsultationDetails('${encodeURIComponent(JSON.stringify(d))}')" >
+  < div class="list-group-item list-group-item-action border-0 mb-1 rounded-3 px-3 py-2 cursor-pointer" onclick = "AdminMedi.showConsultationDetails('${encodeURIComponent(JSON.stringify(d))}')" >
                 <div class="d-flex w-100 justify-content-between align-items-center">
                     <h6 class="mb-0 small fw-bold text-truncate" style="max-width: 180px;">${d.patientName}</h6>
                     <small class="text-muted" style="font-size:0.65rem;">${date} ${time}</small>
@@ -5385,14 +6226,14 @@ onclick = "Medi._reschedSelectDate(this, '${isoDate}')" >
       const profName = _currentProfile ? _currentProfile.displayName : (_ctx.user.displayName || 'Profesional');
 
       // [FIX] Admin Context Alignment
-      // If we are operating as 'Medico' or 'Psicologo' but distinct from the base user ID context,
+      // If we are operating as 'Médico' or 'Psicologo' but distinct from the base user ID context,
       // we must use the Composite Profile ID to match what the Student sees.
-      // E.g. If I am 'Medico', I should use 'UID_Medico' as my profileId if I don't have a specific Shift Profile.
+      // E.g. If I am 'Médico', I should use 'UID_Médico' as my profileId if I don't have a specific Shift Profile.
       // This ensures the student sees 'Atención Médica' chat, not 'Admin' chat.
 
       let profileContextId = _currentProfile ? _currentProfile.id : null;
 
-      if (!profileContextId && (_myRole === 'Medico' || _myRole === 'Psicologo')) {
+      if (!profileContextId && (_myRole === 'Médico' || _myRole === 'Psicologo')) {
         profileContextId = `${_myUid}_${_myRole} `;
         profId = _myUid; // Keep original UID as owner
       }
@@ -5461,9 +6302,9 @@ onclick = "Medi._reschedSelectDate(this, '${isoDate}')" >
           <!-- Filtros -->
           <div class="px-4 py-3 bg-light border-bottom sticky-top" style="z-index:1020;">
             <div class="d-flex gap-2">
-              <button class="btn btn-sm btn-dark rounded-pill px-3 fw-bold filter-btn active" onclick="Medi._setRecentFilter('all', this)">Todas</button>
-              <button class="btn btn-sm btn-outline-secondary rounded-pill px-3 fw-bold filter-btn" onclick="Medi._setRecentFilter('registered', this)">Registradas</button>
-              <button class="btn btn-sm btn-outline-secondary rounded-pill px-3 fw-bold filter-btn" onclick="Medi._setRecentFilter('anonymous', this)">Anónimas</button>
+              <button class="btn btn-sm btn-dark rounded-pill px-3 fw-bold filter-btn active" onclick="AdminMedi._setRecentFilter('all', this)">Todas</button>
+              <button class="btn btn-sm btn-outline-secondary rounded-pill px-3 fw-bold filter-btn" onclick="AdminMedi._setRecentFilter('registered', this)">Registradas</button>
+              <button class="btn btn-sm btn-outline-secondary rounded-pill px-3 fw-bold filter-btn" onclick="AdminMedi._setRecentFilter('anonymous', this)">Anónimas</button>
             </div>
           </div>
 
@@ -5536,160 +6377,157 @@ onclick = "Medi._reschedSelectDate(this, '${isoDate}')" >
       }
 
       list.innerHTML = filtered.map(c => {
-        const fecha = c.safeDate || new Date();
+        let fecha = c.safeDate || c.createdAt || new Date();
+        if (typeof fecha === 'string' || typeof fecha === 'number') fecha = new Date(fecha);
+        if (fecha && typeof fecha.toDate === 'function') fecha = fecha.toDate();
+        if (!(fecha instanceof Date) || isNaN(fecha)) fecha = new Date();
         const dateStr = fecha.toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' });
         const timeStr = fecha.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         const encoded = encodeURIComponent(JSON.stringify(c));
         const isAnon = c.uid && c.uid.startsWith('anon_');
 
         return `
-  < div class="list-group-item list-group-item-action border-0 border-bottom p-3 rounded-3 mb-1 cursor-pointer hover-shadow transition-all"
-onclick = "Medi.showConsultationQuickDetail('${encoded}')" >
-                    <div class="d-flex w-100 justify-content-between align-items-center mb-1">
-                        <div class="d-flex align-items-center gap-2">
-                             <span class="badge ${isAnon ? 'bg-warning text-dark' : 'bg-success-subtle text-success'} rounded-pill" style="font-size:0.6rem;">
-                                ${isAnon ? 'ANÓNIMO' : 'REGISTRADO'}
-                             </span>
-                             <h6 class="mb-0 fw-bold text-dark">${escapeHtml(c.patientName || c.studentEmail || 'Estudiante')}</h6>
-                        </div>
-                        <small class="text-muted fw-bold" style="font-size:0.7rem;">${dateStr} ${timeStr}</small>
-                    </div>
-                    <div class="d-flex justify-content-between align-items-end">
-                        <div class="text-muted small text-truncate" style="max-width: 70%;">
-                            <span class="fw-bold text-primary">${escapeHtml(c.diagnostico || 'Consulta General')}</span>
-                            <span class="mx-1">•</span>
-                            ${escapeHtml(c.subjetivo || c.motivo || 'Sin detalles...')}
-                        </div>
-                        <button class="btn btn-sm btn-light rounded-pill text-primary fw-bold" style="font-size:0.75rem;">
-                            Ver Detalle <i class="bi bi-chevron-right ms-1"></i>
-                        </button>
-                    </div>
-                </div >
+  < div class="list-group-item list-group-item-action border-0 border-bottom p-3 rounded-3 mb-1 cursor-pointer"
+onclick = "AdminMedi.showConsultationQuickDetail('${encoded}')" >
+          <div class="d-flex w-100 justify-content-between align-items-center mb-1">
+            <div class="d-flex align-items-center gap-2">
+              <span class="badge ${isAnon ? 'bg-warning text-dark' : 'bg-success-subtle text-success'} rounded-pill" style="font-size:0.6rem;">
+                ${isAnon ? 'ANÓNIMO' : 'REGISTRADO'}
+              </span>
+              <h6 class="mb-0 fw-bold text-dark">${escapeHtml(c.patientName || c.studentEmail || 'Estudiante')}</h6>
+            </div>
+            <small class="text-muted fw-bold" style="font-size:0.7rem;">${dateStr} ${timeStr}</small>
+          </div>
+          <div class="d-flex justify-content-between align-items-end">
+            <div class="text-muted small text-truncate" style="max-width: 70%;">
+              <span class="fw-bold text-primary">${escapeHtml(c.diagnostico || 'Consulta General')}</span>
+              <span class="mx-1">•</span>
+              ${escapeHtml(c.subjetivo || c.motivo || 'Sin detalles...')}
+            </div>
+            <button class="btn btn-sm btn-light rounded-pill text-primary fw-bold" style="font-size:0.75rem;">
+              Ver Detalle <i class="bi bi-chevron-right ms-1"></i>
+            </button>
+          </div>
+        </div >
   `;
       }).join('');
     });
   }
 
   // 2. Quick Detail Modal
+  // 2. Quick Detail Modal
   function showConsultationQuickDetail(encoded) {
     try {
-      console.log("[QuickDetail] Opening...");
       const c = JSON.parse(decodeURIComponent(encoded));
       const modalId = 'modalQuickDetail';
 
-      // 1. Dispose existing instance properly
       const existingEl = document.getElementById(modalId);
       if (existingEl) {
         const bs = window.bootstrap || (typeof bootstrap !== 'undefined' ? bootstrap : null);
-        if (bs && bs.Modal) {
-          const instance = bs.Modal.getInstance(existingEl);
-          if (instance) instance.dispose();
-        }
+        if (bs && bs.Modal) { const inst = bs.Modal.getInstance(existingEl); if (inst) inst.dispose(); }
         existingEl.remove();
       }
 
-      const fecha = c.safeDate || new Date();
+      let fecha = c.safeDate || c.createdAt || new Date();
+      if (typeof fecha === 'string' || typeof fecha === 'number') fecha = new Date(fecha);
+      if (fecha && typeof fecha.toDate === 'function') fecha = fecha.toDate();
+      if (!(fecha instanceof Date) || isNaN(fecha)) fecha = new Date();
+
       const dateStr = fecha.toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
       const timeStr = fecha.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
       const isAnon = c.uid && c.uid.startsWith('anon_');
+      const name = c.patientName || c.studentEmail || 'Estudiante';
+      const initial = name[0].toUpperCase();
 
-      // 2. Build HTML without leading/trailing whitespace issues
-      let html = `
-    <div class="modal fade" id="${modalId}" tabindex="-1" style="z-index: 1065;">
-      <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 shadow rounded-4">
-          <div class="modal-header border-bottom-0 pb-0">
-            <div>
-              <span class="badge ${isAnon ? 'bg-warning text-dark' : 'bg-success-subtle text-success'} mb-2 border">
-                ${isAnon ? 'PACIENTE ANÓNIMO' : 'ALUMNO REGISTRADO'}
-              </span>
-              <h5 class="modal-title fw-bold text-dark">Detalle de Consulta</h5>
+      const COLORS = [['#dbeafe', '#1d4ed8'], ['#d1fae5', '#065f46'], ['#ede9fe', '#5b21b6'],
+      ['#fce7f3', '#9d174d'], ['#fef3c7', '#92400e'], ['#fee2e2', '#991b1b']];
+      const [bgC, fgC] = COLORS[initial.charCodeAt(0) % COLORS.length];
+
+      const isPsico = (c.tipoServicio || '').toLowerCase().includes('psico');
+      const gradientHdr = isPsico
+        ? 'linear-gradient(135deg,#7c3aed,#a855f7)'
+        : 'linear-gradient(135deg,#1d4ed8,#3b82f6)';
+
+      const vitalsHtml = c.signos ? `
+  < div class="d-flex gap-2 flex-wrap mb-3" >
+    ${c.signos.temp ? `<div class="soap-vital-pill"><label>Temp</label><div class="fw-bold text-primary">${c.signos.temp}°C</div></div>` : ''}
+          ${c.signos.presion ? `<div class="soap-vital-pill"><label>Presion</label><div class="fw-bold text-primary">${c.signos.presion}</div></div>` : ''}
+          ${c.signos.peso ? `<div class="soap-vital-pill"><label>Peso</label><div class="fw-bold text-primary">${c.signos.peso}kg</div></div>` : ''}
+          ${c.signos.talla ? `<div class="soap-vital-pill"><label>Talla</label><div class="fw-bold text-primary">${c.signos.talla}cm</div></div>` : ''}
+        </div > ` : '';
+
+      const soapRow = (label, badgeColor, value) => value ? `
+  < div class="d-flex gap-2 mb-2 align-items-start" >
+          <span class="badge rounded-pill text-white fw-bold flex-shrink-0 mt-1"
+                style="font-size:.6rem;width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;background:${badgeColor};">${label}</span>
+          <div class="small text-dark" style="line-height:1.4;">${escapeHtml(value)}</div>
+        </div > ` : '';
+
+      const html = `
+  < div class="modal fade" id = "${modalId}" tabindex = "-1" style = "z-index:1065;" >
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
+
+        <!-- Header con gradiente -->
+        <div class="modal-header border-0 p-4 pb-3" style="background:${gradientHdr};">
+          <div class="d-flex align-items-center gap-3 w-100">
+            <div class="medi-avatar flex-shrink-0" style="background:rgba(255,255,255,.2);color:#fff;width:48px;height:48px;font-size:1.2rem;">${initial}</div>
+            <div class="flex-fill">
+              <div class="fw-bold text-white" style="font-size:.95rem;">${escapeHtml(name)}</div>
+              <div class="text-white-75" style="font-size:.7rem;opacity:.8;">${dateStr} &bull; ${timeStr}</div>
+              <div class="mt-1">
+                <span class="badge bg-opacity-20 text-white border border-white border-opacity-30" style="font-size:.6rem;">
+                  ${isAnon ? 'Walk-in / Anonimo' : (isPsico ? '<i class="bi bi-chat-heart-fill me-1"></i>Psicología' : '<i class="bi bi-bandaid-fill me-1"></i>Medicina')}
+                </span>
+              </div>
             </div>
-            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
           </div>
-          <div class="modal-body p-4">
-            <!-- Header Info -->
-            <div class="d-flex align-items-center gap-3 mb-4 p-3 bg-light rounded-3 border">
-              <div class="rounded-circle bg-white shadow-sm d-flex align-items-center justify-content-center text-primary fw-bold fs-4" style="width:50px; height:50px;">
-                ${(c.patientName || 'E')[0].toUpperCase()}
-              </div>
-              <div>
-                <h6 class="fw-bold text-dark mb-0">${escapeHtml(c.patientName || c.studentEmail)}</h6>
-                <div class="small text-muted">${dateStr} • ${timeStr}</div>
-              </div>
-            </div>
+          <button type="button" class="btn-close btn-close-white flex-shrink-0" data-bs-dismiss="modal"></button>
+        </div>
 
-            <!-- Clinical Data -->
-            <div class="mb-3">
-              <label class="d-block extra-small text-muted fw-bold mb-1">MOTIVO / DIAGNÓSTICO</label>
-              <div class="fw-bold text-dark fs-5">${escapeHtml(c.diagnostico || c.motivo || 'No registrado')}</div>
-            </div>
+        <div class="modal-body p-4">
+          <!-- Diagnostico -->
+          <div class="mb-3 p-3 rounded-3" style="background:#f0f7ff;">
+            <div class="text-muted fw-bold mb-1" style="font-size:.65rem;text-transform:uppercase;letter-spacing:.5px;">Diagnostico / Motivo</div>
+            <div class="fw-bold text-dark" style="font-size:1rem;">${escapeHtml(c.diagnostico || c.motivo || 'No registrado')}</div>
+          </div>
 
-            <div class="row g-3 mb-3">
-              <div class="col-6">
-                <div class="p-2 border rounded bg-white">
-                  <label class="d-block extra-small text-muted fw-bold">SUBJETIVO</label>
-                  <div class="small text-dark text-truncate">${escapeHtml(c.subjetivo || '--')}</div>
-                </div>
-              </div>
-              <div class="col-6">
-                <div class="p-2 border rounded bg-white">
-                  <label class="d-block extra-small text-muted fw-bold">PLAN / TRAT.</label>
-                  <div class="small text-dark text-truncate">${escapeHtml(c.plan || c.meds || '--')}</div>
-                </div>
-              </div>
-            </div>
+          ${vitalsHtml}
 
-            ${c.signos ? `
-                      <div class="d-flex gap-2 justify-content-between text-center bg-light-subtle p-2 rounded border mb-4">
-                          <div><small class="d-block extra-small text-muted fw-bold">TEMP</small><span class="fw-bold small">${c.signos.temp || '--'}</span></div>
-                          <div><small class="d-block extra-small text-muted fw-bold">PRESION</small><span class="fw-bold small">${c.signos.presion || '--'}</span></div>
-                          <div><small class="d-block extra-small text-muted fw-bold">PESO</small><span class="fw-bold small">${c.signos.peso || '--'}</span></div>
-                      </div>` : ''}
+          <!-- SOAP chips -->
+          <div class="mb-3">
+            ${soapRow('S', '#1d4ed8', c.subjetivo)}
+            ${soapRow('O', '#059669', c.objetivo)}
+            ${soapRow('P', '#0f766e', c.plan || c.meds)}
+          </div>
 
-            <!-- Actions -->
-            <div class="d-grid gap-2">
-              ${!isAnon ? `
-                          <button class="btn btn-primary rounded-pill fw-bold shadow-sm" onclick="Medi.showFullRecord('${c.studentId || c.uid}'); bootstrap.Modal.getInstance(document.getElementById('${modalId}')).hide();">
-                              <i class="bi bi-folder2-open me-2"></i> Ver Expediente Completo
-                          </button>` : ''}
-
-              <button class="btn btn-outline-secondary rounded-pill fw-bold" onclick="Medi.renderConsultationDetail(null, '${encoded}'); bootstrap.Modal.getInstance(document.getElementById('${modalId}')).hide(); Medi.showFullRecord('${c.studentId || c.uid}');">
-                <i class="bi bi-file-text me-2"></i> Ver Nota Completa
-              </button>
-            </div>
-
+          <!-- Acciones -->
+          <div class="d-grid gap-2">
+            ${!isAnon ? `
+                    <button class="btn btn-primary rounded-pill fw-bold"
+                            onclick="AdminMedi.showFullRecord('${c.studentId || c.uid}');
+                                     bootstrap.Modal.getInstance(document.getElementById('${modalId}')).hide();">
+                      <i class="bi bi-folder2-open me-2"></i>Ver Expediente Completo
+                    </button>` : ''}
+            <button class="btn btn-outline-secondary rounded-pill fw-bold"
+              onclick="bootstrap.Modal.getInstance(document.getElementById('${modalId}')).hide();">
+              Cerrar
+            </button>
           </div>
         </div>
       </div>
-    </div>`;
+    </div>
+        </div>`;
 
-      // 3. Insert into DOM safely
-      document.body.insertAdjacentHTML('beforeend', html);
-
-      // 4. Initialize Modal with Delay to prevent 'backdrop' error
-      setTimeout(() => {
-        const modalEl = document.getElementById(modalId);
-        if (modalEl) {
-          const bs = window.bootstrap || (typeof bootstrap !== 'undefined' ? bootstrap : null);
-          if (bs && bs.Modal) {
-            const modal = new bs.Modal(modalEl, {
-              backdrop: true,
-              keyboard: true,
-              focus: true
-            });
-            modal.show();
-          } else {
-            console.error("[QuickDetail] Bootstrap not found");
-          }
-        } else {
-          console.error("[QuickDetail] Modal element not found after insert");
-        }
-      }, 50);
-
+      const div = document.createElement('div');
+      div.innerHTML = html;
+      document.body.appendChild(div.firstElementChild);
+      const modal = new bootstrap.Modal(document.getElementById(modalId));
+      modal.show();
+      document.getElementById(modalId).addEventListener('hidden.bs.modal', e => { try { e.target.remove(); } catch (_) { } });
     } catch (err) {
-      console.error("Error showing quick detail:", err);
-      showToast("Error al abrir detalle rápido", "danger");
+      console.error('[QuickDetail] Error:', err);
+      showToast('Error al abrir detalle', 'danger');
     }
   }
 
@@ -5736,7 +6574,6 @@ onclick = "Medi.showConsultationQuickDetail('${encoded}')" >
     cancelarCitaAdmin,
     iniciarConsulta,
     renderInlineConsultationUI,
-    renderActiveConsultationUI,
     _startConsultaTimer,
     _stopConsultaTimer,
     _getConsultaDurationMinutes,
@@ -5787,21 +6624,26 @@ onclick = "Medi.showConsultationQuickDetail('${encoded}')" >
     _setRecentFilter,
     _loadAllRecentItems,
     showConsultationQuickDetail,
+    openMiAgendaModal,
+    openWaitingRoomModal,
+    openSearchModal,
+    buscarPacienteModal,
+    openMessagesModal,
+    searchAndChat,
+    startClock,
+    updateDashboardStats,
     saveState,
     restoreState,
     cancelarConsultaActiva: async () => {
-      if (!confirm("¿Seguro que deseas cancelar esta consulta?\n\nSe perderán los cambios y se eliminará el borrador.")) return;
-      const studentIdEl = document.getElementById('soap-student-id');
-      if (!studentIdEl) return;
-      const studentId = studentIdEl.value;
-      try {
-        await MediService.deleteDraft(_ctx, studentId);
-        _cleanupConsultation();
-        showToast('Consulta cancelada y descartada.', 'info');
-      } catch (e) {
-        console.error(e);
-        showToast('Error al cancelar', 'danger');
+      if (!confirm('¿Seguro que deseas cancelar esta consulta?\n\nSe perderán los cambios no guardados.')) return;
+      // No hay borrador remoto que borrar; solo limpiamos el estado local
+      _cleanupConsultation();
+      const soapModal = document.getElementById('modalConsulta');
+      if (soapModal) {
+        const inst = bootstrap.Modal.getInstance(soapModal);
+        if (inst) inst.hide();
       }
+      showToast('Consulta cancelada.', 'info');
     }
   };
 

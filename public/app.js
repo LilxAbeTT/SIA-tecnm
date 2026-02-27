@@ -1,10 +1,12 @@
 ﻿// app.js
-// Lógica principal: Auth, Router, Landing y Módulos (VERSIÃ“N CONSOLIDADA PHASE 1+2)
+// Lógica principal: Auth, Router, Landing y Módulos (VERSIÓ“N CONSOLIDADA PHASE 1+2)
 
 // --- WEB COMPONENTS IMPORTS ---
 import './components/landing-view.js';
 import './components/register-wizard.js';
 import './components/dev-tools.js';
+import './components/student-dashboard.js';
+import './components/onboarding-tour.js';
 // import { DEPARTMENT_DIRECTORY } from './config/departments.js'; // Loaded globally
 import { Store } from './core/state.js';
 
@@ -252,13 +254,13 @@ document.addEventListener('DOMContentLoaded', () => {
     if (appLoader && !appLoader.classList.contains('d-none')) {
       // 1. Si no hay internet, damos más tiempo o mostramos mensaje, pero NO cargamos landing rota.
       if (!navigator.onLine) {
-        console.warn("âš ï¸ Tiempo agotado: SIN CONEXIÃ“N DETECTADA.");
+        console.warn("⚠️ Tiempo agotado: SIN CONEXIÓ“N DETECTADA.");
         if (typeof showToast === 'function') showToast("Sin conexión a internet. Esperando red...", "warning");
         return; // Mantenemos el loader esperando red
       }
 
       // 2. Si hay internet pero Firebase no responde en 10s:
-      console.warn("âš ï¸ Tiempo de espera agotado (10s).");
+      console.warn("⚠️ Tiempo de espera agotado (10s).");
 
       // Intentamos ver si ya hay una sesión "flotando" o localStorage antes de tirar al landing
       const hasLocalSession = localStorage.getItem('sia_session_hint');
@@ -330,7 +332,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Verificar si SIA (Firebase) se cargó correctamente
   if (typeof SIA === 'undefined' || !SIA.auth) {
-    console.error("âŒ ERROR CRÃTICO: SIA/Firebase no está definido. Revisa services/firebase.js");
+    console.error("âŒ ERROR CRÓTICO: SIA/Firebase no está definido. Revisa services/firebase.js");
     if (typeof showToast === 'function') showToast("Error de conexión con el sistema.", "danger");
     hideLoader();
     showLanding();
@@ -378,7 +380,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
   // ==========================================
-  // 4. AUTENTICACIÃ“N & FLUJO PRINCIPAL
+  // 4. AUTENTICACIÓ“N & FLUJO PRINCIPAL
   // ==========================================
   // --- CONFIG: ROLES & VISTAS ---
   // --- HELPERS DE ROL ---
@@ -416,8 +418,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
   SIA.auth.onAuthStateChanged(async (user) => {
 
-    const path = window.location.pathname || '/';
+    let path = window.location.pathname || '/';
+    if (window.location.hash && window.location.hash.startsWith('#/')) {
+      path = window.location.hash.replace('#', '');
+    }
     const isVerifyRoute = path.startsWith('/verify/');
+    const isVocacionalRoute = path === '/test-vocacional' || path === '/vocacional/test';
 
     if (!user) {
 
@@ -436,6 +442,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
       if (isVerifyRoute) {
         startVerifyFlowFromCurrentPath();
+      } else if (isVocacionalRoute) {
+        handleLocation();
       } else {
         showLanding();
       }
@@ -509,7 +517,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // C) SI NO EXISTE PERFIL (Y NO ES DEPARTAMENTO) -> REGISTRO
         if (!profile) {
-          console.warn("âš ï¸ Usuario nuevo REAL. Redirigiendo a Registro.");
+          console.warn("⚠️ Usuario nuevo REAL. Redirigiendo a Registro.");
           hideLoader();
 
           let extraData = {};
@@ -536,6 +544,9 @@ document.addEventListener('DOMContentLoaded', () => {
         // Actualizar UI
         updateUserAvatars(profile.displayName);
         updateNavbarUserInfo(profile.displayName, profile.role, profile.email, profile.matricula);
+
+        // Notificar al dashboard del estudiante (y otros componentes) que el perfil está listo
+        window.dispatchEvent(new CustomEvent('sia-profile-ready', { detail: profile }));
         updateMenuVisibility(profile.role);
 
         // --- NOTIFICACIONES ---
@@ -552,6 +563,29 @@ document.addEventListener('DOMContentLoaded', () => {
         // 🚀 ENTRAR A LA APP
         // 🚀 ENTRAR A LA APP
         showApp();
+
+        // Lazy load librerias pesadas para graficos y exportacion de forma asíncrona
+        if (!window._heavyLibsLoaded) {
+          window._heavyLibsLoaded = true;
+          setTimeout(() => {
+            const libs = [
+              "https://cdn.jsdelivr.net/npm/chart.js",
+              "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js",
+              "https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js",
+              "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js",
+              "https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"
+            ];
+            let libsIndex = 0;
+            const loadNext = () => {
+              if (libsIndex >= libs.length) return;
+              const s = document.createElement('script');
+              s.src = libs[libsIndex++];
+              s.onload = loadNext;
+              document.body.appendChild(s);
+            };
+            loadNext();
+          }, 800); // Dar respiro al browser antes de empezar la descarga
+        }
 
         // === AUTO THEME BY ROLE ===
         // Si es Departamento/Admin, forzar Light (si no ha elegido otro)
@@ -570,12 +604,17 @@ document.addEventListener('DOMContentLoaded', () => {
         initThemeToggle(user);
 
         // --- ENRUTAMIENTO INTELIGENTE ---
-        const path = window.location.pathname || '/';
+        // FIX: Leer hash si existe (SPA con hash routing #/ruta)
+        let path = window.location.pathname || '/';
+        if (window.location.hash && window.location.hash.startsWith('#/')) {
+          path = window.location.hash.replace('#', '');
+          console.log('[Nav] Hash detectado en auth:', path);
+        }
 
         // 1. Si es departamento con VISTAS RESTRINGIDAS (ej. solo biblio), forzar esa vista
         if (profile.allowedViews && profile.allowedViews.length === 1) {
           const forcedView = profile.allowedViews[0];
-          console.log(`[Nav] ðŸ”’ Usuario con vista única. Redirigiendo a: ${forcedView}`);
+          console.log('[Nav] Usuario con vista unica. Redirigiendo a: ' + forcedView);
           navigate(forcedView, true, true); // Force skipAuthCheck
           return;
         }
@@ -583,7 +622,13 @@ document.addEventListener('DOMContentLoaded', () => {
         // 2. Si es rol con vista especifica
         const roleHome = ROLE_HOME_VIEWS[currentUserProfile.role];
 
-        if (path === '/' || path === '') {
+        // FIX: Rutas vocacionales son publicas, no redirigir al home aunque sea path '/'
+        const isHashVocacional = path === '/test-vocacional' || path === '/vocacional/test';
+
+        if (isHashVocacional) {
+          // Mostrar la vista vocacional incluso para usuario loggeado
+          handleLocation();
+        } else if (path === '/' || path === '') {
           if (roleHome) {
             navigate(roleHome, true, true); // Force skipAuthCheck
           } else {
@@ -605,6 +650,8 @@ document.addEventListener('DOMContentLoaded', () => {
   // --- Funciones de Cambio de Escena ---
 
   function showLanding() {
+    // Ocultar vistas publicas vocacionales al volver al landing
+    document.querySelectorAll('.sia-public-view').forEach(v => v.classList.add('d-none'));
     if (landingView) landingView.classList.remove('d-none');
 
     if (appShell) {
@@ -624,6 +671,8 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function showApp() {
+    // Ocultar vistas publicas vocacionales al entrar a la app
+    document.querySelectorAll('.sia-public-view').forEach(v => v.classList.add('d-none'));
     if (landingView) landingView.classList.add('d-none');
     if (registerWizard) registerWizard.classList.add('d-none'); // Hide
 
@@ -651,6 +700,16 @@ document.addEventListener('DOMContentLoaded', () => {
   // 3b. EVENT LISTENERS (CRITICAL FIXES)
   // =========================================
 
+  // [FIX 3] Listener de hashchange para SPA hash-routing
+  // Permite navegar desde landing-view u otras fuentes que cambien el hash directamente
+  window.addEventListener('hashchange', () => {
+    const hash = window.location.hash;
+    console.log('[Router] hashchange detectado:', hash);
+    if (hash && hash.startsWith('#/')) {
+      handleLocation();
+    }
+  });
+
   // [FIX] Listener explícito para cambios de vista (Backup + Smart Scroll Reset)
   window.addEventListener('sia-view-changed', (e) => {
     const viewId = e.detail?.viewId;
@@ -671,6 +730,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (e.detail && e.detail.viewId === 'view-dashboard') {
       if (typeof loadDashboard === 'function') loadDashboard();
+      if (window.SIA && window.SIA.updateSmartCards) window.SIA.updateSmartCards();
     }
   });
   /* ==========================================================================
@@ -820,103 +880,133 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Listener para el botón de Microsoft (Azure AD Institucional)
   const btnLoginMS = document.getElementById('btn-login-microsoft');
+  let isLoginMSRunning = false; // Guard para evitar doble-clicks
+
+  if (!window.SIA) window.SIA = {};
+  window.SIA.initiateMicrosoftLogin = async () => {
+    if (isLoginMSRunning) return;
+    isLoginMSRunning = true;
+
+    const appLoader = document.getElementById('app-loader');
+    if (appLoader) {
+      appLoader.classList.remove('d-none');
+      appLoader.style.opacity = '1';
+    }
+
+    try {
+
+      const appLoader = document.getElementById('app-loader');
+      if (appLoader) {
+        appLoader.classList.remove('d-none');
+        appLoader.style.opacity = '1';
+      }
+
+      console.log("ðŸ”  Iniciando login con Microsoft...");
+      console.log("ðŸ” Iniciando login con Microsoft...");
+      const result = await SIA.loginWithMicrosoft();
+      console.log("✅ Login Microsoft exitoso:", result);
+
+      // 1. Verificar si es DEPARTAMENTO OFICIAL
+      const userType = detectUserType(result.user.email);
+
+      if (userType.type === 'department') {
+        console.log("✅ Es departamento login. Delegando a onAuthStateChanged...");
+        // No hacemos nada mas aqui, dejamos que el listener global maneje la redireccion
+        return;
+      }
+
+      // 2. Si NO es departamento, buscamos perfil real
+      const existingProfile = await SIA.findUserByInstitutionalEmail(result.user.email);
+
+      if (existingProfile) {
+        // ===== USUARIO YA EXISTE =====
+        console.log("✅ Usuario encontrado por email institucional:", existingProfile);
+
+        // Actualizar lastLogin en el documento existente (Non-blocking)
+        try {
+          await SIA.db.collection('usuarios').doc(existingProfile.uid).update({
+            lastLogin: SIA.FieldValue.serverTimestamp(),
+            photoURL: result.user.photoURL || existingProfile.photoURL || ''
+          });
+        } catch (updateErr) {
+          console.warn("⚠️ No se pudo actualizar lastLogin (Posible restricción de reglas):", updateErr);
+          // Continuamos el flujo de login aunque esto falle
+        }
+
+        if (typeof showToast === 'function') {
+          showToast(`¡Bienvenido de nuevo, ${existingProfile.displayName}!`, "success");
+        }
+
+        // onAuthStateChanged manejará el resto del flujo
+        console.log("✅ Login completado. Esperando onAuthStateChanged...");
+
+      } else {
+        // ===== USUARIO NUEVO: Iniciar Registro =====
+        console.log("â„¹ï¸ Usuario nuevo detectado. Iniciando registro...");
+        console.log("ðŸ“‹ Datos para registro:", result.extradata);
+
+        if (typeof showToast === 'function') {
+          showToast("Completa tu registro institucional", "info");
+        }
+
+        // ðŸ”‘ GUARDAR extradata en localStorage para recuperarlo después de recargar
+        try {
+          localStorage.setItem('sia_temp_extradata', JSON.stringify(result.extradata));
+          console.log("✅ Extradata guardado en localStorage");
+
+          // PRE-FILL ROL SI YA LO SABEMOS (Estudiante detectado por regex)
+          if (userType.type === 'student') {
+            const currentData = result.extradata || {};
+            currentData.forcedRole = 'student';
+            localStorage.setItem('sia_temp_extradata', JSON.stringify(currentData));
+          }
+        } catch (e) {
+          console.error("âŒ Error guardando extradata:", e);
+        }
+
+        // Mostrar vista de registro con datos pre-llenados
+        if (window.SIA_Register) {
+          SIA_Register.init(result.user, result.extradata);
+        }
+      }
+
+    } catch (error) {
+      console.error("âŒ Error en Microsoft Auth:", error);
+
+      // Mensajes de error específicos
+      if (error.code === 'auth/popup-closed-by-user') {
+        if (typeof showToast === 'function') {
+          showToast("Ventana cerrada. Intenta de nuevo.", "warning");
+        }
+      } else if (error.code === 'auth/cancelled-popup-request') {
+        console.log("â„¹ï¸ Popup cancelado (normal si se abre otro)");
+      } else if (error.code === 'auth/invalid-credential') {
+        if (typeof showToast === 'function') {
+          showToast("Credencial inválida. Contacta a soporte técnico.", "danger");
+        }
+      } else if (error.code === 'auth/network-request-failed') {
+        if (typeof showToast === 'function') {
+          showToast("Error de conexión. Verifica tu internet.", "danger");
+        }
+      } else {
+        if (typeof showToast === 'function') {
+          showToast("Error de acceso institucional. Intenta de nuevo.", "danger");
+        }
+      }
+    } finally {
+      isLoginMSRunning = false;
+      const appLoader = document.getElementById('app-loader');
+      if (appLoader) {
+        appLoader.style.opacity = '0';
+        setTimeout(() => appLoader.classList.add('d-none'), 500);
+      }
+    }
+  };
+
   if (btnLoginMS) {
     btnLoginMS.addEventListener('click', async (e) => {
       if (e) e.preventDefault();
-
-      try {
-        console.log("ðŸ” Iniciando login con Microsoft...");
-        const result = await SIA.loginWithMicrosoft();
-        console.log("✅ Login Microsoft exitoso:", result);
-
-        // 1. Verificar si es DEPARTAMENTO OFICIAL
-        const userType = detectUserType(result.user.email);
-
-        if (userType.type === 'department') {
-          console.log("✅ Es departamento login. Delegando a onAuthStateChanged...");
-          // No hacemos nada mas aqui, dejamos que el listener global maneje la redireccion
-          return;
-        }
-
-        // 2. Si NO es departamento, buscamos perfil real
-        const existingProfile = await SIA.findUserByInstitutionalEmail(result.user.email);
-
-        if (existingProfile) {
-          // ===== USUARIO YA EXISTE =====
-          console.log("✅ Usuario encontrado por email institucional:", existingProfile);
-
-          // Actualizar lastLogin en el documento existente (Non-blocking)
-          try {
-            await SIA.db.collection('usuarios').doc(existingProfile.uid).update({
-              lastLogin: SIA.FieldValue.serverTimestamp(),
-              photoURL: result.user.photoURL || existingProfile.photoURL || ''
-            });
-          } catch (updateErr) {
-            console.warn("âš ï¸ No se pudo actualizar lastLogin (Posible restricción de reglas):", updateErr);
-            // Continuamos el flujo de login aunque esto falle
-          }
-
-          if (typeof showToast === 'function') {
-            showToast(`¡Bienvenido de nuevo, ${existingProfile.displayName}!`, "success");
-          }
-
-          // onAuthStateChanged manejará el resto del flujo
-          console.log("✅ Login completado. Esperando onAuthStateChanged...");
-
-        } else {
-          // ===== USUARIO NUEVO: Iniciar Registro =====
-          console.log("â„¹ï¸ Usuario nuevo detectado. Iniciando registro...");
-          console.log("ðŸ“‹ Datos para registro:", result.extradata);
-
-          if (typeof showToast === 'function') {
-            showToast("Completa tu registro institucional", "info");
-          }
-
-          // ðŸ”‘ GUARDAR extradata en localStorage para recuperarlo después de recargar
-          try {
-            localStorage.setItem('sia_temp_extradata', JSON.stringify(result.extradata));
-            console.log("✅ Extradata guardado en localStorage");
-
-            // PRE-FILL ROL SI YA LO SABEMOS (Estudiante detectado por regex)
-            if (userType.type === 'student') {
-              const currentData = result.extradata || {};
-              currentData.forcedRole = 'student';
-              localStorage.setItem('sia_temp_extradata', JSON.stringify(currentData));
-            }
-          } catch (e) {
-            console.error("âŒ Error guardando extradata:", e);
-          }
-
-          // Mostrar vista de registro con datos pre-llenados
-          if (window.SIA_Register) {
-            SIA_Register.init(result.user, result.extradata);
-          }
-        }
-
-      } catch (error) {
-        console.error("âŒ Error en Microsoft Auth:", error);
-
-        // Mensajes de error específicos
-        if (error.code === 'auth/popup-closed-by-user') {
-          if (typeof showToast === 'function') {
-            showToast("Ventana cerrada. Intenta de nuevo.", "warning");
-          }
-        } else if (error.code === 'auth/cancelled-popup-request') {
-          console.log("â„¹ï¸ Popup cancelado (normal si se abre otro)");
-        } else if (error.code === 'auth/invalid-credential') {
-          if (typeof showToast === 'function') {
-            showToast("Credencial inválida. Contacta a soporte técnico.", "danger");
-          }
-        } else if (error.code === 'auth/network-request-failed') {
-          if (typeof showToast === 'function') {
-            showToast("Error de conexión. Verifica tu internet.", "danger");
-          }
-        } else {
-          if (typeof showToast === 'function') {
-            showToast("Error de acceso institucional. Intenta de nuevo.", "danger");
-          }
-        }
-      }
+      await window.SIA.initiateMicrosoftLogin();
     });
   }
 
@@ -980,7 +1070,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
   // ==========================================
-  // 5. LÃ“GICA DE MÃ“DULOS (CONTEXTO)
+  // 5. LÓ“GICA DE MÓ“DULOS (CONTEXTO)
   // ==========================================
   const GLOBAL_TIPS = {
     general: [
@@ -1362,7 +1452,10 @@ document.addEventListener('DOMContentLoaded', () => {
     'view-aula': '/aula',
     'view-biblio': '/biblio',
     'view-medi': '/medi',
-    'view-foro': '/foro'
+    'view-foro': '/foro',
+    'view-test-vocacional': '/test-vocacional',
+    'view-vocacional-test-active': '/vocacional/test',
+    'view-vocacional-admin': '/vocacional-admin'
   };
 
   function getPathForView(viewId) {
@@ -1442,7 +1535,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
   function handleLocation() {
-    const path = window.location.pathname;
+    let path = window.location.pathname;
+    if (window.location.hash && window.location.hash.startsWith('#/')) {
+      path = window.location.hash.replace('#', '');
+    }
 
     if (path.startsWith('/aula/curso/')) {
       const courseId = decodeURIComponent(path.split('/aula/curso/')[1] || '');
@@ -1463,7 +1559,14 @@ document.addEventListener('DOMContentLoaded', () => {
       const [viewId] = entry;
       showView(viewId);
     } else {
-      showView('view-dashboard');
+      // Default / home logic
+      if (path === '/' || path === '' || path === '/index.html') {
+        // If we have a user logged in, they should go to dashboard.
+        // Otherwise, they'll be trapped in index if they are not authenticated (handled by Auth listener later).
+        showView('view-dashboard');
+      } else {
+        showView('view-dashboard');
+      }
     }
   }
 
@@ -1477,9 +1580,60 @@ document.addEventListener('DOMContentLoaded', () => {
     // Limpiar suscripciones activas
     ModuleManager.clearAll();
 
+    // Permisos públicos: rutas vocacionales accesibles sin importar auth
+    if (viewId === 'view-test-vocacional' || viewId === 'view-vocacional-test-active') {
+      console.log('[showView] Ruta publica vocacional:', viewId);
+
+      // 1. Ocultar landingView si está visible (usuario no loggeado)
+      const _lv = document.querySelector('sia-landing-view') || document.getElementById('landing-view');
+      if (_lv) _lv.classList.add('d-none');
+
+      // 2. Ocultar verify-shell si está visible
+      const _vs = document.getElementById('verify-shell');
+      if (_vs) _vs.classList.add('d-none');
+
+      // 3. Ocultar app-shell si está visible (para no mezclar con la vista pública)
+      const _as = document.getElementById('app-shell');
+      if (_as) _as.classList.add('d-none');
+
+      // 4. Ocultar otras sia-public-view si están visibles
+      document.querySelectorAll('.sia-public-view').forEach(v => v.classList.add('d-none'));
+
+      // 5. Mostrar la vista vocacional pública solicitada
+      const _pubTarget = document.getElementById(viewId);
+      if (_pubTarget) {
+        _pubTarget.classList.remove('d-none');
+        console.log('[showView] Vista publica visible:', viewId);
+
+        // Forzar refresh del componente vocacional-landing si no tiene contenido
+        if (viewId === 'view-test-vocacional') {
+          const landingComp = _pubTarget ? _pubTarget.querySelector('vocacional-landing') : null;
+          if (landingComp && typeof landingComp.refresh === 'function') {
+            setTimeout(() => landingComp.refresh(), 0);
+          }
+        }
+      } else {
+        console.error('[showView] CRITICO: No se encontro el elemento', viewId);
+      }
+
+      _previousView = viewId;
+
+      // 6. Si es el test activo, inicializar el componente
+      if (viewId === 'view-vocacional-test-active') {
+        const testCmp = document.querySelector('vocacional-test');
+        if (testCmp) testCmp.initTest(typeof getCtx === 'function' ? getCtx() : {});
+      }
+
+      // 7. Actualizar URL hash
+      const expectedHash = viewId === 'view-test-vocacional' ? '#/test-vocacional' : '#/vocacional/test';
+      if (window.location.hash !== expectedHash) {
+        history.pushState({ viewId }, '', expectedHash);
+      }
+
+      return; // Saltar middleware de permisos y resto de showView
+    }
     // --- ACCESS CONTROL MIDDLEWARE ---
-    // --- ACCESS CONTROL MIDDLEWARE ---
-    if (window.currentUserProfile) {
+    else if (window.currentUserProfile) {
       const role = currentUserProfile.role || 'student';
       // 1. Validar restricción de acceso (Staff no puede salir de su módulo)
       const roleHome = ROLE_HOME_VIEWS[role];
@@ -1649,6 +1803,13 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
 
+    if (viewId === 'view-vocacional-test-active') {
+      const testCmp = document.querySelector('vocacional-test');
+      if (testCmp) {
+        testCmp.initTest(getCtx());
+      }
+    }
+
     // 🚀 Navbar & View Restrictions Logic (Strict Mode)
     const links = document.querySelectorAll('.main-header .nav-link');
     links.forEach(link => {
@@ -1700,6 +1861,12 @@ document.addEventListener('DOMContentLoaded', () => {
         adm?.classList.remove('d-none');
       } else {
         stu?.classList.remove('d-none');
+      }
+    }
+
+    if (viewId === 'view-vocacional-admin') {
+      if (typeof AdminVocacional !== 'undefined') {
+        AdminVocacional.init(getCtx());
       }
     }
 
@@ -1849,7 +2016,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 
-    // --- 1. LÃ“GICA SUPER ADMIN ---
+    // --- 1. LÓ“GICA SUPER ADMIN ---
     if (currentUserProfile.role === 'superadmin') {
       const dashStandard = document.getElementById('view-dashboard');
       const dashSuper = document.getElementById('view-superadmin-dashboard');
@@ -1888,7 +2055,7 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    // --- 1.5 LÃ“GICA DASHBOARD DEPARTAMENTAL ---
+    // --- 1.5 LÓ“GICA DASHBOARD DEPARTAMENTAL ---
     // Si tiene allowedViews y NO es estudiante (o un rol que forza estudiante), y tiene más de 1 vista permitida
     if (currentUserProfile.allowedViews &&
       currentUserProfile.allowedViews.length > 1 &&
@@ -1909,7 +2076,7 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    // --- 2. LÃ“GICA ESTÃNDAR (Estudiante / Admin Módulo Ãšnico) ---
+    // --- 2. LÓ“GICA ESTÓNDAR (Estudiante / Admin Módulo Óšnico) ---
     const dashSuper = document.getElementById('view-superadmin-dashboard');
     const dashDept = document.getElementById('view-department-dashboard');
     if (dashSuper) dashSuper.classList.add('d-none');
@@ -1978,9 +2145,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 
-      // --- 4. WIDGETS DINÃMICOS COMPACTOS ---
+      // --- 4. WIDGETS DINÓMICOS COMPACTOS ---
 
-      // A) CITAS PRÃ“XIMAS (Renderizado Ultra-Compacto)
+      // A) CITAS PRÓ“XIMAS (Renderizado Ultra-Compacto)
       const widgetCitas = document.getElementById('dash-widget-citas');
       if (widgetCitas) {
         const citasSnap = await SIA.db.collection('citas-medi')
@@ -2050,9 +2217,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  history.replaceState({ viewId: 'landing' }, '', '/');
+  // history.replaceState({ viewId: 'landing' }, '', '/'); // ELIMINADO: Rompe la navegación por hash directo (ej: #/test-vocacional)
 
-  // --- MOBILE NAV LOGIC (Last Module + Waffle) ---
   let lastModuleVisited = null;
   const MOBILE_MODULES = {
     'view-aula': { icon: 'bi-mortarboard-fill', label: 'Aula' },
@@ -2764,6 +2930,7 @@ document.addEventListener('DOMContentLoaded', () => {
           'lactario': 'lactario.png',
           'quejas': 'quejas.png',
           'encuestas': 'encuestas.png',
+          'vocacional': 'vocacional.png',
           'profile': 'perfil.png'
         };
 
@@ -3132,10 +3299,11 @@ document.addEventListener('DOMContentLoaded', () => {
       const seenKey = 'sia_stories_seen';
       const seen = JSON.parse(localStorage.getItem(seenKey) || '{}');
 
-      allStories.forEach(story => {
+      allStories.forEach((story, storyIdx) => {
         const isSeen = !!seen[story.id];
         const div = document.createElement('div');
         div.className = 'story-item text-center animate-fade-in';
+        div.style.animationDelay = `${storyIdx * 60}ms`;
 
         if (story._source === 'encuesta') {
           // --- Encuesta story ---
@@ -3159,12 +3327,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 <i class="bi ${iconClass}"></i>
               </div>
             </div>
-            <span class="d-block extra-small fw-bold text-muted text-truncate" style="max-width: 70px;">${story.title.length > 10 ? story.title.slice(0, 9) + '…' : story.title}</span>`;
+            <span class="story-label">${_escStoryTitle(story.title)}</span>`;
 
         } else if (story._source === 'aviso') {
-          // --- Aviso story ---
+          // --- Aviso story (con imagen thumbnail si existe) ---
           const ringActive = !isSeen;
           const ringClass = ringActive ? 'story-ring aviso-ring active' : 'story-ring aviso-ring';
+          const hasImage = !!(story.imageUrl && story.imageUrl.trim());
           const iconClass = story.type === 'image' ? 'bi-image-fill' : 'bi-megaphone-fill';
           const bgClass = story.priority === 'urgent' ? 'bg-danger-subtle text-danger' : 'bg-success-subtle text-success';
 
@@ -3176,13 +3345,21 @@ document.addEventListener('DOMContentLoaded', () => {
             if (ring) ring.classList.remove('active');
           };
 
+          // Si el aviso tiene imagen, mostrarla como thumbnail en el circulo
+          const circleContent = hasImage
+            ? `<img src="${story.imageUrl}" alt="" class="story-thumb-img" loading="lazy">`
+            : `<i class="bi ${iconClass}"></i>`;
+          const circleClass = hasImage
+            ? 'story-circle story-circle--has-img'
+            : `story-circle ${bgClass} d-flex align-items-center justify-content-center`;
+
           div.innerHTML = `
             <div class="${ringClass} mb-1">
-              <div class="story-circle ${bgClass} d-flex align-items-center justify-content-center">
-                <i class="bi ${iconClass}"></i>
+              <div class="${circleClass} d-flex align-items-center justify-content-center">
+                ${circleContent}
               </div>
             </div>
-            <span class="d-block extra-small fw-bold text-muted text-truncate" style="max-width: 70px;">${story.title.length > 10 ? story.title.slice(0, 9) + '...' : story.title}</span>`;
+            <span class="story-label">${_escStoryTitle(story.title)}</span>`;
 
         } else {
           // --- Foro event story ---
@@ -3206,7 +3383,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <i class="bi ${iconClass}"></i>
               </div>
             </div>
-            <span class="d-block extra-small fw-bold text-muted text-truncate" style="max-width: 70px;">${story.title.length > 10 ? story.title.slice(0, 9) + '…' : story.title}</span>`;
+            <span class="story-label">${_escStoryTitle(story.title)}</span>`;
         }
 
         container.appendChild(div);
@@ -3215,6 +3392,12 @@ document.addEventListener('DOMContentLoaded', () => {
       console.warn('[Stories] Error loading stories:', e);
       _showNoNewsPlaceholder(container);
     }
+  }
+
+  // Helper: escapar titulo de story para HTML
+  function _escStoryTitle(title) {
+    if (!title) return '';
+    return title.replace(/</g, '&lt;').replace(/>/g, '&gt;');
   }
 
   function _showNoNewsPlaceholder(container) {
@@ -3226,7 +3409,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <i class="bi bi-check-circle"></i>
         </div>
       </div>
-      <span class="d-block extra-small fw-bold text-muted text-truncate" style="max-width: 70px;">Al día</span>`;
+      <span class="story-label">Al dia</span>`;
     container.appendChild(ph);
   }
 
@@ -3981,7 +4164,8 @@ document.addEventListener('DOMContentLoaded', () => {
       'view-foro': { title: "Foro y Eventos", desc: "Control de Asistencia", img: "images/foro.png", color: "info" },
       'view-quejas': { title: "Quejas y Sugerencias", desc: "Gestión de Tickets y Calidad", img: null, icon: "bi-chat-heart-fill", color: "primary" },
       'view-encuestas': { title: "Centro de Encuestas", desc: "Crear y analizar encuestas", img: null, icon: "bi-clipboard2-check-fill", color: "info" },
-      'view-avisos-admin': { title: "Avisos Institucionales", desc: "Publicar anuncios para toda la comunidad", img: null, icon: "bi-megaphone-fill", color: "success" }
+      'view-avisos-admin': { title: "Avisos Institucionales", desc: "Publicar anuncios para toda la comunidad", img: null, icon: "bi-megaphone-fill", color: "success" },
+      'view-vocacional-admin': { title: "Test Vocacional", desc: "CRM de Aspirantes y Métricas", img: null, icon: "bi-compass", color: "primary" }
     };
 
     gridEl.innerHTML = '';

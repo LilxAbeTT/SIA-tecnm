@@ -682,7 +682,7 @@ var Reportes = (function () {
         if (_currentArea === 'BIBLIO') {
             renderBiblioDashboard(container);
         } else {
-            renderMedicoDashboard(container);
+            renderMédicoDashboard(container);
         }
     }
 
@@ -703,24 +703,24 @@ var Reportes = (function () {
         renderChartsForSection(loans, 'Préstamos');
     }
 
-    function renderMedicoDashboard(container) {
+    function renderMédicoDashboard(container) {
         const medical = _rawData;
 
         // Categorizar diagnósticos
         const diagnosticos = categorizeDiagnosticos(medical);
-        const topMedicos = diagnosticos.medicos.slice(0, 3);
+        const topMédicos = diagnosticos.medicos.slice(0, 3);
         const topPsico = diagnosticos.psicologicos.slice(0, 3);
 
         container.innerHTML = `
              <div class="d-flex flex-column gap-5 pb-5">
                 ${renderSection('Consultas por Tipo', medical, ['Consulta Médica', 'Consulta Psicológica'])}
-                ${renderDiagnosticosSection('Diagnósticos Médicos Frecuentes', topMedicos, 'medico')}
+                ${renderDiagnosticosSection('Diagnósticos Médicos Frecuentes', topMédicos, 'medico')}
                 ${renderDiagnosticosSection('Diagnósticos Psicológicos Frecuentes', topPsico, 'psico')}
             </div>
         `;
 
         renderChartsForSection(medical, 'Servicios Médicos');
-        renderDiagnosticoCharts(topMedicos, 'medico');
+        renderDiagnosticoCharts(topMédicos, 'medico');
         renderDiagnosticoCharts(topPsico, 'psico');
     }
 

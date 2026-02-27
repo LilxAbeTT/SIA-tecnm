@@ -91,7 +91,7 @@ const AdminAudit = {
         ["KPI", "VALOR"],
         ["Usuarios Totales", stats.totalUsers],
         ["Estudiantes", stats.roleDistribution.student],
-        ["Medicos", stats.roleDistribution.medico],
+        ["Médicos", stats.roleDistribution.medico],
         ["Biblioteca", stats.roleDistribution.biblio],
         ["Aula", stats.roleDistribution.aula],
         ["", ""],

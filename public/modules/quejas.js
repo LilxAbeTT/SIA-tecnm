@@ -1016,7 +1016,7 @@ if (!window.Quejas) {
 
                 let csvContent = "data:text/csv;charset=utf-8,";
                 // Header
-                csvContent += "ID,Fecha,Usuario,Matricula,Tipo,Categoria,Estado,Descripcion,Ultimo_Comentario_Interno\n";
+                csvContent += "ID,Fecha,Usuario,Matricula,Tipo,Categoría,Estado,Descripcion,Ultimo_Comentario_Interno\n";
 
                 tickets.forEach(t => {
                     const date = formatDate(t.createdAt).replace(',', '');

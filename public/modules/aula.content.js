@@ -28,7 +28,7 @@
           const last = parts[parts.length - 1] || '';
           if ((parts.includes('embed') || parts.includes('shorts')) && last) return last;
         }
-      } catch (_) {}
+      } catch (_) { }
       if (url.includes('youtu.be/')) return (url.split('youtu.be/')[1] || '').split(/[?&]/)[0] || null;
       if (url.includes('v=')) return (url.split('v=')[1] || '').split('&')[0] || null;
       return null;
@@ -85,8 +85,8 @@
                       type="button" data-bs-toggle="collapse" data-bs-target="#aula-mod-${mi}">
                 <span class="d-flex align-items-center gap-2 w-100">
                   ${modDone
-                    ? '<i class="bi bi-check-circle-fill text-success"></i>'
-                    : '<i class="bi bi-folder2-open text-primary opacity-75"></i>'}
+            ? '<i class="bi bi-check-circle-fill text-success"></i>'
+            : '<i class="bi bi-folder2-open text-primary opacity-75"></i>'}
                   <span class="flex-grow-1 text-truncate">${esc(mod.titulo || 'Modulo ' + (mi + 1))}</span>
                   <span class="badge bg-secondary-subtle text-secondary rounded-pill" style="font-size:.65rem">${doneLessons.length}/${modLessons.length}</span>
                 </span>
@@ -101,13 +101,13 @@
                 </div>
                 <div class="list-group list-group-flush">
                   ${modLessons.map(l => {
-                    const gIdx = _lessons.indexOf(l);
-                    const active = gIdx === _current;
-                    const done = _completed.has(l.id);
-                    const icon = done
-                      ? 'bi-check-circle-fill text-success'
-                      : (active ? 'bi-play-circle-fill text-primary' : 'bi-circle text-muted');
-                    return `
+              const gIdx = _lessons.indexOf(l);
+              const active = gIdx === _current;
+              const done = _completed.has(l.id);
+              const icon = done
+                ? 'bi-check-circle-fill text-success'
+                : (active ? 'bi-play-circle-fill text-primary' : 'bi-circle text-muted');
+              return `
                       <button type="button"
                         class="list-group-item list-group-item-action aula-lesson-item d-flex align-items-center gap-2 py-2 px-3 small border-0 ${active ? 'aula-lesson-active' : ''} ${done ? 'aula-lesson-done' : ''}"
                         onclick="AulaContent._go(${gIdx})">
@@ -115,7 +115,7 @@
                         <span class="text-truncate flex-grow-1">${esc(l.title || 'Leccion')}</span>
                         ${active ? '<span class="badge bg-primary rounded-pill" style="font-size:.6rem">Actual</span>' : ''}
                       </button>`;
-                  }).join('')}
+            }).join('')}
                 </div>
               </div>
             </div>
@@ -268,7 +268,7 @@
       if (next) next.disabled = _current >= _lessons.length - 1;
 
       if (saveToDb && _courseId && _uid) {
-        AulaService.updateLastViewed(_ctx, _uid, _courseId, L.moduleId || null, L.id).catch(() => {});
+        AulaService.updateLastViewed(_ctx, _uid, _courseId, L.moduleId || null, L.id).catch(() => { });
       }
     }
 
@@ -294,7 +294,7 @@
           newCompleted.add(L.id);
           const allDone = modLessons.every(l => newCompleted.has(l.id));
           if (allDone) {
-            AulaService.markModuleComplete(_ctx, _uid, _courseId, L.moduleId).catch(() => {});
+            AulaService.markModuleComplete(_ctx, _uid, _courseId, L.moduleId).catch(() => { });
           }
         }
 
@@ -315,9 +315,9 @@
               type: 'streak_update',
               streak: newStreak.current,
               cursoId: _courseId
-            }).catch(() => {});
+            }).catch(() => { });
           }
-        } catch (_) {}
+        } catch (_) { }
 
         showToast('Leccion completada', 'success');
 
@@ -339,10 +339,10 @@
     // ── Rewire buttons ──
     function rewire() {
       ['aula-lesson-prev', 'aula-lesson-next', 'aula-lesson-complete',
-       'aula-course-open-quiz', 'aula-course-resume', 'aula-course-back'].forEach(id => {
-        const old = $id(id); if (!old) return;
-        const neo = old.cloneNode(true); old.replaceWith(neo);
-      });
+        'aula-course-open-quiz', 'aula-course-resume', 'aula-course-back'].forEach(id => {
+          const old = $id(id); if (!old) return;
+          const neo = old.cloneNode(true); old.replaceWith(neo);
+        });
       $id('aula-lesson-prev')?.addEventListener('click', () => show(_current - 1));
       $id('aula-lesson-next')?.addEventListener('click', () => show(_current + 1));
       $id('aula-lesson-complete')?.addEventListener('click', onComplete);
@@ -407,7 +407,7 @@
           bodyEl.innerHTML = `<div class="text-center py-4">
             <div class="display-1 text-success mb-3"><i class="bi bi-award"></i></div>
             <h5 class="fw-bold mb-2">Ya aprobaste esta evaluacion.</h5>
-            <p class="text-muted mb-3">Calificacion final: <strong>${bestScore}%</strong></p>
+            <p class="text-muted mb-3">Calificación final: <strong>${bestScore}%</strong></p>
             <div class="d-flex flex-column flex-sm-row gap-2 justify-content-center">
               <button type="button" class="btn btn-outline-primary flex-fill" id="quiz-btn-view-cert">Ver constancia</button>
               <button type="button" class="btn btn-primary flex-fill" id="quiz-btn-exit-aula">Salir a Aula</button>
@@ -428,7 +428,7 @@
         // Start screen
         titleEl.textContent = quiz.title;
         bodyEl.innerHTML = `<div class="text-center py-4">
-          <h6 class="fw-bold mb-3">Informacion de la Prueba</h6>
+          <h6 class="fw-bold mb-3">Información de la Prueba</h6>
           <div class="d-flex flex-wrap justify-content-center gap-3 mb-4">
             <div class="border rounded-3 px-3 py-2 text-center"><div class="small text-muted text-uppercase">Tiempo</div><div class="fw-bold">${quiz.timeLimit > 0 ? quiz.timeLimit + ' min' : 'Sin limite'}</div></div>
             <div class="border rounded-3 px-3 py-2 text-center"><div class="small text-muted text-uppercase">Intentos</div><div class="fw-bold">${usedTries} / ${maxTries}</div></div>
@@ -572,7 +572,7 @@
           <h5 class="fw-bold mb-2">${title}</h5>
           <p class="text-muted mb-3">${msg}</p>
           <div class="d-inline-flex flex-wrap gap-2 justify-content-center mb-4">
-            <div class="badge bg-light text-dark px-3 py-2 border"><div class="small text-muted text-uppercase">Calificacion</div><div class="fw-bold fs-5">${res.score}%</div></div>
+            <div class="badge bg-light text-dark px-3 py-2 border"><div class="small text-muted text-uppercase">Calificación</div><div class="fw-bold fs-5">${res.score}%</div></div>
             <div class="badge bg-light text-dark px-3 py-2 border"><div class="small text-muted text-uppercase">Aciertos</div><div class="fw-bold fs-5">${res.ok} / ${res.total}</div></div>
           </div>
           <div class="d-grid gap-2 col-8 mx-auto">
@@ -606,7 +606,7 @@
           await AulaService.saveAttempt(_ctx, _uid, _courseId, quiz, res, answers);
 
           if (res.approved) {
-            try { await AulaService.issueCertificate(_ctx, _uid, _courseId, res.score); } catch (_) {}
+            try { await AulaService.issueCertificate(_ctx, _uid, _courseId, res.score); } catch (_) { }
             triggerConfetti();
 
             // Badge checks for course completion and perfect score
@@ -619,7 +619,7 @@
                   type: 'quiz_perfect', score: 100, cursoId: _courseId
                 });
               }
-            } catch (_) {}
+            } catch (_) { }
 
             if (window.Notify) {
               const cTitle = _courseData?.title || _courseData?.titulo || 'Curso';

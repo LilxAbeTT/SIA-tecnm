@@ -136,9 +136,7 @@ const BiblioService = (function () {
         const now = Date.now();
         if (_catalogCache && (now - _catalogCacheTime) < CACHE_TTL) return _catalogCache;
 
-        const snap = await ctx.db.collection(CAT_COLL)
-            .where('active', '==', true)
-            .get();
+        const snap = await ctx.db.collection(CAT_COLL).get();
 
         _catalogCache = snap.docs.map(d => ({ id: d.id, ...d.data() }));
         _catalogCacheTime = now;
@@ -175,8 +173,9 @@ const BiblioService = (function () {
 
             const scored = allBooks
                 .map(book => {
-                    const tNorm = norm(book.titulo);
-                    const aNorm = norm(book.autor);
+                    // Usar campos pre-indexados si existen, sino normalizar
+                    const tNorm = book.tituloSearch || norm(book.titulo);
+                    const aNorm = book.autorSearch || norm(book.autor);
                     let score = 0;
 
                     // Match exacto al inicio del titulo (mejor resultado)
@@ -641,29 +640,21 @@ const BiblioService = (function () {
                 throw new Error("Ya se ha usado la extensión permitida.");
             }
 
-            // Validar si el libro se solicitó en viernes (usuario dijo: viernes no hay extensión)
-            // Esto es complejo si solo tenemos fechaVencimiento actual. 
-            // Si la fecha actual de vencimiento es Lunes, significa que se pidió Viernes (probablemente).
-            // Simplificación: Si hoy es Domingo o estamos fuera de rango, validar. 
-            // REGLA: "si se solicita en viernes... no pueden pedir un dia mas (solo de lunes a jueves)"
-            // Revisamos fechaSolicitud
-            const fechaSolicitud = data.fechaSolicitud.toDate();
-            if (fechaSolicitud.getDay() === 5) { // Viernes
-                throw new Error("Préstamos de fin de semana no son extendibles.");
-            }
-
             const currentVenc = data.fechaVencimiento.toDate();
             const nuevaFecha = new Date(currentVenc);
 
-            // Extension siempre +1 dia, saltando finds
+            // Añadir 1 día hábil (si cae viernes → lunes, sáb → lunes, dom → lunes)
             let daysToAdd = 1;
-            if (nuevaFecha.getDay() === 5) daysToAdd = 3; // Si vence viernes, pasa a Lunes (aunque regla dice que vie no extension, cubrimos el caso lun->mar->mie->jue->vie)
+            const diaVenc = nuevaFecha.getDay(); // día actual de vencimiento
+            if (diaVenc === 5) daysToAdd = 3; // Viernes → Lunes
+            else if (diaVenc === 6) daysToAdd = 2; // Sábado → Lunes
+            // Domingo: +1 = Lunes (ok)
 
             nuevaFecha.setDate(nuevaFecha.getDate() + daysToAdd);
 
             t.update(ref, {
                 fechaVencimiento: firebase.firestore.Timestamp.fromDate(nuevaFecha),
-                extensiones: 1 // Flag usada
+                extensiones: 1
             });
         });
     }
@@ -844,13 +835,13 @@ const BiblioService = (function () {
         });
     }
 
-    async function apartarLibro(ctx, { uid, email, bookId, titulo }) {
+    async function autoPrestarLibro(ctx, { uid, email, bookId, titulo }) {
         const perfil = await getPerfilBibliotecario(ctx, uid);
-        if (perfil.estaBloqueado) throw new Error("Adeudos pendientes. No puedes apartar.");
+        if (perfil.estaBloqueado) throw new Error("Adeudos pendientes. No puedes solicitar préstamos.");
         if (perfil.deudaTotal > 0) throw new Error("Regulariza tu situación antes de solicitar.");
 
         const duplicado = [...perfil.solicitados, ...perfil.recogidos].find(l => l.libroId === bookId);
-        if (duplicado) throw new Error("Ya tienes una solicitud activa para este libro.");
+        if (duplicado) throw new Error("Ya tienes un préstamo activo para este libro.");
 
         const bookRef = ctx.db.collection(CAT_COLL).doc(bookId);
 
@@ -861,19 +852,7 @@ const BiblioService = (function () {
 
             t.update(bookRef, { copiasDisponibles: stock - 1 });
 
-            // Lógica de expiración de recolección (Pickup)
-            const hoy = new Date();
-            const esTarde = hoy.getHours() >= 12;
-            const fechaLimitePickup = new Date();
-
-            if (esTarde) {
-                // Si es después de las 12 PM, tienen hoy Y mañana
-                fechaLimitePickup.setDate(fechaLimitePickup.getDate() + 1);
-            }
-            if (fechaLimitePickup.getDay() === 0) fechaLimitePickup.setDate(fechaLimitePickup.getDate() + 1); // Si cae dom, pasa lun
-
-            fechaLimitePickup.setHours(20, 0, 0, 0); // Fin del día
-
+            const fechaVenc = calcularFechaVencimiento();
             const newLoanRef = ctx.db.collection(PRES_COLL).doc();
 
             t.set(newLoanRef, {
@@ -882,10 +861,28 @@ const BiblioService = (function () {
                 libroId: bookId,
                 tituloLibro: titulo,
                 fechaSolicitud: firebase.firestore.FieldValue.serverTimestamp(),
-                fechaExpiracionRecoleccion: firebase.firestore.Timestamp.fromDate(fechaLimitePickup),
-                estado: 'pendiente'
+                fechaEntrega: firebase.firestore.FieldValue.serverTimestamp(),
+                fechaVencimiento: firebase.firestore.Timestamp.fromDate(fechaVenc),
+                estado: 'entregado',
+                extensiones: 0,
+                origenPrestamo: 'app_estudiante'
             });
         });
+
+        // Registrar visita automática para estadísticas del admin
+        try {
+            await ctx.db.collection(VISITAS_COLL).add({
+                studentId: uid,
+                studentName: perfil.nombre || 'Estudiante',
+                matricula: perfil.matricula || 'S/N',
+                motivo: 'Préstamo Digital (App)',
+                fecha: firebase.firestore.FieldValue.serverTimestamp(),
+                tipoUsuario: 'estudiante'
+            });
+        } catch (e) { console.warn('No se pudo registrar visita automática:', e); }
+
+        // XP por préstamo
+        procesarRecompensa(ctx, uid, 'uso_activo');
     }
 
     async function checkInActivo(ctx, uid) {
@@ -1030,7 +1027,8 @@ const BiblioService = (function () {
         extenderPrestamo,
         cancelarPrestamo,
         pagarDeudaMonitor,
-        apartarLibro,
+        apartarLibro: (ctx, data) => autoPrestarLibro(ctx, data),
+        autoPrestarLibro,
         procesarRecompensa,
         checkInActivo,
         getPrestamoInfo,

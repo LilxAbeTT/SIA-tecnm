@@ -298,7 +298,7 @@ const Profile = (function () {
     container.innerHTML = `
            <div class="col-12"><h6 class="fw-bold text-success small mb-0"><i class="bi bi-heart-pulse me-1"></i>Salud</h6></div>
            ${item('Condición', h.condicionSalud)}
-           ${item('Tratamiento', h.tratamientoMedico)}
+           ${item('Tratamiento', h.tratamientoMédico)}
            ${item('Pad. Físico', h.padecimientoFisico)}
            ${item('Pad. Mental', h.padecimientoMental)}
            ${item('Sustancias', h.sustancias)}

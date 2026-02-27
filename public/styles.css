@@ -5017,6 +5017,344 @@ html[data-bs-theme="light"] .badge-dot {
     border: none;
 }
 
+/* --- STORY: Imagen thumbnail dentro del circulo --- */
+.story-circle--has-img {
+    overflow: hidden;
+    padding: 0;
+}
+
+.story-thumb-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 50%;
+}
+
+/* --- STORY: Label con 2 lineas visible --- */
+.story-label {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 0.68rem;
+    font-weight: 600;
+    color: var(--text-muted, #64748b);
+    max-width: 76px;
+    line-height: 1.25;
+    word-break: break-word;
+    min-height: 1.7em;
+}
+
+/* Ajuste del story-item para acomodar label de 2 lineas */
+.story-item {
+    flex-shrink: 0;
+    width: 76px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+/* --- DASHBOARD: Secciones con animacion staggered --- */
+.dash-section {
+    opacity: 0;
+    transform: translateY(14px);
+    animation: dash-section-in 0.5s ease forwards;
+}
+
+@keyframes dash-section-in {
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* --- DASHBOARD: Smart cards con animacion individual --- */
+.smart-card-anim {
+    opacity: 0;
+    transform: scale(0.96);
+    animation: smart-card-pop 0.35s ease forwards;
+}
+
+@keyframes smart-card-pop {
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* --- DASHBOARD: Boton QR rapido --- */
+/* --- DASHBOARD: Botones del header (QR + Tutorial) --- */
+.sia-btn-qr,
+.sia-btn-tutorial {
+    display: inline-flex;
+    align-items: center;
+    padding: 7px 14px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    line-height: 1;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.sia-btn-qr {
+    background: rgba(0, 208, 255, 0.12);
+    color: var(--accent, #00D0FF);
+    border: 1.5px solid rgba(0, 208, 255, 0.3);
+}
+
+.sia-btn-qr:hover {
+    background: rgba(0, 208, 255, 0.22);
+    color: var(--accent, #00D0FF);
+    border-color: rgba(0, 208, 255, 0.5);
+}
+
+.sia-btn-tutorial {
+    background: rgba(255, 255, 255, 0.05);
+    color: #94a3b8;
+    border: 1.5px solid rgba(255, 255, 255, 0.1);
+}
+
+.sia-btn-tutorial:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #cbd5e1;
+    border-color: rgba(255, 255, 255, 0.18);
+}
+
+.sia-btn-qr:active,
+.sia-btn-tutorial:active {
+    transform: scale(0.95);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   ONBOARDING TOUR (Tutorial interactivo)
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* Overlay base: transparente cuando hay spotlight */
+.sia-tour-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 9998;
+    pointer-events: auto;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.sia-tour-overlay--visible {
+    opacity: 1;
+}
+
+.sia-tour-overlay--exiting {
+    opacity: 0;
+    pointer-events: none;
+}
+
+/* Overlay con fondo completo: cuando no hay spotlight (bienvenida / fin) */
+.sia-tour-overlay--center {
+    background: rgba(0, 0, 0, 0.82);
+}
+
+/* Spotlight: el box-shadow crea el efecto de "recorte oscuro" */
+.sia-tour-spotlight {
+    position: absolute;
+    border-radius: 12px;
+    box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.78);
+    border: 2px solid var(--accent, #00D0FF);
+    transition: top    0.45s cubic-bezier(0.4, 0, 0.2, 1),
+                left   0.45s cubic-bezier(0.4, 0, 0.2, 1),
+                width  0.45s cubic-bezier(0.4, 0, 0.2, 1),
+                height 0.45s cubic-bezier(0.4, 0, 0.2, 1),
+                opacity 0.25s ease;
+    z-index: 9999;
+    pointer-events: none;
+    opacity: 0;
+}
+
+.sia-tour-spotlight--visible {
+    opacity: 1;
+}
+
+/* Pulso en el borde del spotlight */
+.sia-tour-spotlight::after {
+    content: '';
+    position: absolute;
+    inset: -6px;
+    border-radius: 15px;
+    border: 2px solid var(--accent, #00D0FF);
+    animation: tour-pulse 2s ease-in-out infinite;
+    pointer-events: none;
+}
+
+@keyframes tour-pulse {
+    0%, 100% { opacity: 0.2; transform: scale(1);    }
+    50%       { opacity: 0.6; transform: scale(1.015); }
+}
+
+/* ── Tooltip: fondo BLANCO para maxima legibilidad ── */
+.sia-tour-tooltip {
+    position: absolute;
+    z-index: 10000;
+    background: #ffffff;
+    border: none;
+    border-radius: 16px;
+    padding: 20px 22px;
+    max-width: 320px;
+    min-width: 260px;
+    box-shadow: 0 8px 40px rgba(0, 0, 0, 0.35), 0 2px 8px rgba(0,0,0,0.2);
+    pointer-events: auto;
+    opacity: 0;
+    transform: translateY(10px);
+    transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.sia-tour-tooltip--visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.sia-tour-tooltip--transitioning {
+    opacity: 0;
+    transform: translateY(8px);
+}
+
+/* Progreso */
+.tour-step-label {
+    font-size: 0.7rem;
+    color: #94a3b8;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+}
+
+.tour-progress-bar {
+    width: 100%;
+    height: 4px;
+    background: #e2e8f0;
+    border-radius: 4px;
+    margin: 6px 0 16px;
+    overflow: hidden;
+}
+
+.tour-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent, #00D0FF), #1B396A);
+    border-radius: 4px;
+    transition: width 0.5s ease;
+}
+
+/* Titulo y descripcion */
+.tour-title {
+    font-weight: 700;
+    color: #0f172a;
+    margin-bottom: 8px;
+    font-size: 1.05rem;
+    line-height: 1.3;
+}
+
+.tour-desc {
+    font-size: 0.875rem;
+    color: #475569;
+    line-height: 1.55;
+    margin-bottom: 20px;
+}
+
+/* Botones */
+.tour-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.tour-actions-nav {
+    display: flex;
+    gap: 8px;
+}
+
+.tour-btn-next {
+    background: #1B396A;
+    color: #ffffff;
+    border: none;
+    border-radius: 10px;
+    padding: 9px 20px;
+    font-weight: 600;
+    font-size: 0.83rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.tour-btn-next:hover {
+    background: #142d54;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(27, 57, 106, 0.3);
+}
+
+.tour-btn-next:active {
+    transform: scale(0.97);
+}
+
+.tour-btn-prev {
+    background: transparent;
+    color: #64748b;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 9px 16px;
+    font-size: 0.83rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.tour-btn-prev:hover {
+    background: #f8fafc;
+    color: #334155;
+    border-color: #cbd5e1;
+}
+
+.tour-btn-skip {
+    background: none;
+    border: none;
+    color: #94a3b8;
+    font-size: 0.78rem;
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    text-decoration-color: #cbd5e1;
+    transition: color 0.2s;
+    padding: 4px 0;
+    flex-shrink: 0;
+}
+
+.tour-btn-skip:hover {
+    color: #64748b;
+}
+
+/* Mobile */
+@media (max-width: 480px) {
+    .sia-tour-tooltip {
+        max-width: calc(100vw - 32px);
+        min-width: auto;
+        padding: 18px;
+    }
+
+    .sia-btn-qr span,
+    .sia-btn-tutorial span {
+        display: none !important;
+    }
+
+    .sia-btn-qr,
+    .sia-btn-tutorial {
+        padding: 8px 10px;
+    }
+}
+
 /* --- FULLSCREEN AVISO MODAL --- */
 /* --- FULLSCREEN GLASS AVISO MODAL --- */
 .modal-aviso-glass .modal-content {
@@ -6206,4 +6544,21 @@ html[data-bs-theme="dark"] .medi-next-appt {
     transition: all 0.5s ease;
     opacity: 0.5;
     transform: translateX(100px);
+}
+
+/* --- WEB COMPONENTS DEFAULT STYLES --- */
+sia-student-dashboard, 
+sia-landing-view, 
+sia-register-wizard {
+    display: block;
+    width: 100%;
+}
+
+.nav-custom-pills .nav-item {
+  margin-right: 90px; /* espacio entre botones */
+}
+
+
+.nav-custom-pills-2 .nav-item {
+  margin-right: 40px; /* espacio entre botones */
 }

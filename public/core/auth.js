@@ -51,7 +51,18 @@ export class AuthManager {
                 }
             } else {
                 Store.clear();
-                this.ui.showLanding();
+
+                let path = window.location.pathname || '/';
+                if (window.location.hash && window.location.hash.startsWith('#/')) {
+                    path = window.location.hash.replace('#', '');
+                }
+
+                const isPublicRoute = path.startsWith('/test-vocacional') || path.startsWith('/vocacional/test') || path.startsWith('/encuesta-publica');
+
+                if (!isPublicRoute) {
+                    this.ui.showLanding();
+                }
+
                 this.ui.hideLoader();
             }
         });
