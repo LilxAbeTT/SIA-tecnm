@@ -1,0 +1,341 @@
+/* SIA - Main Stylesheet
+  Desarrollado por SIA-Dev v2.1 (Responsive Update)
+*/
+
+/* === DARK MODE FORCE (Override Bootstrap defaults) === */
+html[data-bs-theme="dark"] {
+    color-scheme: dark;
+}
+
+html[data-bs-theme="dark"] body {
+    background-color: #0f1114 !important;
+    color: #cbd5e1 !important;
+}
+
+:root {
+    /* PALETA DE COLORES OFICIAL TecNM */
+    --primary: #1B396A;
+    /* Pantone 294 */
+    --primary-hover: #142d54;
+    --accent: #00D0FF;
+
+    /* Módulos */
+    --biblio: #FFD24D;
+    --med: #00D0FF;
+    --aula: #4e1bda;
+    --reportes: #6610f2;
+    /* Indigo - Desarrollo Académico */
+    --cafeteria: #f97316;
+    --cafeteria-light: #fb923c;
+
+    /* Superficies y Textos (Light Mode Default) */
+    --surface: #ffffff;
+    --surface-muted: #f8f9fa;
+    --bg-body: #f3f4f6;
+    --bg-card: #ffffff;
+    --text-body: #334155;
+    --text-main: #1e293b;
+    --text-heading: #0f172a;
+    --text-muted: #64748b;
+    --border-color: #e2e8f0;
+
+    /* Navbar Variables (Default Light) */
+    --nav-bg: rgba(255, 255, 255, 0.9);
+    --nav-text: #1e293b;
+    --nav-border: #e2e8f0;
+    --search-bg: #f1f5f9;
+    --accent-color: #3b82f6;
+    --accent-primary: #1B396A;
+}
+
+html[data-bs-theme="light"] {
+    color-scheme: light;
+}
+
+/* Force Light Mode Styles specifically for light theme */
+html[data-bs-theme="light"] body {
+    background-color: var(--bg-body);
+    color: var(--text-body);
+}
+
+html[data-bs-theme="light"] .card,
+html[data-bs-theme="light"] .modal-content,
+html[data-bs-theme="light"] .dropdown-menu {
+    color: var(--text-body);
+}
+
+html[data-bs-theme="light"] h1,
+html[data-bs-theme="light"] h2,
+html[data-bs-theme="light"] h3,
+html[data-bs-theme="light"] h4,
+html[data-bs-theme="light"] h5,
+html[data-bs-theme="light"] h6 {
+    color: var(--text-heading) !important;
+}
+
+/* Ensure links are visible in light mode */
+html[data-bs-theme="light"] a:not(.btn):not(.nav-link):not(.dropdown-item):not(.badge) {
+    color: var(--primary);
+}
+
+html[data-bs-theme="dark"] {
+    /* PALETA DE COLORES OFICIAL TecNM (Dark Mode Override) */
+    --primary: #1B396A;
+    --accent: #00D0FF;
+
+    /* Superficies y Textos (Dark Mode) */
+    --surface: #1a1d23;
+    --surface-muted: #0f1114;
+    --bg-body: #0f1114;
+    --bg-card: #1a1d23;
+    --text-body: #cbd5e1;
+    --text-main: #cbd5e1;
+    --text-heading: #f0f2f5;
+    --border-color: rgba(255, 255, 255, 0.08);
+
+    color-scheme: dark;
+}
+
+html {
+    scroll-behavior: smooth;
+}
+
+.no-scroll {
+    overflow: hidden !important;
+    height: 100vh !important;
+    touch-action: none;
+}
+
+/* Evitar scroll horizontal y zoom no deseado en PWA */
+html,
+body {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+    overscroll-behavior-x: none;
+    /* Prevenir el menú contextual al mantener presionado y selección involuntaria */
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+/* Re-habilitar selección en inputs y campos editables */
+input,
+textarea,
+[contenteditable="true"] {
+    -webkit-user-select: auto !important;
+    user-select: auto !important;
+}
+
+/* Evitar el arrastre ("drag") de imágenes */
+img {
+    -webkit-user-drag: none;
+}
+
+/* Tipografía Base */
+body {
+    font-family: 'Noto Sans', 'Inter', sans-serif;
+    color: var(--text-body) !important;
+    background-color: var(--surface-muted) !important;
+    position: relative;
+}
+
+/* === FORZAR DARK MODE EN TODOS LOS ELEMENTOS BOOTSTRAP === */
+html[data-bs-theme="dark"] [class*="bg-white"],
+html[data-bs-theme="dark"] [class*=""],
+html[data-bs-theme="dark"] .bg-white,
+html[data-bs-theme="dark"] .,
+html[data-bs-theme="dark"] .card,
+html[data-bs-theme="dark"] .modal-content,
+html[data-bs-theme="dark"] .dropdown-menu,
+html[data-bs-theme="dark"] .list-group-item,
+html[data-bs-theme="dark"] .nav-tabs,
+html[data-bs-theme="dark"] .nav-pills,
+html[data-bs-theme="dark"] .accordion,
+html[data-bs-theme="dark"] .accordion-item,
+html[data-bs-theme="dark"] .offcanvas,
+html[data-bs-theme="dark"] .popover,
+html[data-bs-theme="dark"] .toast,
+html[data-bs-theme="dark"] .alert,
+html[data-bs-theme="dark"] .breadcrumb {
+    background-color: #1a1d23 !important;
+    color: #cbd5e1 !important;
+    border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+/* Cards específicamente */
+html[data-bs-theme="dark"] .card-body,
+html[data-bs-theme="dark"] .card-header,
+html[data-bs-theme="dark"] .card-footer {
+    background-color: transparent !important;
+    color: #cbd5e1 !important;
+    border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+/* Bootstrap List Groups */
+html[data-bs-theme="dark"] .list-group {
+    --bs-list-group-bg: #1a1d23 !important;
+    --bs-list-group-color: #cbd5e1 !important;
+    --bs-list-group-border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+/* Badges */
+.badge {
+    --bs-badge-color: #fff !important;
+}
+
+html[data-bs-theme="dark"] .text-dark,
+html[data-bs-theme="dark"] .text-body,
+html[data-bs-theme="dark"] .text-secondary {
+    color: var(--text-body, #cbd5e1) !important;
+}
+
+html[data-bs-theme="dark"] .text-muted {
+    color: #94a3b8 !important;
+}
+
+html[data-bs-theme="dark"] .form-control,
+html[data-bs-theme="dark"] .form-select,
+html[data-bs-theme="dark"] input:not([type="checkbox"]):not([type="radio"]),
+html[data-bs-theme="dark"] textarea,
+html[data-bs-theme="dark"] select {
+    background-color: var(--surface, #1a1d23) !important;
+    color: var(--text-body, #cbd5e1) !important;
+    border-color: rgba(255, 255, 255, 0.2) !important;
+}
+
+html[data-bs-theme="dark"] .form-control::placeholder {
+    color: rgba(255, 255, 255, 0.4) !important;
+}
+
+html[data-bs-theme="dark"] .btn-light {
+    background-color: rgba(255, 255, 255, 0.1) !important;
+    color: var(--text-body, #cbd5e1) !important;
+    border-color: rgba(255, 255, 255, 0.2) !important;
+}
+
+.btn-close {
+    filter: invert(1) grayscale(100%) brightness(200%);
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+    color: var(--text-heading, #0f172a) !important;
+}
+
+html[data-bs-theme="dark"] .table {
+    --bs-table-bg: transparent !important;
+    --bs-table-color: #cbd5e1 !important;
+    color: #cbd5e1 !important;
+}
+
+html[data-bs-theme="dark"] .table thead {
+    background-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+html[data-bs-theme="dark"] .modal-header,
+html[data-bs-theme="dark"] .modal-footer {
+    border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+html[data-bs-theme="dark"] .border,
+html[data-bs-theme="dark"] .border-top,
+html[data-bs-theme="dark"] .border-bottom,
+html[data-bs-theme="dark"] .border-start,
+html[data-bs-theme="dark"] .border-end {
+    border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+/* Forzar navbar oscuro */
+.navbar,
+.sia-navbar {
+    background-color: rgba(15, 17, 20, 0.95) !important;
+}
+
+h5 {
+    font-weight: 700;
+}
+
+/* --- LACTARIO SPECIFIC --- */
+.text-maternal {
+    color: #E83E8C;
+}
+
+.bg-maternal {
+    background-color: #E83E8C;
+}
+
+.btn-maternal {
+    background-color: #E83E8C;
+    border-color: #E83E8C;
+    color: #fff;
+}
+
+.btn-maternal:hover,
+.btn-maternal:active,
+.btn-maternal.active {
+    background-color: #d63384;
+    border-color: #d63384;
+    color: #fff;
+}
+
+.btn-outline-maternal {
+    color: #E83E8C;
+    border-color: #E83E8C;
+    background-color: transparent;
+}
+
+.btn-outline-maternal:hover,
+.btn-outline-maternal.active {
+    background-color: #E83E8C;
+    color: #fff;
+}
+
+/* Scrollbars estilizados para las listas internas */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #cbd5e0;
+    border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #a0aec0;
+}
+
+/* Navbar Responsive */
+.navbar-brand {
+    font-weight: 800;
+    letter-spacing: -0.5px;
+}
+
+/* Cards Responsive */
+.card {
+    border: none;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+/* Listas con scroll interno (Aula/Biblio) */
+.scroll-container {
+    max-height: 500px;
+    overflow-y: auto;
+    padding-right: 4px;
+}
+
+/* Filtros de Logos */
+.filter-white {
+    filter: brightness(0) invert(1);
+    -webkit-filter: brightness(0) invert(1);
+    transition: opacity 0.3s ease;
+}

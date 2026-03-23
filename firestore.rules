@@ -6,7 +6,24 @@ service cloud.firestore {
     function isSignedIn() { return request.auth != null; }
     function isOwner(uid) { return isSignedIn() && request.auth.uid == uid; }
     function userDoc(uid) { return get(/databases/$(database)/documents/usuarios/$(uid)); }
-    function roleOf(uid)  { return userDoc(uid).data.role; }
+    function roleOf(uid)  { return userDoc(uid).data.get('role', ''); }
+    function isValidAvisoViewCreate(uid, avisoId) {
+      return isOwner(uid)
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.avisoId == avisoId
+        && request.resource.data.openCount == 1
+        && (request.resource.data.completedCount == 0 || request.resource.data.completedCount == 1);
+    }
+    function isValidAvisoViewUpdate(uid, avisoId) {
+      return isOwner(uid)
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.avisoId == avisoId
+        && request.resource.data.openCount == resource.data.openCount + 1
+        && (
+          request.resource.data.completedCount == resource.data.completedCount ||
+          request.resource.data.completedCount == resource.data.completedCount + 1
+        );
+    }
     
     // Roles Específicos
     
@@ -17,19 +34,66 @@ service cloud.firestore {
 
     function isSalud() { 
       let data = userDoc(request.auth.uid).data;
-      let esp = data.get('especialidad', '').toUpper();
-      let espAlt = data.get('specialty', '').toUpper();
-      return isSignedIn() && (data.role == 'medico' || data.role == 'psicologo' || esp == 'PSICOLOGO' || espAlt == 'PSICOLOGO'); 
+      let esp = data.get('especialidad', '').upper();
+      let espAlt = data.get('specialty', '').upper();
+      let role = data.get('role', '');
+      let perm = data.get('permissions', {});
+      let mediPerm = perm.get('medi', '').upper();
+      return isSignedIn() && (
+        role == 'medico' ||
+        role == 'psicologo' ||
+        esp == 'MEDICO' ||
+        esp == 'PSICOLOGO' ||
+        espAlt == 'MEDICO' ||
+        espAlt == 'PSICOLOGO' ||
+        (role == 'department_admin' && (mediPerm == 'MEDICO' || mediPerm == 'PSICOLOGO' || mediPerm == 'ADMIN'))
+      ); 
     }
-    function isBiblio() { return isSignedIn() && (roleOf(request.auth.uid) == 'biblio' || roleOf(request.auth.uid) == 'bibliotecario' || roleOf(request.auth.uid) == 'biblio_admin'); }
+    function isSaludUser(uid) {
+      let data = userDoc(uid).data;
+      let esp = data.get('especialidad', '').upper();
+      let espAlt = data.get('specialty', '').upper();
+      let role = data.get('role', '');
+      let perm = data.get('permissions', {});
+      let mediPerm = perm.get('medi', '').upper();
+      return isSignedIn() && (
+        role == 'medico' ||
+        role == 'psicologo' ||
+        esp == 'MEDICO' ||
+        esp == 'PSICOLOGO' ||
+        espAlt == 'MEDICO' ||
+        espAlt == 'PSICOLOGO' ||
+        (role == 'department_admin' && (mediPerm == 'MEDICO' || mediPerm == 'PSICOLOGO' || mediPerm == 'ADMIN'))
+      );
+    }
+    function isBiblio() { 
+        let data = userDoc(request.auth.uid).data;
+        let perm = data.get('permissions', {});
+        return isSignedIn() && (
+            data.get('role', '') == 'biblio' || 
+            data.get('role', '') == 'bibliotecario' || 
+            data.get('role', '') == 'biblio_admin' || 
+            (data.get('role', '') == 'department_admin' && (perm.get('biblio', '') == 'biblio' || perm.get('biblio', '') == 'admin')) ||
+            request.auth.token.email == 'biblioteca@loscabos.tecnm.mx'
+        ); 
+    }
     function isAula()   { return isSignedIn() && roleOf(request.auth.uid) == 'aula'; }
-    function isForo()   { return isSignedIn() && (roleOf(request.auth.uid) == 'foro' || roleOf(request.auth.uid) == 'foro_admin'); }
+    function isForo()   {
+      let data = userDoc(request.auth.uid).data;
+      let perm = data.get('permissions', {});
+      let role = data.get('role', '');
+      return isSignedIn() && (
+        role == 'foro' ||
+        role == 'foro_admin' ||
+        (role == 'department_admin' && (perm.get('foro', '') == 'admin' || perm.get('foro', '') == 'superadmin'))
+      );
+    }
     
     // Validar si es Admin de Lactario (Calidad o permiso específico)
     function isLactarioAdmin() {
         let data = userDoc(request.auth.uid).data;
         let perm = data.get('permissions', {});
-        return isSignedIn() && (data.role == 'department_admin' && perm.get('lactario', '') == 'admin');
+        return isSignedIn() && (data.get('role', '') == 'department_admin' && perm.get('lactario', '') == 'admin');
     }
 
     // Al incluir isDev() aquí, tienes acceso a TODO lo que permite SuperAdmin
@@ -44,8 +108,92 @@ service cloud.firestore {
             request.auth.token.email == 'desarrolloacademico@loscabos.tecnm.mx' ||
             request.auth.token.email == 'biblioteca@loscabos.tecnm.mx' ||
             isSuperAdmin() ||
-            (data.role == 'department_admin' && perm.get('reportes', '') == 'admin')
+            (data.get('role', '') == 'department_admin' && perm.get('reportes', '') == 'admin')
         );
+    }
+
+    function isDifusionForo() {
+      let data = userDoc(request.auth.uid).data;
+      let perm = data.get('permissions', {});
+      let role = data.get('role', '');
+      return isSignedIn() && (
+        role == 'foro' ||
+        perm.get('foro', '') == 'superadmin' ||
+        request.auth.token.email == 'difusion@loscabos.tecnm.mx'
+      );
+    }
+
+    function foroEventData(eventId) {
+      return get(/databases/$(database)/documents/foro_events/$(eventId)).data;
+    }
+
+    function isForoEventOrganizer(eventId) {
+      let event = foroEventData(eventId);
+      return isSignedIn() && event.createdBy == request.auth.uid;
+    }
+
+    function canReadForoEventData(data) {
+      return isSignedIn() && (
+        isDifusionForo() ||
+        isSuperAdmin() ||
+        data.get('status', '') == 'active' ||
+        data.get('createdBy', '') == request.auth.uid
+      );
+    }
+
+    function canReadForoTicket(data) {
+      return isSignedIn() && (
+        data.userId == request.auth.uid ||
+        isForoEventOrganizer(data.eventId) ||
+        isDifusionForo() ||
+        isSuperAdmin()
+      );
+    }
+
+    function hasForoDeterministicTicket(eventId) {
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/foro_tickets/$(eventId + '__' + request.auth.uid)) &&
+        get(/databases/$(database)/documents/foro_tickets/$(eventId + '__' + request.auth.uid)).data.status in ['registered', 'attended'];
+    }
+
+    function isForoConversationParticipantFromData(data) {
+      return isSignedIn() && (
+        data.studentId == request.auth.uid ||
+        data.organizerId == request.auth.uid
+      );
+    }
+
+    function canCreateForoConversation() {
+      let event = foroEventData(request.resource.data.eventId);
+      return isSignedIn() &&
+        request.resource.data.studentId == request.auth.uid &&
+        request.resource.data.organizerId == event.createdBy &&
+        event.get('status', '') == 'active' &&
+        event.get('contactEnabled', true) == true &&
+        hasForoDeterministicTicket(request.resource.data.eventId);
+    }
+
+    function canUpdateForoConversation() {
+      return isForoConversationParticipantFromData(resource.data) &&
+        request.resource.data.eventId == resource.data.eventId &&
+        request.resource.data.eventTitle == resource.data.eventTitle &&
+        request.resource.data.studentId == resource.data.studentId &&
+        request.resource.data.studentName == resource.data.studentName &&
+        request.resource.data.organizerId == resource.data.organizerId &&
+        request.resource.data.organizerName == resource.data.organizerName &&
+        request.resource.data.participants == resource.data.participants &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'lastMessage',
+          'updatedAt',
+          'lastMessageAt',
+          'unreadByStudent',
+          'unreadByOrganizer'
+        ]);
+    }
+
+    // ==== CACHE DE REPORTES ====
+    match /reportes_cache/{docId} {
+      allow read, write: if isSuperAdmin() || isDesarrollo();
     }
 
     // ==== USUARIOS ====
@@ -55,13 +203,27 @@ service cloud.firestore {
       allow update: if isOwner(uid) || isSuperAdmin() || isBiblio();
       
       match /notificaciones/{notifId} {
-        allow create: if isSalud() || isSuperAdmin() || isBiblio() || isLactarioAdmin();
+        allow create: if isOwner(uid) || isSalud() || isSuperAdmin() || isBiblio() || isLactarioAdmin();
         allow read, update, delete: if isOwner(uid);
       }
 
       // [NEW] Perfiles de Usuario (Multi-perfil / Psicología)
+      match /avisoViews/{avisoId} {
+        allow read: if isOwner(uid);
+        allow create: if isValidAvisoViewCreate(uid, avisoId);
+        allow update: if isValidAvisoViewUpdate(uid, avisoId);
+      }
+
+      match /surveyLaunchSeen/{surveyId} {
+        allow read, write: if isOwner(uid);
+      }
+
       match /profiles/{profileId} {
         allow read, write: if isOwner(uid) || isSuperAdmin();
+      }
+
+      match /pushTokens/{tokenId} {
+        allow read, write: if isOwner(uid);
       }
     }
 
@@ -88,6 +250,17 @@ service cloud.firestore {
       allow write: if isLactarioAdmin() || isSuperAdmin();
     }
 
+    function isSafeCatalogStockAdjustment() {
+      return isSignedIn()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['copiasDisponibles'])
+        && request.resource.data.copiasDisponibles != null
+        && resource.data.copiasDisponibles != null
+        && (
+          request.resource.data.copiasDisponibles == resource.data.copiasDisponibles + 1 ||
+          request.resource.data.copiasDisponibles == resource.data.copiasDisponibles - 1
+        );
+    }
+
     // ==== BIBLIO ====
     match /biblio-visitas/{id} {
       allow read: if isBiblio() || isSuperAdmin() || isDesarrollo() || (isSignedIn() && resource.data.studentId == request.auth.uid); 
@@ -95,9 +268,13 @@ service cloud.firestore {
       allow update: if isBiblio() || isSuperAdmin() || (isSignedIn() && resource.data.studentId == request.auth.uid);
     }
 
+    match /biblio-visitas-activos/{id} {
+      allow read, write: if isBiblio() || isSuperAdmin() || isDesarrollo();
+    }
+
     match /biblio-catalogo/{bookId} {
       allow read: if isSignedIn();
-      allow update: if isSignedIn(); 
+      allow update: if isBiblio() || isSuperAdmin() || isSafeCatalogStockAdjustment();
       allow create, delete: if isBiblio() || isSuperAdmin();
       
       match /waitlist/{uid} {
@@ -109,11 +286,38 @@ service cloud.firestore {
       allow create: if isSignedIn();
       allow read: if isBiblio() || isSuperAdmin() || (isSignedIn() && resource.data.uid == request.auth.uid);
     }
+
+    function isOwnerBiblioLoanUpdate() {
+      return isSignedIn()
+        && resource.data.studentId == request.auth.uid
+        && (
+          (
+            resource.data.estado in ['pendiente', 'pendiente_entrega']
+            && request.resource.data.estado == 'cancelado'
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+              'estado', 'fechaCancelacion', 'motivoCancelacion', 'canceladoPor'
+            ])
+          )
+          ||
+          (
+            resource.data.estado == 'entregado'
+            && request.resource.data.estado == resource.data.estado
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+              'fechaVencimiento', 'extensiones'
+            ])
+            && (
+              (resource.data.extensiones == null && request.resource.data.extensiones == 1)
+              || (resource.data.extensiones != null && request.resource.data.extensiones == resource.data.extensiones + 1)
+            )
+            && request.resource.data.fechaVencimiento > resource.data.fechaVencimiento
+          )
+        );
+    }
     
     match /prestamos-biblio/{id} {
       allow read: if isSignedIn() && (isOwner(resource.data.studentId) || isBiblio() || isSuperAdmin() || isDesarrollo());
       allow create: if isSignedIn() && (request.resource.data.studentId == request.auth.uid || isBiblio() || isSuperAdmin());
-      allow update: if isBiblio() || isSuperAdmin() || (isOwner(resource.data.studentId) && request.resource.data.estado == 'cancelado');
+      allow update: if isBiblio() || isSuperAdmin() || isOwnerBiblioLoanUpdate();
       allow delete: if isOwner(resource.data.studentId) && resource.data.estado == 'pendiente'; 
     }
 
@@ -137,9 +341,36 @@ service cloud.firestore {
 
     // ==== MEDI ====
     match /citas-medi/{id} {
-      allow read: if isSignedIn() && (isOwner(resource.data.studentId) || isSalud() || isSuperAdmin() || isDesarrollo()); 
+      function isStudentAppointmentOwner() {
+        return isOwner(resource.data.studentId);
+      }
+      function isValidStudentAppointmentUpdate() {
+        return isStudentAppointmentOwner()
+          && resource.data.estado in ['pendiente', 'confirmada']
+          && request.resource.data.studentId == resource.data.studentId
+          && request.resource.data.studentEmail == resource.data.studentEmail
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'fechaHoraSlot',
+            'slotId',
+            'tipoServicio',
+            'motivo',
+            'shift',
+            'profesionalShift',
+            'estado',
+            'autoAgendada',
+            'queuePosition',
+            'promovidaDeCola',
+            'profesionalId',
+            'profesionalName',
+            'profesionalProfileId',
+            'motivoCancelacion',
+            'fechaCancelacion',
+            'updatedAt'
+          ]);
+      }
+      allow read: if isSignedIn(); // Needed for slot occupancy/queue calculations on student booking flow
       allow create: if isSignedIn() && (request.resource.data.studentId == request.auth.uid || isSalud() || isSuperAdmin());
-      allow update: if isSalud() || isSuperAdmin() || (isOwner(resource.data.studentId) && resource.data.estado == 'pendiente');
+      allow update: if isSalud() || isSuperAdmin() || isValidStudentAppointmentUpdate();
     }
     match /expedientes-clinicos/{docId} {
       allow create: if isSalud() || isSuperAdmin();
@@ -151,31 +382,50 @@ service cloud.firestore {
         allow read: if isSalud() || isSuperAdmin() || isOwner(docId) || isDesarrollo();
         allow write: if isSalud() || isSuperAdmin();
       }
+      match /consultas-privadas/{consultaId} {
+        function canReadPrivateConsulta() {
+          return isSalud() && (resource.data.autorId == null || resource.data.autorId == request.auth.uid);
+        }
+        function canWritePrivateConsulta() {
+          return isSalud()
+            && request.resource.data.autorId == request.auth.uid
+            && (resource == null || resource.data.autorId == null || resource.data.autorId == request.auth.uid);
+        }
+        allow read: if isSuperAdmin() || canReadPrivateConsulta();
+        allow create, update: if isSuperAdmin() || canWritePrivateConsulta();
+      }
     }
     match /medi-consultas/{id} { allow read, write: if isSalud() || isSuperAdmin(); }
-    match /medi-slots/{slotId} { allow read, write: if isSignedIn(); }
+    match /medi-slots/{slotId} {
+      allow read: if isSignedIn();
+      allow write: if isSalud() || isSuperAdmin();
+    }
     match /medi-config/{docId} { allow read: if isSignedIn(); allow write: if isSuperAdmin() || isSalud(); }
 
     // [NEW] MEDI CHAT RULES (C5+E1)
     match /medi-conversations/{convId} {
       // Helper function to check participation
-      function isChatParticipant() {
+      function isChatParticipantFromData(data) {
         return isSignedIn() && (
-          resource.data.studentId == request.auth.uid || 
-          resource.data.profesionalId == request.auth.uid || 
-          isOwner(resource.data.profesionalProfileId)
+          data.studentId == request.auth.uid ||
+          data.profesionalId == request.auth.uid
         );
+      }
+      function isChatParticipant() {
+        return isChatParticipantFromData(resource.data);
       }
       
       allow read: if isChatParticipant() || isSuperAdmin();
-      allow create: if isSignedIn(); // Allow creation (service handles logic)
+      allow create: if (isChatParticipantFromData(request.resource.data) && isSaludUser(request.resource.data.profesionalId)) || isSuperAdmin();
       allow update: if isChatParticipant() || isSuperAdmin();
       
       match /messages/{msgId} {
-        allow read: if get(/databases/$(database)/documents/medi-conversations/$(convId)).data.studentId == request.auth.uid ||
-                     get(/databases/$(database)/documents/medi-conversations/$(convId)).data.profesionalId == request.auth.uid ||
-                     isSuperAdmin();
-        allow create: if isSignedIn();
+        function conversationData() {
+          return get(/databases/$(database)/documents/medi-conversations/$(convId)).data;
+        }
+        allow read: if isChatParticipantFromData(conversationData()) || isSuperAdmin();
+        allow create: if isChatParticipantFromData(conversationData()) &&
+                      request.resource.data.senderId == request.auth.uid;
       }
     }
 
@@ -184,82 +434,562 @@ service cloud.firestore {
       allow read: if isSalud() || isSuperAdmin();
     }
 
-    // ==== AULA ====
-    match /aula-avisos/{id} {
+    // ==== AULA (Plataforma Colaborativa tipo Teams) ====
+    function aulaText(value) {
+      return value == null ? '' : value;
+    }
+    function hasAulaAcademicDistinction() {
+      let data = userDoc(request.auth.uid).data;
+      let tipoUsuario = aulaText(data.get('tipoUsuario', '')).lower();
+      let jobTitle = aulaText(data.get('originalJobTitle', data.get('jobTitle', ''))).lower();
+      return tipoUsuario == 'docente' ||
+             tipoUsuario == 'personal academico' ||
+             tipoUsuario == 'personal académico' ||
+             tipoUsuario == 'academico' ||
+             tipoUsuario == 'académico' ||
+             tipoUsuario == 'profesor' ||
+             tipoUsuario == 'maestro' ||
+             tipoUsuario == 'catedratico' ||
+             tipoUsuario == 'catedrático' ||
+             jobTitle.matches('.*(docente|profesor|maestro|catedratic|acad[eé]mico).*');
+    }
+    function isAulaAdminProfile() {
+      let data = userDoc(request.auth.uid).data;
+      let role = data.get('role', '');
+      let perm = data.get('permissions', {});
+      return isSignedIn() && (
+        role == 'aula_admin' ||
+        role == 'aula' ||
+        role == 'admin' ||
+        isSuperAdmin() ||
+        perm.get('aula', '') == 'admin'
+      );
+    }
+    function isAulaDocente() {
+      let data = userDoc(request.auth.uid).data;
+      let role = data.get('role', '');
+      let perm = data.get('permissions', {});
+      return isSignedIn() && (
+        isAulaAdminProfile() ||
+        role == 'docente' || 
+        perm.get('aula', '') == 'docente'
+      );
+    }
+
+    match /aula-cursos/{id} { allow read: if isSignedIn(); allow write: if isAulaDocente(); }
+    match /aula-inscripciones/{id} { allow read: if isSignedIn() && (resource.data.studentId == request.auth.uid || isAulaDocente()); allow create: if isSignedIn(); allow update: if isAulaDocente(); }
+    match /aula-progress/{id} { allow read: if isSignedIn(); allow write: if isSignedIn(); }
+    match /aula-certificados/{id} { allow read: if isSignedIn(); allow write: if isAulaDocente(); }
+
+    // Clases: docentes crean, todos los auth leen
+    match /aula-clases/{id} {
       allow read: if isSignedIn();
-      allow write: if isAula() || isSuperAdmin();
+      allow create: if isAulaDocente();
+      // Docentes actualizan su propia clase; cualquier auth puede actualizar solo miembrosCount (al unirse)
+      allow update: if ((isAulaAdminProfile() || resource.data.docenteId == request.auth.uid) && isAulaDocente())
+                   || (isSignedIn() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['miembrosCount']));
+      allow delete: if isAulaAdminProfile() || resource.data.docenteId == request.auth.uid;
     }
-    match /aula-cursos/{id} {
-      allow read: if true; 
-      allow write: if isAula() || isSuperAdmin();
-    }
-    match /aula-inscripciones/{id} {
+
+    // Miembros: join por codigo o agregado por docente
+    match /aula-miembros/{id} {
       allow read: if isSignedIn();
-      allow create: if isSignedIn() && request.resource.data.studentId == request.auth.uid;
-      allow delete: if isOwner(resource.data.studentId) || isAula() || isSuperAdmin();
+      allow create: if isSignedIn() && (
+        isAulaAdminProfile() ||
+        (request.resource.data.userId == request.auth.uid && request.resource.data.rol == 'estudiante') ||
+        (request.resource.data.userId == request.auth.uid && request.resource.data.rol == 'docente' && isAulaDocente()) ||
+        (isAulaDocente() && request.resource.data.rol == 'estudiante')
+      );
+      allow update: if isAulaDocente() || isSuperAdmin();
+      allow delete: if isAulaDocente() || resource.data.userId == request.auth.uid || isSuperAdmin();
     }
-    match /aula-cursos/{cursoId}/lessons/{lessonId} {
+
+    // Publicaciones: docentes publican, todos los auth leen
+    match /aula-publicaciones/{id} {
       allow read: if isSignedIn();
-      allow write: if isAula() || isSuperAdmin();
+      allow create: if isAulaDocente();
+      allow update, delete: if isAulaDocente() && (resource.data.autorId == request.auth.uid || isSuperAdmin());
     }
-    match /aula-cursos/{cursoId}/quizzes/{quizId} {
+
+    // Entregas: estudiantes crean/editan las suyas, docentes califican
+    match /aula-entregas/{id} {
       allow read: if isSignedIn();
-      allow write: if isAula() || isSuperAdmin();
+      allow create: if isSignedIn() && request.resource.data.estudianteId == request.auth.uid;
+      allow update: if isAulaDocente() || (
+        isSignedIn() &&
+        resource.data.calificacion == null &&
+        (
+          resource.data.estudianteId == request.auth.uid ||
+          (resource.data.grupoId != null && request.auth.uid in resource.data.grupoMiembroIds)
+        ) &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'contenido',
+          'archivos',
+          'actualizadoPorId',
+          'actualizadoPorNombre',
+          'updatedAt',
+          'estado',
+          'entregadoAt'
+        ]) &&
+        request.resource.data.estado in ['entregado', 'tarde'] &&
+        request.resource.data.calificacion == resource.data.calificacion &&
+        request.resource.data.retroalimentacion == resource.data.retroalimentacion &&
+        request.resource.data.calificadoPor == resource.data.calificadoPor &&
+        request.resource.data.calificadoAt == resource.data.calificadoAt &&
+        request.resource.data.estudianteId == resource.data.estudianteId &&
+        request.resource.data.publicacionId == resource.data.publicacionId &&
+        request.resource.data.claseId == resource.data.claseId &&
+        request.resource.data.grupoId == resource.data.grupoId &&
+        request.resource.data.grupoNombre == resource.data.grupoNombre &&
+        request.resource.data.grupoMiembroIds == resource.data.grupoMiembroIds
+      );
+      allow delete: if isSuperAdmin();
     }
-    match /aula-progress/{docId} {
+
+    // Comentarios: cualquier auth crea, todos leen
+    match /aula-comentarios/{id} {
       allow read: if isSignedIn();
-      allow create, update: if isSignedIn() && (request.resource.data.uid == request.auth.uid || isAula() || isSuperAdmin());
-      allow delete: if isSignedIn() && (isAula() || isSuperAdmin());
+      allow create: if isSignedIn();
+      allow delete: if isAulaDocente() || resource.data.autorId == request.auth.uid || isSuperAdmin();
     }
-    match /aula-intentos/{docId} {
+
+    // Votos (encuestas): ID determinista previene doble voto
+    match /aula-votos/{id} {
       allow read: if isSignedIn();
-      allow create: if isSignedIn() && (request.resource.data.uid == request.auth.uid || isAula() || isSuperAdmin());
-      allow update, delete: if isSignedIn() && (isAula() || isSuperAdmin());
+      allow create: if isSignedIn();
+      allow update, delete: if false;
     }
-    match /aula-certificados/{certId} {
-      allow read: if true;
-      allow write: if isAula() || isSuperAdmin();
+
+    // Plantillas de publicacion (privadas por docente)
+    match /aula-plantillas/{id} {
+      allow read: if isAulaDocente() && resource.data.docenteId == request.auth.uid;
+      allow create: if isAulaDocente() && request.resource.data.docenteId == request.auth.uid;
+      allow update, delete: if isAulaDocente() && resource.data.docenteId == request.auth.uid;
     }
-    
-    match /aula-badges/{badgeId} {
-      // Permitir leer si eres dueño, superadmin o aula admin
-      allow read: if isSignedIn() && (resource.data.uid == request.auth.uid || isSuperAdmin() || isAula());
-      // Permitir crear/actualizar si es para uno mismo (el sistema lo hace a nombre del usuario) o admin
-      allow create, update: if isSignedIn() && (request.resource.data.uid == request.auth.uid || isSuperAdmin() || isAula());
-      allow delete: if isSuperAdmin() || isAula();
+
+    // Grupos de trabajo
+    match /aula-grupos/{id} {
+      allow read: if isSignedIn();
+      allow create: if isAulaDocente();
+      allow update: if isAulaDocente() || isSuperAdmin();
+      allow delete: if isAulaDocente() || isSuperAdmin();
     }
-    
+
+    // Reacciones en comentarios
+    match /aula-reacciones/{id} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+    }
+
     // ==== FORO ====
     match /foro_events/{eventId} {
-      allow read: if isSignedIn();
-      allow write: if isForo() || isSuperAdmin();
+      allow read: if canReadForoEventData(resource.data);
+      allow create, update, delete: if isSuperAdmin();
+
+      match /feedback/{feedbackId} {
+        allow read: if isSignedIn() && (
+          resource.data.userId == request.auth.uid ||
+          isForoEventOrganizer(eventId) ||
+          isDifusionForo() ||
+          isSuperAdmin()
+        );
+        allow create, update, delete: if isSuperAdmin();
+      }
+
+      match /private/{docId} {
+        allow read, write: if isSuperAdmin();
+      }
     }
-    match /foro_notices/{noticeId} {
-      allow read: if isSignedIn();
-      allow write: if isForo() || isSuperAdmin();
-    }
+
     match /foro_tickets/{ticketId} {
-      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isForo() || isSuperAdmin());
-      allow create: if isSignedIn() && (request.resource.data.userId == request.auth.uid || isForo() || isSuperAdmin());
-      allow update, delete: if isForo() || isSuperAdmin();
+      allow read: if canReadForoTicket(resource.data);
+      allow create, update, delete: if isSuperAdmin();
     }
-    match /foro_registrations/{ticketId} {
-      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isForo() || isSuperAdmin());
-      allow create: if isSignedIn() && (request.resource.data.userId == request.auth.uid || isForo() || isSuperAdmin());
-      allow update, delete: if isForo() || isSuperAdmin();
+
+    match /foro_conversations/{convId} {
+      allow read: if isForoConversationParticipantFromData(resource.data) || isDifusionForo() || isSuperAdmin();
+      allow create: if canCreateForoConversation() || isSuperAdmin();
+      allow update: if canUpdateForoConversation() || isSuperAdmin();
+      allow delete: if isSuperAdmin();
+
+      match /messages/{msgId} {
+        function foroConversationData() {
+          return get(/databases/$(database)/documents/foro_conversations/$(convId)).data;
+        }
+        allow read: if isForoConversationParticipantFromData(foroConversationData()) || isDifusionForo() || isSuperAdmin();
+        allow create: if isForoConversationParticipantFromData(foroConversationData()) &&
+                      request.resource.data.senderId == request.auth.uid;
+        allow update, delete: if isSuperAdmin();
+      }
+    }
+
+    // ==== COMUNIDAD ====
+    function comunidadPermValue() {
+      let data = userDoc(request.auth.uid).data;
+      let perm = data.get('permissions', {});
+      return perm.get('comunidad', '');
+    }
+
+    function isComunidadAdmin() {
+      let role = userDoc(request.auth.uid).data.get('role', '');
+      return isSignedIn() && (
+        isSuperAdmin() ||
+        role == 'admin' ||
+        comunidadPermValue() == 'admin'
+      );
+    }
+
+    function hasComunidadState(uid) {
+      return exists(/databases/$(database)/documents/comunidad_user_states/$(uid));
+    }
+
+    function comunidadStateData(uid) {
+      return get(/databases/$(database)/documents/comunidad_user_states/$(uid)).data;
+    }
+
+    function isComunidadBlocked(uid) {
+      return hasComunidadState(uid) && comunidadStateData(uid).get('status', 'active') == 'blocked';
+    }
+
+    function isComunidadMuted(uid) {
+      return hasComunidadState(uid) && comunidadStateData(uid).get('status', 'active') == 'muted';
+    }
+
+    function canWriteComunidad(uid) {
+      return isSignedIn() &&
+        request.auth.uid == uid &&
+        !isComunidadBlocked(uid) &&
+        !isComunidadMuted(uid);
+    }
+
+    function comunidadUserCareer(uid) {
+      return userDoc(uid).data.get('carrera', '');
+    }
+
+    function comunidadPostData(postId) {
+      return get(/databases/$(database)/documents/comunidad_posts/$(postId)).data;
+    }
+
+    function comunidadConversationData(conversationId) {
+      return get(/databases/$(database)/documents/comunidad_conversations/$(conversationId)).data;
+    }
+
+    function isComunidadConversationParticipant(data) {
+      return isSignedIn() && request.auth.uid in data.get('participants', []);
+    }
+
+    function canReadComunidadPost(data) {
+      return isSignedIn() && (
+        isComunidadAdmin() ||
+        data.get('authorId', '') == request.auth.uid ||
+        (
+          data.get('status', 'active') == 'active' &&
+          data.get('hiddenByAdmin', false) == false &&
+          (
+            data.get('scope', 'global') == 'global' ||
+            (
+              data.get('scope', 'global') == 'career' &&
+              comunidadUserCareer(request.auth.uid) in data.get('careerTargets', [])
+            )
+          )
+        )
+      );
+    }
+
+    function isComunidadPostCounterUpdate() {
+      return isSignedIn() &&
+        !isComunidadBlocked(request.auth.uid) &&
+        !isComunidadMuted(request.auth.uid) &&
+        request.resource.data.authorId == resource.data.authorId &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'commentCount',
+          'reactionCount',
+          'lastActivityAt',
+          'updatedAt'
+        ]);
+    }
+
+    function isComunidadCommentCounterUpdate() {
+      return isSignedIn() &&
+        !isComunidadBlocked(request.auth.uid) &&
+        !isComunidadMuted(request.auth.uid) &&
+        request.resource.data.authorId == resource.data.authorId &&
+        request.resource.data.postId == resource.data.postId &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'replyCount',
+          'reactionCount',
+          'updatedAt'
+        ]);
+    }
+
+    match /comunidad_posts/{postId} {
+      allow read: if canReadComunidadPost(resource.data);
+      allow create: if canWriteComunidad(request.resource.data.authorId) &&
+                    request.resource.data.authorId == request.auth.uid &&
+                    request.resource.data.status == 'active';
+      allow update: if isComunidadAdmin() ||
+                    isComunidadPostCounterUpdate() ||
+                    (
+                      isSignedIn() &&
+                      resource.data.authorId == request.auth.uid &&
+                      request.resource.data.authorId == resource.data.authorId &&
+                      request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+                        'title',
+                        'text',
+                        'bullets',
+                        'type',
+                        'scope',
+                        'careerTargets',
+                        'contentMode',
+                        'media',
+                        'status',
+                        'updatedAt'
+                      ])
+                    );
+      allow delete: if isComunidadAdmin();
+    }
+
+    match /comunidad_comments/{commentId} {
+      allow read: if canReadComunidadPost(comunidadPostData(resource.data.postId));
+      allow create: if canWriteComunidad(request.resource.data.authorId) &&
+                    request.resource.data.authorId == request.auth.uid &&
+                    comunidadPostData(request.resource.data.postId).get('status', 'active') == 'active' &&
+                    comunidadPostData(request.resource.data.postId).get('commentsEnabled', true) == true &&
+                    canReadComunidadPost(comunidadPostData(request.resource.data.postId));
+      allow update: if isComunidadAdmin() ||
+                    isComunidadCommentCounterUpdate() ||
+                    (
+                      isSignedIn() &&
+                      resource.data.authorId == request.auth.uid &&
+                      request.resource.data.authorId == resource.data.authorId &&
+                      request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+                        'text',
+                        'status',
+                        'updatedAt'
+                      ])
+                    );
+      allow delete: if isComunidadAdmin();
+    }
+
+    match /comunidad_reactions/{reactionId} {
+      allow read: if isSignedIn();
+      allow create: if canWriteComunidad(request.resource.data.userId) &&
+                    request.resource.data.userId == request.auth.uid;
+      allow delete: if isSignedIn() &&
+                    (resource.data.userId == request.auth.uid || isComunidadAdmin());
+      allow update: if false;
+    }
+
+    match /comunidad_reports/{reportId} {
+      allow read, delete: if isComunidadAdmin();
+      allow create: if isSignedIn() &&
+                    request.resource.data.reportedBy == request.auth.uid;
+      allow update: if isComunidadAdmin() ||
+                    (
+                      isSignedIn() &&
+                      resource.data.reportedBy == request.auth.uid &&
+                      request.resource.data.reportedBy == resource.data.reportedBy &&
+                      request.resource.data.targetType == resource.data.targetType &&
+                      request.resource.data.targetId == resource.data.targetId &&
+                      request.resource.data.status == resource.data.status &&
+                      request.resource.data.createdAt == resource.data.createdAt &&
+                      request.resource.data.reviewedAt == resource.data.reviewedAt &&
+                      request.resource.data.reviewedBy == resource.data.reviewedBy &&
+                      request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+                        'reason',
+                        'details',
+                        'updatedAt'
+                      ])
+                    );
+    }
+
+    match /comunidad_user_states/{uid} {
+      allow read: if isOwner(uid) || isComunidadAdmin();
+      allow create, update: if isOwner(uid) || isComunidadAdmin();
+      allow delete: if isComunidadAdmin();
+    }
+
+    match /comunidad_conversations/{conversationId} {
+      allow get: if isSignedIn() &&
+                 (resource == null || isComunidadConversationParticipant(resource.data));
+      allow list: if isSignedIn() && isComunidadConversationParticipant(resource.data);
+      allow create: if isSignedIn() &&
+                    request.auth.uid in request.resource.data.get('participants', []) &&
+                    request.resource.data.get('participants', []).size() == 2 &&
+                    request.resource.data.get('status', 'active') == 'active' &&
+                    !isComunidadBlocked(request.auth.uid) &&
+                    !isComunidadMuted(request.auth.uid);
+      allow update: if isComunidadAdmin() ||
+                    (
+                      isSignedIn() &&
+                      isComunidadConversationParticipant(resource.data) &&
+                      request.resource.data.get('participants', []) == resource.data.get('participants', []) &&
+                      request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+                        'participantNames',
+                        'participantProfiles',
+                        'lastMessage',
+                        'lastMessageAt',
+                        'lastSenderId',
+                        'unreadBy',
+                        'updatedAt'
+                      ])
+                    );
+      allow delete: if isComunidadAdmin();
+
+      match /messages/{messageId} {
+        allow read: if isSignedIn() &&
+                    isComunidadConversationParticipant(comunidadConversationData(conversationId));
+        allow create: if canWriteComunidad(request.resource.data.senderId) &&
+                      request.resource.data.senderId == request.auth.uid &&
+                      comunidadConversationData(conversationId).get('status', 'active') == 'active' &&
+                      request.auth.uid in comunidadConversationData(conversationId).get('participants', []);
+        allow update: if false;
+        allow delete: if isComunidadAdmin();
+      }
     }
 
     // ==== QUEJAS ====
     function isQuejasAdmin() {
         let data = userDoc(request.auth.uid).data;
         let perm = data.get('permissions', {});
-        return isSignedIn() && ((data.role == 'department_admin' && perm.get('quejas', '') == 'admin') || request.auth.token.email == 'calidad@loscabos.tecnm.mx');
+        return isSignedIn() && (
+          isSuperAdmin() ||
+          (data.role == 'department_admin' && perm.get('quejas', '') == 'admin') ||
+          request.auth.token.email == 'calidad@loscabos.tecnm.mx'
+        );
+    }
+
+    function quejasTicketDoc(ticketId) {
+      return get(/databases/$(database)/documents/quejas/$(ticketId));
+    }
+
+    function isValidQuejasCreate() {
+      return isSignedIn()
+        && request.resource.data.keys().hasOnly([
+          'userId', 'userEmail', 'userName', 'matricula',
+          'tipo', 'categoria', 'descripcion', 'evidenciaUrl', 'isAnonymous',
+          'status', 'publicResponseCount', 'internalNoteCount',
+          'lastPublicResponseAt', 'lastInternalNoteAt', 'lastInternalNotePreview',
+          'historyMigrationVersion', 'createdAt', 'updatedAt'
+        ])
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.userEmail == request.auth.token.email
+        && request.resource.data.userName is string
+        && request.resource.data.userName.size() > 0
+        && request.resource.data.userName.size() <= 180
+        && request.resource.data.matricula is string
+        && request.resource.data.tipo in ['queja', 'sugerencia', 'felicitacion']
+        && request.resource.data.categoria in ['infraestructura', 'servicios', 'docentes', 'administrativo', 'limpieza', 'otro']
+        && request.resource.data.descripcion is string
+        && request.resource.data.descripcion.size() >= 10
+        && request.resource.data.descripcion.size() <= 5000
+        && request.resource.data.evidenciaUrl is string
+        && request.resource.data.evidenciaUrl.size() <= 3000
+        && request.resource.data.isAnonymous is bool
+        && request.resource.data.status == 'pendiente'
+        && request.resource.data.publicResponseCount == 0
+        && request.resource.data.internalNoteCount == 0
+        && request.resource.data.lastPublicResponseAt == null
+        && request.resource.data.lastInternalNoteAt == null
+        && request.resource.data.lastInternalNotePreview == ''
+        && request.resource.data.historyMigrationVersion == 1
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time;
+    }
+
+    function isValidQuejasStudentTouch() {
+      return isSignedIn()
+        && resource.data.userId == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['updatedAt', 'publicResponseCount', 'lastPublicResponseAt'])
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.lastPublicResponseAt == request.time
+        && request.resource.data.publicResponseCount == resource.data.get('publicResponseCount', 0) + 1;
+    }
+
+    function isValidQuejasAdminPublicTouch() {
+      return isQuejasAdmin()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['updatedAt', 'publicResponseCount', 'lastPublicResponseAt'])
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.lastPublicResponseAt == request.time
+        && request.resource.data.publicResponseCount == resource.data.get('publicResponseCount', 0) + 1;
+    }
+
+    function isValidQuejasAdminInternalTouch() {
+      return isQuejasAdmin()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['updatedAt', 'internalNoteCount', 'lastInternalNoteAt', 'lastInternalNotePreview'])
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.lastInternalNoteAt == request.time
+        && request.resource.data.lastInternalNotePreview is string
+        && request.resource.data.lastInternalNotePreview.size() <= 180
+        && request.resource.data.internalNoteCount == resource.data.get('internalNoteCount', 0) + 1;
+    }
+
+    function isValidQuejasAdminStatusTouch() {
+      return isQuejasAdmin()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt', 'publicResponseCount', 'lastPublicResponseAt'])
+        && request.resource.data.status in ['pendiente', 'en-proceso', 'resuelto', 'rechazado']
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.lastPublicResponseAt == request.time
+        && request.resource.data.publicResponseCount == resource.data.get('publicResponseCount', 0) + 1;
+    }
+
+    function isValidQuejasMigrationTouch() {
+      return isQuejasAdmin()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'publicResponseCount', 'internalNoteCount', 'lastPublicResponseAt',
+          'lastInternalNoteAt', 'lastInternalNotePreview', 'historyMigrationVersion', 'history'
+        ])
+        && request.resource.data.historyMigrationVersion == 1
+        && request.resource.data.get('history', null) == null
+        && request.resource.data.publicResponseCount >= 0
+        && request.resource.data.internalNoteCount >= 0
+        && request.resource.data.lastInternalNotePreview is string
+        && request.resource.data.lastInternalNotePreview.size() <= 180;
+    }
+
+    function isValidQuejasResponseCreate(ticketId) {
+      let ticket = quejasTicketDoc(ticketId).data;
+      return isSignedIn()
+        && ticket != null
+        && request.resource.data.keys().hasOnly(['author', 'authorId', 'message', 'role', 'type', 'status', 'createdAt'])
+        && request.resource.data.author is string
+        && request.resource.data.author.size() > 0
+        && request.resource.data.author.size() <= 180
+        && request.resource.data.authorId == request.auth.uid
+        && request.resource.data.message is string
+        && request.resource.data.message.size() > 0
+        && request.resource.data.message.size() <= 2000
+        && request.resource.data.createdAt == request.time
+        && (
+          (
+            ticket.userId == request.auth.uid &&
+            request.resource.data.role == 'student' &&
+            request.resource.data.type == 'public' &&
+            request.resource.data.status == null
+          ) ||
+          (
+            isQuejasAdmin() &&
+            request.resource.data.role == 'admin' &&
+            request.resource.data.type in ['public', 'internal', 'status_change'] &&
+            (
+              request.resource.data.type != 'status_change' ||
+              request.resource.data.status in ['pendiente', 'en-proceso', 'resuelto', 'rechazado']
+            )
+          )
+        );
     }
 
     match /quejas/{ticketId} {
-      allow create: if isSignedIn();
+      allow create: if isValidQuejasCreate();
       allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isQuejasAdmin() || isSuperAdmin());
-      allow update: if isQuejasAdmin() || isSuperAdmin();
+      allow update: if isValidQuejasStudentTouch() || isValidQuejasAdminPublicTouch() || isValidQuejasAdminInternalTouch() || isValidQuejasAdminStatusTouch() || isValidQuejasMigrationTouch();
+
+      match /responses/{responseId} {
+        allow create: if isValidQuejasResponseCreate(ticketId);
+        allow read: if isQuejasAdmin() || isSuperAdmin() || (isSignedIn() && quejasTicketDoc(ticketId).data.userId == request.auth.uid && resource.data.type != 'internal');
+        allow update, delete: if false;
+      }
     }
     
     // ==== ENCUESTAS ====
@@ -270,16 +1000,52 @@ function isEncuestasAdmin() {
            || request.auth.token.email == 'calidad@loscabos.tecnm.mx');
 }
 
+    function surveyIsActiveForRead(data) {
+      let scheduling = data.get('scheduling', {});
+      let type = scheduling.get('type', 'manual');
+      let startDate = scheduling.get('startDate', null);
+      let endDate = scheduling.get('endDate', null);
+      return data.get('status', 'draft') == 'active'
+        && (
+          type != 'timed' ||
+          ((startDate == null || request.time >= startDate) &&
+           (endDate == null || request.time <= endDate))
+        );
+    }
+
+    function isValidSignedSurveyResponse(responseId) {
+      return isSignedIn()
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.isPublicResponse == false
+        && responseId == request.resource.data.surveyId + '__' + request.auth.uid;
+    }
+
+    function isValidPublicSurveyResponse() {
+      let survey = get(/databases/$(database)/documents/encuestas/$(request.resource.data.surveyId)).data;
+      return !isSignedIn()
+        && request.resource.data.userId == 'anonymous'
+        && request.resource.data.isPublicResponse == true
+        && survey.get('isPublic', false) == true
+        && surveyIsActiveForRead(survey);
+    }
+
+    function isValidServiceSurveyResponse() {
+      return isSignedIn()
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.isSkip == false;
+    }
+
     // ==== ENCUESTAS DE SERVICIO (NUEVO) ====
     match /encuestas-servicio/{id} {
       // Configuración de encuestas: Lectura auth, Escritura admin
       allow read: if isSignedIn();
-      allow write: if isEncuestasAdmin() || isSuperAdmin();
+      allow create, delete: if isEncuestasAdmin() || isSuperAdmin();
+      allow update: if isEncuestasAdmin() || isSuperAdmin();
     }
 
     match /encuestas-servicio-respuestas/{id} {
         // Respuestas: Crear auth, Leer admin
-        allow create: if isSignedIn();
+        allow create: if isValidServiceSurveyResponse();
         allow read: if isEncuestasAdmin() || isSuperAdmin();
     }
 
@@ -294,16 +1060,22 @@ function isEncuestasAdmin() {
 
     // ==== ENCUESTAS DE SATISFACCIÓN (LIGADAS A TRÁMITES/GENERAL) ====
     match /encuestas/{surveyId} {
-      allow read: if true;  // Públicas necesitan lectura sin auth
+      allow read: if (isSignedIn() && (isEncuestasAdmin() || isSuperAdmin() || surveyIsActiveForRead(resource.data)))
+                   || (!isSignedIn() && resource.data.get('isPublic', false) == true && surveyIsActiveForRead(resource.data));
       allow create, update, delete: if isEncuestasAdmin() || isSuperAdmin();
     }
     
     match /encuestas-respuestas/{responseId} {
-      // Lectura: solo admin o el propio usuario
-      allow read: if isEncuestasAdmin() || isSuperAdmin() 
+      // Lectura: admin puede listar; el usuario solo puede consultar su respuesta
+      // determinista (`surveyId__uid`) aun si todavia no existe.
+      allow get: if isEncuestasAdmin() || isSuperAdmin()
+                  || (isSignedIn() && (
+                      (resource != null && resource.data.userId == request.auth.uid)
+                      || responseId.matches('^.+__' + request.auth.uid + '$')
+                  ));
+      allow list: if isEncuestasAdmin() || isSuperAdmin()
                    || (isSignedIn() && resource.data.userId == request.auth.uid);
-      // Creación: autenticados O anónimos (para encuestas públicas)
-      allow create: if true;
+      allow create: if isValidSignedSurveyResponse(responseId) || isValidPublicSurveyResponse();
       allow update, delete: if false;
     }
 
@@ -354,6 +1126,72 @@ function isEncuestasAdmin() {
     match /medi-shift-profiles/{id} {
       allow read: if isSignedIn();
       allow write: if isSalud() || isSuperAdmin();
+    }
+
+    // [NEW] System Logs — auditoría SuperAdmin
+    match /system-logs/{logId} {
+      allow read: if isSuperAdmin();
+      allow create: if isSignedIn();
+    }
+
+    // [NEW] Config global
+    match /config/{docId} {
+      allow read: if isSignedIn();
+      allow write: if isSuperAdmin();
+    }
+
+    // [NEW] Tickets de soporte técnico
+    match /tickets-soporte/{ticketId} {
+      allow create: if isSignedIn();
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isSuperAdmin());
+      allow update: if isSuperAdmin();
+    }
+
+    // ==== CAFETERIA ====
+    function isCafeteriaAdmin() {
+        let data = userDoc(request.auth.uid).data;
+        let role = data.get('role', '');
+        let perm = data.get('permissions', {});
+        return isSignedIn() && (
+            role == 'superadmin' ||
+            role == 'admin' ||
+            role == 'cafeteria' ||
+            perm.get('cafeteria', '') == 'admin' ||
+            perm.get('cafeteria', '') == true ||
+            (role == 'department_admin' && perm.get('cafeteria', '') != '')
+        );
+    }
+
+    match /cafeteria-config/{docId} {
+      allow read: if isSignedIn();
+      allow write: if isCafeteriaAdmin() || isSuperAdmin();
+    }
+
+    match /cafeteria-productos/{productoId} {
+      allow read: if isSignedIn();
+      allow create, delete: if isCafeteriaAdmin() || isSuperAdmin();
+      allow update: if isCafeteriaAdmin() || isSuperAdmin() ||
+        (isSignedIn() && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['promedioResenas', 'totalResenas']));
+    }
+
+    match /cafeteria-pedidos/{pedidoId} {
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow read: if isSignedIn() && (
+        resource.data.userId == request.auth.uid ||
+        isCafeteriaAdmin() || isSuperAdmin()
+      );
+      allow update: if isCafeteriaAdmin() || isSuperAdmin() ||
+        (isSignedIn() && resource.data.userId == request.auth.uid &&
+         request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['comprobanteUrl', 'updatedAt']));
+    }
+
+    match /cafeteria-resenas/{resenaId} {
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow read: if isSignedIn();
+      allow update: if isCafeteriaAdmin() || isSuperAdmin();
+      allow delete: if false;
     }
   }
 }

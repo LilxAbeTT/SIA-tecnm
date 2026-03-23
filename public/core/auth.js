@@ -92,7 +92,7 @@ export class AuthManager {
         const provider = new firebase.auth.OAuthProvider('microsoft.com');
         provider.setCustomParameters({
             prompt: 'select_account',
-            tenant: 'common' // or specific tenant
+            tenant: 'e5da4e41-4181-4acd-a7e9-3c954a086c06'
         });
 
         try {

@@ -1,0 +1,572 @@
+/* Navbar Contenedor */
+.sia-navbar {
+    background: var(--nav-bg) !important;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--nav-border);
+    padding: 0.6rem 1rem;
+    transition: all 0.3s ease;
+}
+
+.search-icon-sia {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #94a3b8;
+    font-size: 0.9rem;
+}
+
+/* Botones de Acción Navbar */
+.nav-action-btn {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--nav-text);
+    background: transparent;
+    border: none;
+    transition: all 0.2s;
+    cursor: pointer;
+}
+
+.nav-action-btn:hover {
+    background: var(--search-bg);
+    transform: translateY(-1px);
+}
+
+.badge-dot {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 8px;
+    height: 8px;
+    background: #ef4444;
+    border: 2px solid var(--nav-bg);
+    border-radius: 50%;
+}
+
+.sia-shell-breadcrumbs-wrap {
+    position: relative;
+    z-index: 1020;
+    margin: -0.1rem 0 0.9rem;
+}
+
+.sia-shell-breadcrumbs {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 18px;
+    box-shadow: 0 12px 24px rgba(15, 23, 42, 0.08);
+    overflow: hidden;
+}
+
+.sia-shell-breadcrumbs-track {
+    --crumb-accent: var(--primary, #1B396A);
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.8rem 1rem;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+.sia-shell-breadcrumbs-track::-webkit-scrollbar {
+    display: none;
+}
+
+.sia-shell-breadcrumbs-link,
+.sia-shell-breadcrumbs-node,
+.sia-shell-breadcrumbs-current {
+    white-space: nowrap;
+    font-size: 0.86rem;
+    line-height: 1.2;
+}
+
+.sia-shell-breadcrumbs-link {
+    border: 0;
+    background: transparent;
+    padding: 0;
+    color: var(--text-muted, #64748b);
+    font-weight: 700;
+    transition: color 0.18s ease, transform 0.18s ease;
+}
+
+.sia-shell-breadcrumbs-link:hover {
+    color: var(--crumb-accent);
+    transform: translateY(-1px);
+}
+
+.sia-shell-breadcrumbs-node {
+    color: var(--text-muted, #64748b);
+    font-weight: 700;
+    opacity: 0.82;
+}
+
+.sia-shell-breadcrumbs-current {
+    color: var(--text-heading, #f8fafc);
+    font-weight: 800;
+}
+
+.sia-shell-breadcrumbs-separator {
+    color: var(--crumb-accent);
+    font-size: 0.72rem;
+    opacity: 0.55;
+}
+
+/* Ajustes Responsive */
+@media (max-width: 991.98px) {
+
+    .desktop-brand-text {
+        display: none;
+    }
+}
+
+@media (max-width: 767.98px) {
+    .sia-shell-breadcrumbs-wrap {
+        margin: 0.75rem 0 0.6rem;
+    }
+
+    .sia-shell-breadcrumbs {
+        border-radius: 16px;
+    }
+
+    .sia-shell-breadcrumbs-track {
+        padding: 0.72rem 0.9rem;
+    }
+}
+
+/* Light Mode overrides for Navbar Actions */
+html[data-bs-theme="light"] .nav-action-btn {
+    color: var(--text-main);
+}
+
+html[data-bs-theme="light"] .nav-action-btn:hover {
+    background-color: rgba(0, 0, 0, 0.05);
+    color: var(--primary);
+}
+
+html[data-bs-theme="light"] .badge-dot {
+    border-color: #fff;
+}
+
+/* --- NUEVO DASHBOARD SYSTEM --- */
+.hero-banner-v2 {
+    background: linear-gradient(135deg, #1B396A 0%, #0d6efd 100%);
+    border-radius: 20px;
+    padding: 1.5rem;
+    color: white;
+    position: relative;
+    overflow: hidden;
+}
+
+.hero-bg-icon-v2 {
+    position: absolute;
+    right: -10px;
+    bottom: -20px;
+    font-size: 7rem;
+    opacity: 0.1;
+    transform: rotate(-15deg);
+}
+
+/* Desktop Fix */
+@media (min-width: 768px) {
+
+    .hero-banner-v2 {
+        padding: 3rem;
+    }
+}
+
+/* App Drawer (Waffle Menu) */
+.app-drawer-dropdown {
+    width: 320px;
+    padding: 1rem;
+    border-radius: 16px;
+    border: none;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+}
+
+@media (max-width: 576px) {
+    .app-drawer-dropdown {
+        position: fixed !important;
+        top: 70px !important;
+        left: 50% !important;
+        right: auto !important;
+        transform: translateX(-50%) !important;
+        width: 90% !important;
+        max-width: 320px !important;
+        margin: 0 !important;
+    }
+}
+
+.app-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+}
+
+.app-icon-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 0.75rem 0.25rem;
+    border-radius: 12px;
+    transition: background-color 0.2s;
+    color: var(--text-body);
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.app-icon-item:hover {
+    background-color: var(--surface-muted);
+    color: var(--primary);
+}
+
+.app-icon-item img {
+    width: 40px;
+    height: 40px;
+    margin-bottom: 0.5rem;
+    object-fit: contain;
+}
+
+.app-icon-item span {
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+/* Bottom Navigation Bar (Mobile) */
+.bottom-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 70px;
+    /* Altura fija */
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    border-top: 1px solid rgba(0, 0, 0, 0.05);
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    z-index: 1050;
+    padding-bottom: env(safe-area-inset-bottom);
+    /* Soporte iPhone X+ */
+    box-shadow: 0 -5px 20px rgba(0, 0, 0, 0.03);
+}
+
+.bottom-nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: #94a3b8;
+    text-decoration: none;
+    font-size: 0.7rem;
+    font-weight: 600;
+    width: 100%;
+    height: 100%;
+    transition: color 0.2s;
+    background: none;
+    border: none;
+    padding: 0;
+}
+
+.bottom-nav-item i {
+    font-size: 1.4rem;
+    margin-bottom: 2px;
+    transition: transform 0.2s;
+}
+
+.bottom-nav-item.active {
+    color: var(--primary);
+}
+
+.bottom-nav-item.active i {
+    transform: translateY(-2px);
+}
+
+/* Ajuste para que el contenido no quede tapado por la bottom nav */
+@media (max-width: 767.98px) {
+    body {
+        padding-bottom: 80px;
+    }
+}
+
+/* Dark default overrides (now base styles) */
+
+.app-drawer-dropdown {
+    background: var(--bg-card) !important;
+    border: 1px solid var(--border-color) !important;
+}
+
+.app-icon-item:hover {
+    background-color: rgba(255, 255, 255, 0.05);
+    color: #fff;
+}
+
+/* =========================================
+   UI IMPLEMENTATIONS (Phase 2)
+   ========================================= */
+
+/* --- SKELETON LOADERS --- */
+:root {
+    --skeleton-color-start: rgba(255, 255, 255, 0.05);
+    --skeleton-color-mid: rgba(255, 255, 255, 0.1);
+}
+
+[data-bs-theme="light"] {
+    --skeleton-color-start: rgba(0, 0, 0, 0.05);
+    --skeleton-color-mid: rgba(0, 0, 0, 0.11);
+}
+
+@keyframes pulse-gray {
+    0% {
+        background-color: var(--skeleton-color-start);
+    }
+
+    50% {
+        background-color: var(--skeleton-color-mid);
+    }
+
+    100% {
+        background-color: var(--skeleton-color-start);
+    }
+}
+
+.skeleton-loader {
+    animation: pulse-gray 1.5s infinite ease-in-out;
+    border-radius: 6px;
+    color: transparent !important;
+    cursor: default;
+    user-select: none;
+    background-color: var(--skeleton-color-start);
+}
+
+.skeleton-text {
+    height: 1em;
+    width: 70%;
+    margin-bottom: 0.5rem;
+    display: inline-block;
+}
+
+.skeleton-rect {
+    width: 100%;
+    height: 100%;
+    min-height: 100px;
+}
+
+/* Backdrop Blur Fix */
+.modal-backdrop.show {
+    opacity: 0.5;
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+}
+
+/* --- PWA INSTALL PROMPT (Phase 2) --- */
+.pwa-install-sheet {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    background: var(--bg-card);
+    border-top-left-radius: 1.5rem;
+    border-top-right-radius: 1.5rem;
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.4);
+    z-index: 1090;
+    transform: translateY(100%);
+    transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+    padding: 1.5rem;
+    padding-bottom: env(safe-area-inset-bottom, 1.5rem);
+    color: var(--text-main);
+}
+
+.pwa-install-sheet.show {
+    transform: translateY(0);
+}
+
+.pwa-icon {
+    width: 64px;
+    height: 64px;
+    border-radius: 16px;
+    margin-bottom: 1rem;
+    background: rgba(255, 255, 255, 0.06);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+    color: var(--accent);
+}
+
+/* FIX: Ensure Modal is above Mobile Nav */
+.modal {
+    z-index: 1060 !important;
+}
+
+.modal-backdrop {
+    z-index: 1050 !important;
+}
+
+.search-icon-sia {
+    position: absolute;
+    left: 12px;
+    z-index: 2;
+    color: #94a3b8;
+    pointer-events: none;
+}
+
+/* Hide desktop brand text on small mobile */
+@media(max-width: 380px) {
+    .navbar-brand img {
+        width: 28px;
+        height: 28px;
+    }
+}
+
+/* --- FIX NAVBAR & SEARCH --- */
+.sia-navbar {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    padding: 0.5rem 0;
+}
+
+/* Icono dentro del input */
+.search-icon-sia {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #9ca3af;
+    pointer-events: none;
+}
+
+/* =========================================
+   FIX NAVBAR & SEARCH (DEFINITIVO)
+   ========================================= */
+
+/* Navbar contenedor base (dark default) */
+.sia-navbar {
+    background: rgba(15, 17, 20, 0.95) !important;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    padding: 0.5rem 0;
+}
+
+[data-bs-theme="light"] .sia-navbar {
+    background: rgba(255, 255, 255, 0.95) !important;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+/* Wrapper: Controla el ancho y evita el "segundo piso" */
+.search-wrapper {
+    position: relative;
+    flex-grow: 1;
+    /* Esto permite que ocupe el espacio disponible sin forzar */
+    max-width: 500px;
+    min-width: 140px;
+    /* Un poco más pequeño para móviles angostos */
+    display: flex;
+    align-items: center;
+    margin: 0 0.5rem;
+}
+
+/* Input del buscador */
+.search-input-sia {
+    width: 100%;
+    height: 42px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background-color: rgba(255, 255, 255, 0.06);
+    border-radius: 50rem;
+    padding: 0 1rem 0 2.5rem;
+    font-size: 0.9rem;
+    outline: none;
+    transition: all 0.2s;
+    color: #f0f2f5;
+}
+
+[data-bs-theme="light"] .search-input-sia {
+    background-color: #f8f9fa;
+    border-color: #e5e7eb;
+    color: #1a202c;
+}
+
+.search-input-sia:focus {
+    background-color: #1a1d23;
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+
+[data-bs-theme="light"] .search-input-sia:focus {
+    background-color: #fff;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(27, 57, 106, 0.15);
+}
+
+/* Icono dentro del input */
+.search-icon-sia {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #9ca3af;
+    pointer-events: none;
+    z-index: 5;
+}
+
+/* RESULTADOS FLOTANTES (La clave para no romper el navbar) */
+.search-results-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    margin-top: 8px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    box-shadow: 0 10px 40px -5px rgba(0, 0, 0, 0.2);
+    z-index: 2000;
+    /* Por encima de todo */
+    max-height: 400px;
+    overflow-y: auto;
+    display: none;
+}
+
+.search-results-dropdown.active {
+    display: block;
+}
+
+/* Ajuste específico para móvil extremo (iPhone SE, etc) */
+@media (max-width: 380px) {
+    .navbar-brand span {
+        display: none;
+    }
+
+    /* Ocultar texto SIA si no cabe */
+    .search-wrapper {
+        max-width: 160px;
+    }
+}
+
+/* SIA Theme: Soporte para tarjetas de color sólido en ambos modos */
+.card.bg-danger,
+.card.bg-primary {
+    color: #ffffff !important;
+}
+
+.card.bg-danger .text-white-50,
+.card.bg-danger .opacity-75 {
+    color: rgba(255, 255, 255, 0.8) !important;
+}
+
+.card.bg-danger h6,
+.card.bg-danger .fw-bolder {
+    color: #ffffff !important;
+}
+
+[data-bs-theme="light"] .card.bg-danger {
+    box-shadow: 0 4px 15px rgba(220, 53, 69, 0.4) !important;
+}

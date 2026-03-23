@@ -6,13 +6,13 @@
 
 async function registerServiceSurveys() {
   console.log('🚀 Iniciando registro de encuestas de servicio...');
-  
+
   try {
     // ========== ENCUESTA DE SERVICIO MÉDICO ==========
     console.log('📋 Registrando encuesta de Servicio Médico...');
     await EncuestasServicioService.createServiceSurvey(window.appContext, 'servicio-medico', {
       title: 'Encuesta de Satisfacción - Servicio Médico',
-      description: 'Ayúdanos a mejorar la calidad de nuestro servicio médico',
+      description: '¡Hola! Nos gustaría conocer tu experiencia. Ayúdanos a mejorar la calidad de nuestro servicio médico.',
       questions: [
         {
           id: 'q0',
@@ -132,7 +132,7 @@ async function registerServiceSurveys() {
     console.log('📋 Registrando encuesta de Psicología...');
     await EncuestasServicioService.createServiceSurvey(window.appContext, 'psicologia', {
       title: 'Encuesta de Satisfacción - Atención Psicopedagógica',
-      description: 'Tu opinión nos ayuda a mejorar el servicio de apoyo psicopedagógico',
+      description: '¡Hola! Tu opinión es muy valiosa para nosotros y nos ayuda a mejorar el servicio de apoyo psicopedagógico.',
       questions: [
         {
           id: 'q0',
@@ -260,7 +260,7 @@ async function registerServiceSurveys() {
     console.log('📋 Registrando encuesta de Biblioteca...');
     await EncuestasServicioService.createServiceSurvey(window.appContext, 'biblioteca', {
       title: 'Encuesta de Satisfacción - Biblioteca',
-      description: 'Ayúdanos a mejorar los servicios de la biblioteca',
+      description: '¡Hola! Compártenos tu experiencia para ayudarnos a mejorar los servicios de la biblioteca.',
       questions: [
         {
           id: 'q0',
@@ -341,7 +341,7 @@ async function registerServiceSurveys() {
     console.log('1. Ve a la sección "Encuestas de Servicio" en el panel de administración');
     console.log('2. Configura la frecuencia y habilita las encuestas que desees');
     console.log('3. Las encuestas comenzarán a mostrarse automáticamente a los usuarios');
-    
+
   } catch (error) {
     console.error('❌ Error al registrar encuestas:', error);
     console.error('Detalles:', error.message);

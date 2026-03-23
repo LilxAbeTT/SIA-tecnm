@@ -1,6 +1,64 @@
 const BiblioAssetsService = (function () {
     const ASSETS_COLL = 'biblio-activos';
     const RES_COLL = 'biblio-reservas';
+    const USERS_COLL = 'usuarios';
+    const CLEAR_OCCUPANCY = {
+        occupiedBy: null,
+        occupiedByMatricula: null,
+        occupiedAt: null,
+        expiresAt: null
+    };
+
+    function getReservationStart(date, hourBlock) {
+        if (!date) return null;
+        const safeHour = hourBlock || '00:00';
+        return new Date(`${date}T${safeHour}:00`);
+    }
+
+    function getReservationEnd(date, hourBlock) {
+        const start = getReservationStart(date, hourBlock);
+        if (!start || Number.isNaN(start.getTime())) return null;
+        return new Date(start.getTime() + 60 * 60 * 1000);
+    }
+
+    function isUpcomingReservation(data, now = new Date()) {
+        if (!data || data.status !== 'activa' || !data.date) return false;
+
+        const end = getReservationEnd(data.date, data.hourBlock);
+        if (!end) return data.date >= now.toISOString().split('T')[0];
+        return end > now;
+    }
+
+    async function getAssetDoc(ctx, assetId) {
+        const assetRef = ctx.db.collection(ASSETS_COLL).doc(assetId);
+        const assetSnap = await assetRef.get();
+        if (!assetSnap.exists) throw new Error("El activo ya no existe.");
+        return { ref: assetRef, snap: assetSnap, data: assetSnap.data() || {} };
+    }
+
+    async function getUpcomingReservationsForAsset(ctx, assetId) {
+        const snap = await ctx.db.collection(RES_COLL)
+            .where('assetId', '==', assetId)
+            .get();
+
+        return snap.docs
+            .map(doc => ({ id: doc.id, ...doc.data() }))
+            .filter(item => isUpcomingReservation(item));
+    }
+
+    async function ensureAssetCanBeDisabledOrDeleted(ctx, assetId) {
+        const asset = await getAssetDoc(ctx, assetId);
+        if (asset.data.status === 'ocupado') {
+            throw new Error("El activo está ocupado. Libéralo antes de deshabilitarlo o eliminarlo.");
+        }
+
+        const upcomingReservations = await getUpcomingReservationsForAsset(ctx, assetId);
+        if (upcomingReservations.length > 0) {
+            throw new Error("El activo tiene reservas futuras activas. Cancélalas o reprográmalas antes.");
+        }
+
+        return asset;
+    }
 
     // Stream de activos para ver disponibilidad en tiempo real
     function streamAssets(ctx, callback) {
@@ -24,13 +82,56 @@ const BiblioAssetsService = (function () {
         return snap.docs.map(d => ({ id: d.id, ...d.data() }));
     }
 
+    async function getServiceCatalog(ctx) {
+        const assets = (await getAssetsOnce(ctx))
+            .filter(asset => asset.status !== 'mantenimiento');
+
+        const base = {
+            pc: { type: 'pc', total: 0, available: 0, occupied: 0 },
+            sala: { type: 'sala', total: 0, available: 0, occupied: 0 },
+            mesa: { type: 'mesa', total: 0, available: 0, occupied: 0 }
+        };
+
+        assets.forEach(asset => {
+            const type = asset.tipo;
+            if (!base[type]) return;
+            base[type].total += 1;
+            if (asset.status === 'disponible') base[type].available += 1;
+            if (asset.status === 'ocupado') base[type].occupied += 1;
+        });
+
+        return base;
+    }
+
     async function saveAsset(ctx, id, data) {
         const ref = ctx.db.collection(ASSETS_COLL);
         if (id) {
-            return ref.doc(id).update({ ...data, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+            const asset = await getAssetDoc(ctx, id);
+            const cleanUpdate = { ...data, updatedAt: firebase.firestore.FieldValue.serverTimestamp() };
+
+            if (cleanUpdate.status === 'mantenimiento') {
+                await ensureAssetCanBeDisabledOrDeleted(ctx, id);
+                Object.assign(cleanUpdate, CLEAR_OCCUPANCY);
+            } else if (cleanUpdate.status === 'disponible' && asset.data.status !== 'ocupado') {
+                Object.assign(cleanUpdate, CLEAR_OCCUPANCY);
+            }
+
+            return ref.doc(id).update(cleanUpdate);
         } else {
             const newId = data.nombre.replace(/\s+/g, '-').toUpperCase();
-            return ref.doc(newId).set({ ...data, status: 'disponible', createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+            const docRef = ref.doc(newId);
+            await ctx.db.runTransaction(async t => {
+                const existing = await t.get(docRef);
+                if (existing.exists) throw new Error("Ya existe un activo con ese nombre.");
+                t.set(docRef, {
+                    ...data,
+                    status: 'disponible',
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    ...CLEAR_OCCUPANCY
+                });
+            });
+            return docRef;
         }
     }
 
@@ -38,46 +139,105 @@ const BiblioAssetsService = (function () {
         const snap = await ctx.db.collection(RES_COLL)
             .where('studentId', '==', uid)
             .orderBy('createdAt', 'desc')
-            .limit(10)
+            .limit(25)
             .get();
-        return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+        const reservations = snap.docs
+            .map(d => ({ id: d.id, ...d.data() }))
+            .filter(item => isUpcomingReservation(item))
+            .sort((a, b) => {
+                const aStart = getReservationStart(a.date, a.hourBlock) || new Date(8640000000000000);
+                const bStart = getReservationStart(b.date, b.hourBlock) || new Date(8640000000000000);
+                return aStart.getTime() - bStart.getTime();
+            });
+
+        if (reservations.length === 0) return [];
+
+        const assets = await getAssetsOnce(ctx);
+        const assetsMap = new Map(assets.map(asset => [asset.id, asset.nombre || asset.id]));
+
+        return reservations.map(item => ({
+            ...item,
+            assetName: item.assetName || assetsMap.get(item.assetId) || item.assetId
+        }));
+    }
+
+    async function getUserReservationPerks(ctx, uid) {
+        if (!uid) {
+            return { maxDailyReservations: 1, reservationLeadMinutes: 15 };
+        }
+
+        try {
+            const userSnap = await ctx.db.collection(USERS_COLL).doc(uid).get();
+            const perks = userSnap.data()?.biblioPerks || {};
+            return {
+                maxDailyReservations: Math.max(1, Number(perks.maxDailyReservations) || 1),
+                reservationLeadMinutes: Math.max(5, Number(perks.reservationLeadMinutes) || 15)
+            };
+        } catch (error) {
+            console.warn('[BIBLIO] No se pudieron leer perks de reserva:', error);
+            return { maxDailyReservations: 1, reservationLeadMinutes: 15 };
+        }
     }
 
     async function deleteAsset(ctx, id) {
+        await ensureAssetCanBeDisabledOrDeleted(ctx, id);
         return ctx.db.collection(ASSETS_COLL).doc(id).delete();
     }
 
     async function checkUserDailyLimit(ctx, uid, date) {
-        // Formato fecha: YYYY-MM-DD
-        const startOfDay = new Date(date + 'T00:00:00');
-        const endOfDay = new Date(date + 'T23:59:59');
-
-        // Convert to Firestore Timestamps for query if stored as such, 
-        // but here we stored 'date' string in 'reservarEspacio'.
-        // Let's query by string date for simplicity as defined in 'reservarEspacio'
-
         const snap = await ctx.db.collection(RES_COLL)
             .where('studentId', '==', uid)
             .where('date', '==', date)
             .where('status', '!=', 'cancelado') // Si canceló, permiso de nuevo
             .get();
 
-        return !snap.empty; // True si ya tiene reserva
+        return snap.size;
     }
 
     async function reservarEspacio(ctx, { studentId, assetId, hourBlock, date, tipo }) {
+        const now = new Date();
+        const slotStart = getReservationStart(date, hourBlock);
+        const perks = await getUserReservationPerks(ctx, studentId);
+        const minLeadMinutes = Math.max(5, Number(perks.reservationLeadMinutes) || 15);
+        const maxDailyReservations = Math.max(1, Number(perks.maxDailyReservations) || 1);
+        if (!slotStart || Number.isNaN(slotStart.getTime())) {
+            throw new Error("El horario seleccionado no es válido.");
+        }
+        if (slotStart.getTime() - now.getTime() < minLeadMinutes * 60 * 1000) {
+            throw new Error(`Las reservas deben realizarse con al menos ${minLeadMinutes} minutos de anticipacion.`);
+        }
         // 1. Validar Límite Diario por Usuario
-        const hasBooking = await checkUserDailyLimit(ctx, studentId, date);
-        if (hasBooking) {
-            throw new Error("Ya tienes una reserva para este día. Límite: 1 diaria.");
+        const reservationCount = await checkUserDailyLimit(ctx, studentId, date);
+        if (reservationCount >= maxDailyReservations) {
+            throw new Error(`Ya alcanzaste tu limite de ${maxDailyReservations} reserva${maxDailyReservations === 1 ? '' : 's'} para este dia.`);
         }
 
         // 2. Validar Colisión de Espacio (Concurrency)
         // ID Compuesto: ID_FECHA_HORA
         const resId = `${assetId}_${date}_${hourBlock.replace(':', '')}`;
         const ref = ctx.db.collection(RES_COLL).doc(resId);
+        const assetRef = ctx.db.collection(ASSETS_COLL).doc(assetId);
+        const userRef = ctx.db.collection(USERS_COLL).doc(studentId);
 
         await ctx.db.runTransaction(async t => {
+            const assetDoc = await t.get(assetRef);
+            if (!assetDoc.exists) throw new Error("El activo seleccionado ya no existe.");
+
+            const assetData = assetDoc.data() || {};
+            if (assetData.status === 'mantenimiento') {
+                throw new Error("Este activo está en mantenimiento y no admite reservas.");
+            }
+            if (assetData.tipo && assetData.tipo !== tipo) {
+                throw new Error("El activo seleccionado no coincide con el tipo solicitado.");
+            }
+            const occupiedUntil = assetData.expiresAt?.toDate ? assetData.expiresAt.toDate() : null;
+            if (assetData.status === 'ocupado' && date === now.toISOString().split('T')[0]) {
+                if (!occupiedUntil || occupiedUntil > slotStart) {
+                    throw new Error(`${assetData.nombre || 'El activo'} sigue ocupado y no alcanza a liberarse para ese horario.`);
+                }
+            }
+
             const doc = await t.get(ref);
             if (doc.exists) {
                 const d = doc.data();
@@ -87,13 +247,33 @@ const BiblioAssetsService = (function () {
             t.set(ref, {
                 studentId,
                 assetId,
+                assetName: assetData.nombre || assetId,
                 date,
                 hourBlock, // "10:00"
                 tipo,      // 'pc' or 'sala'
                 status: 'activa',
                 createdAt: firebase.firestore.FieldValue.serverTimestamp()
             });
+            t.set(userRef, {
+                biblioReservationCount: firebase.firestore.FieldValue.increment(1)
+            }, { merge: true });
         });
+    }
+
+    async function cancelarReserva(ctx, reservationId) {
+        const ref = ctx.db.collection(RES_COLL).doc(reservationId);
+        const snap = await ref.get();
+        if (!snap.exists) throw new Error("La reserva ya no existe.");
+
+        const data = snap.data() || {};
+        if (data.studentId !== ctx.auth.currentUser.uid) {
+            throw new Error("Solo puedes cancelar tus propias reservas.");
+        }
+        if (data.status !== 'activa') {
+            throw new Error("La reserva ya no está activa.");
+        }
+
+        await ref.delete();
     }
 
     async function getAvailability(ctx, date, tipo) {
@@ -116,11 +296,10 @@ const BiblioAssetsService = (function () {
 
     async function asignarMesaAutomatica(ctx, uid, matricula) {
         const assetsRef = ctx.db.collection(ASSETS_COLL);
-        // Try to find free table
         let freeTablesSnap = await assetsRef
             .where('tipo', '==', 'mesa')
             .where('status', '==', 'disponible')
-            .limit(1)
+            .limit(8)
             .get();
 
         // [FIX] Auto-initialize if running low on tables (ensure 8 exist)
@@ -131,26 +310,40 @@ const BiblioAssetsService = (function () {
             if (totalTables < 8) {
                 console.log(`[ASSETS] Found ${totalTables} tables. Initializing up to 8...`);
                 await initializeDefaultTables(ctx, totalTables + 1);
-                freeTablesSnap = await assetsRef.where('tipo', '==', 'mesa').where('status', '==', 'disponible').limit(1).get();
+                freeTablesSnap = await assetsRef.where('tipo', '==', 'mesa').where('status', '==', 'disponible').limit(8).get();
             }
         }
 
         if (freeTablesSnap.empty) throw new Error("No hay mesas disponibles en este momento. (Todas ocupadas)");
 
-        const table = freeTablesSnap.docs[0];
-
         const now = new Date();
         const expiresAt = new Date(now.getTime() + 60 * 60 * 1000); // 1 hora
 
-        await assetsRef.doc(table.id).update({
-            status: 'ocupado',
-            occupiedBy: uid || 'anonimo',
-            occupiedByMatricula: matricula,
-            occupiedAt: firebase.firestore.FieldValue.serverTimestamp(),
-            expiresAt: firebase.firestore.Timestamp.fromDate(expiresAt)
-        });
+        for (const table of freeTablesSnap.docs) {
+            try {
+                await ctx.db.runTransaction(async t => {
+                    const current = await t.get(table.ref);
+                    if (!current.exists) throw new Error("Mesa no disponible.");
+                    const currentData = current.data() || {};
+                    if (currentData.status !== 'disponible') throw new Error("Mesa no disponible.");
 
-        return { id: table.id, nombre: table.data().nombre };
+                    t.update(table.ref, {
+                        status: 'ocupado',
+                        occupiedBy: uid || 'anonimo',
+                        occupiedByMatricula: matricula || null,
+                        occupiedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        expiresAt: firebase.firestore.Timestamp.fromDate(expiresAt)
+                    });
+                });
+
+                return { id: table.id, nombre: table.data().nombre };
+            } catch (error) {
+                if ((error.message || '').includes('no disponible')) continue;
+                throw error;
+            }
+        }
+
+        throw new Error("No hay mesas disponibles en este momento. (Todas ocupadas)");
     }
 
     async function initializeDefaultTables(ctx, startIdx = 1) {
@@ -168,7 +361,7 @@ const BiblioAssetsService = (function () {
         await batch.commit();
     }
 
-    async function asignarActivoManual(ctx, uid, assetId) {
+    async function asignarActivoManual(ctx, uid, assetId, meta = {}) {
         // [FIX] Prevent multiple PC assignments
         const existingSession = await ctx.db.collection(ASSETS_COLL)
             .where('occupiedBy', '==', uid)
@@ -185,21 +378,30 @@ const BiblioAssetsService = (function () {
         const now = new Date();
         const expiresAt = new Date(now.getTime() + 60 * 60 * 1000); // 1 hora
 
-        await ctx.db.collection(ASSETS_COLL).doc(assetId).update({
-            status: 'ocupado',
-            occupiedBy: uid,
-            occupiedAt: firebase.firestore.FieldValue.serverTimestamp(),
-            expiresAt: firebase.firestore.Timestamp.fromDate(expiresAt)
+        const assetRef = ctx.db.collection(ASSETS_COLL).doc(assetId);
+        await ctx.db.runTransaction(async t => {
+            const assetDoc = await t.get(assetRef);
+            if (!assetDoc.exists) throw new Error("El activo ya no existe.");
+
+            const assetData = assetDoc.data() || {};
+            if (assetData.status !== 'disponible') {
+                throw new Error(`${assetData.nombre || 'El activo'} ya no está disponible.`);
+            }
+
+            t.update(assetRef, {
+                status: 'ocupado',
+                occupiedBy: uid,
+                occupiedByMatricula: meta.matricula || assetData.occupiedByMatricula || null,
+                occupiedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                expiresAt: firebase.firestore.Timestamp.fromDate(expiresAt)
+            });
         });
     }
 
     async function liberarActivo(ctx, assetId) {
         await ctx.db.collection(ASSETS_COLL).doc(assetId).update({
             status: 'disponible',
-            occupiedBy: null,
-            occupiedByMatricula: null,
-            occupiedAt: null,
-            expiresAt: null
+            ...CLEAR_OCCUPANCY
         });
     }
 
@@ -215,10 +417,7 @@ const BiblioAssetsService = (function () {
         snap.docs.forEach(doc => {
             batch.update(doc.ref, {
                 status: 'disponible',
-                occupiedBy: null,
-                occupiedByMatricula: null,
-                occupiedAt: null,
-                expiresAt: null
+                ...CLEAR_OCCUPANCY
             });
         });
         await batch.commit();
@@ -243,10 +442,7 @@ const BiblioAssetsService = (function () {
             if (data.expiresAt && data.expiresAt.toMillis() <= now.toMillis()) {
                 batch.update(doc.ref, {
                     status: 'disponible',
-                    occupiedBy: null,
-                    occupiedByMatricula: null,
-                    occupiedAt: null,
-                    expiresAt: null
+                    ...CLEAR_OCCUPANCY
                 });
                 liberados.push(data.nombre);
             }
@@ -263,9 +459,11 @@ const BiblioAssetsService = (function () {
         streamAssets,
         streamAssetsAdmin,
         getAssetsOnce, // Exported
+        getServiceCatalog,
         saveAsset,
         deleteAsset,
         reservarEspacio,
+        cancelarReserva,
         getMyReservations,
         getAvailability,
         asignarMesaAutomatica,

@@ -1,12 +1,15 @@
 import { Store } from './state.js';
+import { Breadcrumbs } from './breadcrumbs.js';
 
 export class Router {
     constructor(uiManager) {
         this.ui = uiManager;
         this._activeSubscriptions = []; // Initialize array
+        this.qaSecretRoute = window.SIA?.getQaSecretLoginConfig?.()?.route || '/qa-portal-k9m2x7c4';
         this.routes = {
             'view-dashboard': '/dashboard',
             'view-aula': '/aula',
+            'view-comunidad': '/comunidad',
             'view-biblio': '/biblio',
             'view-medi': '/medi',
             'view-foro': '/foro',
@@ -14,12 +17,17 @@ export class Router {
             'view-superadmin-dashboard': '/superadmin', // [NEW]
             'view-lactario': '/lactario', // [NEW]
             'view-quejas': '/quejas',
+            'view-reportes': '/reportes',
             'view-encuestas': '/encuestas',
             'view-encuesta-publica': '/encuesta-publica',
             'view-register': '/register',
             'view-test-vocacional': '/test-vocacional',
             'view-vocacional-test-active': '/vocacional/test',
-            'view-vocacional-admin': '/vocacional-admin'
+            'view-vocacional-admin': '/vocacional-admin',
+            'view-cafeteria': '/cafeteria',
+            'view-avisos': '/avisos',
+            'view-notificaciones': '/notificaciones',
+            'view-qa-secret-login': this.qaSecretRoute
         };
 
         // Reverse map for URL -> View ID
@@ -29,16 +37,16 @@ export class Router {
         }, {});
 
         // Listen to hashchange for robust SPA routing on any server
-        window.addEventListener('hashchange', () => this.handleLocation());
+        window.addEventListener('hashchange', () => { void this.handleLocation(); });
 
         // Keep popstate for backward compatibility
-        window.addEventListener('popstate', (e) => {
-            this.handleLocation();
+        window.addEventListener('popstate', () => {
+            void this.handleLocation();
         });
     }
 
     init() {
-        this.handleLocation();
+        return this.handleLocation();
     }
 
     // New helper to parse path regardless of Hash or History mode
@@ -51,7 +59,19 @@ export class Router {
         return path === '/index.html' ? '/' : path;
     }
 
-    handleLocation() {
+    _getPathForView(viewId) {
+        if (viewId === 'view-aula-course') {
+            const courseId = window.SIA_currentCourseId;
+            if (courseId) {
+                return `/aula/curso/${encodeURIComponent(courseId)}`;
+            }
+            return this.routes['view-aula'] || '/aula';
+        }
+
+        return this.routes[viewId] || '/dashboard';
+    }
+
+    async handleLocation() {
         // FIX: Support both Hash (priority) and Path
         const path = this._getCurrentPath();
         const role = Store.userProfile ? Store.userProfile.role : null;
@@ -59,12 +79,7 @@ export class Router {
         if (path === '/' || path === '' || path === '/index.html') {
             if (Store.user) {
                 const defaultView = this._getDefaultView(role);
-                // Instead of calling navigate (which sets hash), just replace hash if empty
-                if (!window.location.hash) {
-                    this.navigate(defaultView, true, true);
-                } else {
-                    this._renderView(defaultView);
-                }
+                await this.navigate(defaultView, true, true);
             } else {
                 this.ui.showLanding();
             }
@@ -76,7 +91,15 @@ export class Router {
 
         // Handle sub-routes via simple matching
         if (!viewId) {
-            if (path.startsWith('/aula')) viewId = 'view-aula';
+            if (path.startsWith('/aula/curso/')) {
+                const rawCourseId = path.split('/aula/curso/')[1] || '';
+                const courseId = decodeURIComponent(rawCourseId.split(/[?#]/)[0] || '');
+                if (courseId) {
+                    window.SIA_currentCourseId = courseId;
+                    viewId = 'view-aula-course';
+                }
+            } else if (path.startsWith('/aula')) viewId = 'view-aula';
+            else if (path.startsWith('/comunidad')) viewId = 'view-comunidad';
             else if (path.startsWith('/biblio')) viewId = 'view-biblio';
             else if (path.startsWith('/medi')) viewId = 'view-medi';
             else if (path.startsWith('/foro')) viewId = 'view-foro';
@@ -89,20 +112,26 @@ export class Router {
             else if (path.startsWith('/test-vocacional')) viewId = 'view-test-vocacional';
             else if (path.startsWith('/vocacional/test')) viewId = 'view-vocacional-test-active';
             else if (path.startsWith('/vocacional-admin')) viewId = 'view-vocacional-admin';
+            else if (path.startsWith('/cafeteria')) viewId = 'view-cafeteria';
+            else if (path.startsWith('/avisos')) viewId = 'view-avisos';
+            else if (path.startsWith('/notificaciones')) viewId = 'view-notificaciones';
         }
 
         // Public routes - no auth required
-        if (viewId === 'view-encuesta-publica' || viewId === 'view-test-vocacional' || viewId === 'view-vocacional-test-active') {
+        if (viewId === 'view-encuesta-publica'
+            || viewId === 'view-test-vocacional'
+            || viewId === 'view-vocacional-test-active'
+            || viewId === 'view-qa-secret-login') {
             this._renderView(viewId);
             return;
         }
 
         if (viewId && Store.user) {
             if (this._canAccess(viewId, role)) {
-                this._renderView(viewId);
+                await this.navigate(viewId, false, true);
             } else {
                 const defaultView = this._getDefaultView(role);
-                this.navigate(defaultView, true, true);
+                await this.navigate(defaultView, true, true);
             }
         } else if (viewId && !Store.user) {
             this.ui.showLanding();
@@ -114,8 +143,13 @@ export class Router {
 
     // Separated render logic from navigate to avoid loops
     _renderView(viewId) {
+        Store.currentView = viewId;
+
         // Ocultar landing y app-shell si es una vista publica
-        if (viewId === 'view-test-vocacional' || viewId === 'view-vocacional-test-active' || viewId === 'view-encuesta-publica') {
+        if (viewId === 'view-test-vocacional'
+            || viewId === 'view-vocacional-test-active'
+            || viewId === 'view-encuesta-publica'
+            || viewId === 'view-qa-secret-login') {
             const landing = document.getElementById('landing-view');
             const appshell = document.getElementById('app-shell');
             if (landing) landing.classList.add('d-none');
@@ -154,14 +188,12 @@ export class Router {
     }
 
     _getDefaultView(role) {
-        if (!role) return 'view-dashboard';
-
-        // [NEW] Logic: If multiple allowedViews, default to Dashboard (Department Dashboard)
         const profile = Store.userProfile;
-        if (profile && profile.allowedViews && profile.allowedViews.length > 1) {
-            return 'view-dashboard';
+        if (window.SIA?.getHomeView) {
+            return window.SIA.getHomeView(profile || { role });
         }
 
+        if (!role) return 'view-dashboard';
         if (role === 'bibliotecario' || role === 'biblio' || role === 'biblio_admin') return 'view-biblio';
         if (role === 'medico' || role === 'medico_oficial') return 'view-medi'; // Doctor goes strictly to Medi
 
@@ -174,12 +206,32 @@ export class Router {
         return 'view-dashboard';
     }
 
+    _canTeachInAula(profile) {
+        if (window.SIA?.canTeachInAula) {
+            return window.SIA.canTeachInAula(profile);
+        }
+        const role = profile?.role || '';
+        return ['docente', 'aula_admin', 'admin', 'aula', 'superadmin'].includes(role) ||
+            (profile && profile.permissions && (profile.permissions.aula === 'admin' || profile.permissions.aula === 'docente'));
+    }
+
     _canAccess(viewId, role) {
+        const profile = Store.userProfile;
+        if (window.SIA?.canAccessView) {
+            return window.SIA.canAccessView(profile || { role }, viewId);
+        }
+
         if (!role) return false;
         if (viewId === 'view-profile') return true;
 
+        if (viewId === 'view-avisos') {
+            if (role === 'department_admin') {
+                return profile?.permissions?.avisos === 'admin';
+            }
+            return true;
+        }
+
         // [NEW] 1. Priority: Check allowedViews from Profile (Dynamic Permissions)
-        const profile = Store.userProfile;
         if (profile && profile.allowedViews && Array.isArray(profile.allowedViews)) {
             // Check if view is in list OR is sub-view (e.g. view-aula-course starts with view-aula)
             const isAllowed = profile.allowedViews.some(av => viewId === av || viewId.startsWith(av + '-'));
@@ -208,17 +260,22 @@ export class Router {
             return viewId === 'view-medi' || viewId === 'view-lactario' || viewId === 'view-dashboard';
         }
 
-        if (role === 'aula_admin') return viewId === 'view-aula' || viewId === 'view-dashboard'; // Allow dashboard for testing
+        if (role === 'aula_admin') return viewId === 'view-aula' || viewId.startsWith('view-aula-') || viewId === 'view-dashboard'; // Allow dashboard for testing
         if (role === 'foro_admin') return viewId === 'view-foro';
         if (role === 'superadmin') return true;
 
         if (viewId === 'view-quejas') return true; // Allow all authenticated roles to access Quejas
         if (viewId === 'view-encuestas') return true; // Allow all authenticated roles to access Encuestas
+        if (viewId === 'view-cafeteria') return true; // Allow all authenticated roles to access Cafeteria
 
         return false;
     }
 
     async navigate(viewId, pushState = true, skipAuthCheck = false) {
+        if (viewId === 'view-aula-course' && !window.SIA_currentCourseId) {
+            viewId = 'view-aula';
+        }
+
         if (!Store.user && viewId !== 'landing' && !skipAuthCheck) {
             console.warn("Navegación bloqueada: Usuario no autenticado.");
             this.ui.showLanding();
@@ -260,7 +317,7 @@ export class Router {
 
         // Update URL
         if (pushState) {
-            const path = this.routes[viewId] || '/dashboard';
+            const path = this._getPathForView(viewId);
             history.pushState({ viewId }, '', path);
         }
 
@@ -284,51 +341,92 @@ export class Router {
     }
 
     async _loadModuleDependencies(viewId) {
-        const role = Store && Store.userProfile ? Store.userProfile.role : null;
         const profile = Store && Store.userProfile ? Store.userProfile : null;
-        const isMediAdmin = role === 'medico' || role === 'docente_medico' || role === 'Psicologo' || role === 'superadmin' ||
-            (role === 'department_admin' && profile && profile.permissions && profile.permissions.medi);
-        const isBiblioAdmin = role === 'biblio' || role === 'bibliotecario' || role === 'biblio_admin' || role === 'superadmin' ||
-            (role === 'department_admin' && profile && profile.permissions && profile.permissions.biblio);
-        const isForoAdmin = (Store && Store.userProfile && Store.userProfile.permissions && (Store.userProfile.permissions.foro === 'admin' || Store.userProfile.permissions.foro === 'superadmin')) || (Store && Store.userProfile && Store.userProfile.email === 'difusion@loscabos.tecnm.mx');
+        const isMediAdmin = window.SIA?.canAdminMedi ? window.SIA.canAdminMedi(profile) : false;
+        const isBiblioAdmin = window.SIA?.canAdminBiblio ? window.SIA.canAdminBiblio(profile) : false;
+        const isForoAdmin = window.SIA?.canAdminForo ? window.SIA.canAdminForo(profile) : false;
+        const isComunidadAdmin = window.SIA?.canAdminComunidad ? window.SIA.canAdminComunidad(profile) : false;
+        const isAulaAdmin = this._canTeachInAula(profile);
+        const isCafeteriaAdmin = window.SIA?.canAdminCafeteria ? window.SIA.canAdminCafeteria(profile) : false;
+        const aulaDependencies = [
+            '/config/aula-subject-catalog.js',
+            '/modules/aula/aula-class-form.js',
+            '/services/aula-service.js',
+            '/modules/aula/aula-clase.js',
+            '/modules/aula/aula-publicar.js',
+            '/modules/aula/aula-entregas.js',
+            '/modules/aula/aula-portfolio.js',
+            '/modules/aula/aula-grupos.js',
+            ...(isAulaAdmin
+                ? ['/modules/aula/aula-analytics.js', '/modules/admin.aula.js']
+                : ['/modules/aula/aula-deadlines.js', '/modules/aula/aula-student.js']),
+            '/modules/aula.js'
+        ];
 
         const modules = {
             'view-biblio': [
                 '/services/biblio-service.js',
                 '/services/biblio-assets-service.js',
-                isBiblioAdmin ? '/modules/admin.biblio.js' : '/modules/biblio.js'
+                ...(isBiblioAdmin ? [
+                    '/modules/admin-biblio/shared.js',
+                    '/modules/admin-biblio/catalogo.js',
+                    '/modules/admin-biblio/prestamos.js',
+                    '/modules/admin-biblio/devoluciones.js',
+                    '/modules/admin-biblio/historial.js',
+                    '/modules/admin-biblio/reportes.js',
+                    '/modules/admin.biblio.js'
+                ] : ['/modules/biblio.js'])
             ],
             'view-medi': [
                 '/services/medi-service.js',
                 '/services/medi-chat-service.js',
-                isMediAdmin ? '/modules/admin.medi.js' : '/modules/medi.js'
+                ...(isMediAdmin ? [
+                    '/modules/admin-medi/ui.js',
+                    '/modules/admin-medi/agenda.js',
+                    '/modules/admin-medi/chat.js',
+                    '/modules/admin-medi/consultas.js',
+                    '/modules/admin-medi/tools.js',
+                    '/modules/admin.medi.js' // Orquestador va al final
+                ] : [
+                    '/modules/medi/student-experience.js',
+                    '/modules/medi/student-chat.js',
+                    '/modules/medi/student-appointments.js',
+                    '/modules/medi.js'
+                ])
             ],
-            'view-aula': [
-                '/services/aula-service.js',
-                '/modules/aula.js',
-                '/modules/aula.content.js'
-            ],
-            'view-aula-course': [
-                '/services/aula-service.js',
-                '/modules/aula.js',
-                '/modules/aula.content.js'
+            'view-aula': aulaDependencies,
+            'view-aula-course': aulaDependencies,
+            'view-comunidad': [
+                '/services/comunidad-service.js',
+                '/services/comunidad-chat-service.js',
+                '/modules/comunidad/comunidad.shared.js',
+                '/modules/comunidad/comunidad.student.js',
+                '/modules/comunidad.js',
+                ...(isComunidadAdmin ? ['/modules/comunidad/comunidad.admin.js', '/modules/admin.comunidad.js'] : [])
             ],
             'view-foro': [
+                '/services/push-service.js',
                 '/services/foro-service.js',
-                isForoAdmin ? '/modules/admin.foro.js' : '/modules/foro.js'
+                '/services/foro-chat-service.js',
+                '/modules/foro/foro.shared.js',
+                ...(isForoAdmin
+                    ? ['/modules/foro/foro.admin.js', '/modules/admin.foro.js']
+                    : ['/modules/foro/foro.student.js', '/modules/foro.js'])
             ],
             'view-profile': [
+                '/services/push-service.js',
                 '/modules/profile.js'
             ],
-            'view-superadmin-dashboard': [ // [NEW]
-                '/services/admin-service.js',
-                '/services/audit-service.js',
-                '/modules/admin.users.js',
-                '/modules/admin.system.js',
-                '/modules/admin.audit.js'
+            'view-superadmin-dashboard': [
+                '/services/superadmin-service.js',
+                '/modules/superadmin.js'
             ],
             'view-lactario': [
+                '/services/medi-service.js',
                 '/services/lactario-service.js',
+                '/modules/lactario/lactario.shared.js',
+                '/modules/lactario/lactario.student.js',
+                '/modules/lactario/lactario.admin.js',
                 '/modules/lactario.js'
             ],
             'view-quejas': [
@@ -341,15 +439,35 @@ export class Router {
             ],
             'view-encuestas': [
                 '/services/encuestas-service.js',
+                '/services/encuestas-servicio-service.js',
+                '/modules/encuestas/encuestas-ui.js',
+                '/modules/encuestas/encuestas-forms.js',
+                '/modules/encuestas/encuestas-responses.js',
+                '/modules/encuestas/encuestas-nav.js',
                 '/modules/encuestas.js'
             ],
             'view-encuesta-publica': [
                 '/services/encuestas-service.js',
+                '/modules/encuestas/encuestas-ui.js',
+                '/modules/encuestas/encuestas-forms.js',
+                '/modules/encuestas/encuestas-responses.js',
+                '/modules/encuestas/encuestas-nav.js',
                 '/modules/encuestas.js'
             ],
             'view-vocacional-admin': [
                 '/services/vocacional-service.js',
                 '/modules/vocacional-admin.js'
+            ],
+            'view-cafeteria': [
+                '/services/cafeteria-service.js',
+                isCafeteriaAdmin ? '/modules/admin.cafeteria.js' : '/modules/cafeteria.js'
+            ],
+            'view-avisos': [
+                '/modules/avisos.js'
+            ],
+            'view-notificaciones': [
+                '/services/push-service.js',
+                '/modules/notifications.js'
             ]
         };
 
@@ -437,11 +555,21 @@ export class Router {
 
         // [LEGACY ADAPTER] Initialize Global Modules
         // Mimic app.js getContext()
+        const effectiveProfile = Store.userProfile;
+        const effectiveAuth = window.SIA?.getEffectiveAuth
+            ? window.SIA.getEffectiveAuth(window.SIA ? window.SIA.auth : null, effectiveProfile)
+            : (window.SIA ? window.SIA.auth : null);
+        const effectiveUser = window.SIA?.getEffectiveSessionUser
+            ? window.SIA.getEffectiveSessionUser(window.SIA?.auth?.currentUser || Store.user, effectiveProfile)
+            : Store.user;
         const ctx = {
             db: window.SIA ? window.SIA.db : null,
-            auth: window.SIA ? window.SIA.auth : null,
-            user: Store.user,
-            profile: Store.userProfile,
+            auth: effectiveAuth,
+            storage: window.SIA ? window.SIA.storage : null,
+            user: effectiveUser,
+            realUser: window.SIA?.auth?.currentUser || Store.user,
+            qaActingAs: effectiveProfile?.qaActor || null,
+            profile: effectiveProfile,
             // Pass a ModuleManager that links to Router's subscription manager
             ModuleManager: {
                 addSubscription: (fn) => this._addSubscription(fn),
@@ -451,18 +579,9 @@ export class Router {
             navigate: this.navigate.bind(this),
             activeUnsubs: { push: (fn) => this._addSubscription(fn) }
         };
-
-
-        // Specific Legacy Hooks
-        if (viewId === 'view-dashboard' && window.updateDashboardWidgets) {
-            window.updateDashboardWidgets();
-        }
-
         if (viewId === 'view-biblio') {
-            const role = Store && Store.userProfile ? Store.userProfile.role : null;
             const profile = Store && Store.userProfile ? Store.userProfile : null;
-            const isBiblioAdmin = role === 'biblio' || role === 'bibliotecario' || role === 'biblio_admin' || role === 'superadmin' ||
-                (role === 'department_admin' && profile && profile.permissions && profile.permissions.biblio);
+            const isBiblioAdmin = window.SIA?.canAdminBiblio ? window.SIA.canAdminBiblio(profile) : false;
 
             if (isBiblioAdmin && window.AdminBiblio && window.AdminBiblio.init) {
                 window.AdminBiblio.init(ctx);
@@ -472,10 +591,8 @@ export class Router {
         }
 
         if (viewId === 'view-medi') {
-            const role = Store && Store.userProfile ? Store.userProfile.role : null;
             const profile = Store && Store.userProfile ? Store.userProfile : null;
-            const isMediAdmin = role === 'medico' || role === 'docente_medico' || role === 'Psicologo' || role === 'superadmin' ||
-                (role === 'department_admin' && profile && profile.permissions && profile.permissions.medi);
+            const isMediAdmin = window.SIA?.canAdminMedi ? window.SIA.canAdminMedi(profile) : false;
 
             if (isMediAdmin && window.AdminMedi && window.AdminMedi.init) {
                 window.AdminMedi.init(ctx);
@@ -488,13 +605,29 @@ export class Router {
             window.Aula.init(ctx);
         }
 
-        if (viewId === 'view-aula-course' && window.SIA_currentCourseId && window.AulaContent) {
-            window.AulaContent.initCourse(ctx, window.SIA_currentCourseId);
+        if (viewId === 'view-aula-course') {
+            const courseId = window.SIA_currentCourseId;
+            if (courseId && window.AulaClase && window.AulaClase.init) {
+                window.AulaClase.init(ctx, courseId);
+            } else if (window.Aula && window.Aula.init) {
+                window.Aula.init(ctx);
+            }
+        }
+
+        if (viewId === 'view-comunidad') {
+            const profile = Store && Store.userProfile ? Store.userProfile : null;
+            const isComunidadAdmin = window.SIA?.canAdminComunidad ? window.SIA.canAdminComunidad(profile) : false;
+
+            if (isComunidadAdmin && window.AdminComunidad && window.AdminComunidad.init) {
+                window.AdminComunidad.init(ctx);
+            } else if (window.Comunidad && window.Comunidad.init) {
+                window.Comunidad.init(ctx);
+            }
         }
 
         if (viewId === 'view-foro') {
-            const role = Store && Store.userProfile ? Store.userProfile.role : null;
-            const isForoAdmin = (Store && Store.userProfile && Store.userProfile.permissions && (Store.userProfile.permissions.foro === 'admin' || Store.userProfile.permissions.foro === 'superadmin')) || (Store && Store.userProfile && Store.userProfile.email === 'difusion@loscabos.tecnm.mx');
+            const profile = Store && Store.userProfile ? Store.userProfile : null;
+            const isForoAdmin = window.SIA?.canAdminForo ? window.SIA.canAdminForo(profile) : false;
 
             if (isForoAdmin && window.AdminForo && window.AdminForo.init) {
                 window.AdminForo.init(ctx);
@@ -534,9 +667,7 @@ export class Router {
         }
 
         if (viewId === 'view-superadmin-dashboard') {
-            if (window.AdminUsers && window.AdminUsers.init) window.AdminUsers.init(ctx);
-            if (window.AdminSystem && window.AdminSystem.init) window.AdminSystem.init(ctx);
-            if (window.AdminAudit && window.AdminAudit.init) window.AdminAudit.init(ctx);
+            if (window.SuperAdmin && window.SuperAdmin.init) window.SuperAdmin.init(ctx);
         }
 
         if (viewId === 'view-reportes') {
@@ -562,21 +693,59 @@ export class Router {
                 window.Encuestas.initPublic(surveyId);
             }
         }
+
+        if (viewId === 'view-cafeteria') {
+            const profile = Store && Store.userProfile ? Store.userProfile : null;
+            const isCafAdmin = window.SIA?.canAdminCafeteria ? window.SIA.canAdminCafeteria(profile) : false;
+
+            if (isCafAdmin && window.AdminCafeteria && window.AdminCafeteria.init) {
+                window.AdminCafeteria.init(ctx);
+            } else if (window.Cafeteria && window.Cafeteria.init) {
+                window.Cafeteria.init(ctx);
+            } else {
+                console.error('[Router] Cafeteria module not found!');
+            }
+        }
+
+        if (viewId === 'view-notificaciones') {
+            if (window.Notifications && window.Notifications.init) {
+                window.Notifications.init(ctx);
+            }
+        }
+
+        if (viewId === 'view-avisos') {
+            if (window.Avisos && window.Avisos.init) {
+                window.Avisos.init(ctx);
+            }
+        }
     }
 
     _updateBreadcrumbs(viewId) {
+        const currentState = Breadcrumbs.getState();
+        if (currentState?.viewId === viewId && currentState.source && currentState.source !== 'view') {
+            return currentState;
+        }
+
+        return Breadcrumbs.setView(viewId);
         const breadcrumb = document.getElementById('breadcrumb-current');
+
         if (breadcrumb) {
             const labels = {
                 'view-dashboard': 'Inicio',
-                'view-aula': 'Aula Virtual',
+                'view-aula': 'Aula',
+                'view-comunidad': 'Comunidad',
                 'view-biblio': 'Biblioteca',
                 'view-medi': 'Servicios Médicos',
-                'view-foro': 'Foro Escolar',
+                'view-foro': 'Eventos',
                 'view-lactario': 'Lactario',
+                'view-quejas': 'Quejas',
                 'view-reportes': 'Reportes',
                 'view-encuestas': 'Encuestas',
-                'view-profile': 'Mi Perfil'
+                'view-profile': 'Mi Perfil',
+                'view-superadmin-dashboard': 'SuperAdmin',
+                'view-cafeteria': 'Cafetería',
+                'view-avisos': 'Avisos',
+                'view-notificaciones': 'Notificaciones'
             };
             breadcrumb.textContent = labels[viewId] || 'SIA';
         }

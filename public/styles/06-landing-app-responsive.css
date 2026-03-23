@@ -1,0 +1,526 @@
+/* 6. Banner promocional de la app */
+#landing-view .landing-app-banner {
+    position: relative;
+    max-width: 580px;
+    padding: 1.35rem;
+    border-radius: 28px;
+    background: linear-gradient(145deg, rgba(18, 40, 74, 0.92) 0%, rgba(24, 66, 126, 0.82) 52%, rgba(14, 20, 34, 0.88) 100%);
+    border: 1px solid rgba(79, 172, 254, 0.28);
+    box-shadow: 0 24px 70px rgba(3, 10, 24, 0.45);
+    overflow: hidden;
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+}
+
+#landing-view .landing-app-banner.is-installed {
+    background: linear-gradient(145deg, rgba(17, 63, 47, 0.92) 0%, rgba(21, 86, 63, 0.86) 48%, rgba(12, 24, 19, 0.92) 100%);
+    border-color: rgba(52, 211, 153, 0.28);
+}
+
+#landing-view .landing-app-sheen {
+    position: absolute;
+    top: -80px;
+    right: -60px;
+    width: 220px;
+    height: 220px;
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.26) 0%, rgba(255, 255, 255, 0) 70%);
+    pointer-events: none;
+}
+
+#landing-view .landing-app-platforms,
+#landing-view .landing-app-benefits,
+#landing-view .landing-app-actions {
+    position: relative;
+    z-index: 1;
+}
+
+#landing-view .landing-app-platforms,
+#landing-view .landing-app-benefits {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+}
+
+#landing-view .landing-app-chip,
+#landing-view .landing-app-benefit {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.08);
+    color: rgba(255, 255, 255, 0.86);
+    font-size: 0.82rem;
+    font-weight: 700;
+}
+
+#landing-view .landing-app-chip {
+    padding: 0.45rem 0.8rem;
+}
+
+#landing-view .landing-app-chip img {
+    width: 18px;
+    height: 18px;
+    object-fit: contain;
+}
+
+#landing-view .landing-app-copy {
+    position: relative;
+    z-index: 1;
+}
+
+#landing-view .landing-app-kicker {
+    font-size: 0.76rem;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #8cc8ff;
+}
+
+#landing-view .landing-app-banner.is-installed .landing-app-kicker {
+    color: #86efac;
+}
+
+#landing-view .landing-app-title {
+    font-family: var(--landing-font-heading);
+    font-size: 1.55rem;
+    line-height: 1.08;
+    color: #fff !important;
+}
+
+#landing-view .landing-app-copy p {
+    max-width: 48ch;
+    color: rgba(255, 255, 255, 0.72) !important;
+    font-size: 0.96rem;
+    line-height: 1.7;
+}
+
+#landing-view .landing-app-benefit {
+    padding: 0.6rem 0.9rem;
+    border-radius: 18px;
+    font-weight: 600;
+    font-size: 0.83rem;
+}
+
+#landing-view .landing-app-benefit i {
+    color: #7dd3fc;
+}
+
+#landing-view .landing-app-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+}
+
+#landing-view .btn-landing-app-download,
+#landing-view .btn-landing-app-share {
+    min-width: 190px;
+    border-radius: 999px;
+    padding: 0.9rem 1.3rem;
+    font-weight: 800;
+    font-size: 0.92rem;
+    border: 0;
+    transition: transform 0.25s ease, box-shadow 0.25s ease, background 0.25s ease;
+}
+
+#landing-view .btn-landing-app-download {
+    background: linear-gradient(135deg, #ffffff 0%, #dff0ff 100%);
+    color: #13396a;
+    box-shadow: 0 14px 35px rgba(7, 18, 38, 0.28);
+}
+
+#landing-view .landing-app-banner.is-installed .btn-landing-app-download {
+    background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);
+    color: #14532d;
+}
+
+#landing-view .btn-landing-app-share {
+    background: rgba(255, 255, 255, 0.08);
+    color: #fff;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+#landing-view .btn-landing-app-download:hover,
+#landing-view .btn-landing-app-share:hover {
+    transform: translateY(-2px);
+}
+
+#landing-view .btn-landing-app-download:hover {
+    box-shadow: 0 20px 38px rgba(7, 18, 38, 0.34);
+}
+
+#landing-view .btn-landing-app-share:hover {
+    background: rgba(255, 255, 255, 0.14);
+}
+
+#landing-view .landing-app-status {
+    position: relative;
+    z-index: 1;
+    color: rgba(255, 255, 255, 0.76);
+    font-size: 0.82rem;
+    line-height: 1.6;
+}
+
+/* 6. Badge de módulo */
+.landing-module-icon {
+    width: 56px;
+    height: 56px;
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    transition: transform 0.3s ease;
+}
+
+.landing-card:hover .landing-module-icon {
+    transform: scale(1.1);
+}
+
+/* 7. Sección de avisos */
+.aviso-card {
+    background: var(--landing-card-bg);
+    border: 1px solid var(--landing-border);
+    border-radius: 16px;
+    overflow: hidden;
+    transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.aviso-card:hover {
+    border-color: rgba(27, 57, 106, 0.3);
+    transform: translateY(-3px);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
+}
+
+.aviso-badge {
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 0.25rem 0.6rem;
+    border-radius: 50rem;
+    font-family: 'Noto Sans', sans-serif;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+/* 8. Estadísticas */
+.stat-number {
+    font-family: var(--landing-font-heading);
+    font-weight: 900;
+    font-size: 2.75rem;
+    line-height: 1;
+    background: linear-gradient(135deg, #ffffff 0%, rgba(255, 255, 255, 0.7) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.stat-divider {
+    width: 1px;
+    height: 60px;
+    background: linear-gradient(to bottom, transparent, rgba(255, 255, 255, 0.15), transparent);
+}
+
+/* 9. Footer landing */
+#landing-view footer {
+    border-top: 1px solid var(--landing-border) !important;
+}
+
+#landing-view footer a {
+    color: var(--landing-text-muted) !important;
+    text-decoration: none;
+    transition: color 0.2s;
+}
+
+#landing-view footer a:hover {
+    color: #fff !important;
+}
+
+/* 10. Logos con proporción oficial */
+.landing-brand-logos {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.landing-brand-logos .logo-tecnm {
+    height: 44px;
+    width: auto;
+}
+
+.landing-brand-logos .logo-ites {
+    height: 28px;
+    width: auto;
+}
+
+.landing-brand-logos .brand-divider {
+    width: 1px;
+    height: 36px;
+    background: rgba(255, 255, 255, 0.2);
+}
+
+/* 11. Animaciones del landing */
+@keyframes landingFadeUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes landingFloat {
+
+    0%,
+    100% {
+        transform: translateY(0) rotate(-1deg);
+    }
+
+    50% {
+        transform: translateY(-12px) rotate(-1deg);
+    }
+}
+
+.landing-fade-up {
+    opacity: 0;
+    animation: landingFadeUp 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.landing-fade-up-1 {
+    animation-delay: 0.1s;
+}
+
+.landing-fade-up-2 {
+    animation-delay: 0.2s;
+}
+
+.landing-fade-up-3 {
+    animation-delay: 0.3s;
+}
+
+.landing-fade-up-4 {
+    animation-delay: 0.4s;
+}
+
+.landing-fade-up-5 {
+    animation-delay: 0.5s;
+}
+
+.landing-float {
+    animation: landingFloat 5s ease-in-out infinite;
+}
+
+/* 12. Section labels */
+.landing-section-label {
+    font-family: 'Noto Sans', sans-serif;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--landing-gray);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.landing-section-label::before {
+    content: '';
+    width: 24px;
+    height: 2px;
+    background: var(--landing-primary);
+    border-radius: 1px;
+}
+
+/* 13. Mobile landing responsive */
+@media (max-width: 767.98px) {
+    #landing-view .landing-hero {
+        padding-top: 6rem !important;
+        padding-bottom: 3rem !important;
+        min-height: 90vh;
+    }
+
+    #landing-view .landing-hero-title {
+        font-size: 2.25rem !important;
+    }
+
+    .landing-brand-logos .logo-tecnm {
+        height: 36px;
+    }
+
+    .landing-brand-logos .logo-ites {
+        height: 22px;
+    }
+
+    .landing-brand-logos .brand-divider {
+        height: 28px;
+    }
+
+    .stat-number {
+        font-size: 2rem;
+    }
+
+    .btn-acceso-institucional {
+        padding: 0.85rem 2rem;
+        font-size: 0.95rem;
+        width: 100%;
+    }
+
+    #landing-view .landing-app-banner {
+        padding: 1rem;
+        border-radius: 24px;
+    }
+
+    #landing-view .landing-app-title {
+        font-size: 1.2rem;
+    }
+
+    #landing-view .landing-app-chip,
+    #landing-view .landing-app-benefit {
+        width: 100%;
+        justify-content: center;
+    }
+
+    #landing-view .btn-landing-app-download,
+    #landing-view .btn-landing-app-share {
+        width: 100%;
+        min-width: 0;
+    }
+
+    .landing-modules-grid {
+        grid-template-columns: repeat(2, 1fr) !important;
+    }
+}
+
+/* 14. Navbar landing mobile collapse */
+@media (max-width: 991.98px) {
+    .landing-nav-collapse {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: rgba(15, 17, 20, 0.95);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        padding: 1rem;
+        margin-top: 8px;
+        border-radius: 16px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
+    }
+}
+
+/* 15. Módulos grid */
+.landing-modules-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1rem;
+}
+
+@media (max-width: 991.98px) and (min-width: 768px) {
+    .landing-modules-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+#landing-view .landing-app-banner-compact {
+    max-width: none;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 1rem 1.25rem;
+    align-items: center;
+    padding: 1.1rem 1.2rem;
+    border-radius: 24px;
+}
+
+#landing-view .landing-app-banner-compact .landing-app-copy p {
+    max-width: 60ch;
+    margin: 0;
+}
+
+#landing-view .landing-app-banner-compact .landing-app-actions {
+    justify-content: flex-end;
+}
+
+#landing-view .landing-app-banner-compact .landing-app-status {
+    grid-column: 1 / -1;
+    margin-top: 0;
+}
+
+@media (max-width: 1199.98px) {
+    #landing-view .landing-value-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    #landing-view .landing-process-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 991.98px) {
+    #landing-view .landing-vocational-spotlight {
+        grid-template-columns: 1fr;
+    }
+
+    #landing-view .landing-app-banner-compact {
+        grid-template-columns: 1fr;
+    }
+
+    #landing-view .landing-app-banner-compact .landing-app-actions {
+        justify-content: flex-start;
+    }
+
+    #landing-view .landing-process-footer {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+}
+
+@media (max-width: 767.98px) {
+    #landing-view .landing-hero-subtitle {
+        font-size: 0.98rem;
+    }
+
+    #landing-view .landing-hero-actions,
+    #landing-view .landing-vocational-actions {
+        flex-direction: column;
+    }
+
+    #landing-view .landing-dashboard-preview {
+        max-width: 100%;
+        transform: none;
+    }
+
+    #landing-view .landing-process-grid,
+    #landing-view .landing-value-grid {
+        grid-template-columns: 1fr;
+    }
+
+    #landing-view .landing-trust-chip,
+    #landing-view .landing-process-badge,
+    #landing-view .landing-route-pill,
+    #landing-view .landing-process-tag {
+        width: fit-content;
+        max-width: 100%;
+    }
+
+    #landing-view .landing-vocational-copy,
+    #landing-view .landing-vocational-card,
+    #landing-view .landing-process-card,
+    #landing-view .landing-value-card {
+        padding: 1.2rem;
+    }
+
+    #landing-view .landing-app-banner-compact .landing-app-copy p {
+        max-width: none;
+    }
+
+    #landing-view .landing-preview-item {
+        flex-direction: column;
+    }
+
+    #landing-view .landing-preview-badge {
+        width: fit-content;
+    }
+}

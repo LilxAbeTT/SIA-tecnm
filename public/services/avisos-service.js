@@ -1,228 +1,397 @@
 // avisos-service.js
-// Servicio de Avisos/Anuncios Institucionales para SIA
-// Gestión CRUD + consultas para el dashboard de estudiantes y stories
+// Servicio de Avisos Institucionales para SIA.
+// Expone CRUD, filtros de visibilidad y tracking de lecturas por usuario.
 
 (function () {
     'use strict';
 
     const COLLECTION = 'avisos';
-
-    // ========================================
-    // HELPERS
-    // ========================================
+    const USER_VIEWS_SUBCOLLECTION = 'avisoViews';
+    const DEFAULT_LIMIT = 40;
+    const SEEN_TTL_MS = 90 * 24 * 60 * 60 * 1000;
 
     function _getDb() {
         return window.SIA?.db;
+    }
+
+    function _getAuth() {
+        return window.SIA?.auth;
+    }
+
+    function _getUid(ctx) {
+        return ctx?.user?.uid || ctx?.auth?.currentUser?.uid || _getAuth()?.currentUser?.uid || null;
+    }
+
+    function _getProfile(ctx) {
+        return ctx?.profile || ctx?.currentUserProfile || null;
     }
 
     function _now() {
         return firebase.firestore.FieldValue.serverTimestamp();
     }
 
-    function _toDate(ts) {
-        if (!ts) return null;
-        if (ts.toDate) return ts.toDate();
-        if (ts instanceof Date) return ts;
-        return new Date(ts);
+    function _timestampFrom(value) {
+        if (!value) return null;
+        if (value.toDate || value.seconds) return value;
+        const parsed = new Date(value);
+        if (Number.isNaN(parsed.getTime())) return null;
+        return firebase.firestore.Timestamp.fromDate(parsed);
     }
 
-    // ========================================
-    // ADMIN CRUD (Difusión)
-    // ========================================
+    function _toDate(value) {
+        if (!value) return null;
+        if (value.toDate) return value.toDate();
+        if (value instanceof Date) return value;
+        const parsed = new Date(value);
+        return Number.isNaN(parsed.getTime()) ? null : parsed;
+    }
 
-    /**
-     * Crea un nuevo aviso
-     * @param {object} ctx - Contexto (auth, db, user, profile)
-     * @param {object} data - { title, type, imageUrl, body, priority, startDate, endDate }
-     * @returns {string} ID del documento creado
-     */
+    function _isStudentRole(role) {
+        return (role || '') === 'student';
+    }
+
+    function _canManageAvisos(ctx) {
+        const profile = _getProfile(ctx) || {};
+        const email = profile.email || ctx?.auth?.currentUser?.email || '';
+        return profile.role === 'superadmin'
+            || profile.permissions?.avisos === 'admin'
+            || email === 'difusion@loscabos.tecnm.mx';
+    }
+
+    function _normalizeAudience(value) {
+        const allowed = ['all', 'students', 'staff', 'admins'];
+        return allowed.includes(value) ? value : 'all';
+    }
+
+    function _matchesAudience(aviso, profile) {
+        const audience = _normalizeAudience(aviso?.audience);
+        const role = profile?.role || '';
+        if (audience === 'all') return true;
+        if (audience === 'students') return _isStudentRole(role);
+        if (audience === 'staff') return !_isStudentRole(role);
+        if (audience === 'admins') return role === 'department_admin' || role === 'superadmin';
+        return true;
+    }
+
+    function resolveStatus(aviso, now) {
+        const current = now || new Date();
+        const rawStatus = aviso?.status || 'active';
+        const startDate = _toDate(aviso?.startDate);
+        const endDate = _toDate(aviso?.endDate);
+
+        if (rawStatus === 'draft') return 'draft';
+        if (rawStatus === 'archived') return 'archived';
+        if (rawStatus === 'paused') return 'paused';
+        if (startDate && startDate > current) return 'scheduled';
+        if (endDate && endDate < current) return 'expired';
+        return 'active';
+    }
+
+    function _decorateAviso(id, data) {
+        const aviso = { id, ...data };
+        aviso.effectiveStatus = resolveStatus(aviso);
+        aviso.analytics = aviso.analytics || {};
+        aviso.viewCount = typeof aviso.viewCount === 'number' ? aviso.viewCount : (aviso.analytics.totalViews || 0);
+        return aviso;
+    }
+
+    function _getSeenStorageKey(ctx) {
+        const uid = _getUid(ctx) || 'guest';
+        return `sia:avisos:seen:${uid}`;
+    }
+
+    function _readSeenMap(ctx) {
+        try {
+            const raw = localStorage.getItem(_getSeenStorageKey(ctx)) || '{}';
+            const parsed = JSON.parse(raw);
+            const now = Date.now();
+            let changed = false;
+            Object.keys(parsed).forEach((key) => {
+                if (!parsed[key] || now - parsed[key] > SEEN_TTL_MS) {
+                    delete parsed[key];
+                    changed = true;
+                }
+            });
+            if (changed) {
+                localStorage.setItem(_getSeenStorageKey(ctx), JSON.stringify(parsed));
+            }
+            return parsed;
+        } catch (_) {
+            return {};
+        }
+    }
+
+    function _writeSeenMap(ctx, map) {
+        try {
+            localStorage.setItem(_getSeenStorageKey(ctx), JSON.stringify(map || {}));
+        } catch (_) {
+        }
+    }
+
+    function getLocalSeenMap(ctx) {
+        return _readSeenMap(ctx);
+    }
+
+    function hasSeenLocal(ctx, avisoId) {
+        return !!_readSeenMap(ctx)[avisoId];
+    }
+
+    function markSeenLocal(ctx, avisoId) {
+        if (!avisoId) return;
+        const seen = _readSeenMap(ctx);
+        seen[avisoId] = Date.now();
+        _writeSeenMap(ctx, seen);
+    }
+
     async function createAviso(ctx, data) {
         const db = _getDb();
         if (!db) throw new Error('Firestore no disponible');
+        if (!_canManageAvisos(ctx)) throw new Error('Sin permisos para crear avisos');
 
-        const user = ctx.user || ctx.auth?.currentUser;
+        const user = ctx?.user || ctx?.auth?.currentUser || _getAuth()?.currentUser;
         if (!user) throw new Error('No autenticado');
 
+        const startDate = _timestampFrom(data.startDate) || _now();
+        const endDate = _timestampFrom(data.endDate);
         const doc = {
-            title: data.title || 'Sin título',
-            type: data.type || 'text',          // 'image' | 'text' | 'mixed'
+            title: data.title || 'Sin titulo',
+            type: data.type || 'text',
             imageUrl: data.imageUrl || '',
             body: data.body || '',
-            status: 'active',                    // 'active' | 'paused' | 'expired'
-            priority: data.priority || 'normal', // 'normal' | 'urgent'
-            displayDuration: data.displayDuration || 8,
-            startDate: data.startDate ? firebase.firestore.Timestamp.fromDate(new Date(data.startDate)) : _now(),
-            endDate: data.endDate ? firebase.firestore.Timestamp.fromDate(new Date(data.endDate)) : null,
+            audience: _normalizeAudience(data.audience),
+            status: data.status || 'active',
+            priority: data.priority || 'normal',
+            displayDuration: Number(data.displayDuration) || 8,
+            startDate,
+            endDate: endDate || null,
             createdAt: _now(),
             updatedAt: _now(),
             createdBy: {
                 uid: user.uid,
-                email: user.email,
-                displayName: ctx.profile?.displayName || user.displayName || ''
+                email: user.email || '',
+                displayName: ctx?.profile?.displayName || user.displayName || ''
+            },
+            analytics: {
+                totalViews: 0,
+                uniqueViewers: 0,
+                completedViews: 0,
+                viewsBySource: {}
             },
             viewCount: 0
         };
 
         const ref = await db.collection(COLLECTION).add(doc);
-        console.log('[AvisosService] ✅ Aviso creado:', ref.id);
         return ref.id;
     }
 
-    /**
-     * Actualiza un aviso existente
-     */
     async function updateAviso(ctx, id, data) {
         const db = _getDb();
         if (!db) throw new Error('Firestore no disponible');
+        if (!_canManageAvisos(ctx)) throw new Error('Sin permisos para editar avisos');
 
-        const updates = { ...data, updatedAt: _now() };
+        const updates = {
+            ...data,
+            updatedAt: _now()
+        };
 
-        // Convertir fechas si vienen como string
-        if (updates.startDate && typeof updates.startDate === 'string') {
-            updates.startDate = firebase.firestore.Timestamp.fromDate(new Date(updates.startDate));
+        if (Object.prototype.hasOwnProperty.call(updates, 'startDate')) {
+            updates.startDate = _timestampFrom(updates.startDate) || _now();
         }
-        if (updates.endDate && typeof updates.endDate === 'string') {
-            updates.endDate = firebase.firestore.Timestamp.fromDate(new Date(updates.endDate));
+        if (Object.prototype.hasOwnProperty.call(updates, 'endDate')) {
+            updates.endDate = _timestampFrom(updates.endDate);
         }
 
-        // No permitir sobreescribir ciertos campos
+        updates.audience = _normalizeAudience(updates.audience);
+
         delete updates.createdAt;
         delete updates.createdBy;
+        delete updates.analytics;
         delete updates.viewCount;
+        delete updates.effectiveStatus;
 
         await db.collection(COLLECTION).doc(id).update(updates);
-        console.log('[AvisosService] ✏️ Aviso actualizado:', id);
     }
 
-    /**
-     * Elimina un aviso
-     */
     async function deleteAviso(ctx, id) {
         const db = _getDb();
         if (!db) throw new Error('Firestore no disponible');
-
+        if (!_canManageAvisos(ctx)) throw new Error('Sin permisos para eliminar avisos');
         await db.collection(COLLECTION).doc(id).delete();
-        console.log('[AvisosService] 🗑️ Aviso eliminado:', id);
     }
 
-    /**
-     * Pausa o reactiva un aviso
-     */
+    async function duplicateAviso(ctx, id) {
+        const db = _getDb();
+        if (!db) throw new Error('Firestore no disponible');
+        if (!_canManageAvisos(ctx)) throw new Error('Sin permisos para duplicar avisos');
+
+        const snap = await db.collection(COLLECTION).doc(id).get();
+        if (!snap.exists) throw new Error('Aviso no encontrado');
+
+        const source = snap.data() || {};
+        const payload = {
+            ...source,
+            title: `${source.title || 'Aviso'} (Copia)`,
+            status: 'draft',
+            analytics: {
+                totalViews: 0,
+                uniqueViewers: 0,
+                completedViews: 0,
+                viewsBySource: {}
+            },
+            viewCount: 0,
+            createdAt: _now(),
+            updatedAt: _now()
+        };
+
+        delete payload.effectiveStatus;
+
+        const ref = await db.collection(COLLECTION).add(payload);
+        return ref.id;
+    }
+
     async function toggleAviso(ctx, id) {
         const db = _getDb();
         if (!db) throw new Error('Firestore no disponible');
+        if (!_canManageAvisos(ctx)) throw new Error('Sin permisos para cambiar estado');
 
         const doc = await db.collection(COLLECTION).doc(id).get();
         if (!doc.exists) throw new Error('Aviso no encontrado');
 
-        const current = doc.data().status;
+        const current = doc.data()?.status || 'active';
         const newStatus = current === 'active' ? 'paused' : 'active';
-
         await db.collection(COLLECTION).doc(id).update({
             status: newStatus,
             updatedAt: _now()
         });
-
-        console.log(`[AvisosService] ⏯️ Aviso ${id} → ${newStatus}`);
         return newStatus;
     }
 
-    // ========================================
-    // QUERIES
-    // ========================================
+    async function archiveAviso(ctx, id) {
+        const db = _getDb();
+        if (!db) throw new Error('Firestore no disponible');
+        if (!_canManageAvisos(ctx)) throw new Error('Sin permisos para archivar avisos');
+        await db.collection(COLLECTION).doc(id).update({
+            status: 'archived',
+            updatedAt: _now()
+        });
+    }
 
-    /**
-     * Obtiene todos los avisos (para el panel admin de Difusión)
-     * Ordenados por createdAt desc
-     */
-    async function getAllAvisos(ctx) {
+    async function getAllAvisos(ctx, options) {
         const db = _getDb();
         if (!db) return [];
 
+        const limit = Number(options?.limit) || 80;
         const snap = await db.collection(COLLECTION)
             .orderBy('createdAt', 'desc')
-            .limit(50)
+            .limit(limit)
             .get();
 
-        return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        return snap.docs.map((doc) => _decorateAviso(doc.id, doc.data()));
     }
 
-    /**
-     * Obtiene avisos activos vigentes (para el modal del estudiante)
-     * Solo los que están 'active' y dentro de su ventana de fechas
-     */
-    async function getActiveAvisos(ctx) {
-        const db = _getDb();
-        if (!db) return [];
-
-        const now = new Date();
-
-        const snap = await db.collection(COLLECTION)
-            .where('status', '==', 'active')
-            .orderBy('createdAt', 'desc')
-            .limit(10)
-            .get();
-
-        // Filtrar por ventana de fechas en el cliente
-        return snap.docs
-            .map(d => ({ id: d.id, ...d.data() }))
-            .filter(a => {
-                const start = _toDate(a.startDate);
-                const end = _toDate(a.endDate);
-                if (start && start > now) return false; // Aún no empieza
-                if (end && end < now) return false;     // Ya expiró
-                return true;
-            });
+    async function getActiveAvisos(ctx, options) {
+        const profile = _getProfile(ctx) || {};
+        const all = await getAllAvisos(ctx, { limit: Number(options?.limit) || DEFAULT_LIMIT });
+        return all.filter((aviso) => {
+            return resolveStatus(aviso) === 'active' && _matchesAudience(aviso, profile);
+        });
     }
 
-    /**
-     * Obtiene avisos activos formateados para la sección de stories del dashboard
-     */
     async function getAvisosForStories(ctx) {
-        const avisos = await getActiveAvisos(ctx);
-
-        return avisos.map(a => ({
-            id: a.id,
-            title: a.title,
-            type: a.type,
-            imageUrl: a.imageUrl,
-            body: a.body,
-            priority: a.priority,
-            createdAt: a.createdAt,
-            _source: 'aviso' // Tag para el renderer de stories
+        const avisos = await getActiveAvisos(ctx, { limit: DEFAULT_LIMIT });
+        return avisos.map((aviso) => ({
+            id: aviso.id,
+            title: aviso.title,
+            type: aviso.type,
+            imageUrl: aviso.imageUrl,
+            body: aviso.body,
+            priority: aviso.priority,
+            createdAt: aviso.createdAt,
+            audience: aviso.audience || 'all',
+            _source: 'aviso'
         }));
     }
 
-    /**
-     * Incrementa el contador de vistas de un aviso
-     */
-    async function incrementViewCount(ctx, id) {
+    async function getUserViewsMap(ctx, limit) {
         const db = _getDb();
-        if (!db) return;
+        const uid = _getUid(ctx);
+        if (!db || !uid) return {};
 
-        try {
-            await db.collection(COLLECTION).doc(id).update({
-                viewCount: firebase.firestore.FieldValue.increment(1)
-            });
-        } catch (e) {
-            console.warn('[AvisosService] Error incrementando viewCount:', e);
-        }
+        const snap = await db.collection('usuarios')
+            .doc(uid)
+            .collection(USER_VIEWS_SUBCOLLECTION)
+            .limit(Number(limit) || 120)
+            .get();
+
+        const map = {};
+        snap.docs.forEach((doc) => {
+            map[doc.id] = doc.data() || {};
+        });
+        return map;
     }
 
-    // ========================================
-    // EXPONER API PÚBLICA
-    // ========================================
+    async function recordView(ctx, avisoId, options) {
+        const db = _getDb();
+        const uid = _getUid(ctx);
+        if (!db || !uid || !avisoId) return false;
+
+        const source = (options?.source || 'center').toLowerCase();
+        const completed = !!options?.completed;
+        const ref = db.collection('usuarios').doc(uid).collection(USER_VIEWS_SUBCOLLECTION).doc(avisoId);
+
+        await db.runTransaction(async (transaction) => {
+            const snap = await transaction.get(ref);
+            const current = snap.exists ? (snap.data() || {}) : {};
+
+            const payload = {
+                avisoId,
+                userId: uid,
+                openCount: (current.openCount || 0) + 1,
+                completedCount: (current.completedCount || 0) + (completed ? 1 : 0),
+                lastSource: source,
+                lastSeenAt: _now(),
+                updatedAt: _now()
+            };
+
+            if (!snap.exists) {
+                payload.firstSeenAt = _now();
+            }
+            if (completed && !current.firstCompletedAt) {
+                payload.firstCompletedAt = _now();
+            }
+            if (completed) {
+                payload.lastCompletedAt = _now();
+            }
+
+            transaction.set(ref, payload, { merge: true });
+        });
+
+        markSeenLocal(ctx, avisoId);
+        return true;
+    }
+
+    async function incrementViewCount(ctx, avisoId) {
+        return recordView(ctx, avisoId, { source: 'legacy', completed: true });
+    }
 
     window.AvisosService = {
         createAviso,
         updateAviso,
         deleteAviso,
+        duplicateAviso,
         toggleAviso,
+        archiveAviso,
         getAllAvisos,
         getActiveAvisos,
         getAvisosForStories,
-        incrementViewCount
+        getUserViewsMap,
+        recordView,
+        incrementViewCount,
+        getLocalSeenMap,
+        hasSeenLocal,
+        markSeenLocal,
+        resolveStatus,
+        matchesAudience: _matchesAudience,
+        canManage: _canManageAvisos
     };
-
-    console.log('[AvisosService] ✅ Servicio de Avisos cargado.');
 })();

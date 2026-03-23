@@ -1,0 +1,4 @@
+// functions/.gitignore
+node_modules/
+.env
+*.local

@@ -1,0 +1,341 @@
+/* ================================================================
+   SUPERADMIN — Command Panel Styles
+   ================================================================ */
+
+.sa-sidebar {
+    width: 260px;
+    min-height: 100vh;
+    background: linear-gradient(180deg, #0f172a 0%, #1e293b 100%);
+    color: #fff;
+    display: flex;
+    flex-direction: column;
+    padding: 1rem;
+    gap: 0.5rem;
+    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.15);
+    flex-shrink: 0;
+    z-index: 10;
+}
+
+.sa-sidebar-header {
+    text-align: center;
+    padding: 1rem 0 1.5rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    margin-bottom: 0.5rem;
+}
+
+.sa-godmode-badge {
+    background: linear-gradient(90deg, #f59e0b, #ef4444);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    font-weight: 800;
+    font-size: 0.7rem;
+    letter-spacing: 1.5px;
+}
+
+.sa-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.sa-nav-item {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    padding: 0.6rem 0.85rem;
+    border: none;
+    background: none;
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 0.875rem;
+    font-weight: 500;
+    border-radius: 0.6rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: left;
+    width: 100%;
+    position: relative;
+}
+
+.sa-nav-item:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: #fff;
+}
+
+.sa-nav-item.active {
+    background: rgba(59, 130, 246, 0.2);
+    color: #fff;
+    font-weight: 600;
+    box-shadow: inset 3px 0 0 #3b82f6;
+}
+
+.sa-nav-item i {
+    font-size: 1.1rem;
+    width: 22px;
+    text-align: center;
+}
+
+.sa-badge-count {
+    background: #ef4444;
+    color: #fff;
+    font-size: 0.65rem;
+    padding: 0.1rem 0.45rem;
+    border-radius: 999px;
+    margin-left: auto;
+    font-weight: 700;
+}
+
+.sa-sidebar-footer {
+    margin-top: auto;
+    padding: 0.75rem;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 0.6rem;
+}
+
+.sa-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+}
+
+.sa-main {
+    flex-grow: 1;
+    padding: 1.5rem 2rem;
+    overflow-y: auto;
+    background: var(--bg-body, #f3f4f6);
+    max-height: 100vh;
+}
+
+.sa-panel-header {
+    margin-bottom: 1.25rem;
+}
+
+/* KPI Cards */
+.sa-kpi-card {
+    padding: 1.25rem;
+    border-radius: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+    border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.sa-kpi-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 0.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.35rem;
+    flex-shrink: 0;
+}
+
+.sa-kpi-value {
+    font-size: 1.5rem;
+    font-weight: 800;
+    line-height: 1.1;
+}
+
+.sa-kpi-label {
+    font-size: 0.75rem;
+    color: #64748b;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.sa-kpi-blue {
+    background: linear-gradient(135deg, #eff6ff, #dbeafe);
+}
+
+.sa-kpi-blue .sa-kpi-icon {
+    background: #3b82f6;
+    color: #fff;
+}
+
+.sa-kpi-blue .sa-kpi-value {
+    color: #1e40af;
+}
+
+.sa-kpi-orange {
+    background: linear-gradient(135deg, #fffbeb, #fef3c7);
+}
+
+.sa-kpi-orange .sa-kpi-icon {
+    background: #f59e0b;
+    color: #fff;
+}
+
+.sa-kpi-orange .sa-kpi-value {
+    color: #b45309;
+}
+
+.sa-kpi-green {
+    background: linear-gradient(135deg, #f0fdf4, #dcfce7);
+}
+
+.sa-kpi-green .sa-kpi-icon {
+    background: #10b981;
+    color: #fff;
+}
+
+.sa-kpi-green .sa-kpi-value {
+    color: #047857;
+}
+
+.sa-kpi-purple {
+    background: linear-gradient(135deg, #faf5ff, #ede9fe);
+}
+
+.sa-kpi-purple .sa-kpi-icon {
+    background: #8b5cf6;
+    color: #fff;
+}
+
+.sa-kpi-purple .sa-kpi-value {
+    color: #6d28d9;
+}
+
+/* Filter bar */
+.sa-filter-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    padding: 0.65rem 1rem;
+    background: var(--bg-card, #fff);
+    border-radius: 0.75rem;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+}
+
+/* Table */
+.sa-table thead th {
+    font-size: 0.7rem;
+    letter-spacing: 0.5px;
+    padding: 0.65rem 0.75rem;
+}
+
+/* Stat pills (tickets) */
+.sa-stat-pill {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.15rem;
+    padding: 0.75rem;
+    border-radius: 0.75rem;
+    background: var(--bg-card, #fff);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+    border-left: 3px solid transparent;
+}
+
+/* Ticket history */
+.sa-ticket-history {
+    max-height: 250px;
+    overflow-y: auto;
+    padding-right: 4px;
+}
+
+/* Responsive sidebar */
+@media (max-width: 991px) {
+    .sa-sidebar {
+        width: 100%;
+        min-height: auto;
+        flex-direction: row;
+        flex-wrap: wrap;
+        padding: 0.75rem;
+        gap: 0.5rem;
+        align-items: center;
+    }
+
+    .sa-sidebar-header {
+        padding: 0;
+        border-bottom: none;
+        margin-bottom: 0;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .sa-sidebar-header img {
+        margin-bottom: 0 !important;
+    }
+
+    .sa-sidebar-header h6 {
+        display: none;
+    }
+
+    .sa-nav {
+        flex-direction: row;
+        overflow-x: auto;
+    }
+
+    .sa-nav-item span {
+        display: none;
+    }
+
+    .sa-nav-item {
+        padding: 0.5rem 0.7rem;
+    }
+
+    .sa-nav-item.active {
+        box-shadow: none;
+        background: rgba(59, 130, 246, 0.3);
+    }
+
+    .sa-sidebar-footer {
+        display: none;
+    }
+
+    .sa-main {
+        max-height: none;
+        padding: 1rem;
+    }
+}
+
+/* Dark mode overrides for SA panel */
+html[data-bs-theme="dark"] .sa-kpi-card {
+    border-color: rgba(255, 255, 255, 0.08);
+}
+
+html[data-bs-theme="dark"] .sa-kpi-blue {
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(37, 99, 235, 0.1));
+}
+
+html[data-bs-theme="dark"] .sa-kpi-blue .sa-kpi-value {
+    color: #60a5fa;
+}
+
+html[data-bs-theme="dark"] .sa-kpi-orange {
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.15), rgba(217, 119, 6, 0.1));
+}
+
+html[data-bs-theme="dark"] .sa-kpi-orange .sa-kpi-value {
+    color: #fbbf24;
+}
+
+html[data-bs-theme="dark"] .sa-kpi-green {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.15), rgba(5, 150, 105, 0.1));
+}
+
+html[data-bs-theme="dark"] .sa-kpi-green .sa-kpi-value {
+    color: #34d399;
+}
+
+html[data-bs-theme="dark"] .sa-kpi-purple {
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.15), rgba(109, 40, 217, 0.1));
+}
+
+html[data-bs-theme="dark"] .sa-kpi-purple .sa-kpi-value {
+    color: #a78bfa;
+}
+
+html[data-bs-theme="dark"] .sa-filter-bar {
+    background: var(--surface, #1a1d23);
+}
+
+html[data-bs-theme="dark"] .sa-stat-pill {
+    background: var(--surface, #1a1d23);
+}

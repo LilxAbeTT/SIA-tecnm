@@ -475,7 +475,7 @@ class VocacionalTest extends HTMLElement {
             ${top3.slice(1).map((c, i) => `
                             <div class="card border border-light shadow-sm rounded-4 mb-3 hover-elevate bg-white">
                                 <div class="card-body p-4 d-flex align-items-center">
-                                    <div class="bg-light rounded-circle p-3 me-4 text-primary">
+                                    <div class=" rounded-circle p-3 me-4 text-primary">
                                         <i class="bi ${c.icon} fs-3"></i>
                                     </div>
                                     <div class="flex-grow-1">

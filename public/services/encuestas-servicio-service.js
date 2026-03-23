@@ -1,6 +1,5 @@
 // services/encuestas-servicio-service.js
-// Servicio para el Módulo de Encuestas de Servicio
-// Gestiona encuestas predeterminadas por servicio, triggers automáticos y respuestas
+// Gestiona encuestas predeterminadas por servicio, triggers automáticos y respuestas.
 
 if (!window.EncuestasServicioService) {
     window.EncuestasServicioService = (function () {
@@ -8,16 +7,60 @@ if (!window.EncuestasServicioService) {
         const C_SERVICE_RESPONSES = 'encuestas-servicio-respuestas';
         const C_SERVICE_TRIGGERS = 'encuestas-servicio-triggers';
 
-        // =============================================
-        // CRUD - ENCUESTAS DE SERVICIO
-        // =============================================
+        function toDate(value) {
+            if (!value) return null;
+            if (value instanceof Date) return value;
+            if (typeof value.toDate === 'function') return value.toDate();
+            const parsed = new Date(value);
+            return Number.isNaN(parsed.getTime()) ? null : parsed;
+        }
 
-        /**
-         * Crear o actualizar encuesta de servicio
-         * @param {Object} ctx - Contexto de usuario
-         * @param {string} serviceType - Tipo de servicio (biblioteca, servicio-medico, psicologia, etc.)
-         * @param {Object} data - Datos de la encuesta
-         */
+        function normalizeQuestions(questions = []) {
+            return (questions || []).map((question, index) => {
+                const normalized = {
+                    id: question.id || `q${index}`,
+                    type: question.type || 'open',
+                    text: question.text || `Pregunta ${index + 1}`,
+                    required: question.required !== false
+                };
+
+                if (normalized.type === 'multiple') {
+                    normalized.options = (question.options || []).filter(Boolean);
+                }
+                if (normalized.type === 'scale') {
+                    normalized.min = Number.isFinite(Number(question.min)) ? Number(question.min) : 1;
+                    normalized.max = Number.isFinite(Number(question.max)) ? Number(question.max) : 10;
+                }
+
+                return normalized;
+            });
+        }
+
+        function normalizeConfig(config = {}) {
+            return {
+                frequency: config.frequency || 'per-use',
+                customDays: Number.isFinite(Number(config.customDays)) ? Number(config.customDays) : null,
+                showToAll: !!config.showToAll,
+                maxSkips: Number.isFinite(Number(config.maxSkips)) ? Number(config.maxSkips) : 2,
+                triggerTimestamp: config.triggerTimestamp || null
+            };
+        }
+
+        function normalizeSurvey(snapshotOrData, fallbackId = '') {
+            const raw = typeof snapshotOrData.data === 'function' ? snapshotOrData.data() : snapshotOrData;
+            const id = snapshotOrData.id || fallbackId;
+            return {
+                id,
+                ...raw,
+                title: raw.title || 'Encuesta de servicio',
+                description: raw.description || '',
+                questions: normalizeQuestions(raw.questions || []),
+                config: normalizeConfig(raw.config || {}),
+                createdAt: toDate(raw.createdAt),
+                updatedAt: toDate(raw.updatedAt)
+            };
+        }
+
         async function createServiceSurvey(ctx, serviceType, data) {
             const db = ctx.db;
             const docRef = db.collection(C_SERVICE_SURVEYS).doc(serviceType);
@@ -26,57 +69,57 @@ if (!window.EncuestasServicioService) {
                 serviceType,
                 title: data.title,
                 description: data.description || '',
-                questions: data.questions || [],
+                questions: normalizeQuestions(data.questions || []),
                 enabled: data.enabled !== undefined ? data.enabled : false,
-                config: {
-                    frequency: data.config?.frequency || 'per-use', // per-use, weekly, monthly, custom
-                    customDays: data.config?.customDays || null,
-                    showToAll: data.config?.showToAll || false,
-                    maxSkips: data.config?.maxSkips || 2
-                },
+                config: normalizeConfig(data.config || {}),
                 createdAt: firebase.firestore.FieldValue.serverTimestamp(),
                 updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-                createdBy: ctx.profile.email
+                createdBy: ctx.profile?.email || ctx.profile?.displayName || 'Administrador',
+                responseCount: 0,
+                analytics: {
+                    totalResponses: 0,
+                    notUsedCount: 0,
+                    lastResponseAt: null
+                }
             };
 
             await docRef.set(surveyData, { merge: true });
             return { id: serviceType, ...surveyData };
         }
 
-        /**
-         * Obtener encuesta de un servicio específico
-         */
         async function getServiceSurvey(ctx, serviceType) {
             const db = ctx.db;
             const doc = await db.collection(C_SERVICE_SURVEYS).doc(serviceType).get();
             if (!doc.exists) return null;
-            return { id: doc.id, ...doc.data() };
+            return normalizeSurvey(doc);
         }
 
-        /**
-         * Obtener todas las encuestas de servicio
-         */
         async function getAllServiceSurveys(ctx) {
             const db = ctx.db;
             const snapshot = await db.collection(C_SERVICE_SURVEYS).get();
-            return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            return snapshot.docs.map((doc) => normalizeSurvey(doc));
         }
 
-        /**
-         * Actualizar configuración de encuesta de servicio
-         */
         async function updateServiceSurvey(ctx, serviceType, data) {
             const db = ctx.db;
+            const ref = db.collection(C_SERVICE_SURVEYS).doc(serviceType);
+            const current = await ref.get();
+            const currentData = current.exists ? current.data() : {};
+            const nextConfig = normalizeConfig({
+                ...(currentData.config || {}),
+                ...(data.config || {})
+            });
+
             const updateData = {
                 ...data,
+                questions: data.questions ? normalizeQuestions(data.questions) : normalizeQuestions(currentData.questions || []),
+                config: nextConfig,
                 updatedAt: firebase.firestore.FieldValue.serverTimestamp()
             };
-            await db.collection(C_SERVICE_SURVEYS).doc(serviceType).update(updateData);
+
+            await ref.set(updateData, { merge: true });
         }
 
-        /**
-         * Habilitar/deshabilitar encuesta de servicio
-         */
         async function toggleServiceSurvey(ctx, serviceType, enabled) {
             const db = ctx.db;
             await db.collection(C_SERVICE_SURVEYS).doc(serviceType).update({
@@ -85,24 +128,26 @@ if (!window.EncuestasServicioService) {
             });
         }
 
-        // =============================================
-        // SISTEMA DE TRIGGERS
-        // =============================================
+        async function triggerSurveyToAll(ctx, serviceType) {
+            await updateServiceSurvey(ctx, serviceType, {
+                enabled: true,
+                config: {
+                    showToAll: true,
+                    triggerTimestamp: firebase.firestore.Timestamp.now()
+                }
+            });
+        }
 
-        /**
-         * Registrar uso de un servicio
-         * @param {Object} ctx - Contexto de usuario
-         * @param {string} serviceType - Tipo de servicio
-         * @param {Object} metadata - Metadatos del uso (action, timestamp, etc.)
-         * @param {string} [targetUid] - ID del usuario objetivo (si es diferente al actual, ej. medico -> estudiante)
-         */
+        async function stopGlobalSurvey(ctx, serviceType) {
+            await updateServiceSurvey(ctx, serviceType, {
+                config: { showToAll: false }
+            });
+        }
+
         async function registerServiceUsage(ctx, serviceType, metadata, targetUid = null) {
             const db = ctx.db;
-            // Usar targetUid si existe (acción de admin/medico), sino el usuario actual (autoservicio)
             const userId = targetUid || ctx.profile.uid;
-
             const triggerRef = db.collection(C_SERVICE_TRIGGERS).doc(`${userId}_${serviceType}`);
-
             const triggerDoc = await triggerRef.get();
             const usageRecord = {
                 action: metadata.action,
@@ -111,18 +156,16 @@ if (!window.EncuestasServicioService) {
             };
 
             if (triggerDoc.exists) {
-                // Actualizar registro existente
-                // CRITICAL: Resetear flags para volver a activar la encuesta
                 await triggerRef.update({
-                    userId, // Asegurar que el ID está correcto
+                    userId,
                     lastUsage: firebase.firestore.Timestamp.now(),
                     usageHistory: firebase.firestore.FieldValue.arrayUnion(usageRecord),
                     updatedAt: firebase.firestore.Timestamp.now(),
-                    responded: false, // RESET: Permitir nueva respuesta
-                    skipCount: 0      // RESET: Reiniciar skips
+                    responded: false,
+                    exempted: false,
+                    skipCount: 0
                 });
             } else {
-                // Crear nuevo registro
                 await triggerRef.set({
                     userId,
                     serviceType,
@@ -130,6 +173,7 @@ if (!window.EncuestasServicioService) {
                     lastSurveyShown: null,
                     skipCount: 0,
                     responded: false,
+                    exempted: false,
                     responseId: null,
                     usageHistory: [usageRecord],
                     createdAt: firebase.firestore.Timestamp.now(),
@@ -138,45 +182,31 @@ if (!window.EncuestasServicioService) {
             }
         }
 
-        /**
-         * Verificar si debe mostrar encuesta al usuario
-         * @returns {Object|null} - Datos de la encuesta si debe mostrarla, null si no
-         */
         async function checkPendingSurvey(ctx, serviceType) {
             const db = ctx.db;
             const userId = ctx.profile.uid;
-
-            // Obtener configuración de la encuesta
             const survey = await getServiceSurvey(ctx, serviceType);
             if (!survey || !survey.enabled) return null;
 
-            // Obtener registro de triggers del usuario
             const triggerRef = db.collection(C_SERVICE_TRIGGERS).doc(`${userId}_${serviceType}`);
             const triggerDoc = await triggerRef.get();
             const triggerData = triggerDoc.exists ? triggerDoc.data() : null;
 
-            // 1. CHEQUEO DE DISPARADOR MANUAL (LANZAR A TODOS)
             if (survey.config.showToAll && survey.config.triggerTimestamp) {
-                const triggerTime = survey.config.triggerTimestamp.toDate ? survey.config.triggerTimestamp.toDate() : new Date(survey.config.triggerTimestamp);
-                const lastResponse = triggerData?.lastResponseAt ? (triggerData.lastResponseAt.toDate ? triggerData.lastResponseAt.toDate() : new Date(triggerData.lastResponseAt)) : null;
+                const triggerTime = toDate(survey.config.triggerTimestamp);
+                const lastResponse = toDate(triggerData?.lastResponseAt);
 
-                // Si nunca respondió O si el disparo manual es más reciente que su última respuesta
-                if (!lastResponse || triggerTime > lastResponse) {
+                if (!lastResponse || (triggerTime && triggerTime > lastResponse)) {
                     return { ...survey, isMandatory: true, reason: 'manual_trigger' };
                 }
             }
 
-            // Si no hay registro de uso y no es manual, no mostrar
             if (!triggerData) return null;
+            if (triggerData.responded || triggerData.exempted) return null;
 
-            // Si ya respondió (y no cayó en el caso manual de arriba), no mostrar
-            if (triggerData.responded) return null;
-
-            // Verificar si debe mostrar según la frecuencia
             const shouldShow = await shouldShowSurvey(ctx, serviceType, survey, triggerData);
             if (!shouldShow) return null;
 
-            // Retornar datos de la encuesta con información de skip
             return {
                 ...survey,
                 skipCount: triggerData?.skipCount || 0,
@@ -185,54 +215,31 @@ if (!window.EncuestasServicioService) {
             };
         }
 
-        /**
-         * Lógica para determinar si debe mostrar la encuesta
-         */
         async function shouldShowSurvey(ctx, serviceType, survey, triggerData) {
-            // Si está configurado para mostrar a todos, siempre mostrar
             if (survey.config.showToAll) return true;
-
-            // Si no hay registro de uso, no mostrar
             if (!triggerData) return false;
 
             const now = Date.now();
-            const lastUsage = triggerData.lastUsage?.toDate?.() || new Date(triggerData.lastUsage);
-            const lastSurveyShown = triggerData.lastSurveyShown?.toDate?.() || null;
+            const lastUsage = toDate(triggerData.lastUsage);
+            const lastSurveyShown = toDate(triggerData.lastSurveyShown);
 
-            // Si nunca se ha mostrado la encuesta, mostrarla
             if (!lastSurveyShown) return true;
 
-            const config = survey.config;
-
-            switch (config.frequency) {
+            switch (survey.config.frequency) {
                 case 'per-use':
-                    // Mostrar después de cada uso
-                    return lastUsage > lastSurveyShown;
-
+                    return !!lastUsage && lastUsage > lastSurveyShown;
                 case 'weekly':
-                    // Mostrar si han pasado 7 días desde la última vez que se mostró
-                    const weekInMs = 7 * 24 * 60 * 60 * 1000;
-                    return (now - lastSurveyShown.getTime()) >= weekInMs;
-
+                    return (now - lastSurveyShown.getTime()) >= (7 * 24 * 60 * 60 * 1000);
                 case 'monthly':
-                    // Mostrar si han pasado 30 días
-                    const monthInMs = 30 * 24 * 60 * 60 * 1000;
-                    return (now - lastSurveyShown.getTime()) >= monthInMs;
-
+                    return (now - lastSurveyShown.getTime()) >= (30 * 24 * 60 * 60 * 1000);
                 case 'custom':
-                    // Mostrar según días personalizados
-                    if (!config.customDays) return false;
-                    const customMs = config.customDays * 24 * 60 * 60 * 1000;
-                    return (now - lastSurveyShown.getTime()) >= customMs;
-
+                    if (!survey.config.customDays) return false;
+                    return (now - lastSurveyShown.getTime()) >= (survey.config.customDays * 24 * 60 * 60 * 1000);
                 default:
                     return false;
             }
         }
 
-        /**
-         * Registrar que el usuario saltó la encuesta
-         */
         async function recordSurveySkip(ctx, serviceType) {
             const db = ctx.db;
             const userId = ctx.profile.uid;
@@ -245,9 +252,6 @@ if (!window.EncuestasServicioService) {
             }, { merge: true });
         }
 
-        /**
-         * Marcar que se mostró la encuesta (sin skip ni respuesta aún)
-         */
         async function markSurveyShown(ctx, serviceType) {
             const db = ctx.db;
             const userId = ctx.profile.uid;
@@ -259,57 +263,60 @@ if (!window.EncuestasServicioService) {
             }, { merge: true });
         }
 
-        // =============================================
-        // RESPUESTAS
-        // =============================================
-
-        /**
-         * Guardar respuesta de encuesta de servicio
-         */
-        async function submitServiceSurveyResponse(ctx, serviceType, answers) {
+        async function submitServiceSurveyResponse(ctx, serviceType, answers, meta = {}) {
             const db = ctx.db;
             const userId = ctx.profile.uid;
             const profile = ctx.profile;
-
-            // Guardar respuesta
             const responseData = {
                 serviceType,
                 userId,
-                userName: profile.name || profile.displayName || 'Anónimo',
-                userEmail: profile.email,
-                userCareer: profile.career || null,
+                userName: profile.name || profile.displayName || 'Anonimo',
+                userEmail: profile.email || null,
+                userCareer: profile.career || profile.carrera || null,
                 userRole: profile.role || 'student',
                 answers,
-                submittedAt: firebase.firestore.Timestamp.now()
+                source: meta.source || 'service_modal',
+                submittedAt: firebase.firestore.Timestamp.now(),
+                isSkip: false
             };
 
             const responseRef = await db.collection(C_SERVICE_RESPONSES).add(responseData);
-
-            // Actualizar trigger: marcar como respondido
             const triggerRef = db.collection(C_SERVICE_TRIGGERS).doc(`${userId}_${serviceType}`);
             await triggerRef.set({
                 responded: true,
+                exempted: false,
                 responseId: responseRef.id,
-                skipCount: 0, // Resetear contador de skips
-                lastResponseAt: firebase.firestore.Timestamp.now(), // SAVE TIMESTAMP FOR MANUAL TRIGGERS
+                skipCount: 0,
+                lastSurveyShown: firebase.firestore.Timestamp.now(),
+                lastResponseAt: firebase.firestore.Timestamp.now(),
                 updatedAt: firebase.firestore.Timestamp.now()
             }, { merge: true });
-
-            // Incrementar contador de respuestas en la encuesta
-            const surveyRef = db.collection(C_SERVICE_SURVEYS).doc(serviceType);
-            await surveyRef.update({
-                responseCount: firebase.firestore.FieldValue.increment(1)
-            });
 
             return { id: responseRef.id, ...responseData };
         }
 
-        /**
-         * Obtener respuestas de una encuesta de servicio
-         */
-        async function getServiceSurveyResponses(ctx, serviceType, filters = {}) {
+        async function markSurveyNotUsed(ctx, serviceType) {
             const db = ctx.db;
-            let query = db.collection(C_SERVICE_RESPONSES).where('serviceType', '==', serviceType);
+            const userId = ctx.profile.uid;
+            const triggerRef = db.collection(C_SERVICE_TRIGGERS).doc(`${userId}_${serviceType}`);
+
+            await triggerRef.set({
+                responded: false,
+                exempted: true,
+                responseId: null,
+                skipCount: 0,
+                lastSurveyShown: firebase.firestore.Timestamp.now(),
+                lastResponseAt: firebase.firestore.Timestamp.now(),
+                updatedAt: firebase.firestore.Timestamp.now()
+            }, { merge: true });
+
+            return { success: true };
+        }
+
+        async function getServiceSurveyResponses(ctx, serviceType, filters = {}) {
+            let query = ctx.db.collection(C_SERVICE_RESPONSES)
+                .where('serviceType', '==', serviceType)
+                .orderBy('submittedAt', 'desc');
 
             if (filters.startDate) {
                 query = query.where('submittedAt', '>=', filters.startDate);
@@ -318,19 +325,14 @@ if (!window.EncuestasServicioService) {
                 query = query.where('submittedAt', '<=', filters.endDate);
             }
 
-            query = query.orderBy('submittedAt', 'desc');
-
             const snapshot = await query.get();
-            return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            return snapshot.docs.map((doc) => ({
+                id: doc.id,
+                ...doc.data(),
+                submittedAt: toDate(doc.data().submittedAt)
+            }));
         }
 
-        // =============================================
-        // ESTADÍSTICAS
-        // =============================================
-
-        /**
-         * Obtener estadísticas de una encuesta de servicio
-         */
         async function getServiceSurveyStats(ctx, serviceType, dateRange = {}) {
             const responses = await getServiceSurveyResponses(ctx, serviceType, dateRange);
             const survey = await getServiceSurvey(ctx, serviceType);
@@ -345,97 +347,75 @@ if (!window.EncuestasServicioService) {
                 byDate: {}
             };
 
-            // Analizar respuestas por pregunta
-            survey.questions.forEach(q => {
-                stats.byQuestion[q.id] = {
-                    questionText: q.text,
-                    questionType: q.type,
+            survey.questions.forEach((question) => {
+                stats.byQuestion[question.id] = {
+                    questionText: question.text,
+                    questionType: question.type,
                     answers: {},
                     textAnswers: [],
                     average: null
                 };
             });
 
-            responses.forEach(r => {
-                // Por carrera
-                const career = r.userCareer || 'Sin carrera';
-                stats.byCareers[career] = (stats.byCareers[career] || 0) + 1;
-
-                // Por rol
-                const role = r.userRole || 'student';
-                stats.byRole[role] = (stats.byRole[role] || 0) + 1;
-
-                // Por fecha
-                const date = r.submittedAt?.toDate?.() || new Date(r.submittedAt);
+            responses.forEach((response) => {
+                const career = response.userCareer || 'Sin carrera';
+                const role = response.userRole || 'student';
+                const date = toDate(response.submittedAt) || new Date();
                 const dateKey = date.toISOString().split('T')[0];
+
+                stats.byCareers[career] = (stats.byCareers[career] || 0) + 1;
+                stats.byRole[role] = (stats.byRole[role] || 0) + 1;
                 stats.byDate[dateKey] = (stats.byDate[dateKey] || 0) + 1;
 
-                // Por pregunta
-                Object.entries(r.answers).forEach(([qId, answer]) => {
-                    const qStats = stats.byQuestion[qId];
-                    if (!qStats) return;
+                Object.entries(response.answers || {}).forEach(([questionId, answer]) => {
+                    const bucket = stats.byQuestion[questionId];
+                    if (!bucket) return;
 
-                    if (qStats.questionType === 'open') {
-                        if (answer && answer.trim()) {
-                            qStats.textAnswers.push(answer);
+                    if (bucket.questionType === 'open') {
+                        if (answer && String(answer).trim()) {
+                            bucket.textAnswers.push(answer);
                         }
-                    } else if (qStats.questionType === 'scale') {
-                        const key = String(answer);
-                        qStats.answers[key] = (qStats.answers[key] || 0) + 1;
-                    } else {
-                        const key = String(answer);
-                        qStats.answers[key] = (qStats.answers[key] || 0) + 1;
+                        return;
                     }
+
+                    const key = String(answer);
+                    bucket.answers[key] = (bucket.answers[key] || 0) + 1;
                 });
             });
 
-            // Calcular promedios para escalas
-            Object.values(stats.byQuestion).forEach(qStats => {
-                if (qStats.questionType === 'scale') {
-                    const values = Object.entries(qStats.answers).map(([k, count]) => {
-                        return parseInt(k) * count;
-                    });
-                    const total = Object.values(qStats.answers).reduce((a, b) => a + b, 0);
-                    const sum = values.reduce((a, b) => a + b, 0);
-                    qStats.average = total > 0 ? (sum / total).toFixed(1) : null;
-                }
+            Object.values(stats.byQuestion).forEach((bucket) => {
+                if (bucket.questionType !== 'scale') return;
+                const total = Object.values(bucket.answers).reduce((sum, value) => sum + Number(value), 0);
+                const weighted = Object.entries(bucket.answers).reduce((sum, [value, count]) => {
+                    return sum + (Number(value) * Number(count));
+                }, 0);
+                bucket.average = total ? (weighted / total).toFixed(1) : null;
             });
 
             return stats;
         }
 
-        /**
-         * Obtener estadísticas generales de todas las encuestas de servicio
-         */
         async function getOverviewStats(ctx) {
             const surveys = await getAllServiceSurveys(ctx);
-
             const stats = {
                 totalSurveys: surveys.length,
-                enabled: surveys.filter(s => s.enabled).length,
-                disabled: surveys.filter(s => !s.enabled).length,
-                totalResponses: surveys.reduce((sum, s) => sum + (s.responseCount || 0), 0),
+                enabled: surveys.filter((survey) => survey.enabled).length,
+                disabled: surveys.filter((survey) => !survey.enabled).length,
+                totalResponses: surveys.reduce((sum, survey) => sum + (survey.analytics?.totalResponses || survey.responseCount || 0), 0),
                 byService: {}
             };
 
-            surveys.forEach(s => {
-                stats.byService[s.serviceType] = {
-                    title: s.title,
-                    enabled: s.enabled,
-                    responseCount: s.responseCount || 0
+            surveys.forEach((survey) => {
+                stats.byService[survey.serviceType] = {
+                    title: survey.title,
+                    enabled: survey.enabled,
+                    responseCount: survey.analytics?.totalResponses || survey.responseCount || 0
                 };
             });
 
             return stats;
         }
 
-        // =============================================
-        // HELPERS
-        // =============================================
-
-        /**
-         * Resetear estado de encuesta para un usuario (para testing)
-         */
         async function resetUserSurveyState(ctx, serviceType) {
             const db = ctx.db;
             const userId = ctx.profile.uid;
@@ -443,6 +423,7 @@ if (!window.EncuestasServicioService) {
 
             await triggerRef.update({
                 responded: false,
+                exempted: false,
                 responseId: null,
                 skipCount: 0,
                 lastSurveyShown: null,
@@ -450,37 +431,26 @@ if (!window.EncuestasServicioService) {
             });
         }
 
-        // =============================================
-        // PUBLIC API
-        // =============================================
-
         return {
-            // CRUD
             createServiceSurvey,
             getServiceSurvey,
             getAllServiceSurveys,
             updateServiceSurvey,
             toggleServiceSurvey,
-
-            // Triggers
+            triggerSurveyToAll,
+            stopGlobalSurvey,
             registerServiceUsage,
             checkPendingSurvey,
             shouldShowSurvey,
             recordSurveySkip,
             markSurveyShown,
-
-            // Respuestas
             submitServiceSurveyResponse,
+            markSurveyNotUsed,
             getServiceSurveyResponses,
-
-            // Estadísticas
             getServiceSurveyStats,
             getOverviewStats,
-
-            // Helpers
             resetUserSurveyState
         };
-
     })();
 }
 

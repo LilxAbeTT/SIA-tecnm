@@ -67,3 +67,11 @@ node_modules/
 
 # dataconnect generated files
 .dataconnect
+
+# Local AI/editor workspaces
+.agents/
+.claude/
+
+# Local scratch files
+active
+22222.txt

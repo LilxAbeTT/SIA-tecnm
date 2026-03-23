@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBox="0 0 160 160" fill="none" aria-labelledby="title desc" role="img">
+  <title id="title">Logo del modulo Comunidad</title>
+  <desc id="desc">Marca abstracta de tres personas conectadas en color rojo vino.</desc>
+  <g fill="#7A1F3D">
+    <circle cx="44" cy="38" r="16"/>
+    <circle cx="80" cy="24" r="16"/>
+    <circle cx="116" cy="38" r="16"/>
+    <ellipse cx="40" cy="105" rx="25" ry="35" transform="rotate(-24 40 105)"/>
+    <rect x="65" y="58" width="30" height="77" rx="15"/>
+    <ellipse cx="120" cy="105" rx="25" ry="35" transform="rotate(24 120 105)"/>
+  </g>
+</svg>

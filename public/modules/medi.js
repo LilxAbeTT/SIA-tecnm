@@ -1,5 +1,8 @@
-// modules/medi.js
+﻿// modules/medi.js
 // Sistema Profesional de Gestión Médica (v4.0 - Consolidado)
+
+window.Medi = window.Medi || {};
+window.Medi.Factories = window.Medi.Factories || {};
 
 var Medi = (function () {
   // --- CONSTANTES & CONFIG ---
@@ -15,6 +18,7 @@ var Medi = (function () {
   let _myRole = null;
   let _myUid = null;
   let _isSaving = false; // Prevent double clicks
+  const _patientCache = new Map(); // Cache patients by uid to avoid inline JSON in onclick
   let _unsubs = {};  // Named listeners: { wall, agenda, studentHistory, ... }
   function _cleanupListeners() {
     Object.values(_unsubs).forEach(fn => { if (typeof fn === 'function') fn(); });
@@ -22,6 +26,8 @@ var Medi = (function () {
   }
   let _lastCount = 0;
   let _lastConsultaData = null;
+  let _activeFollowUpBannerId = null;
+  let _currentBookingLock = null;
   let _currentShift = null; // Mantiene el turno 'legacy' para filtrado
   let _currentProfile = null; // [NEW] Objeto del perfil autenticado
   let _profesionalCedula = null;
@@ -41,6 +47,347 @@ var Medi = (function () {
   const safeDate = MediService.safeDate;
   const isWeekday = (d) => { const day = d.getDay(); return day !== 0 && day !== 6; };
 
+  function _normalizeStudentServiceType(rawType) {
+    return String(rawType || '').toLowerCase().includes('psic') ? 'Psicologo' : 'M\u00e9dico';
+  }
+
+  function _getStudentServiceLabel(rawType) {
+    return _normalizeStudentServiceType(rawType) === 'Psicologo' ? 'Psicolog\u00eda' : 'M\u00e9dico General';
+  }
+
+  function _getStudentServiceCategory(rawType) {
+    return _normalizeStudentServiceType(rawType) === 'Psicologo' ? 'Salud Mental' : 'Medicina General';
+  }
+
+  function _getStudentServiceIconClass(rawType) {
+    return _normalizeStudentServiceType(rawType) === 'Psicologo'
+      ? 'bi bi-chat-heart-fill text-primary'
+      : 'bi bi-bandaid-fill text-info';
+  }
+
+  function _getProfessionalDisplayName(data = {}) {
+    if (data.profesionalName) return data.profesionalName;
+    if (data.autorName) return data.autorName;
+    if (data.displayName) return data.displayName;
+    if (data.autorEmail) return String(data.autorEmail).split('@')[0];
+    if (data.profesionalEmail) return String(data.profesionalEmail).split('@')[0];
+    return 'Profesional de Salud';
+  }
+
+  function _buildCalendarAppointmentPayload(cita = {}) {
+    const safeSlotDate = cita?.safeDate ? new Date(cita.safeDate) : safeDate(cita?.fechaHoraSlot);
+    if (!safeSlotDate) return null;
+    return {
+      id: cita.id || `medi_${safeSlotDate.getTime()}`,
+      safeDate: safeSlotDate.toISOString(),
+      tipoServicio: _normalizeStudentServiceType(cita.tipoServicio || cita.tipo || 'Medico'),
+      profesionalName: cita.profesionalName || cita.profName || null,
+      motivo: cita.motivo || ''
+    };
+  }
+
+  function _buildConsultationPrescriptionPayload(exp = {}) {
+    const dateObj = exp.safeDate ? new Date(exp.safeDate) : new Date();
+    const professionalEmail = exp.profesionalEmail || exp.autorEmail || '';
+    const signs = exp.signos || {};
+    const studentProfile = _ctx?.profile || {};
+    const age = studentProfile.fechaNacimiento ? MediService.calculateAge(studentProfile.fechaNacimiento) : (studentProfile.edad || exp.edad || '');
+    const allergies = studentProfile.alergias || studentProfile.healthData?.alergia || exp.alergias || '';
+    return {
+      doctor: {
+        name: _getProfessionalDisplayName(exp) || 'Profesional de Salud',
+        specialty: exp.profesionalSpecialty || _getStudentServiceLabel(exp.tipoServicio),
+        email: professionalEmail,
+        phone: exp.profesionalPhone || '',
+        cedula: exp.cedula || '',
+        cedulaLabel: exp.profesionalCedulaLabel || ''
+      },
+      student: {
+        name: studentProfile.displayName || exp.studentName || _ctx?.user?.email || 'Paciente',
+        matricula: studentProfile.matricula || exp.studentId || '--',
+        carrera: studentProfile.carrera || '--',
+        age: age || '',
+        allergies
+      },
+      consultation: {
+        date: dateObj,
+        signs: {
+          temp: exp.temp ?? signs.temp ?? null,
+          presion: exp.presion ?? signs.presion ?? null,
+          peso: exp.peso ?? signs.peso ?? null,
+          talla: exp.talla ?? signs.talla ?? null
+        },
+        diagnosis: exp.diagnostico,
+        treatment: exp.plan || exp.meds
+      }
+    };
+  }
+
+  function _downloadConsultationPrescription(encodedExp) {
+    if (!window.PDFGenerator?.generateProfessionalPrescription) {
+      showToast('La descarga de receta no está disponible en este momento.', 'warning');
+      return;
+    }
+
+    try {
+      const exp = JSON.parse(decodeURIComponent(encodedExp));
+      PDFGenerator.generateProfessionalPrescription(_buildConsultationPrescriptionPayload(exp));
+    } catch (error) {
+      console.error('[Medi] Error generando receta desde historial:', error);
+      showToast('No se pudo generar la receta.', 'danger');
+    }
+  }
+
+  function _isShiftEnabledForService(cfg = {}, serviceType, shiftTag = null) {
+    const normalizedType = _normalizeStudentServiceType(serviceType);
+    if (normalizedType === 'Psicologo') {
+      const globalEnabled = cfg.availablePsicologo !== false;
+      if (!shiftTag) {
+        return globalEnabled
+          && (cfg.availablePsicologoMatutino !== false || cfg.availablePsicologoVespertino !== false);
+      }
+      const normalizedShift = String(shiftTag || '').toLowerCase().includes('vesp') ? 'Vespertino' : 'Matutino';
+      const shiftEnabled = normalizedShift === 'Vespertino'
+        ? cfg.availablePsicologoVespertino !== false
+        : cfg.availablePsicologoMatutino !== false;
+      return globalEnabled && shiftEnabled;
+    }
+
+    if (window.MediService?.isServiceEnabledForContext) {
+      return MediService.isServiceEnabledForContext(cfg, normalizedType);
+    }
+    return cfg.availableMédico !== false && cfg.availableMedico !== false;
+  }
+
+  function _isServiceEnabledForBookingDate(cfg = {}, serviceType, targetDate = null) {
+    const normalizedType = _normalizeStudentServiceType(serviceType);
+    if (normalizedType !== 'Psicologo') {
+      return _isShiftEnabledForService(cfg, normalizedType);
+    }
+
+    const date = safeDate(targetDate) || new Date();
+    const now = new Date();
+    const isToday = date.toDateString() === now.toDateString();
+    const canUseMorning = _isShiftEnabledForService(cfg, normalizedType, 'Matutino') && (!isToday || now.getHours() < 15);
+    const canUseEvening = _isShiftEnabledForService(cfg, normalizedType, 'Vespertino');
+    return canUseMorning || canUseEvening;
+  }
+
+  function _hasRemainingSlotsForDate(dateObj, serviceType = null, cfg = (_ctx?.config?.medi || {})) {
+    const targetDate = new Date(dateObj);
+    if (serviceType) {
+      return _getStudentBookableSlotsForDate(targetDate, serviceType, cfg).length > 0;
+    }
+    return buildSlotsForDate(targetDate).length > 0;
+  }
+
+  function _buildStudentSurveyContext() {
+    return {
+      ..._ctx,
+      profile: {
+        ...(_ctx?.profile || {}),
+        uid: _ctx?.profile?.uid || _ctx?.user?.uid,
+        email: _ctx?.profile?.email || _ctx?.user?.email || null,
+        displayName: _ctx?.profile?.displayName || _ctx?.user?.displayName || _ctx?.user?.email || 'Alumno',
+        name: _ctx?.profile?.name || _ctx?.profile?.displayName || _ctx?.user?.displayName || _ctx?.user?.email || 'Alumno'
+      }
+    };
+  }
+
+  function _buildFollowUpDismissKey(consultaId) {
+    const uid = _ctx?.user?.uid || 'anon';
+    return `medi_followup_dismiss_${uid}_${consultaId}`;
+  }
+
+  function _isFollowUpDismissed(consultaId) {
+    if (!consultaId) return false;
+    const dismissStateStr = localStorage.getItem(_buildFollowUpDismissKey(consultaId));
+    if (!dismissStateStr) return false;
+    try {
+      const dismissState = JSON.parse(dismissStateStr);
+      if (dismissState.forever) return true;
+      return !!(dismissState.until && Date.now() < dismissState.until);
+    } catch (error) {
+      return false;
+    }
+  }
+
+  function _isBlockingStudentAppointment(cita = {}) {
+    return ['confirmada', 'en_proceso'].includes(String(cita?.estado || '').toLowerCase());
+  }
+
+  function _getCurrentBlockingAppointment(citas = _lastCitasFull || []) {
+    const now = new Date();
+    const blocking = (Array.isArray(citas) ? citas : [])
+      .filter((cita) => _isBlockingStudentAppointment(cita))
+      .filter((cita) => cita.safeDate instanceof Date && !Number.isNaN(cita.safeDate.getTime()));
+
+    if (blocking.length === 0) return null;
+
+    const upcoming = blocking
+      .filter((cita) => cita.safeDate >= now)
+      .sort((a, b) => a.safeDate - b.safeDate);
+    if (upcoming.length > 0) return upcoming[0];
+
+    return blocking.sort((a, b) => b.safeDate - a.safeDate)[0] || null;
+  }
+
+  function _getStudentBookingLockBanner() {
+    let banner = document.getElementById('medi-booking-lock');
+    if (banner) return banner;
+
+    const dateContainer = document.getElementById('medi-date-container');
+    if (!dateContainer?.parentNode) return null;
+
+    banner = document.createElement('div');
+    banner.id = 'medi-booking-lock';
+    banner.className = 'alert alert-warning border-0 shadow-sm rounded-4 mb-3 d-none';
+    dateContainer.parentNode.insertBefore(banner, dateContainer);
+    return banner;
+  }
+
+  function _isStudentSlotBookable(slot, serviceType, cfg = {}) {
+    const normalizedType = _normalizeStudentServiceType(serviceType);
+    const shiftTag = MediService.normalizeShiftTag ? MediService.normalizeShiftTag(null, slot) : (slot.getHours() < 15 ? 'Matutino' : 'Vespertino');
+
+    if (normalizedType === 'Psicologo' && !_isShiftEnabledForService(cfg, normalizedType, shiftTag)) {
+      return false;
+    }
+
+    const timeStr = `${String(slot.getHours()).padStart(2, '0')}:${String(slot.getMinutes()).padStart(2, '0')}`;
+    const disabledHours = MediService.getDisabledHoursForContext
+      ? MediService.getDisabledHoursForContext(cfg, normalizedType, shiftTag)
+      : (cfg[`disabledHours_${normalizedType}`] || []);
+
+    return !disabledHours.includes(timeStr);
+  }
+
+  function _getStudentBookableSlotsForDate(dateObj, serviceType, cfg = (_ctx?.config?.medi || {})) {
+    const normalizedType = _normalizeStudentServiceType(serviceType);
+    const targetDate = safeDate(dateObj);
+    if (!(targetDate instanceof Date) || Number.isNaN(targetDate.getTime())) return [];
+    const now = new Date();
+
+    const slotDuration = MediService.getSlotDurationForContext
+      ? MediService.getSlotDurationForContext(cfg, normalizedType)
+      : (cfg[`slotDuration_${normalizedType}`] || cfg.slotDuration || SLOT_DURATION || 60);
+
+    const slots = [];
+    for (let mins = (SLOT_START || 8) * 60; mins < (SLOT_END || 22) * 60; mins += slotDuration) {
+      const slot = new Date(
+        targetDate.getFullYear(),
+        targetDate.getMonth(),
+        targetDate.getDate(),
+        Math.floor(mins / 60),
+        mins % 60,
+        0,
+        0
+      );
+
+      const isPastToday = slot.toDateString() === now.toDateString() && slot < now;
+      if (!isPastToday && _isStudentSlotBookable(slot, normalizedType, cfg)) {
+        slots.push(slot);
+      }
+    }
+
+    return slots;
+  }
+
+  async function _refreshStudentBookingLock(forceRemote = false) {
+    let blockingAppointment = _getCurrentBlockingAppointment();
+
+    if (!blockingAppointment && forceRemote && _ctx?.user?.uid) {
+      try {
+        blockingAppointment = await MediService.checkActiveAppointment(_ctx, _ctx.user.uid);
+      } catch (error) {
+        console.warn('[Medi] No se pudo validar la cita activa del alumno:', error);
+      }
+    }
+
+    _currentBookingLock = blockingAppointment || null;
+    const banner = _getStudentBookingLockBanner();
+    const dateContainer = document.getElementById('medi-date-container');
+    const timeGrid = document.getElementById('medi-time-grid');
+    const timeMsg = document.getElementById('medi-time-msg');
+    const timeInput = document.getElementById('medi-cita-hora');
+    const dateInput = document.getElementById('medi-cita-fecha');
+    const summary = document.getElementById('medi-booking-summary');
+    const confirmBtn = document.getElementById('btn-medi-confirm');
+
+    if (_currentBookingLock && banner) {
+      const cita = _currentBookingLock;
+      const dateLabel = cita.safeDate
+        ? cita.safeDate.toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' })
+        : 'fecha pendiente';
+      const timeLabel = cita.safeDate
+        ? cita.safeDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        : '--:--';
+      const serviceLabel = _getStudentServiceLabel(cita.tipoServicio);
+      banner.innerHTML = `
+        <div class="d-flex flex-column flex-md-row gap-3 align-items-start align-items-md-center justify-content-between">
+          <div>
+            <div class="fw-bold mb-1"><i class="bi bi-shield-lock me-2"></i>Ya tienes una cita activa</div>
+            <div class="small text-dark">
+              Tu ${escapeHtml(serviceLabel)} del ${escapeHtml(dateLabel)} a las ${escapeHtml(timeLabel)} sigue ${escapeHtml(cita.estado)}.
+              Debes atenderla, cancelarla o reprogramarla desde <b>Mis Citas</b> antes de reservar otra.
+            </div>
+          </div>
+          <div class="d-flex gap-2 flex-wrap">
+            <button type="button" class="btn btn-sm btn-outline-dark rounded-pill fw-bold" onclick="Medi._switchMediTab('medi-tab-citas')">
+              <i class="bi bi-calendar-week me-1"></i>Ver mis citas
+            </button>
+            ${cita.profesionalId ? `<button type="button" class="btn btn-sm btn-outline-primary rounded-pill fw-bold" onclick="Medi.startChatWithProfessional('${escapeHtml(cita.profesionalId)}', '${escapeHtml(cita.profesionalName || 'Profesional de salud')}', '${escapeHtml(cita.profesionalProfileId || '')}', 'Conversación iniciada desde bloqueo de agenda')">
+              <i class="bi bi-chat-dots me-1"></i>Contactar
+            </button>` : ''}
+          </div>
+        </div>`;
+      banner.classList.remove('d-none');
+
+      if (dateContainer) dateContainer.classList.add('d-none');
+      if (timeGrid) {
+        timeGrid.innerHTML = '';
+        timeGrid.classList.add('d-none');
+      }
+      if (timeMsg) {
+        timeMsg.classList.remove('d-none');
+        timeMsg.innerHTML = '<i class="bi bi-lock-fill fs-4 d-block mb-2"></i>La agenda está bloqueada mientras tengas una cita activa.';
+      }
+      if (timeInput) timeInput.value = '';
+      if (dateInput) dateInput.value = '';
+      if (summary) summary.classList.add('d-none');
+      if (confirmBtn) confirmBtn.disabled = true;
+      _updateBookingStatusPreview();
+      return _currentBookingLock;
+    }
+
+    if (banner) {
+      banner.classList.add('d-none');
+      banner.innerHTML = '';
+    }
+
+    const categoryInput = document.getElementById('medi-cita-categoria');
+    if (categoryInput?.value && dateContainer) {
+      dateContainer.classList.remove('d-none');
+    }
+
+    return null;
+  }
+
+  function _findRelevantStudentAppointment(profId, profileId = null) {
+    return (_lastCitasFull || [])
+      .filter((cita) => ['pendiente', 'confirmada'].includes(cita.estado))
+      .filter((cita) => cita.profesionalId === profId || (profileId && cita.profesionalProfileId === profileId))
+      .sort((a, b) => (a.safeDate || 0) - (b.safeDate || 0))[0] || null;
+  }
+
+  function _resolveStudentChatServiceLabel(profId, profileId = null, appointmentContext = null) {
+    const contextText = String(appointmentContext || '');
+    if (/psic/i.test(contextText)) return 'Psicología';
+    if (/m[eé]d|medic/i.test(contextText)) return 'Médico General';
+    const relatedAppointment = _findRelevantStudentAppointment(profId, profileId);
+    return relatedAppointment ? _getStudentServiceLabel(relatedAppointment.tipoServicio) : 'Servicio Médico';
+  }
+
   function escapeHtml(text) {
     if (text === null || text === undefined) return '';
     return text.toString()
@@ -50,6 +397,86 @@ var Medi = (function () {
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#039;');
   }
+
+  const _mediScope = {};
+  Object.defineProperties(_mediScope, {
+    _ctx: { get: () => _ctx, set: (v) => { _ctx = v; } },
+    _myRole: { get: () => _myRole, set: (v) => { _myRole = v; } },
+    _myUid: { get: () => _myUid, set: (v) => { _myUid = v; } },
+    _isSaving: { get: () => _isSaving, set: (v) => { _isSaving = v; } },
+    _patientCache: { get: () => _patientCache },
+    _unsubs: { get: () => _unsubs, set: (v) => { _unsubs = v; } },
+    _lastCount: { get: () => _lastCount, set: (v) => { _lastCount = v; } },
+    _lastConsultaData: { get: () => _lastConsultaData, set: (v) => { _lastConsultaData = v; } },
+    _activeFollowUpBannerId: { get: () => _activeFollowUpBannerId, set: (v) => { _activeFollowUpBannerId = v; } },
+    _currentBookingLock: { get: () => _currentBookingLock, set: (v) => { _currentBookingLock = v; } },
+    _currentShift: { get: () => _currentShift, set: (v) => { _currentShift = v; } },
+    _currentProfile: { get: () => _currentProfile, set: (v) => { _currentProfile = v; } },
+    _profesionalCedula: { get: () => _profesionalCedula, set: (v) => { _profesionalCedula = v; } },
+    _consultaTimer: { get: () => _consultaTimer, set: (v) => { _consultaTimer = v; } },
+    _consultaStartTime: { get: () => _consultaStartTime, set: (v) => { _consultaStartTime = v; } },
+    _consultaActive: { get: () => _consultaActive, set: (v) => { _consultaActive = v; } },
+    _lastConsultasFull: { get: () => _lastConsultasFull, set: (v) => { _lastConsultasFull = v; } },
+    _lastCitasFull: { get: () => _lastCitasFull, set: (v) => { _lastCitasFull = v; } },
+    _activeStudentConvId: { get: () => _activeStudentConvId, set: (v) => { _activeStudentConvId = v; } },
+    _stuMsgsUnsub: { get: () => _stuMsgsUnsub, set: (v) => { _stuMsgsUnsub = v; } },
+    _stuConvUnsub: { get: () => _stuConvUnsub, set: (v) => { _stuConvUnsub = v; } },
+    _activeConvData: { get: () => _activeConvData, set: (v) => { _activeConvData = v; } },
+    _chatTypingTimer: { get: () => _chatTypingTimer, set: (v) => { _chatTypingTimer = v; } },
+    _prevUnreadTotal: { get: () => _prevUnreadTotal, set: (v) => { _prevUnreadTotal = v; } }
+  });
+  Object.assign(_mediScope, {
+    _cleanupListeners,
+    _normalizeStudentServiceType,
+    _getStudentServiceLabel,
+    _getStudentServiceCategory,
+    _getStudentServiceIconClass,
+    _getProfessionalDisplayName,
+    _buildCalendarAppointmentPayload,
+    _buildConsultationPrescriptionPayload,
+    _downloadConsultationPrescription,
+    _isShiftEnabledForService,
+    _isServiceEnabledForBookingDate,
+    _hasRemainingSlotsForDate,
+    _buildStudentSurveyContext,
+    _buildFollowUpDismissKey,
+    _isFollowUpDismissed,
+    _isBlockingStudentAppointment,
+    _getCurrentBlockingAppointment,
+    _getStudentBookingLockBanner,
+    _isStudentSlotBookable,
+    _getStudentBookableSlotsForDate,
+    _refreshStudentBookingLock,
+    _findRelevantStudentAppointment,
+    _resolveStudentChatServiceLabel,
+    escapeHtml,
+    pad,
+    toISO,
+    slotIdFromDate,
+    safeDate,
+    isWeekday,
+    showToast,
+    _switchMediTab,
+    _switchContextTab,
+    _selectStudentService,
+    _updateChatBadgeOnTab,
+    _relativeTime
+  });
+  const _studentExperience = window.Medi.Factories?.studentExperience
+    ? window.Medi.Factories.studentExperience(_mediScope)
+    : {};
+  Object.assign(_mediScope, {
+    _showBookingConfirmModal: (...args) => _studentExperience._showBookingConfirmModal?.(...args)
+  });
+  const _studentChat = window.Medi.Factories?.studentChat
+    ? window.Medi.Factories.studentChat(_mediScope)
+    : {};
+  const _studentAppointments = window.Medi.Factories?.studentAppointments
+    ? window.Medi.Factories.studentAppointments(_mediScope)
+    : {};
+  window.Medi.StudentExperience = _studentExperience;
+  window.Medi.StudentChat = _studentChat;
+  window.Medi.StudentAppointments = _studentAppointments;
 
   // --- 3-ZONE LAYOUT TAB HELPERS ---
   let _waitingRoomFilter = 'all'; // Moved here for scope visibility
@@ -87,6 +514,10 @@ var Medi = (function () {
     const container = document.getElementById('medi-patient-context');
     if (!container) return;
 
+    // Cache patient data by uid to avoid inline JSON serialization (XSS prevention)
+    const patientKey = student.id || student.uid;
+    if (patientKey) _patientCache.set(patientKey, student);
+
     const age = MediService.calculateAge(student.fechaNacimiento);
     container.innerHTML = `
       <div class="text-center mb-3">
@@ -97,23 +528,23 @@ var Medi = (function () {
         <span class="badge text-muted border small">${escapeHtml(student.matricula || student.email)}</span>
       </div>
       <div class="row g-2 mb-3">
-        ${age != null ? `<div class="col-4 text-center"><div class="bg-light rounded-3 p-2"><div class="extra-small text-muted">Edad</div><div class="fw-bold small">${age}</div></div></div>` : ''}
-        ${student.tipoSangre ? `<div class="col-4 text-center"><div class="bg-light rounded-3 p-2"><div class="extra-small text-muted">Sangre</div><div class="fw-bold small text-danger">${escapeHtml(student.tipoSangre)}</div></div></div>` : ''}
-        ${student.genero ? `<div class="col-4 text-center"><div class="bg-light rounded-3 p-2"><div class="extra-small text-muted">Género</div><div class="fw-bold small">${escapeHtml(student.genero)}</div></div></div>` : ''}
+        ${age != null ? `<div class="col-4 text-center"><div class=" rounded-3 p-2"><div class="extra-small text-muted">Edad</div><div class="fw-bold small">${age}</div></div></div>` : ''}
+        ${student.tipoSangre ? `<div class="col-4 text-center"><div class=" rounded-3 p-2"><div class="extra-small text-muted">Sangre</div><div class="fw-bold small text-danger">${escapeHtml(student.tipoSangre)}</div></div></div>` : ''}
+        ${student.genero ? `<div class="col-4 text-center"><div class=" rounded-3 p-2"><div class="extra-small text-muted">Género</div><div class="fw-bold small">${escapeHtml(student.genero)}</div></div></div>` : ''}
       </div>
       ${student.alergias ? `<div class="alert alert-danger border-0 py-2 px-3 small mb-3"><i class="bi bi-exclamation-triangle-fill me-1"></i><strong>Alergias:</strong> ${escapeHtml(student.alergias)}</div>` : ''}
       <div class="d-grid gap-2">
-        <button class="btn btn-sm btn-primary rounded-pill fw-bold" onclick="Medi.startWalkIn('${encodeURIComponent(JSON.stringify(student))}')">
+        <button class="btn btn-sm btn-primary rounded-pill fw-bold" onclick="Medi.startWalkIn('${escapeHtml(student.id || student.uid)}')">
             <i class="bi bi-lightning-charge-fill me-1"></i>Atender Ahora
         </button>
         <div class="d-flex gap-2">
-            <button class="btn btn-sm btn-outline-dark flex-fill rounded-pill fw-bold" onclick="Medi.showFullRecord('${student.id || student.uid}')">
+            <button class="btn btn-sm btn-outline-dark flex-fill rounded-pill fw-bold" onclick="Medi.showFullRecord('${escapeHtml(student.id || student.uid)}')">
               <i class="bi bi-folder2-open me-1"></i>Expediente
             </button>
-            <button class="btn btn-sm btn-outline-primary flex-fill rounded-pill" onclick="Medi.openManualBooking('book','${encodeURIComponent(JSON.stringify(student))}')" title="Reservar Cita">
+            <button class="btn btn-sm btn-outline-primary flex-fill rounded-pill" onclick="Medi.openManualBooking('${escapeHtml(student.id || student.uid)}')" title="Reservar Cita">
               <i class="bi bi-calendar-plus"></i>
             </button>
-            <button class="btn btn-sm btn-outline-secondary flex-fill rounded-pill" onclick="Medi.startChatWithStudent('${student.id || student.uid}', '${escapeHtml(student.displayName || student.email)}')">
+            <button class="btn btn-sm btn-outline-secondary flex-fill rounded-pill" onclick="Medi.startChatWithStudent('${escapeHtml(student.id || student.uid)}', '${escapeHtml(student.displayName || student.email)}')">
               <i class="bi bi-chat-dots"></i>
             </button>
         </div>
@@ -146,7 +577,7 @@ var Medi = (function () {
             <div class="fw-bold extra-small">${escapeHtml(h.diagnostico || h.motivo || 'General')}</div>
             <div class="text-muted" style="font-size:.65rem;">${d.toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' })}</div>
           </div>
-          <span class="badge bg-light text-muted border" style="font-size:.6rem;">${escapeHtml(h.tipoServicio || '')}</span>
+          <span class="badge text-muted border" style="font-size:.6rem;">${escapeHtml(h.tipoServicio || '')}</span>
         </div>`;
       }).join('');
     } catch (e) {
@@ -223,6 +654,157 @@ var Medi = (function () {
         #medi-student-app .medi-hero-icon { display: none !important; }
         #medi-student-app .nav-pills .nav-link { font-size: 0.72rem; padding: 0.35rem 0.5rem; }
       }
+      /* Chat float button pulse (new message notification) */
+      @keyframes medi-chat-btn-pulse { 0%,100%{box-shadow:0 0 0 0 rgba(37,211,102,0.45);} 60%{box-shadow:0 0 0 10px rgba(37,211,102,0);} }
+      .medi-chat-pulse { animation: medi-chat-btn-pulse 1.4s ease-in-out infinite !important; }
+      /* Typing indicator dots */
+      @keyframes stu-typing-bounce { 0%,80%,100%{transform:translateY(0);} 40%{transform:translateY(-5px);} }
+      .stu-typing-dot { display:inline-block; width:5px; height:5px; border-radius:50%; background:#6c757d; margin:0 1px; animation:stu-typing-bounce 1.2s ease-in-out infinite; }
+      .stu-typing-dot:nth-child(2){animation-delay:.15s;}
+      .stu-typing-dot:nth-child(3){animation-delay:.3s;}
+      /* Chat empty state with CTA */
+      .medi-empty-state { padding: 2rem 1rem; text-align: center; }
+      .medi-empty-state .medi-empty-icon { font-size: 2.5rem; opacity: 0.25; display: block; margin-bottom: .75rem; }
+      /* Check-in de bienestar */
+      .medi-checkin-opt { cursor: pointer; transition: transform 0.15s, box-shadow 0.15s; border-radius: 12px; padding: 0.5rem; }
+      .medi-checkin-opt:hover, .medi-checkin-opt.selected { transform: scale(1.18); box-shadow: 0 4px 12px rgba(0,0,0,0.12); }
+      .medi-checkin-bar { height: 28px; border-radius: 6px; background: linear-gradient(90deg,#0d6efd,#0dcaf0); min-width: 4px; transition: width 0.4s; display: flex; align-items: center; justify-content: center; font-size: 0.55rem; color: #fff; font-weight: 700; }
+      /* Disponibilidad servicio */
+      @keyframes medi-avail-pulse { 0%,100%{opacity:1;} 50%{opacity:0.35;} }
+      .medi-avail-dot { width:10px; height:10px; border-radius:50%; display:inline-block; flex-shrink:0; }
+      .medi-avail-dot.open { background:#198754; animation:medi-avail-pulse 2s ease-in-out infinite; }
+      .medi-avail-dot.closing { background:#f59e0b; animation:medi-avail-pulse 1s ease-in-out infinite; }
+      .medi-avail-dot.closed { background:#dc3545; }
+      /* SOS btn */
+      #medi-sos-btn { transition: transform 0.2s, box-shadow 0.2s; }
+      #medi-sos-btn:hover { transform: scale(1.1); box-shadow: 0 6px 20px rgba(220,53,69,0.4) !important; }
+      @keyframes medi-sos-pulse { 0%,100%{box-shadow:0 0 0 0 rgba(220,53,69,0.5);} 60%{box-shadow:0 0 0 12px rgba(220,53,69,0);} }
+      .medi-sos-pulse { animation: medi-sos-pulse 2s ease-in-out infinite; }
+      body.medi-student-floating-stack #btn-report-problem,
+      body.medi-student-floating-stack #medi-sos-btn button,
+      body.medi-student-floating-stack #medi-chat-float-btn button {
+        transition: transform 0.2s, box-shadow 0.2s, background-color 0.2s;
+      }
+      body.medi-student-floating-stack #btn-report-problem:hover,
+      body.medi-student-floating-stack #medi-sos-btn button:hover,
+      body.medi-student-floating-stack #medi-chat-float-btn button:hover {
+        transform: scale(1.08);
+      }
+      body.medi-student-floating-stack #btn-report-problem {
+        background: #f97316 !important;
+        border-color: #f97316 !important;
+        color: #fff !important;
+      }
+      body.medi-student-floating-stack #medi-sos-btn button {
+        background: #dc2626 !important;
+        border-color: #dc2626 !important;
+        color: #fff !important;
+      }
+      body.medi-student-floating-stack #medi-chat-float-btn button {
+        background: #25d366 !important;
+        border-color: #25d366 !important;
+        color: #fff !important;
+      }
+      @media (max-width: 767.98px) {
+        body.medi-student-floating-stack #btn-report-problem,
+        body.medi-student-floating-stack #medi-sos-btn,
+        body.medi-student-floating-stack #medi-chat-float-btn {
+          left: auto !important;
+          right: 14px !important;
+          z-index: 2000 !important;
+        }
+        body.medi-student-floating-stack #btn-report-problem,
+        body.medi-student-floating-stack #medi-sos-btn button,
+        body.medi-student-floating-stack #medi-chat-float-btn button {
+          width: 46px !important;
+          height: 46px !important;
+          border-radius: 50% !important;
+          box-shadow: 0 8px 18px rgba(15, 23, 42, 0.18) !important;
+        }
+        body.medi-student-floating-stack #btn-report-problem {
+          bottom: 90px !important;
+          font-size: 1rem !important;
+        }
+        body.medi-student-floating-stack #medi-chat-float-btn { bottom: 148px !important; }
+        body.medi-student-floating-stack #medi-sos-btn { bottom: 206px !important; }
+        body.medi-student-floating-stack #btn-report-problem i,
+        body.medi-student-floating-stack #medi-sos-btn button i,
+        body.medi-student-floating-stack #medi-chat-float-btn button i {
+          font-size: 1.1rem !important;
+        }
+        body.medi-student-floating-stack #stu-chat-badge {
+          font-size: 0.52rem !important;
+          padding: 0.2em 0.38em !important;
+        }
+      }
+      /* Slot progress bar */
+      .medi-slot-bar { height: 4px; border-radius: 2px; background: #e9ecef; overflow: hidden; margin-top: 3px; }
+      .medi-slot-bar-fill { height: 100%; border-radius: 2px; transition: width 0.3s; }
+      /* Timeline historial */
+      .medi-timeline { padding-left: 1.25rem; position: relative; }
+      .medi-timeline-item { position: relative; padding-bottom: 0.75rem; }
+      .medi-timeline-item::before { content:''; position:absolute; left:-1.25rem; top:6px; width:10px; height:10px; border-radius:50%; background:var(--medi); border:2px solid #fff; box-shadow:0 0 0 2px var(--medi); }
+      .medi-timeline-item::after { content:''; position:absolute; left:calc(-1.25rem + 4px); top:16px; width:2px; bottom:0; background:rgba(13,110,253,0.15); }
+      .medi-timeline-item:last-child::after { display:none; }
+      .medi-timeline-item.psico::before { background:var(--medi-purple); box-shadow:0 0 0 2px var(--medi-purple); }
+      /* Stars survey */
+      .medi-star { font-size:1.6rem; cursor:pointer; color:#dee2e6; transition:color 0.12s; }
+      .medi-star.lit { color:#f59e0b; }
+      /* Stat mini cards */
+      .medi-stat-mini { border-radius:14px; padding:0.6rem 0.75rem; }
+      .medi-slot-legend-item { border: 1px solid rgba(15,23,42,0.08); background:#fff; }
+      .medi-doc-card { border: 1px solid rgba(15,23,42,0.08); background:linear-gradient(180deg,#ffffff 0%, #f8fbff 100%); }
+      .medi-doc-card .doc-snippet { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+      .medi-doc-card .doc-meta { font-size:.7rem; color:#6c757d; }
+      .medi-tab-label { display:inline-block; min-width:0; max-width:100%; overflow:hidden; text-overflow:ellipsis; vertical-align:bottom; }
+      .medi-next-appt-actions { display:flex; flex-wrap:wrap; gap:.5rem; }
+      .medi-next-appt-actions .btn { min-width:0; }
+      .medi-checkin-summary-card { border:1px solid rgba(15,23,42,0.08); border-radius:14px; background:#fff; padding:.7rem .8rem; }
+      .medi-checkin-history-list { max-height:190px; overflow:auto; }
+      .medi-checkin-entry { border:1px solid rgba(15,23,42,0.08); border-radius:12px; background:#fff; }
+      .medi-chat-card { border:1px solid rgba(15,23,42,0.08); background:linear-gradient(180deg,#ffffff 0%, #f8fbff 100%); }
+      .medi-chat-chip { display:inline-flex; align-items:center; gap:.3rem; border-radius:999px; padding:.16rem .5rem; font-size:.62rem; font-weight:700; background:rgba(13,110,253,0.08); color:#0d6efd; }
+      .medi-chat-thread-intro { border:1px solid rgba(13,110,253,0.12); background:linear-gradient(135deg, rgba(13,110,253,0.08), rgba(13,202,240,0.08)); }
+      /* FAQ */
+      #medi-faq-section .accordion-button { font-size:0.82rem; }
+      #medi-faq-section .accordion-button:not(.collapsed) { color:var(--medi); background:rgba(13,110,253,0.04); box-shadow:none; }
+      #medi-faq-section .accordion-button:focus { box-shadow:none; }
+      /* Wellness tips modal categories */
+      .medi-tip-cat-btn.active { background:var(--medi) !important; color:#fff !important; }
+      @media (max-width: 767.98px) {
+        #medi-student-tabs { overflow:visible; flex-wrap:nowrap !important; gap:.15rem; }
+        #medi-student-tabs .nav-item { flex:1 1 0 !important; min-width:0; }
+        #medi-student-tabs .nav-link {
+          white-space:nowrap;
+          padding:.58rem .35rem;
+          font-size:.74rem;
+          display:flex;
+          align-items:center;
+          justify-content:center;
+          gap:.25rem;
+        }
+        #medi-student-tabs .nav-link i { margin:0 !important; font-size:.95rem; }
+        #medi-quick-actions .col-4 { width:50%; }
+        #medi-booking-actions { flex-direction:column; align-items:stretch !important; gap:.75rem; }
+        #medi-booking-actions #btn-medi-confirm { width:100%; }
+        #medi-next-appointment .medi-next-appt { gap:.75rem !important; }
+        #medi-next-appointment .medi-next-appt-actions { width:100%; display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); }
+        #medi-next-appointment .medi-next-appt-actions .btn { width:100%; padding-inline:.55rem; font-size:.78rem; }
+        #medi-checkin-widget .medi-checkin-options { display:flex; flex-wrap:wrap; gap:.5rem; }
+        #medi-checkin-widget .medi-checkin-opt { flex:1 1 calc(33.333% - .5rem); }
+      }
+      @media (max-width: 420px) {
+        #medi-student-tabs .nav-link { font-size:.68rem; padding:.52rem .2rem; gap:.2rem; }
+        #medi-student-tabs .nav-link i { font-size:.88rem; }
+        #medi-student-chat-panel {
+          left:12px !important;
+          right:12px !important;
+          width:auto !important;
+          max-width:none !important;
+          bottom:84px !important;
+          height:min(72vh, 560px) !important;
+        }
+      }
     </style>
     <section id="medi-student" class="d-none">
       <div id="medi-student-app">
@@ -232,44 +814,56 @@ var Medi = (function () {
           <div class="position-relative z-1">
             <div class="d-flex justify-content-between align-items-start mb-2">
               <span class="badge bg-white text-dark mb-2 fw-bold shadow-sm" style="font-size: 0.7rem; color: #0d6efd !important;">
-                <i class="bi bi-heart-pulse-fill me-1"></i>Servicio Medico ITES
+                <i class="bi bi-heart-pulse-fill me-1"></i>Servicio Médico ITES
               </span>
               <button class="btn btn-sm bg-opacity-25 text-white border-0 rounded-pill px-3" id="medi-tutorial-btn" onclick="Medi.launchMediTutorial()" title="Ver tutorial">
                 <i class="bi bi-play-circle me-1"></i>Tutorial
               </button>
             </div>
-            <h2 class="fw-bold mb-1 text-white" id="medi-hero-greeting" style="font-size: 1.5rem;">Servicio Medico</h2>
-            <p class="small mb-2 text-white" id="medi-hero-subtitle" style="max-width: 70%; opacity: 0.85;">Tu salud es lo mas importante.</p>
+            <h2 class="fw-bold mb-1 text-white filter-white" id="medi-hero-greeting" style="font-size: 1.5rem;">Servicio Médico</h2>
+            <p class="small mb-2 text-white" id="medi-hero-subtitle" style="max-width: 70%; opacity: 0.85;">Tu salud es lo más importante.</p>
             <div id="medi-hero-next-badge" class="d-none"></div>
           </div>
           <i class="bi bi-heart-pulse-fill medi-hero-icon position-absolute end-0 top-50 translate-middle-y me-3 text-white" style="font-size: 6rem; opacity: 0.08;"></i>
         </div>
 
-        <!-- EMERGENCY COMPACT CHIP -->
-        <div id="medi-emergency-chip" class="alert alert-danger border-0 shadow-sm rounded-4 mb-3 p-2 px-3">
-          <div class="d-flex align-items-center justify-content-between">
-            <div class="d-flex align-items-center gap-3 overflow-hidden flex-grow-1">
-              <div class="d-flex align-items-center gap-2 flex-shrink-0">
-                <i class="bi bi-droplet-fill" style="font-size:0.9rem;"></i>
-                <span class="fw-bolder" id="view-sangre" style="font-size:1.1rem;">--</span>
+        <!-- EMERGENCY COMPACT CHIP — Carnet Médico -->
+        <div id="medi-emergency-chip" class="rounded-4 mb-3 overflow-hidden shadow-sm" style="background: linear-gradient(135deg, #b91c1c 0%, #dc2626 60%, #ef4444 100%); color: white;">
+          <div class="px-3 pt-2 pb-1 d-flex align-items-center justify-content-between" style="background:rgba(0,0,0,0.15);">
+            <span class="fw-bold" style="font-size:0.6rem; letter-spacing:2px; opacity:0.85;">CARNET MÉDICO DE EMERGENCIA</span>
+            <button type="button" class="btn btn-sm btn-link text-white p-0 opacity-75"
+                    style="font-size: 0.65rem;"
+                    data-bs-toggle="modal" data-bs-target="#modalMediEditCard">
+              <i class="bi bi-pencil-fill me-1"></i>Editar
+            </button>
+          </div>
+          <div class="p-3 pt-1">
+            <div class="d-flex align-items-center gap-3 overflow-hidden">
+              <!-- Tipo de sangre prominente -->
+              <div class="text-center flex-shrink-0">
+                <div class="fw-black text-white" style="font-size:1.8rem; line-height:1; font-weight:900;" id="view-sangre">--</div>
+                <div style="font-size:0.55rem; opacity:0.75; letter-spacing:1px;">SANGRE</div>
               </div>
-              <div class="vr opacity-25" style="height:24px;"></div>
-              <div class="text-truncate" style="min-width:0;">
-                <div class="fw-bold" style="font-size:0.6rem; letter-spacing:0.5px; opacity:0.8;">ALERGIAS</div>
+              <div class="vr opacity-25" style="height:36px;"></div>
+              <!-- Alergias con alerta visual -->
+              <div class="flex-grow-1 text-truncate">
+                <div style="font-size:0.58rem; letter-spacing:0.5px; opacity:0.8;" class="fw-bold">⚠ ALERGIAS</div>
                 <div class="fw-bold text-truncate" id="view-alergias" style="font-size:0.75rem;">Ninguna</div>
+                <div id="view-condiciones" class="text-truncate" style="font-size:0.65rem; opacity:0.8;"></div>
               </div>
-              <div class="vr opacity-25 d-none d-sm-block" style="height:24px;"></div>
-              <div class="text-truncate d-none d-sm-block" style="min-width:0;">
-                <div class="fw-bold" style="font-size:0.6rem; letter-spacing:0.5px; opacity:0.8;">CONTACTO</div>
+              <div class="vr opacity-25 d-none d-sm-block" style="height:36px;"></div>
+              <!-- Contacto de emergencia -->
+              <div class="text-truncate d-none d-sm-block" style="min-width:0; max-width:130px;">
+                <div style="font-size:0.58rem; letter-spacing:0.5px; opacity:0.8;" class="fw-bold">CONTACTO SOS</div>
                 <div class="fw-bold text-truncate" id="view-contacto-nombre" style="font-size:0.75rem;">--</div>
-                <span class="font-monospace d-none" id="view-contacto-tel">--</span>
+                <span class="font-monospace d-none" id="view-contacto-tel" style="font-size:0.65rem;opacity:0.8;">--</span>
               </div>
             </div>
-            <button type="button" class="btn btn-sm btn-outline-light rounded-pill border-white border-opacity-50 flex-shrink-0 ms-2"
-                    style="font-size: 0.7rem; padding: 0.15rem 0.6rem;"
-                    data-bs-toggle="modal" data-bs-target="#modalMediEditCard">
-              <i class="bi bi-pencil me-1"></i>Editar
-            </button>
+            <!-- Advertencia crítica de alergias -->
+            <div id="view-alergia-warning" class="d-none mt-2 rounded-2 px-2 py-1 d-flex align-items-center gap-1" style="background:rgba(0,0,0,0.25); font-size:0.65rem;">
+              <i class="bi bi-exclamation-triangle-fill me-1"></i>
+              <span>Advertencia: paciente con alergias registradas</span>
+            </div>
           </div>
         </div>
 
@@ -277,22 +871,22 @@ var Medi = (function () {
         <ul class="nav nav-pills nav-fill p-1 rounded-pill shadow-sm mb-4" id="medi-student-tabs" role="tablist" style="background: var(--medi-surface);">
           <li class="nav-item" role="presentation">
             <button class="nav-link active rounded-pill" data-bs-toggle="pill" data-bs-target="#medi-tab-inicio" type="button" role="tab">
-              <i class="bi bi-house me-1"></i>Inicio
+              <i class="bi bi-house"></i><span class="medi-tab-label">Inicio</span>
             </button>
           </li>
           <li class="nav-item" role="presentation">
             <button class="nav-link rounded-pill" data-bs-toggle="pill" data-bs-target="#medi-tab-agendar" type="button" role="tab">
-              <i class="bi bi-calendar-plus me-1"></i>Agendar
+              <i class="bi bi-calendar-plus"></i><span class="medi-tab-label">Agendar</span>
             </button>
           </li>
           <li class="nav-item" role="presentation">
             <button class="nav-link rounded-pill" data-bs-toggle="pill" data-bs-target="#medi-tab-citas" type="button" role="tab">
-              <i class="bi bi-calendar-week me-1"></i>Citas
+              <i class="bi bi-calendar-week"></i><span class="medi-tab-label">Citas</span>
             </button>
           </li>
           <li class="nav-item" role="presentation">
             <button class="nav-link rounded-pill" data-bs-toggle="pill" data-bs-target="#medi-tab-historial" type="button" role="tab">
-              <i class="bi bi-clock-history me-1"></i>Historial
+              <i class="bi bi-clock-history"></i><span class="medi-tab-label">Historial</span>
             </button>
           </li>
         </ul>
@@ -302,6 +896,8 @@ var Medi = (function () {
 
           <!-- TAB 1: INICIO -->
           <div class="tab-pane fade show active" id="medi-tab-inicio" role="tabpanel">
+            <!-- Encuesta post-consulta -->
+            <div id="medi-postconsult-survey" class="d-none mb-3"></div>
             <!-- Follow-up Banner -->
             <div id="medi-followup-banner" class="d-none mb-3"></div>
             <!-- Next Appointment -->
@@ -309,15 +905,66 @@ var Medi = (function () {
             <!-- Queue Card -->
             <div id="medi-queue-card" class="d-none mb-3"></div>
             <!-- Quick Actions -->
-            <div id="medi-quick-actions" class="row g-2 mb-4"></div>
+            <div id="medi-quick-actions" class="row g-2 mb-3"></div>
+            <!-- Disponibilidad del servicio -->
+            <div id="medi-availability-card" class="mb-3"></div>
+            <!-- Check-in de bienestar diario -->
+            <div id="medi-checkin-widget" class="mb-3"></div>
             <!-- Wellness Tips -->
-            <div class="card border-0 shadow-sm rounded-4">
+            <div class="card border-0 shadow-sm rounded-4 mb-3">
               <div class="card-body p-3">
-                <h6 class="fw-bold mb-3 small" style="color: var(--medi);">
-                  <i class="bi bi-lightbulb me-2 text-warning"></i>Tips de Salud
-                </h6>
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                  <h6 class="fw-bold mb-0 small" style="color: var(--medi);">
+                    <i class="bi bi-lightbulb me-2 text-warning"></i>Tips de Salud
+                  </h6>
+                  <button class="btn btn-outline-primary rounded-pill px-2 py-0" style="font-size:.7rem;" onclick="Medi._openWellnessTipsModal()">
+                    Ver todos <i class="bi bi-chevron-right ms-1"></i>
+                  </button>
+                </div>
                 <div id="medi-wellness-tips">
                   <div class="text-center py-3 text-muted small">Cargando tips...</div>
+                </div>
+              </div>
+            </div>
+            <!-- FAQ Preguntas Frecuentes -->
+            <div class="card border-0 shadow-sm rounded-4 mb-3" id="medi-faq-section">
+              <div class="card-body p-3">
+                <h6 class="fw-bold mb-3 small text-muted">
+                  <i class="bi bi-question-circle me-2"></i>Preguntas Frecuentes
+                </h6>
+                <div class="accordion accordion-flush" id="mediAccordionFAQ">
+                  <div class="accordion-item border-bottom border-0 border-light">
+                    <h2 class="accordion-header"><button class="accordion-button collapsed py-2 px-0 bg-transparent fw-bold" type="button" data-bs-toggle="collapse" data-bs-target="#faq1"><i class="bi bi-heart me-2 text-danger"></i>¿Médico General o Psicología?</button></h2>
+                    <div id="faq1" class="accordion-collapse collapse" data-bs-parent="#mediAccordionFAQ"><div class="accordion-body small text-muted px-0 pt-1 pb-3">Elige <strong>Médico General</strong> para dolores físicos, fiebre, malestares o lesiones. Elige <strong>Psicología</strong> para estrés, ansiedad, problemas emocionales o académicos. Si no estás seguro/a, el médico puede orientarte.</div></div>
+                  </div>
+                  <div class="accordion-item border-bottom border-0 border-light">
+                    <h2 class="accordion-header"><button class="accordion-button collapsed py-2 px-0 bg-transparent fw-bold" type="button" data-bs-toggle="collapse" data-bs-target="#faq2"><i class="bi bi-lock me-2 text-primary"></i>¿Son confidenciales mis consultas?</button></h2>
+                    <div id="faq2" class="accordion-collapse collapse" data-bs-parent="#mediAccordionFAQ"><div class="accordion-body small text-muted px-0 pt-1 pb-3">Sí. Toda tu información médica es <strong>estrictamente confidencial</strong>. Solo el profesional de salud que te atiende tiene acceso a tu expediente, de acuerdo a la NOM-024-SSA3-2012.</div></div>
+                  </div>
+                  <div class="accordion-item border-bottom border-0 border-light">
+                    <h2 class="accordion-header"><button class="accordion-button collapsed py-2 px-0 bg-transparent fw-bold" type="button" data-bs-toggle="collapse" data-bs-target="#faq3"><i class="bi bi-calendar-x me-2 text-warning"></i>¿Puedo cancelar mi cita?</button></h2>
+                    <div id="faq3" class="accordion-collapse collapse" data-bs-parent="#mediAccordionFAQ"><div class="accordion-body small text-muted px-0 pt-1 pb-3">Sí, puedes cancelar desde la pestaña <strong>Citas</strong>. Por favor hazlo con al menos 1 hora de anticipación para liberar el espacio a otro estudiante que lo necesite.</div></div>
+                  </div>
+                  <div class="accordion-item border-bottom border-0 border-light">
+                    <h2 class="accordion-header"><button class="accordion-button collapsed py-2 px-0 bg-transparent fw-bold" type="button" data-bs-toggle="collapse" data-bs-target="#faq4"><i class="bi bi-bag me-2 text-success"></i>¿Qué llevar a mi cita?</button></h2>
+                    <div id="faq4" class="accordion-collapse collapse" data-bs-parent="#mediAccordionFAQ"><div class="accordion-body small text-muted px-0 pt-1 pb-3">Lleva tu <strong>credencial del ITES</strong>. Si tienes medicamentos actuales o estudios previos, tráelos también. Para psicología no necesitas preparar nada especial.</div></div>
+                  </div>
+                  <div class="accordion-item border-bottom border-0 border-light">
+                    <h2 class="accordion-header"><button class="accordion-button collapsed py-2 px-0 bg-transparent fw-bold" type="button" data-bs-toggle="collapse" data-bs-target="#faq5"><i class="bi bi-clock me-2 text-info"></i>¿Cuánto dura una consulta?</button></h2>
+                    <div id="faq5" class="accordion-collapse collapse" data-bs-parent="#mediAccordionFAQ"><div class="accordion-body small text-muted px-0 pt-1 pb-3"><strong>Médico General:</strong> ~20-30 min. <strong>Psicología:</strong> 45-60 min por sesión.</div></div>
+                  </div>
+                  <div class="accordion-item border-bottom border-0 border-light">
+                    <h2 class="accordion-header"><button class="accordion-button collapsed py-2 px-0 bg-transparent fw-bold" type="button" data-bs-toggle="collapse" data-bs-target="#faq6"><i class="bi bi-hourglass me-2 text-warning"></i>¿Cuánto tarda en confirmarse mi cita?</button></h2>
+                    <div id="faq6" class="accordion-collapse collapse" data-bs-parent="#mediAccordionFAQ"><div class="accordion-body small text-muted px-0 pt-1 pb-3">Si eres el primero en ese horario, se confirma <strong>automáticamente</strong>. Si hay alguien más, entras a cola y el profesional confirma en orden de llegada.</div></div>
+                  </div>
+                  <div class="accordion-item border-bottom border-0 border-light">
+                    <h2 class="accordion-header"><button class="accordion-button collapsed py-2 px-0 bg-transparent fw-bold" type="button" data-bs-toggle="collapse" data-bs-target="#faq7"><i class="bi bi-chat-dots me-2 text-primary"></i>¿Puedo chatear con mi médico?</button></h2>
+                    <div id="faq7" class="accordion-collapse collapse" data-bs-parent="#mediAccordionFAQ"><div class="accordion-body small text-muted px-0 pt-1 pb-3">Sí. En la pestaña <strong>Citas</strong>, toca "Chatear" en tu cita confirmada. También está disponible en el botón <i class="bi bi-chat-dots-fill text-primary"></i> de acciones rápidas.</div></div>
+                  </div>
+                  <div class="accordion-item border-0">
+                    <h2 class="accordion-header"><button class="accordion-button collapsed py-2 px-0 bg-transparent fw-bold" type="button" data-bs-toggle="collapse" data-bs-target="#faq8"><i class="bi bi-people me-2 text-secondary"></i>¿Quiénes me pueden atender?</button></h2>
+                    <div id="faq8" class="accordion-collapse collapse" data-bs-parent="#mediAccordionFAQ"><div class="accordion-body small text-muted px-0 pt-1 pb-3">El ITES cuenta con <strong>médico general</strong> y <strong>psicólogos</strong> (turno matutino y vespertino). El sistema asigna al profesional disponible según el horario que elijas.</div></div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -332,91 +979,134 @@ var Medi = (function () {
                   <div class="bg-success bg-opacity-10 d-inline-flex align-items-center justify-content-center rounded-circle mb-3" style="width: 72px; height: 72px;">
                     <i class="bi bi-check-circle-fill text-success" style="font-size: 2.5rem;"></i>
                   </div>
-                  <h5 class="fw-bold text-dark mb-2">Cita Registrada</h5>
+                  <h5 class="fw-bold text-dark mb-2">Cita registrada</h5>
                   <div id="medi-success-details" class="mb-3"></div>
                   <button class="btn btn-outline-primary rounded-pill px-4 fw-bold mt-2" onclick="Medi._switchMediTab('medi-tab-citas')">
-                    <i class="bi bi-calendar-week me-1"></i>Ver Mis Citas
+                    <i class="bi bi-calendar-week me-1"></i>Ver mis citas
                   </button>
                 </div>
                 <form id="form-medi-nueva-cita">
                   <div class="row g-3">
-                    <div class="col-12">
+                    <div class="col-12" id="medi-service-container">
                       <label class="form-label small fw-bold text-muted mb-2">Tipo de servicio</label>
                       <div class="d-flex flex-column flex-sm-row gap-3 medi-service-btns">
                         <button type="button" class="btn btn-outline-light flex-fill p-3 border rounded-4 text-start position-relative overflow-hidden service-btn shadow-sm"
                             style="border-color: rgba(255,255,255,0.1);"
-                            onclick="
-                                document.getElementById('medi-cita-categoria').value='Medicina General';
-                                document.getElementById('medi-cita-tipo').value='Medico';
-                                window._selectedServiceDuration = 'Medico';
-                                document.querySelectorAll('.service-btn').forEach(b => { b.classList.remove('active','border-info','border-primary','bg-info-subtle','bg-primary-subtle'); b.classList.add('btn-outline-light'); b.style.borderColor = 'rgba(255,255,255,0.1)'; });
-                                this.classList.remove('btn-outline-light'); this.classList.add('active','bg-info-subtle','border-info'); this.style.borderColor = '';
-                                document.getElementById('medi-date-container').classList.remove('d-none');
-                                document.getElementById('summary-service').textContent = 'Medico General';
-                                document.getElementById('summary-service-icon').className = 'bi bi-bandaid-fill text-info';
-                            ">
+                            data-service-type="M\u00e9dico"
+                            onclick="Medi._selectStudentService('M\u00e9dico', this)">
                             <div class="d-flex align-items-center">
                               <div class="bg-white rounded-circle p-2 shadow-sm me-3 text-info"><i class="bi bi-bandaid-fill fs-4"></i></div>
                               <div>
-                                <h6 class="fw-bold text-body mb-0">Medico General</h6>
-                                <span class="extra-small text-muted">Malestar, chequeo, salud fisica</span>
+                                <h6 class="fw-bold text-body mb-0">Médico General</h6>
+                                <span class="extra-small text-muted">Malestar, chequeo, salud física</span>
                               </div>
                             </div>
                         </button>
                         <button type="button" class="btn btn-outline-light flex-fill p-3 border rounded-4 text-start position-relative overflow-hidden service-btn shadow-sm"
                             style="border-color: rgba(255,255,255,0.1);"
-                            onclick="
-                                document.getElementById('medi-cita-categoria').value='Salud Mental';
-                                document.getElementById('medi-cita-tipo').value='Psicologo';
-                                window._selectedServiceDuration = 'Psicologo';
-                                document.querySelectorAll('.service-btn').forEach(b => { b.classList.remove('active','border-info','border-primary','bg-info-subtle','bg-primary-subtle'); b.classList.add('btn-outline-light'); b.style.borderColor = 'rgba(255,255,255,0.1)'; });
-                                this.classList.remove('btn-outline-light'); this.classList.add('active','bg-primary-subtle','border-primary'); this.style.borderColor = '';
-                                document.getElementById('medi-date-container').classList.remove('d-none');
-                                document.getElementById('summary-service').textContent = 'Psicologia';
-                                document.getElementById('summary-service-icon').className = 'bi bi-chat-heart-fill text-primary';
-                            ">
+                            data-service-type="Psicologo"
+                            onclick="Medi._selectStudentService('Psicologo', this)">
                             <div class="d-flex align-items-center">
                               <div class="bg-white rounded-circle p-2 shadow-sm me-3 text-primary"><i class="bi bi-chat-heart-fill fs-4"></i></div>
                               <div>
-                                <h6 class="fw-bold text-body mb-0">Psicologia</h6>
-                                <span class="extra-small text-muted">Apoyo emocional, estres</span>
+                                <h6 class="fw-bold text-body mb-0">Psicología</h6>
+                                <span class="extra-small text-muted">Apoyo emocional, estrés</span>
                               </div>
                             </div>
                         </button>
                       </div>
                       <input type="hidden" id="medi-cita-categoria" required>
-                      <input type="hidden" id="medi-cita-tipo" value="Medico">
+                      <input type="hidden" id="medi-cita-tipo" value="M\u00e9dico">
                     </div>
                     <div class="col-12 mt-4 d-none" id="medi-date-container">
-                      <label class="form-label small fw-bold text-muted mb-3">Selecciona el dia</label>
-                      <div id="medi-date-selector" class="d-flex gap-2 overflow-auto pb-3 medi-date-scroll" style="scrollbar-width: none; -ms-overflow-style: none;"></div>
+                      <label class="form-label small fw-bold text-muted mb-3">Selecciona el día</label>
+                      <div class="d-flex align-items-center gap-1">
+                        <button type="button" class="btn btn-light btn-sm rounded-circle flex-shrink-0 d-none d-md-flex align-items-center justify-content-center" style="width:32px;height:32px;" onclick="(function(){const el=document.getElementById('medi-date-selector');el.scrollBy({left:-180,behavior:'smooth'})})()"><i class="bi bi-chevron-left" style="font-size:.7rem;"></i></button>
+                        <div id="medi-date-selector" class="d-flex gap-2 overflow-auto pb-2 flex-grow-1" style="scrollbar-width: thin; scrollbar-color: #dee2e6 transparent;"></div>
+                        <button type="button" class="btn btn-light btn-sm rounded-circle flex-shrink-0 d-none d-md-flex align-items-center justify-content-center" style="width:32px;height:32px;" onclick="(function(){const el=document.getElementById('medi-date-selector');el.scrollBy({left:180,behavior:'smooth'})})()"><i class="bi bi-chevron-right" style="font-size:.7rem;"></i></button>
+                      </div>
                       <input type="hidden" id="medi-cita-fecha" required>
-                      <div class="mt-2">
-                        <label class="form-label small fw-bold text-muted">Horarios Disponibles</label>
-                        <div id="medi-time-msg" class="p-4 bg-light rounded-4 text-center text-muted small border border-dashed">
-                          <i class="bi bi-calendar-check fs-4 d-block mb-2"></i> Selecciona un dia primero
+                      <div class="mt-2" id="medi-time-container">
+                        <label class="form-label small fw-bold text-muted">Horarios disponibles</label>
+                        <div id="medi-time-msg" class="p-4  rounded-4 text-center text-muted small border border-dashed">
+                          <i class="bi bi-calendar-check fs-4 d-block mb-2"></i> Selecciona un día primero
                         </div>
                         <input type="hidden" id="medi-cita-hora" required>
-                        <div id="medi-time-grid" class="d-none gap-2 flex-wrap mt-2"></div>
+                        <div id="medi-time-grid" class="d-none gap-2 flex-wrap mt-2" style="max-height: 260px; overflow-y: auto; scrollbar-width: thin;"></div>
+                        <div class="row g-2 mt-2" id="medi-slot-legend">
+                          <div class="col-6 col-lg-3">
+                            <div class="medi-slot-legend-item rounded-3 px-2 py-2 h-100 d-flex align-items-center gap-2">
+                              <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill">Libre</span>
+                              <span class="small text-muted">Confirmación inmediata</span>
+                            </div>
+                          </div>
+                          <div class="col-6 col-lg-3">
+                            <div class="medi-slot-legend-item rounded-3 px-2 py-2 h-100 d-flex align-items-center gap-2">
+                              <span class="badge bg-warning-subtle text-warning border border-warning-subtle rounded-pill">Cola</span>
+                              <span class="small text-muted">Hay alguien antes</span>
+                            </div>
+                          </div>
+                          <div class="col-6 col-lg-3">
+                            <div class="medi-slot-legend-item rounded-3 px-2 py-2 h-100 d-flex align-items-center gap-2">
+                              <span class="badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill">Lleno</span>
+                              <span class="small text-muted">Sin espacio disponible</span>
+                            </div>
+                          </div>
+                          <div class="col-6 col-lg-3">
+                            <div class="medi-slot-legend-item rounded-3 px-2 py-2 h-100 d-flex align-items-center gap-2">
+                              <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle rounded-pill">Turno</span>
+                              <span class="small text-muted">Horario no habilitado</span>
+                            </div>
+                          </div>
+                        </div>
                       </div>
                     </div>
-                    <div class="col-12 mt-3">
-                      <label class="form-label small fw-bold text-muted">Motivo / Sintomas (Opcional)</label>
-                      <textarea class="form-control border-0 bg-light rounded-3" id="medi-cita-motivo" rows="2" placeholder="Describe brevemente como te sientes..."></textarea>
+                    <div class="col-12 mt-3" id="medi-motivo-container">
+                      <label class="form-label small fw-bold text-muted mb-2"><i class="bi bi-chat-left-text me-1 text-primary"></i>¿Cómo te sientes? <span class="fw-normal text-muted">(Opcional)</span></label>
+                      <div class="rounded-3 border p-2" style="background:#f8f9ff;">
+                        <textarea class="form-control border-0 bg-transparent" id="medi-cita-motivo" rows="2" placeholder="Describe brevemente tus síntomas o motivo de consulta..." style="resize:none; font-size:0.85rem;"></textarea>
+                        <div class="d-flex flex-wrap gap-1 mt-2 pt-1 border-top">
+                          <span class="badge rounded-pill text-muted fw-normal border" style="background:#fff;cursor:pointer;font-size:.7rem;" onclick="(function(){var t=document.getElementById('medi-cita-motivo');t.value=(t.value?t.value+' ':'')+'Dolor de cabeza';t.focus()})()">🤕 Dolor de cabeza</span>
+                          <span class="badge rounded-pill text-muted fw-normal border" style="background:#fff;cursor:pointer;font-size:.7rem;" onclick="(function(){var t=document.getElementById('medi-cita-motivo');t.value=(t.value?t.value+' ':'')+'Fiebre';t.focus()})()">🌡️ Fiebre</span>
+                          <span class="badge rounded-pill text-muted fw-normal border" style="background:#fff;cursor:pointer;font-size:.7rem;" onclick="(function(){var t=document.getElementById('medi-cita-motivo');t.value=(t.value?t.value+' ':'')+'Tos o gripa';t.focus()})()">🤧 Tos/Gripa</span>
+                          <span class="badge rounded-pill text-muted fw-normal border" style="background:#fff;cursor:pointer;font-size:.7rem;" onclick="(function(){var t=document.getElementById('medi-cita-motivo');t.value=(t.value?t.value+' ':'')+'Dolor de estómago';t.focus()})()">🤢 Estómago</span>
+                          <span class="badge rounded-pill text-muted fw-normal border" style="background:#fff;cursor:pointer;font-size:.7rem;" onclick="(function(){var t=document.getElementById('medi-cita-motivo');t.value=(t.value?t.value+' ':'')+'Estrés o ansiedad';t.focus()})()">😰 Estrés</span>
+                          <span class="badge rounded-pill text-muted fw-normal border" style="background:#fff;cursor:pointer;font-size:.7rem;" onclick="(function(){var t=document.getElementById('medi-cita-motivo');t.value=(t.value?t.value+' ':'')+'Revisión general';t.focus()})()">🩺 Revisión general</span>
+                        </div>
+                      </div>
                     </div>
                   </div>
-                  <div id="medi-booking-summary" class="mt-4 p-3 rounded-4 bg-light d-none slide-up-anim">
-                    <h6 class="fw-bold small text-muted mb-3">RESUMEN DE RESERVA</h6>
-                    <div class="d-flex align-items-center mb-2">
-                      <i id="summary-service-icon" class="bi bi-bandaid-fill text-muted me-2"></i>
-                      <span id="summary-service" class="fw-bold text-dark small">--</span>
+                  <div id="medi-booking-summary" class="mt-4 d-none slide-up-anim rounded-4 overflow-hidden shadow-sm border">
+                    <div class="px-3 py-2 d-flex align-items-center gap-2" style="background:linear-gradient(135deg,#1B396A,#0d6efd);color:white;">
+                      <i class="bi bi-clipboard2-check-fill"></i>
+                      <span class="fw-bold small">Resumen de tu cita</span>
                     </div>
-                    <div class="d-flex align-items-center">
-                      <i class="bi bi-clock-history text-muted me-2"></i>
-                      <span id="summary-datetime" class="fw-bold text-dark small">--</span>
+                    <div class="p-3 bg-white">
+                      <div class="d-flex align-items-center gap-3 mb-2">
+                        <div class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0" style="width:36px;height:36px;background:#e8f0fe;">
+                          <i id="summary-service-icon" class="bi bi-bandaid-fill text-primary"></i>
+                        </div>
+                        <div>
+                          <div class="extra-small text-muted">Servicio</div>
+                          <div class="fw-bold small text-dark" id="summary-service">--</div>
+                        </div>
+                      </div>
+                      <div class="d-flex align-items-center gap-3">
+                        <div class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0" style="width:36px;height:36px;background:#e8f0fe;">
+                          <i class="bi bi-calendar-check-fill text-primary"></i>
+                        </div>
+                        <div>
+                          <div class="extra-small text-muted">Fecha y hora</div>
+                          <div class="fw-bold small text-dark" id="summary-datetime">--</div>
+                        </div>
+                      </div>
+                      <div class="mt-2 pt-2 border-top d-flex align-items-center gap-1" style="font-size:0.7rem;color:#888;">
+                        <i class="bi bi-info-circle me-1"></i> Estado esperado:
+                        <span class="text-muted fw-bold ms-1" id="summary-status-text">Se definirá al confirmar</span>
+                      </div>
                     </div>
                   </div>
-                  <div class="d-flex justify-content-between align-items-center mt-3 pt-3 border-top">
+                  <div class="d-flex justify-content-between align-items-center mt-3 pt-3 border-top" id="medi-booking-actions">
                     <div id="medi-cita-disponibilidad" class="small fw-bold text-primary"></div>
                     <button type="submit" class="btn btn-primary rounded-pill px-5 fw-bold shadow-sm" id="btn-medi-confirm" disabled>
                       <i class="bi bi-check-lg me-2"></i>Confirmar
@@ -429,17 +1119,45 @@ var Medi = (function () {
 
           <!-- TAB 3: MIS CITAS -->
           <div class="tab-pane fade" id="medi-tab-citas" role="tabpanel">
+            <!-- Stats rápidas -->
+            <div class="row g-2 mb-3" id="medi-citas-stats-row">
+              <div class="col-4">
+                <div class="rounded-4 p-3 text-center border shadow-sm bg-white">
+                  <div class="fw-bold fs-5 text-warning" id="stat-citas-pend">--</div>
+                  <div class="extra-small text-muted">Pendientes</div>
+                </div>
+              </div>
+              <div class="col-4">
+                <div class="rounded-4 p-3 text-center border shadow-sm bg-white">
+                  <div class="fw-bold fs-5 text-success" id="stat-citas-conf">--</div>
+                  <div class="extra-small text-muted">Confirmadas</div>
+                </div>
+              </div>
+              <div class="col-4">
+                <div class="rounded-4 p-3 text-center border shadow-sm bg-white">
+                  <div class="fw-bold fs-5 text-danger" id="stat-citas-canc">--</div>
+                  <div class="extra-small text-muted">Canceladas</div>
+                </div>
+              </div>
+            </div>
             <div class="card border-0 shadow-sm rounded-4 mb-4">
               <div class="card-header bg-white py-3 border-0">
                 <div class="d-flex justify-content-between align-items-center mb-3">
                   <h6 class="fw-bold mb-0"><i class="bi bi-calendar-week me-2" style="color:var(--medi);"></i>Mi Agenda</h6>
+                  <button class="btn btn-primary btn-sm rounded-pill px-3 fw-bold shadow-sm" onclick="Medi._switchMediTab('medi-tab-agendar')">
+                    <i class="bi bi-plus-lg me-1"></i>Nueva cita
+                  </button>
                 </div>
                 <ul class="nav-custom-pills-2 d-flex gap-3 flex-nowrap overflow-auto pb-0" id="medi-citas-tabs" role="tablist" style="scrollbar-width: none;">
                   <li class="nav-item" role="presentation">
-                    <button class="nav-link active rounded-pill fw-bold small px-3 py-1 text-nowrap" id="tab-pendientes" data-bs-toggle="tab" data-bs-target="#pills-pendientes" type="button" role="tab">Pendientes</button>
+                    <button class="nav-link active rounded-pill fw-bold small px-3 py-1 text-nowrap" id="tab-pendientes" data-bs-toggle="tab" data-bs-target="#pills-pendientes" type="button" role="tab">
+                      Pendientes <span class="badge bg-warning text-dark ms-1" id="badge-pend" style="font-size:.6rem;">0</span>
+                    </button>
                   </li>
                   <li class="nav-item" role="presentation">
-                    <button class="nav-link rounded-pill fw-bold small px-3 py-1 text-nowrap" id="tab-confirmadas" data-bs-toggle="tab" data-bs-target="#pills-confirmadas" type="button" role="tab">Confirmadas</button>
+                    <button class="nav-link rounded-pill fw-bold small px-3 py-1 text-nowrap" id="tab-confirmadas" data-bs-toggle="tab" data-bs-target="#pills-confirmadas" type="button" role="tab">
+                      Confirmadas <span class="badge bg-success ms-1" id="badge-conf" style="font-size:.6rem;">0</span>
+                    </button>
                   </li>
                   <li class="nav-item" role="presentation">
                     <button class="nav-link rounded-pill fw-bold small px-3 py-1 text-nowrap" id="tab-canceladas" data-bs-toggle="tab" data-bs-target="#pills-canceladas" type="button" role="tab">Canceladas</button>
@@ -470,11 +1188,21 @@ var Medi = (function () {
 
           <!-- TAB 4: HISTORIAL -->
           <div class="tab-pane fade" id="medi-tab-historial" role="tabpanel">
+            <div id="medi-documents-panel" class="mb-3"></div>
+            <!-- Estadísticas personales -->
+            <div id="medi-history-stats" class="row g-2 mb-3"></div>
             <div class="card border-0 shadow-sm rounded-4">
               <div class="card-body p-3">
-                <h6 class="fw-bold mb-3" style="color: var(--medi);">
-                  <i class="bi bi-folder2-open me-2"></i>Mi Expediente Medico
-                </h6>
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                  <h6 class="fw-bold mb-0" style="color: var(--medi);">
+                    <i class="bi bi-folder2-open me-2"></i>Mi Expediente
+                  </h6>
+                  <div class="d-flex gap-1" id="medi-history-filter-btns">
+                    <button class="btn btn-primary rounded-pill px-2 py-0" style="font-size:.7rem;" onclick="Medi._filterHistory('todos', this)">Todos</button>
+                    <button class="btn btn-outline-info rounded-pill px-2 py-0" style="font-size:.7rem;" onclick="Medi._filterHistory('Médico', this)"><i class="bi bi-bandaid me-1"></i>Médico</button>
+                    <button class="btn btn-outline-primary rounded-pill px-2 py-0 text-purple" style="font-size:.7rem;" onclick="Medi._filterHistory('Psicologo', this)"><i class="bi bi-chat-heart me-1"></i>Psico</button>
+                  </div>
+                </div>
                 <div id="medi-stu-consultas" class="d-flex flex-column gap-2">
                   <div class="text-center py-4 text-muted rounded-4" style="background: var(--medi-surface);">
                     <i class="bi bi-folder2-open fs-1 d-block mb-2 opacity-50"></i>
@@ -505,13 +1233,13 @@ var Medi = (function () {
                   <label class="form-label small fw-bold text-muted mb-2">Selecciona nueva fecha</label>
                   <div id="resched-date-selector" class="d-flex gap-2 overflow-auto pb-3 medi-date-scroll medi-resched-dates" style="scrollbar-width: none;"></div>
                   <div id="resched-time-container" class="mt-2">
-                    <label class="form-label small fw-bold text-muted">Horarios Disponibles</label>
-                    <div id="resched-time-msg" class="p-3 bg-light rounded-3 text-center text-muted small border border-dashed">
-                      <i class="bi bi-calendar-check d-block mb-1"></i> Selecciona un dia primero
+                    <label class="form-label small fw-bold text-muted">Horarios disponibles</label>
+                    <div id="resched-time-msg" class="p-3  rounded-3 text-center text-muted small border border-dashed">
+                      <i class="bi bi-calendar-check d-block mb-1"></i> Selecciona un día primero
                     </div>
                     <div id="resched-time-grid" class="d-none d-flex flex-wrap gap-2 justify-content-center mt-2 p-2"></div>
                   </div>
-                  <div id="resched-summary" class="d-none mt-3 p-3 rounded-4 bg-light">
+                  <div id="resched-summary" class="d-none mt-3 p-3 rounded-4 ">
                     <div class="d-flex align-items-center gap-2">
                       <i class="bi bi-arrow-right-circle text-primary"></i>
                       <span class="fw-bold small text-dark" id="resched-summary-text">--</span>
@@ -725,7 +1453,7 @@ var Medi = (function () {
                        </div>
                    </div>
                    <!-- Messages / Chat -->
-                   <div id="medi-ctx-messages" class="p-3 d-none">
+                   <div id="medi-ctx-messages" class="p-2 d-none" style="overflow:hidden;">
                        <div id="medi-chat-panel">
                            <div class="text-center py-4 text-muted small">
                                <i class="bi bi-chat-square-dots display-6 d-block mb-2 opacity-25"></i>
@@ -764,7 +1492,7 @@ var Medi = (function () {
                  </button>
              </div>
           </div>
-          <div class="modal-body bg-light p-0">
+          <div class="modal-body  p-0">
              <div class="row g-0 h-100">
                 <div class="col-md-7 p-4 border-end" style="max-height: 80vh; overflow-auto;">
                    <form id="form-soap">
@@ -793,12 +1521,23 @@ var Medi = (function () {
     </div>
 
     <div class="modal fade" id="modalMediEditCard" tabindex="-1">
-      <div class="modal-dialog modal-dialog-centered modal-sm">
+      <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content rounded-4 border-0 shadow">
-          <div class="modal-body p-4">
-             <h6 class="fw-bold mb-3">Actualizar Datos Médicos</h6>
+          <div class="modal-header border-0 pb-0 pt-4 px-4">
+            <div class="d-flex align-items-center gap-2">
+              <div class="bg-danger bg-opacity-10 p-2 rounded-3 text-danger"><i class="bi bi-heart-pulse-fill fs-5"></i></div>
+              <div>
+                <h6 class="fw-bold mb-0">Ficha de Emergencia</h6>
+                <small class="text-muted">Tu información médica esencial</small>
+              </div>
+            </div>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body p-4 pt-2">
              <form id="medi-card-form">
-                <div class="mb-2">
+                <!-- Sección: Datos Clínicos -->
+                <p class="small fw-bold text-muted text-uppercase letter-spacing-1 mb-2 mt-2" style="font-size:0.65rem; letter-spacing:1px;">Datos Clínicos</p>
+                <div class="mb-3">
                    <label class="small text-muted fw-bold">Tipo de Sangre</label>
                    <select class="form-select" id="edit-sangre">
                       <option value="">Seleccionar...</option>
@@ -808,17 +1547,48 @@ var Medi = (function () {
                       <option value="AB+">AB+</option><option value="AB-">AB-</option>
                    </select>
                 </div>
-                <div class="mb-2">
-                   <label class="small text-muted fw-bold">Alergias</label>
-                   <input type="text" class="form-control" id="edit-alergias" placeholder="Ninguna">
+                <div class="mb-3">
+                   <label class="small text-muted fw-bold">Alergias conocidas</label>
+                   <input type="text" class="form-control" id="edit-alergias" placeholder="Ej: Penicilina, Mariscos... o Ninguna">
                 </div>
-                <hr>
-                <div class="mb-2">
-                   <label class="small text-muted fw-bold">Contacto Emergencia</label>
+                <!-- Sección: Condiciones Crónicas -->
+                <div class="mb-3">
+                  <label class="small text-muted fw-bold d-block mb-1">Condiciones Crónicas</label>
+                  <div class="d-flex flex-wrap gap-2">
+                    <div class="form-check form-check-inline">
+                      <input class="form-check-input" type="checkbox" id="cond-diabetes" value="Diabetes">
+                      <label class="form-check-label small" for="cond-diabetes">Diabetes</label>
+                    </div>
+                    <div class="form-check form-check-inline">
+                      <input class="form-check-input" type="checkbox" id="cond-hipertension" value="Hipertensión">
+                      <label class="form-check-label small" for="cond-hipertension">Hipertensión</label>
+                    </div>
+                    <div class="form-check form-check-inline">
+                      <input class="form-check-input" type="checkbox" id="cond-asma" value="Asma">
+                      <label class="form-check-label small" for="cond-asma">Asma</label>
+                    </div>
+                    <div class="form-check form-check-inline">
+                      <input class="form-check-input" type="checkbox" id="cond-otra" value="Otra">
+                      <label class="form-check-label small" for="cond-otra">Otra</label>
+                    </div>
+                  </div>
+                  <input type="text" class="form-control form-control-sm mt-2 d-none" id="cond-otra-detalle" placeholder="Especifica la condición...">
+                </div>
+                <!-- Sección: Medicamentos -->
+                <div class="mb-3">
+                  <label class="small text-muted fw-bold">Medicamentos Actuales</label>
+                  <textarea class="form-control form-control-sm" id="edit-medicamentos" rows="2" placeholder="Ej: Metformina 850mg, Losartan 50mg... o Ninguno"></textarea>
+                </div>
+                <hr class="my-3">
+                <!-- Sección: Contacto de Emergencia -->
+                <p class="small fw-bold text-muted text-uppercase mb-2" style="font-size:0.65rem; letter-spacing:1px;">Contacto de Emergencia</p>
+                <div class="mb-3">
                    <input type="text" class="form-control mb-2" id="edit-contacto-nombre" placeholder="Nombre completo">
                    <input type="tel" class="form-control" id="edit-contacto-tel" placeholder="Teléfono">
                 </div>
-                <button type="submit" class="btn btn-primary w-100 mt-3 rounded-pill fw-bold">Guardar Cambios</button>
+                <button type="submit" class="btn btn-danger w-100 mt-1 rounded-pill fw-bold">
+                  <i class="bi bi-shield-check me-2"></i>Guardar Ficha Médica
+                </button>
              </form>
           </div>
         </div>
@@ -862,7 +1632,7 @@ var Medi = (function () {
     <div class="modal fade" id="modalDetalleConsulta" tabindex="-1">
       <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content border-0 shadow-lg rounded-4">
-          <div class="modal-header bg-light border-0 py-3">
+          <div class="modal-header  border-0 py-3">
             <div class="d-flex align-items-center">
                 <div class="bg-primary-subtle p-2 rounded-3 me-3 text-primary">
                     <i class="bi bi-file-earmark-medical fs-4"></i>
@@ -877,7 +1647,7 @@ var Medi = (function () {
           <div class="modal-body p-4 pt-2">
              <div class="row g-4">
                 <div class="col-12">
-                    <div class="p-3 rounded-4 bg-light d-flex justify-content-around text-center border">
+                    <div class="p-3 rounded-4  d-flex justify-content-around text-center border">
                         <div>
                             <div class="extra-small text-muted fw-bold">Presión</div>
                             <div class="fw-bold text-dark" id="detail-presion">--</div>
@@ -902,11 +1672,11 @@ var Medi = (function () {
 
                 <div class="col-md-6">
                     <h6 class="fw-bold text-primary small mb-1"><i class="bi bi-person-heart me-1"></i> Motivo / Subjetivo</h6>
-                    <p class="small text-muted bg-light p-2 rounded-3 border-start border-3 border-primary" id="detail-subjetivo"></p>
+                    <p class="small text-muted  p-2 rounded-3 border-start border-3 border-primary" id="detail-subjetivo"></p>
                 </div>
                 <div class="col-md-6">
                     <h6 class="fw-bold text-info small mb-1"><i class="bi bi-clipboard2-pulse me-1"></i> Diagnóstico (A)</h6>
-                    <p class="small text-dark fw-bold bg-light p-2 rounded-3 border-start border-3 border-info" id="detail-diagnosis"></p>
+                    <p class="small text-dark fw-bold  p-2 rounded-3 border-start border-3 border-info" id="detail-diagnosis"></p>
                 </div>
 
                 <div class="col-12">
@@ -921,7 +1691,7 @@ var Medi = (function () {
                 </div>
              </div>
           </div>
-          <div class="modal-footer bg-light border-0 justify-content-between p-3">
+          <div class="modal-footer  border-0 justify-content-between p-3">
             <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">Cerrar</button>
             <button type="button" class="btn btn-primary rounded-pill px-4 fw-bold shadow" id="btn-print-receta">
                 <i class="bi bi-printer me-2"></i>Descargar Receta
@@ -985,7 +1755,7 @@ var Medi = (function () {
                         </div>
                     </form>
                 </div>
-                <div class="bg-light p-2 text-center border-top" style="font-size: 0.65rem;">
+                <div class=" p-2 text-center border-top" style="font-size: 0.65rem;">
                     <span class="text-muted"><i class="bi bi-info-circle me-1"></i>Cada turno (matutino/vespertino) tiene su propio PIN</span>
                 </div>
             </div>
@@ -1026,7 +1796,7 @@ var Medi = (function () {
                ¿Deseas <b>cancelar la actual</b> y confirmar este nuevo horario?
             </p>
             
-            <div class="card bg-light border-0 mb-4 p-3 rounded-3 text-start">
+            <div class="card  border-0 mb-4 p-3 rounded-3 text-start">
                <div class="d-flex justify-content-between mb-2">
                   <span class="small text-muted">Cita Actual:</span>
                   <span class="badg bg-secondary-subtle text-secondary rounded-pill px-2" id="replace-old-date">--</span>
@@ -1101,7 +1871,7 @@ var Medi = (function () {
                          <div class="mb-3">
                              <label class="form-label small fw-bold text-muted">Buscar Estudiante</label>
                              <div class="input-group">
-                                 <input type="text" id="adm-book-matricula" class="form-control bg-light border-0" placeholder="Matrícula...">
+                                 <input type="text" id="adm-book-matricula" class="form-control  border-0" placeholder="Matrícula...">
                                  <button class="btn btn-primary" type="button" onclick="Medi.searchStudentForBooking()">
                                      <i class="bi bi-search"></i>
                                  </button>
@@ -1120,7 +1890,7 @@ var Medi = (function () {
                              </div>
                              <div class="col-12 mt-2">
                                  <label class="form-label small fw-bold text-muted">Seleccionar Hora</label>
-                                 <div id="adm-book-time-msg" class="text-center small text-muted fst-italic py-2 bg-light rounded-3 border border-dashed">
+                                 <div id="adm-book-time-msg" class="text-center small text-muted fst-italic py-2  rounded-3 border border-dashed">
                                     <i class="bi bi-calendar-event me-2"></i>Selecciona un día primero
                                  </div>
                                  <div id="adm-book-times" class="d-flex flex-wrap gap-2 justify-content-center d-none p-2"></div>
@@ -1129,13 +1899,13 @@ var Medi = (function () {
                          </div>
                          <div class="mb-3">
                              <label class="form-label small fw-bold text-muted">Motivo</label>
-                             <select class="form-select bg-light border-0 mb-2" id="adm-book-category">
+                             <select class="form-select  border-0 mb-2" id="adm-book-category">
                                  <option value="Consulta General">Consulta General</option>
                                  <option value="Urgencia Menor">Urgencia Menor</option>
                                  <option value="Seguimiento">Seguimiento</option>
                                  <option value="Certificado Médico">Certificado Médico</option>
                              </select>
-                             <textarea id="adm-book-reason" class="form-control bg-light border-0" rows="2" placeholder="Detalles adicionales..."></textarea>
+                             <textarea id="adm-book-reason" class="form-control  border-0" rows="2" placeholder="Detalles adicionales..."></textarea>
                          </div>
                          <div class="d-grid">
                              <button type="submit" class="btn btn-primary rounded-pill fw-bold shadow-sm">
@@ -1179,7 +1949,7 @@ var Medi = (function () {
                 <!-- 1. Habilitar Servicio -->
                 <!-- 1. Habilitar Servicio (Role Specific) -->
                 ${_myRole === 'Médico' ? `
-                <div class="d-flex justify-content-between align-items-center p-3 bg-light rounded-3 mb-3">
+                <div class="d-flex justify-content-between align-items-center p-3  rounded-3 mb-3">
                     <div>
                         <div class="fw-bold text-dark">Habilitar Agenda Médica</div>
                         <div class="small text-muted">Permitir reservas para medicina general</div>
@@ -1190,7 +1960,7 @@ var Medi = (function () {
                 </div>` : ''}
 
                 ${_myRole === 'Psicologo' ? `
-                <div class="d-flex justify-content-between align-items-center p-3 bg-light rounded-3 mb-3">
+                <div class="d-flex justify-content-between align-items-center p-3  rounded-3 mb-3">
                     <div>
                         <div class="fw-bold text-dark">Habilitar Agenda Psicología</div>
                         <div class="small text-muted">Permitir reservas para psicología</div>
@@ -1325,12 +2095,14 @@ var Medi = (function () {
 
     _studentForBooking = null;
 
-    // Logic for Pre-filled Student (from Search Result)
+    // Logic for Pre-filled Student (from Search Result or cache)
     if (encodedStudent) {
       try {
         let student = null;
         if (encodedStudent === 'found') {
           student = _foundPatient;
+        } else if (_patientCache.has(encodedStudent)) {
+          student = _patientCache.get(encodedStudent);
         } else {
           student = typeof encodedStudent === 'string' ? JSON.parse(decodeURIComponent(encodedStudent)) : encodedStudent;
         }
@@ -1583,6 +2355,7 @@ var Medi = (function () {
     // Renderizado Garantizado: Limpiamos y renderizamos la estructura base
     // Esto evita pantallas en blanco si el HTML inicial tenía basura o placeholders
     renderStructure(container);
+    _enableStudentFloatingStack();
 
     // Mostrar vista de estudiante y asegurar limpieza de la admin
     const vStu = document.getElementById('medi-student');
@@ -1606,29 +2379,32 @@ var Medi = (function () {
       SLOT_STEP = cfg.slotStep || 30;
       SLOT_DURATION = cfg.slotDuration || 60;
 
-      // [NEW] Hero personalizado
+      // Hero personalizado
       _updateHeroGreeting(user);
 
-      // [NEW] Quick Actions grid
+      // Quick Actions grid (6 acciones)
       _renderQuickActions();
 
-      // Inicializar componentes
+      // Indicador de disponibilidad del servicio
+      _renderServiceAvailability();
+
+      // Check-in de bienestar diario
+      _renderDailyCheckin(user.uid);
+
+      // Inicializar componentes principales
       loadEmergencyCard(user);
       setupAppointmentForm();
       loadStudentHistory(user.uid);
       loadWellnessFeed();
 
-      // [NEW] Student Chat
+      // Botón SOS flotante
+      _renderSOSButton();
+
+      // Student Chat
       renderStudentChat(user.uid, user.displayName || user.email);
 
-      // [NEW] Tutorial en primera visita
+      // Tutorial en primera visita
       initMediTutorial(user.uid);
-
-      // [ENCUESTAS] Verificar encuesta de servicio (Médico o Psicología)
-      if (window.Encuestas && window.Encuestas.checkAndShowServiceSurvey) {
-        setTimeout(() => window.Encuestas.checkAndShowServiceSurvey('servicio-medico'), 1500);
-        setTimeout(() => window.Encuestas.checkAndShowServiceSurvey('psicologia'), 5000);
-      }
 
     } catch (err) {
       console.error("[Medi] Error en initStudent async:", err);
@@ -1639,32 +2415,91 @@ var Medi = (function () {
   function loadEmergencyCard(user) {
     // CORRECCIÓN: Usar _ctx.profile que es la propiedad estándar en SIA
     const p = _ctx.profile || {};
+    const hd = p.healthData || {};
+    const contacts = Array.isArray(hd.contactos) ? hd.contactos : [];
+    const primaryContact = contacts[0] || {};
+    const bloodType = p.tipoSangre || hd.tipoSangre || '';
+    const allergyValue = p.alergias || hd.alergia || '';
+    const medsValue = p.medicamentosActuales || hd.tratamientoMédico || hd.medicamentoActual || '';
+    const emergencyName = p.contactoEmergenciaName || primaryContact.nombre || hd.contactoEmergencia || '';
+    const emergencyTel = p.contactoEmergenciaTel || primaryContact.telefono || hd.contactoEmergenciaTel || '';
+    const savedConds = Array.isArray(p.condicionesCronicas)
+      ? p.condicionesCronicas
+      : String(hd.enfermedadCronica || hd.padecimientoFisico || '')
+        .split(',')
+        .map(item => item.trim())
+        .filter(Boolean);
 
-    // Render Vista - Actualizamos los elementos con los datos del perfil
+    // Render Vista — Carnet médico de emergencia
     const elSangre = document.getElementById('view-sangre');
-    if (elSangre) elSangre.textContent = p.tipoSangre || '--';
+    if (elSangre) elSangre.textContent = bloodType || '--';
 
     const elAlergias = document.getElementById('view-alergias');
-    if (elAlergias) elAlergias.textContent = p.alergias || 'Ninguna';
+    if (elAlergias) elAlergias.textContent = allergyValue || 'Ninguna';
+
+    // Condiciones crónicas en el carnet
+    const elCondiciones = document.getElementById('view-condiciones');
+    if (elCondiciones) {
+      const conds = savedConds.join(', ');
+      elCondiciones.textContent = conds ? `Condiciones: ${conds}` : '';
+      elCondiciones.classList.toggle('d-none', !conds);
+    }
+
+    // Advertencia crítica si tiene alergias registradas (distintas de "Ninguna" / vacías)
+    const warning = document.getElementById('view-alergia-warning');
+    if (warning) {
+      const hasAllergy = allergyValue && allergyValue.toLowerCase() !== 'ninguna';
+      warning.classList.toggle('d-none', !hasAllergy);
+    }
 
     const elContNom = document.getElementById('view-contacto-nombre');
-    if (elContNom) elContNom.textContent = p.contactoEmergenciaName || '--';
+    const tel = emergencyTel || '';
+    if (elContNom) {
+      const nombre = emergencyName || '--';
+      elContNom.innerHTML = tel
+        ? `<a href="tel:${escapeHtml(tel)}" class="text-white text-decoration-none fw-bold" title="Llamar: ${escapeHtml(tel)}"><i class="bi bi-telephone-fill me-1" style="font-size:0.6rem;"></i>${escapeHtml(nombre)}</a>`
+        : escapeHtml(nombre);
+    }
 
     const elContTel = document.getElementById('view-contacto-tel');
-    if (elContTel) elContTel.textContent = p.contactoEmergenciaTel || '--';
+    if (elContTel) {
+      if (tel) {
+        elContTel.innerHTML = `<a href="tel:${escapeHtml(tel)}" class="text-white-50 text-decoration-none">${escapeHtml(tel)}</a>`;
+        elContTel.classList.remove('d-none');
+      } else {
+        elContTel.textContent = '';
+        elContTel.classList.add('d-none');
+      }
+    }
 
-    // Render Form - Precargar el formulario con lo que ya existe
+    // Render Form — Precargar el formulario con lo que ya existe
     const inpSangre = document.getElementById('edit-sangre');
-    if (inpSangre) inpSangre.value = p.tipoSangre || '';
+    if (inpSangre) inpSangre.value = bloodType;
 
     const inpAlergias = document.getElementById('edit-alergias');
-    if (inpAlergias) inpAlergias.value = p.alergias || '';
+    if (inpAlergias) inpAlergias.value = allergyValue;
+
+    const inpMeds = document.getElementById('edit-medicamentos');
+    if (inpMeds) inpMeds.value = medsValue;
+
+    // Precargar checkboxes de condiciones crónicas
+    ['diabetes', 'hipertension', 'asma', 'otra'].forEach(c => {
+      const cb = document.getElementById(`cond-${c}`);
+      if (cb) cb.checked = savedConds.includes(cb.value);
+    });
+    const otraDetalle = document.getElementById('cond-otra-detalle');
+    const otraCb = document.getElementById('cond-otra');
+    if (otraDetalle && otraCb) {
+      otraDetalle.classList.toggle('d-none', !otraCb.checked);
+      otraDetalle.value = p.otraCondicionDetalle || hd.otraCondicionDetalle || '';
+      otraCb.addEventListener('change', () => otraDetalle.classList.toggle('d-none', !otraCb.checked));
+    }
 
     const inpContNom = document.getElementById('edit-contacto-nombre');
-    if (inpContNom) inpContNom.value = p.contactoEmergenciaName || '';
+    if (inpContNom) inpContNom.value = emergencyName;
 
     const inpContTel = document.getElementById('edit-contacto-tel');
-    if (inpContTel) inpContTel.value = p.contactoEmergenciaTel || '';
+    if (inpContTel) inpContTel.value = emergencyTel;
 
     // Handler de guardado
     const form = document.getElementById('medi-card-form');
@@ -1673,17 +2508,58 @@ var Medi = (function () {
       const newForm = form.cloneNode(true);
       form.parentNode.replaceChild(newForm, form);
 
+      // Re-bind change listener for "Otra" checkbox after clone
+      const otraCbNew = newForm.querySelector('#cond-otra');
+      const otraDetNew = newForm.querySelector('#cond-otra-detalle');
+      if (otraCbNew && otraDetNew) {
+        otraCbNew.addEventListener('change', () => otraDetNew.classList.toggle('d-none', !otraCbNew.checked));
+      }
+
       newForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         const submitBtn = newForm.querySelector('button[type="submit"]');
         submitBtn.disabled = true;
-        submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Guardando...';
+        submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Guardando...';
+
+        // Recopilar condiciones crónicas seleccionadas
+        const condiciones = [];
+        ['cond-diabetes', 'cond-hipertension', 'cond-asma', 'cond-otra'].forEach(id => {
+          const cb = document.getElementById(id);
+          if (cb && cb.checked) condiciones.push(cb.value);
+        });
+
+        const bloodTypeValue = document.getElementById('edit-sangre').value.trim();
+        const allergyText = document.getElementById('edit-alergias').value.trim();
+        const medsText = document.getElementById('edit-medicamentos').value.trim();
+        const emergencyNameValue = document.getElementById('edit-contacto-nombre').value.trim();
+        const emergencyTelValue = document.getElementById('edit-contacto-tel').value.trim();
+        const otherConditionDetail = condiciones.includes('Otra') ? (document.getElementById('cond-otra-detalle').value || '').trim() : '';
+        const conditionsText = condiciones.join(', ');
+        const contactList = emergencyNameValue
+          ? [{
+            nombre: emergencyNameValue,
+            parentesco: primaryContact.parentesco || '',
+            telefono: emergencyTelValue
+          }]
+          : [];
 
         const data = {
-          tipoSangre: document.getElementById('edit-sangre').value,
-          alergias: document.getElementById('edit-alergias').value,
-          contactoEmergenciaName: document.getElementById('edit-contacto-nombre').value,
-          contactoEmergenciaTel: document.getElementById('edit-contacto-tel').value
+          tipoSangre: bloodTypeValue,
+          alergias: allergyText,
+          condicionesCronicas: condiciones,
+          otraCondicionDetalle: otherConditionDetail,
+          medicamentosActuales: medsText,
+          contactoEmergenciaName: emergencyNameValue,
+          contactoEmergenciaTel: emergencyTelValue,
+          'healthData.alergia': allergyText,
+          'healthData.enfermedadCronica': conditionsText,
+          'healthData.padecimientoFisico': conditionsText,
+          'healthData.otraCondicionDetalle': otherConditionDetail,
+          'healthData.tratamientoMédico': medsText,
+          'healthData.medicamentoActual': medsText,
+          'healthData.contactoEmergencia': emergencyNameValue,
+          'healthData.contactoEmergenciaTel': emergencyTelValue,
+          'healthData.contactos': contactList
         };
 
         try {
@@ -1691,24 +2567,42 @@ var Medi = (function () {
           await _ctx.db.collection('usuarios').doc(user.uid).update(data);
 
           // CORRECCIÓN: Actualizar el perfil en el contexto local de forma segura
-          if (_ctx.profile) {
-            Object.assign(_ctx.profile, data);
-          } else {
-            _ctx.profile = data;
+          if (!_ctx.profile) _ctx.profile = {};
+          Object.assign(_ctx.profile, {
+            tipoSangre: bloodTypeValue,
+            alergias: allergyText,
+            condicionesCronicas: condiciones,
+            otraCondicionDetalle: otherConditionDetail,
+            medicamentosActuales: medsText,
+            contactoEmergenciaName: emergencyNameValue,
+            contactoEmergenciaTel: emergencyTelValue
+          });
+          if (!_ctx.profile.healthData || typeof _ctx.profile.healthData !== 'object') {
+            _ctx.profile.healthData = {};
           }
+          _ctx.profile.healthData.alergia = allergyText;
+          _ctx.profile.healthData.enfermedadCronica = conditionsText;
+          _ctx.profile.healthData.padecimientoFisico = conditionsText;
+          _ctx.profile.healthData.otraCondicionDetalle = otherConditionDetail;
+          _ctx.profile.healthData['tratamientoM\u00E9dico'] = medsText;
+          _ctx.profile.healthData.medicamentoActual = medsText;
+          _ctx.profile.healthData.contactoEmergencia = emergencyNameValue;
+          _ctx.profile.healthData.contactoEmergenciaTel = emergencyTelValue;
+          _ctx.profile.healthData.contactos = contactList;
 
           loadEmergencyCard(user); // Refrescar vista
 
           const modal = bootstrap.Modal.getInstance(document.getElementById('modalMediEditCard'));
           if (modal) modal.hide();
 
-          showToast('Datos de emergencia actualizados', 'success');
+          window.dispatchEvent(new CustomEvent('sia-profile-ready', { detail: _ctx.profile }));
+          showToast('Ficha médica actualizada', 'success');
         } catch (err) {
           console.error("[Medi] Error al guardar datos medicos:", err);
           showToast('Error al guardar: ' + err.message, 'danger');
         } finally {
           submitBtn.disabled = false;
-          submitBtn.textContent = 'Guardar Cambios';
+          submitBtn.innerHTML = '<i class="bi bi-shield-check me-2"></i>Guardar Ficha Médica';
         }
       });
     }
@@ -1717,6 +2611,104 @@ var Medi = (function () {
   function cancelarEdicionTarjeta() {
     const modal = bootstrap.Modal.getInstance(document.getElementById('modalMediEditCard'));
     if (modal) modal.hide();
+  }
+
+  function _scrollBookingTargetIntoView(target, block = 'center') {
+    const el = typeof target === 'string' ? document.getElementById(target) : target;
+    if (!el) return;
+    requestAnimationFrame(() => {
+      el.scrollIntoView({ behavior: 'smooth', block, inline: 'nearest' });
+    });
+  }
+
+  function _focusBookingSection(section) {
+    const map = {
+      service: 'medi-service-container',
+      date: 'medi-date-container',
+      time: 'medi-time-container',
+      motivo: 'medi-motivo-container',
+      summary: 'medi-booking-summary',
+      confirm: 'medi-booking-actions'
+    };
+    const targetId = map[section] || section;
+    _scrollBookingTargetIntoView(targetId, section === 'confirm' ? 'nearest' : 'center');
+  }
+
+  function _selectStudentService(serviceType, btn = null, options = {}) {
+    const normalizedType = _normalizeStudentServiceType(serviceType);
+    const isPsi = normalizedType === 'Psicologo';
+    const category = _getStudentServiceCategory(normalizedType);
+    const summaryLabel = _getStudentServiceLabel(normalizedType);
+    const summaryIconClass = _getStudentServiceIconClass(normalizedType);
+    const serviceButtons = document.querySelectorAll('.service-btn');
+
+    const categoryInput = document.getElementById('medi-cita-categoria');
+    const typeInput = document.getElementById('medi-cita-tipo');
+    if (categoryInput) categoryInput.value = category;
+    if (typeInput) typeInput.value = normalizedType;
+    window._selectedServiceDuration = normalizedType;
+
+    serviceButtons.forEach((button) => {
+      const buttonType = _normalizeStudentServiceType(button.dataset.serviceType);
+      button.classList.remove('active', 'border-info', 'border-primary', 'bg-info-subtle', 'bg-primary-subtle');
+      button.classList.add('btn-outline-light');
+      button.style.borderColor = 'rgba(255,255,255,0.1)';
+      if (buttonType === normalizedType) {
+        button.classList.remove('btn-outline-light');
+        button.classList.add('active', isPsi ? 'bg-primary-subtle' : 'bg-info-subtle', isPsi ? 'border-primary' : 'border-info');
+        button.style.borderColor = '';
+      }
+    });
+
+    document.getElementById('medi-date-container')?.classList.remove('d-none');
+    const summaryService = document.getElementById('summary-service');
+    if (summaryService) summaryService.textContent = summaryLabel;
+    const summaryIcon = document.getElementById('summary-service-icon');
+    if (summaryIcon) summaryIcon.className = summaryIconClass;
+
+    if (_currentBookingLock) {
+      _refreshStudentBookingLock();
+      return;
+    }
+
+    if (!options.skipRefresh) {
+      _refreshSlotsOnTypeChange();
+    }
+    if (!options.skipFocus) {
+      setTimeout(() => _focusBookingSection('date'), 120);
+    }
+  }
+
+  function _updateBookingStatusPreview(status = 'neutral', queuePosition = 0) {
+    const statusEl = document.getElementById('summary-status-text');
+    if (!statusEl) return;
+
+    statusEl.classList.remove('text-muted', 'text-warning', 'text-success');
+
+    if (status === 'confirmada') {
+      statusEl.classList.add('text-success');
+      statusEl.textContent = 'Se confirmará al instante';
+      return;
+    }
+
+    if (status === 'pendiente') {
+      statusEl.classList.add('text-warning');
+      statusEl.textContent = queuePosition > 0
+        ? `Sala de espera (${queuePosition} antes)`
+        : 'Pendiente de confirmación';
+      return;
+    }
+
+    statusEl.classList.add('text-muted');
+    statusEl.textContent = 'Se definirá al confirmar';
+  }
+
+  function _redirectToAppointmentsTab(status = 'pendiente') {
+    _switchMediTab('medi-tab-citas');
+    setTimeout(() => {
+      const tabId = status === 'confirmada' ? 'tab-confirmadas' : 'tab-pendientes';
+      document.getElementById(tabId)?.click();
+    }, 180);
   }
 
   // Helper function for setupAppointmentForm
@@ -1730,12 +2722,96 @@ var Medi = (function () {
     const msg = document.getElementById('medi-time-msg');
     const availDiv = document.getElementById('medi-cita-disponibilidad');
     const timeInput = document.getElementById('medi-cita-hora');
+    const motivoInput = document.getElementById('medi-cita-motivo');
 
     // Reset visual
     if (timeGrid) { timeGrid.innerHTML = ''; timeGrid.classList.add('d-none'); }
     if (msg) { msg.classList.remove('d-none'); msg.innerHTML = '<i class="bi bi-calendar-check fs-4 d-block mb-2"></i> Selecciona un día primero'; }
     if (availDiv) availDiv.textContent = '';
     dateInput.value = ""; timeInput.value = "";
+    _updateBookingStatusPreview();
+    _refreshStudentBookingLock(true);
+
+    function resetBookingFlow() {
+      form.reset();
+      dateInput.value = '';
+      timeInput.value = '';
+      if (availDiv) availDiv.textContent = '';
+      if (msg) {
+        msg.classList.remove('d-none');
+        msg.innerHTML = '<i class="bi bi-calendar-check fs-4 d-block mb-2"></i> Selecciona un día primero';
+      }
+      if (timeGrid) {
+        timeGrid.innerHTML = '';
+        timeGrid.className = 'd-none gap-2 flex-wrap mt-2';
+      }
+      document.getElementById('medi-date-container')?.classList.add('d-none');
+      document.getElementById('medi-booking-summary')?.classList.add('d-none');
+      document.getElementById('summary-datetime').textContent = '--';
+      document.getElementById('summary-service').textContent = '--';
+      document.getElementById('summary-service-icon').className = 'bi bi-bandaid-fill text-primary';
+      document.getElementById('medi-cita-categoria').value = '';
+      document.getElementById('medi-cita-tipo').value = 'Médico';
+      document.querySelectorAll('.service-btn').forEach(b => {
+        b.classList.remove('active', 'border-info', 'border-primary', 'bg-info-subtle', 'bg-primary-subtle');
+        b.classList.add('btn-outline-light');
+        b.style.borderColor = 'rgba(255,255,255,0.1)';
+      });
+      dateSelector?.querySelectorAll('.date-option').forEach(c => {
+        c.classList.remove('bg-primary', 'text-white', 'shadow', 'border-primary', 'scale-105');
+        c.classList.add('bg-white', 'text-dark');
+        c.querySelector('.date-label')?.classList.remove('text-white-50');
+        c.querySelector('.date-label')?.classList.add('text-muted');
+        c.querySelector('.date-month')?.classList.remove('text-white');
+        c.querySelector('.date-month')?.classList.add('text-primary');
+      });
+      if (motivoInput) motivoInput.value = '';
+      const btnConf = document.getElementById('btn-medi-confirm');
+      if (btnConf) btnConf.disabled = true;
+      _updateBookingStatusPreview();
+    }
+
+    // [NEW] Bind category change to hidden type input
+    const catSelect = document.getElementById('medi-cita-categoria');
+    const typeInput = document.getElementById('medi-cita-tipo');
+    if (catSelect && typeInput) {
+      catSelect.addEventListener('change', (e) => {
+        const prevDate = dateInput.value;
+        const val = e.target.value;
+        typeInput.value = (val === 'Salud Mental') ? 'Psicologo' : 'Médico';
+
+        typeInput.value = _normalizeStudentServiceType(typeInput.value);
+
+        // Reset child selections
+        dateInput.value = "";
+        timeInput.value = "";
+        _updateBookingStatusPreview();
+        dateSelector.querySelectorAll('.date-option').forEach(c => {
+          c.classList.remove('bg-primary', 'text-white', 'shadow', 'border-primary', 'scale-105');
+          c.classList.add('bg-white', 'text-dark');
+          c.querySelector('.date-label').classList.remove('text-white-50');
+          c.querySelector('.date-label').classList.add('text-muted');
+          c.querySelector('.date-month').classList.remove('text-white');
+          c.querySelector('.date-month').classList.add('text-primary');
+        });
+        if (timeGrid) { timeGrid.innerHTML = ''; timeGrid.classList.add('d-none'); }
+        document.getElementById('medi-booking-summary')?.classList.add('d-none');
+        const btnConf = document.getElementById('btn-medi-confirm');
+        if (btnConf) btnConf.disabled = true;
+
+        // Si ya había una fecha seleccionada, recargar horarios automáticamente
+        if (prevDate) {
+          const selectedCard = dateSelector.querySelector(`.date-option[data-date="${prevDate}"]`);
+          if (selectedCard) {
+            selectedCard.click();
+          } else {
+            if (msg) { msg.classList.remove('d-none'); msg.innerHTML = '<i class="bi bi-calendar-check fs-4 d-block mb-2"></i> Selecciona un día primero'; }
+          }
+        } else {
+          if (msg) { msg.classList.remove('d-none'); msg.innerHTML = '<i class="bi bi-calendar-check fs-4 d-block mb-2"></i> Selecciona un día primero'; }
+        }
+      });
+    }
 
     // Generar 10 días hábiles (INCLUYENDO HOY)
     const days = [];
@@ -1783,82 +2859,104 @@ var Medi = (function () {
 
           dateInput.value = card.dataset.date;
           timeInput.value = "";
+          _updateBookingStatusPreview();
 
           // [NEW] Reset Confirmation State
           document.getElementById('medi-booking-summary').classList.add('d-none');
           document.getElementById('btn-medi-confirm').disabled = true;
+
+          if (_currentBookingLock) {
+            await _refreshStudentBookingLock();
+            return;
+          }
 
           msg.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Buscando disponibilidad...';
           timeGrid.classList.add('d-none');
           msg.classList.remove('d-none');
 
           // [NEW] Check Availability Config
+          const targetDate = new Date(card.dataset.date + 'T12:00:00');
           const selectedType = document.getElementById('medi-cita-tipo').value || 'Médico';
           const cfg = _ctx.config?.medi || {};
+          const normalizedSelectedType = _normalizeStudentServiceType(document.getElementById('medi-cita-tipo').value || selectedType || 'Medico');
 
-          let isServiceAvailable = true;
-          if (selectedType === 'Médico' && cfg.availableMédico === false) isServiceAvailable = false;
-          if (selectedType === 'Psicologo' && cfg.availablePsicologo === false) isServiceAvailable = false;
+          const isServiceAvailable = _isServiceEnabledForBookingDate(cfg, normalizedSelectedType, targetDate);
 
           if (!isServiceAvailable) {
             msg.innerHTML = `<i class="bi bi-cone-striped me-2"></i> La agenda de <b>${selectedType === 'Médico' ? 'Medicina' : 'Psicología'}</b> no está disponible por el momento.`;
+            msg.innerHTML = `<i class="bi bi-cone-striped me-2"></i> La agenda de <b>${normalizedSelectedType === 'Psicologo' ? 'Psicología' : 'Medicina'}</b> no está disponible por el momento.`;
             msg.classList.remove('d-none');
             return;
           }
 
           // Fetch Occupied Slots
-          const targetDate = new Date(card.dataset.date + 'T12:00:00');
-          const slots = buildSlotsForDate(targetDate);
+          const currentType = document.getElementById('medi-cita-tipo').value || 'Médico';
+          const cfgMed = _ctx.config?.medi || {};
+          const slots = _getStudentBookableSlotsForDate(targetDate, currentType, cfgMed);
           let occupied = [];
 
           try {
-            const currentType = document.getElementById('medi-cita-tipo').value || 'Médico';
-            occupied = await MediService.getOccupiedSlots(_ctx, currentType, card.dataset.date);
+            occupied = await MediService.getOccupiedSlots(_ctx, card.dataset.date, currentType);
           } catch (e) { console.error("Error fetching occupied:", e); }
 
           // Render Time Grid
           timeGrid.classList.remove('d-none');
-          timeGrid.className = 'd-flex overflow-auto gap-2 py-2 px-1 mb-3 no-scrollbar';
+          timeGrid.className = 'd-flex flex-wrap gap-2 py-2 px-1 mb-3';
           timeGrid.innerHTML = '';
 
           // [NEW] Slot counts for queue badges
           const slotCounts = occupied._slotCounts || {};
-
           const validSlots = slots.map(slot => {
             const tStr = `${slot.getHours().toString().padStart(2, '0')}:${slot.getMinutes().toString().padStart(2, '0')}`;
-            const currentType = document.getElementById('medi-cita-tipo').value || 'Médico';
             const baseId = MediService.slotIdFromDate(slot);
             const slotId = `${baseId}_${currentType}`;
             const isTaken = occupied.includes(slotId);
             const count = slotCounts[slotId] || 0;
 
-            return { tStr, isTaken, count };
+            return { tStr, isTaken, count, slotId };
           });
 
+          // Determinar el slot con menor ocupación para badge "Mejor opción"
+          const availableSlots = validSlots.filter(s => !s.isTaken);
+          let bestSlotTime = null;
+          if (availableSlots.length > 0) {
+            bestSlotTime = availableSlots.reduce((a, b) => a.count <= b.count ? a : b).tStr;
+          }
+
           if (validSlots.length === 0) {
-            timeGrid.innerHTML = '<div class="text-muted small w-100 text-center fst-italic">No hay horarios.</div>';
+            timeGrid.innerHTML = '<div class="text-muted small w-100 text-center fst-italic">No hay horarios habilitados para ese día.</div>';
           } else {
-            validSlots.forEach(({ tStr, isTaken, count }) => {
+            validSlots.forEach(({ tStr, isTaken, count, slotId }) => {
               const btn = document.createElement('div');
               const isDisabled = isTaken;
+              const MAX_PER_SLOT = 4;
+              const isBest = !isDisabled && tStr === bestSlotTime && count === 0;
 
-              // Queue badge logic: 0 = green "Libre", 1-3 = yellow "Cola (N)", 4+ = red "Lleno"
-              let statusLabel, statusClass;
+              // Queue badge logic
+              let statusLabel, statusClass, barColor;
               if (isDisabled) {
-                statusLabel = 'Lleno'; statusClass = 'text-danger';
+                statusLabel = 'Lleno'; statusClass = 'text-danger'; barColor = '#dc3545';
               } else if (count > 0) {
-                statusLabel = `Cola (${count})`; statusClass = 'text-warning';
+                const waitMins = count * 15;
+                statusLabel = `Cola ${count} (~${waitMins}min)`; statusClass = 'text-warning'; barColor = '#f59e0b';
               } else {
-                statusLabel = 'Libre'; statusClass = 'text-success';
+                statusLabel = 'Libre'; statusClass = 'text-success'; barColor = '#198754';
               }
+              const fillPct = Math.round((Math.min(count, MAX_PER_SLOT) / MAX_PER_SLOT) * 100);
 
-              btn.className = `flex-shrink-0 text-center border rounded-3 shadow-sm p-3 time-slot-card ${isDisabled ? 'bg-light text-muted opacity-50 pe-none' : 'bg-white cursor-pointer hover-lift'}`;
-              btn.style.width = '85px';
+              btn.className = `flex-shrink-0 text-center border rounded-3 shadow-sm p-2 time-slot-card position-relative ${isDisabled ? 'text-muted opacity-50 pe-none' : 'bg-white cursor-pointer hover-lift'}`;
+              btn.style.width = '90px';
+              btn.dataset.time = tStr;
+              btn.dataset.date = dateInput.value;
+              btn.dataset.slotId = slotId;
 
               btn.innerHTML = `
-                     <div class="fw-bold fs-5 lh-1 mb-1 ${isDisabled ? 'text-decoration-line-through' : 'text-dark'}">${tStr}</div>
-                     <div class="extra-small text-uppercase fw-bold ${statusClass}">${statusLabel}</div>
-                 `;
+                ${isBest ? '<span class="position-absolute top-0 start-50 translate-middle badge bg-success rounded-pill" style="font-size:.55rem;padding:2px 5px;">★ Mejor</span>' : ''}
+                <div class="fw-bold fs-6 lh-1 mb-1 ${isDisabled ? 'text-decoration-line-through' : 'text-dark'}" style="margin-top:${isBest ? '8px' : '0'}">${tStr}</div>
+                <div class="extra-small text-uppercase fw-bold ${statusClass}" style="font-size:.6rem;">${statusLabel}</div>
+                <div class="medi-slot-bar mt-1">
+                  <div class="medi-slot-bar-fill" style="width:${fillPct}%;background:${barColor};"></div>
+                </div>`;
 
               if (!isDisabled) {
                 btn.onclick = () => {
@@ -1870,6 +2968,7 @@ var Medi = (function () {
                   btn.classList.add('border-primary', 'bg-primary-subtle');
 
                   timeInput.value = tStr;
+                  _updateBookingStatusPreview(count === 0 ? 'confirmada' : 'pendiente', count);
 
                   // [NEW] Update Summary & Resume
                   const dParts = dateInput.value.split('-');
@@ -1888,15 +2987,19 @@ var Medi = (function () {
                   const btnConf = document.getElementById('btn-medi-confirm');
                   if (btnConf) {
                     btnConf.disabled = false;
-                    // Scroll to bottom subtly
-                    sumDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                   }
+
+                  setTimeout(() => {
+                    const nextSection = (motivoInput?.value || '').trim() ? 'summary' : 'motivo';
+                    _focusBookingSection(nextSection);
+                  }, 120);
                 };
               }
               timeGrid.appendChild(btn);
             });
           }
           msg.classList.add('d-none');
+          setTimeout(() => _focusBookingSection('time'), 120);
         });
       });
     } if (window.Medi && typeof window.Medi.renderFollowUpBanner === 'function') window.Medi.renderFollowUpBanner(_ctx.user.uid);
@@ -1912,7 +3015,6 @@ var Medi = (function () {
           showToast('Selecciona fecha y hora', 'warning'); return;
         }
 
-        form.dataset.submitting = 'true';
         submitBtn.disabled = true;
         submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Verificando...';
 
@@ -1920,45 +3022,24 @@ var Medi = (function () {
           const [y, m, d] = dateInput.value.split('-').map(Number);
           const [hh, mm] = timeInput.value.split(':').map(Number);
           const localDate = new Date(y, m - 1, d, hh, mm);
-          // [FIX] Generate Type-Specific ID for Booking
-          const selectedType = document.getElementById('medi-cita-tipo').value || 'Médico'; // Should match value set by buttons
+          const selectedType = document.getElementById('medi-cita-tipo').value || 'Médico';
           const baseSlotId = MediService.slotIdFromDate(localDate);
           const newSlotId = `${baseSlotId}_${selectedType}`;
 
-          // [NEW] STRICT CHECK: One active appointment
-          const activeAppt = await MediService.checkActiveAppointment(_ctx, _ctx.user.uid);
-          let replaceId = null;
+          const activeAppt = _currentBookingLock || await MediService.checkActiveAppointment(_ctx, _ctx.user.uid);
+
+          submitBtn.disabled = false;
+          submitBtn.innerHTML = '<i class="bi bi-check-lg me-2"></i>Confirmar';
 
           if (activeAppt) {
-            const activeDate = activeAppt.safeDate;
-            if (activeDate.getTime() <= localDate.getTime()) {
-              throw new Error(`Ya tienes una cita programada para el ${activeDate.toLocaleString()}. Debes asistir o cancelarla antes.`);
-            } else {
-              // [NEW] Visual Modal for Replace
-              const modal = new bootstrap.Modal(document.getElementById('modalConfirmReplace'));
-              document.getElementById('replace-old-date').textContent = activeDate.toLocaleString();
-              document.getElementById('replace-new-date').textContent = localDate.toLocaleString();
-
-              const confirmBtn = document.getElementById('btn-do-replace');
-              submitBtn.disabled = false;
-              submitBtn.textContent = 'Confirmar'; // Reset
-              form.dataset.submitting = 'false';
-
-              modal.show();
-
-              confirmBtn.onclick = async () => {
-                modal.hide();
-                // Re-lock
-                form.dataset.submitting = 'true';
-                submitBtn.disabled = true;
-                await executeBooking(localDate, newSlotId, activeAppt.id);
-              };
-              return;
-            }
+            _currentBookingLock = activeAppt;
+            await _refreshStudentBookingLock();
+            const activeDate = activeAppt.safeDate instanceof Date ? activeAppt.safeDate.toLocaleString() : 'tu cita activa';
+            throw new Error(`Ya tienes una cita activa (${activeDate}). Debes atenderla, cancelarla o reprogramarla antes de agendar otra.`);
           }
 
-          // Normal Flow
-          await executeBooking(localDate, newSlotId, null);
+          // Mostrar modal de revisión ANTES de guardar
+          _showPreConfirmModal(localDate, newSlotId, null, form, submitBtn);
 
         } catch (err) {
           showToast(err.message, 'danger');
@@ -1971,6 +3052,98 @@ var Medi = (function () {
     }
 
     // Independent Executor
+    /** Muestra modal de revisión PRE-guardado. Al confirmar llama executeBooking. */
+    function _showPreConfirmModal(localDate, newSlotId, replaceId, form, submitBtn) {
+      const categoria = form.querySelector('#medi-cita-categoria').value || 'Médico';
+      const tipo = categoria === 'Salud Mental' ? 'Psicología' : 'Médico General';
+      const isPsi = tipo === 'Psicología';
+      const motivo = form.querySelector('#medi-cita-motivo').value || '';
+      const dateText = localDate.toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' });
+      const timeText = localDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      const dateCap = dateText.charAt(0).toUpperCase() + dateText.slice(1);
+
+      document.getElementById('modalPreConfirm')?.remove();
+      const d = document.createElement('div');
+      d.innerHTML = `
+        <div class="modal fade" id="modalPreConfirm" tabindex="-1">
+          <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
+              <div class="px-4 pt-4 pb-3 text-white" style="background:linear-gradient(135deg,#1B396A 0%,#0d6efd 100%);">
+                <h5 class="fw-bold mb-1 filter-white"><i class="bi bi-clipboard2-check me-2"></i>Revisar y confirmar</h5>
+                <div class="small opacity-75">Verifica los datos antes de agendar</div>
+              </div>
+              <div class="modal-body p-4">
+                <div class="d-flex gap-3 mb-3">
+                  <div class="rounded-3 p-2 flex-shrink-0 text-center" style="background:#eff6ff;min-width:48px;">
+                    <i class="bi bi-${isPsi ? 'chat-heart-fill' : 'bandaid-fill'}" style="font-size:1.4rem;color:${isPsi ? '#6f42c1' : '#0d6efd'};"></i>
+                  </div>
+                  <div>
+                    <div class="extra-small text-muted">Servicio</div>
+                    <div class="fw-bold">${escapeHtml(tipo)}</div>
+                  </div>
+                </div>
+                <div class="d-flex gap-3 mb-3">
+                  <div class="rounded-3 p-2 flex-shrink-0 text-center" style="background:#eff6ff;min-width:48px;">
+                    <i class="bi bi-calendar-event-fill" style="font-size:1.4rem;color:#0d6efd;"></i>
+                  </div>
+                  <div>
+                    <div class="extra-small text-muted">Fecha y hora</div>
+                    <div class="fw-bold">${escapeHtml(dateCap)}</div>
+                    <div class="small text-muted">${escapeHtml(timeText)} hrs</div>
+                  </div>
+                </div>
+                ${motivo ? `<div class="d-flex gap-3 mb-3">
+                  <div class="rounded-3 p-2 flex-shrink-0 text-center" style="background:#eff6ff;min-width:48px;">
+                    <i class="bi bi-chat-left-text-fill" style="font-size:1.1rem;color:#0d6efd;"></i>
+                  </div>
+                  <div>
+                    <div class="extra-small text-muted">Motivo</div>
+                    <div class="small text-dark">${escapeHtml(motivo)}</div>
+                  </div>
+                </div>` : ''}
+                <div class="rounded-3 p-3 mb-3" style="background:#fffbeb;border-left:4px solid #f59e0b;">
+                  <div class="fw-bold small mb-1" style="color:#92400e;"><i class="bi bi-lightbulb-fill me-1"></i>Indicaciones</div>
+                  <ul class="mb-0 small ps-3" style="color:#78350f;">
+                    <li>Llega <b>10 minutos antes</b> de tu cita.</li>
+                    <li>Trae tu <b>credencial de estudiante</b>.</li>
+                    <li>Si no puedes asistir, <b>cancela con anticipación</b>.</li>
+                  </ul>
+                </div>
+                <div class="rounded-3 p-2 mb-4" style="background:#f8f9fa;font-size:0.7rem;color:#6c757d;">
+                  <i class="bi bi-shield-check me-1"></i>Tu información es confidencial bajo la normativa del TEC.
+                </div>
+                <div class="d-flex gap-2">
+                  <button class="btn btn-light rounded-pill flex-fill fw-bold" data-bs-dismiss="modal">Regresar</button>
+                  <button class="btn btn-primary rounded-pill flex-fill fw-bold" id="btn-pre-confirm-ok">
+                    <i class="bi bi-check-lg me-1"></i>${replaceId ? 'Reprogramar' : 'Agendar cita'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>`;
+      document.body.appendChild(d.firstElementChild);
+      const modalEl = document.getElementById('modalPreConfirm');
+      const m = new bootstrap.Modal(modalEl, { backdrop: 'static' });
+      m.show();
+
+      let _confirmed = false;
+      document.getElementById('btn-pre-confirm-ok').onclick = () => {
+        _confirmed = true;
+        m.hide();
+      };
+      modalEl.addEventListener('hidden.bs.modal', () => {
+        modalEl.remove();
+        if (_confirmed) {
+          executeBooking(localDate, newSlotId, replaceId);
+        } else {
+          // Usuario canceló: restaurar botón
+          if (form) form.dataset.submitting = 'false';
+          if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = '<i class="bi bi-check-lg me-2"></i>Confirmar'; }
+        }
+      }, { once: true });
+    }
+
     async function executeBooking(localDate, newSlotId, replaceId) {
       const form = document.getElementById('form-medi-nueva-cita'); // re-grab
       const submitBtn = form.querySelector('button[type="submit"]');
@@ -2000,7 +3173,7 @@ var Medi = (function () {
         const profName = profData.displayName;
         const profProfileId = profData.profileId;
 
-        await MediService.reservarCita(_ctx, {
+        const bookingResult = await MediService.reservarCita(_ctx, {
           user: _ctx.user,
           date: localDate,
           slotId: newSlotId,
@@ -2012,11 +3185,45 @@ var Medi = (function () {
           profesionalName: profName,
           profesionalProfileId: profProfileId
         });
+        const tipoLabel = (form.querySelector('#medi-cita-categoria').value === 'Salud Mental') ? 'Psicología' : 'Médico General';
+        const dateText = localDate.toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' });
+        const timeText = localDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const dateCap = dateText.charAt(0).toUpperCase() + dateText.slice(1);
+        const finalStatus = bookingResult?.isQueued ? 'pendiente' : 'confirmada';
+        const calendarCita = finalStatus === 'confirmada'
+          ? _buildCalendarAppointmentPayload({
+            id: bookingResult?.citaId || replaceId || `medi_${localDate.getTime()}`,
+            safeDate: localDate,
+            tipoServicio: tipo,
+            profesionalName: profName,
+            motivo: `[${form.querySelector('#medi-cita-categoria').value}] ${form.querySelector('#medi-cita-motivo').value}`
+          })
+          : null;
 
-        showToast(replaceId ? '\u00a1Cita actualizada correctamente!' : '\u00a1Cita agendada correctamente!', 'success');
+        resetBookingFlow();
+        _showBookingConfirmModal({
+          tipo: tipoLabel,
+          dateText: dateCap,
+          timeText,
+          replaceId,
+          finalStatus,
+          queuePosition: bookingResult?.queuePosition || 0,
+          calendarCita
+        });
 
-        // Show success state
+        // 🔔 Notificación in-app de cita agendada
+        if (window.Notify && _ctx.user?.uid) {
+          const statusTxt = finalStatus === 'confirmada' ? 'Confirmada ✅' : 'En lista de espera ⏳';
+          Notify.send(_ctx.user.uid, {
+            tipo: 'medi',
+            titulo: `Cita ${replaceId ? 'Reprogramada' : 'Agendada'} — ${tipoLabel}`,
+            mensaje: `${dateCap} a las ${timeText}. Estado: ${statusTxt}`,
+            link: '/medi'
+          });
+        }
+        return;
 
+        // Show success state (no toast here — modal will appear instead)
         const successEl = document.getElementById('medi-booking-success');
         const detailsEl = document.getElementById('medi-success-details');
         if (successEl && detailsEl) {
@@ -2026,7 +3233,7 @@ var Medi = (function () {
           const dateCap = dateText.charAt(0).toUpperCase() + dateText.slice(1);
 
           detailsEl.innerHTML = `
-              <div class="bg-light rounded-4 p-3 d-inline-block text-start">
+              <div class=" rounded-4 p-3 d-inline-block text-start">
                 <div class="d-flex align-items-center gap-2 mb-2">
                   <i class="bi bi-calendar-check text-primary"></i>
                   <span class="fw-bold text-dark small">${dateCap}</span>
@@ -2049,19 +3256,29 @@ var Medi = (function () {
               <div class="mt-2 small text-muted">Estado: <span class="fw-bold text-warning">Pendiente de confirmaci\u00f3n</span></div>`;
 
           form.classList.add('d-none');
-          successEl.classList.remove('d-none'); // Ensure visible
+          successEl.classList.remove('d-none');
+          setTimeout(() => { successEl.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 100);
 
-          // [FIX] Scroll to success message to ensure context
-          setTimeout(() => {
-            successEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          }, 100);
+          // Mostrar modal de confirmación con indicaciones
+          _showBookingConfirmModal({
+            tipo: tipo,
+            dateText: dateCap,
+            timeText,
+            profName,
+            profId,
+            profProfileId,
+            replaceId
+          });
 
-          // [NEW] Auto-navigate to "Mis Citas" tab after 2.5s
+          // Auto-navigate a "Mis Citas" tras 4s (el listener real-time decide Pendientes vs Confirmadas)
           setTimeout(() => {
             _switchMediTab('medi-tab-citas');
+            // Ir a Pendientes inicialmente; el listener cambiará a Confirmadas si auto-confirma
+            const tabPend = document.getElementById('tab-pendientes');
+            if (tabPend) tabPend.click();
             form.classList.remove('d-none');
             successEl.classList.add('d-none');
-          }, 2500);
+          }, 4000);
 
           // [FIX] Immediate Refresh of Dashboard (Banner + Agenda)
           // Listener should handle this automatically. Manual restart caused race conditions.
@@ -2074,6 +3291,7 @@ var Medi = (function () {
       } catch (err) {
         showToast(err.message, 'danger');
       } finally {
+        form.dataset.submitting = 'false';
         submitBtn.disabled = false;
         submitBtn.innerHTML = '<i class="bi bi-check-lg me-2"></i>Confirmar';
       }
@@ -2107,1258 +3325,71 @@ var Medi = (function () {
   }
 
   // E2: Load queue position for a pending appointment (async, updates DOM)
-  async function _loadQueuePosition(citaId, tipoServicio, citaDate, targetElId) {
-    try {
-      const el = document.getElementById(targetElId || ('queue-pos-' + citaId));
-      if (!el) return;
+  function _loadQueuePosition(...args) { return _studentExperience._loadQueuePosition?.(...args); }
+  function loadStudentHistory(...args) { return _studentExperience.loadStudentHistory?.(...args); }
+  function renderFollowUpBanner(...args) { return _studentExperience._renderFollowUpBanner?.(...args); }
+  function _updateHeroGreeting(...args) { return _studentExperience._updateHeroGreeting?.(...args); }
+  function _renderHeroNextAppointment(...args) { return _studentExperience._renderHeroNextAppointment?.(...args); }
+  function _renderQueueCard(...args) { return _studentExperience._renderQueueCard?.(...args); }
+  function _renderQuickActions(...args) { return _studentExperience._renderQuickActions?.(...args); }
+  function _switchMediTab(...args) { return _studentExperience._switchMediTab?.(...args); }
+  function _updateChatBadgeOnTab(...args) { return _studentExperience._updateChatBadgeOnTab?.(...args); }
+  function _relativeTime(...args) { return _studentExperience._relativeTime?.(...args); }
+  function initMediTutorial(...args) { return _studentExperience.initMediTutorial?.(...args); }
+  function launchMediTutorial(...args) { return _studentExperience.launchMediTutorial?.(...args); }
+  function loadWellnessFeed(...args) { return _studentExperience.loadWellnessFeed?.(...args); }
+  function _openWellnessTipsModal(...args) { return _studentExperience._openWellnessTipsModal?.(...args); }
+  function _filterTipsModal(...args) { return _studentExperience._filterTipsModal?.(...args); }
+  function _toggleCheckinHistory(...args) { return _studentExperience._toggleCheckinHistory?.(...args); }
+  function _renderDailyCheckin(...args) { return _studentExperience._renderDailyCheckin?.(...args); }
+  function _submitCheckin(...args) { return _studentExperience._submitCheckin?.(...args); }
+  function _showHealthProfileModal(...args) { return _studentExperience._showHealthProfileModal?.(...args); }
+  function _refreshSlotsOnTypeChange(...args) { return _studentExperience._refreshSlotsOnTypeChange?.(...args); }
+  function _showBookingConfirmModalLegacy(...args) { return _studentExperience._showBookingConfirmModalLegacy?.(...args); }
+  function _showBookingConfirmModal(...args) { return _studentExperience._showBookingConfirmModal?.(...args); }
+  function _renderSOSButton(...args) { return _studentExperience._renderSOSButton?.(...args); }
+  function _showSOSModal(...args) { return _studentExperience._showSOSModal?.(...args); }
+  function _dismissFollowUp(...args) { return _studentExperience._dismissFollowUp?.(...args); }
+  function _setSurveyRating(...args) { return _studentExperience._setSurveyRating?.(...args); }
+  function _enableStudentFloatingStack(...args) { return _studentExperience._enableStudentFloatingStack?.(...args); }
+  function _disableStudentFloatingStack(...args) { return _studentExperience._disableStudentFloatingStack?.(...args); }
+  function _renderServiceAvailability(...args) { return _studentExperience._renderServiceAvailability?.(...args); }
+  function _renderFollowUpBannerComplete(...args) { return _studentExperience._renderFollowUpBannerComplete?.(...args); }
+  function _initPostConsultSurvey(...args) { return _studentExperience._initPostConsultSurvey?.(...args); }
+  function _skipSurvey(...args) { return _studentExperience._skipSurvey?.(...args); }
+  function _submitSurvey(...args) { return _studentExperience._submitSurvey?.(...args); }
+  function _addToCalendar(...args) { return _studentExperience._addToCalendar?.(...args); }
+  function _filterHistory(...args) { return _studentExperience._filterHistory?.(...args); }
+  function showFullHistory(...args) { return _studentExperience.showFullHistory?.(...args); }
 
-      // Count pending citas of same type with earlier fechaSolicitud
-      const snap = await _ctx.db.collection(C_CITAS)
-        .where('estado', '==', 'pendiente')
-        .where('tipoServicio', '==', tipoServicio)
-        .orderBy('fechaSolicitud', 'asc')
-        .get();
-
-      let pos = 1;
-      for (const doc of snap.docs) {
-        if (doc.id === citaId) break;
-        pos++;
-      }
-      const total = snap.size;
-      const estWait = pos * 15; // ~15 min avg per patient
-
-      el.innerHTML = `
-        <div class="d-flex align-items-center gap-2">
-          <span class="badge bg-primary-subtle text-primary"><i class="bi bi-people-fill me-1"></i>Posicion: #${pos}/${total}</span>
-          <span class="badge bg-light text-muted border"><i class="bi bi-clock me-1"></i>~${estWait} min</span>
-        </div>`;
-    } catch (e) {
-      // Silently fail - index might not exist
-      console.warn('Queue position unavailable:', e.message);
-    }
-  }
-
-  function loadStudentHistory(uid) {
-    let _lastStates = {}; // [E4] State tracking
-
-    // New Containers for Tabbed Carousel
-    const cPend = document.getElementById('carousel-pendientes');
-    const cConf = document.getElementById('carousel-confirmadas');
-    const cCanc = document.getElementById('carousel-canceladas');
-
-    // Legacy/Existing container for Medical Record
-    const expList = document.getElementById('medi-stu-consultas');
-
-    // If critical containers missing, abort (UI not ready)
-    if (!cPend || !cConf || !cCanc || !expList) return;
-
-    // [FIX] Listener Management
-    if (_unsubs.studentHistory && typeof _unsubs.studentHistory === 'function') {
-      _unsubs.studentHistory();
-    }
-
-    _unsubs.studentHistory = MediService.streamStudentHistory(_ctx, uid, (items) => {
-      // 1. APPOINTMENTS (Citas)
-      if (items.type === 'citas') {
-        const allCitas = items.data || [];
-
-        // [E4] Real-time State Change Detection
-        const newlyConfirmed = new Set();
-
-        allCitas.forEach(c => {
-          const oldState = _lastStates[c.id];
-          if (oldState && oldState === 'pendiente') {
-            if (c.estado === 'confirmada') {
-              newlyConfirmed.add(c.id);
-              if (window.showToast) showToast(`¡Tu cita ha sido confirmada!`, 'success');
-            } else if (c.estado === 'rechazada') {
-              if (window.showToast) showToast(`Cita rechazada: ${c.motivoRechazo || ''}`, 'danger');
-            }
-          }
-          _lastStates[c.id] = c.estado;
-        });
-
-
-        // Update global counter (Active interactions)
-        const activas = allCitas.filter(c => ['pendiente', 'confirmada'].includes(c.estado));
-        const countEl = document.getElementById('cita-count');
-        if (countEl) countEl.textContent = activas.length;
-
-        // [NEW] Hero next appointment badge
-        const now2 = new Date();
-        const upcomingAll = activas
-          .filter(c => c.safeDate && c.safeDate > now2)
-          .sort((a, b) => a.safeDate - b.safeDate);
-        _renderHeroNextAppointment(upcomingAll.length > 0 ? upcomingAll[0] : null);
-
-        // [NEW] Queue card on Tab Inicio — show first pending
-        const firstPending = allCitas.find(c => c.estado === 'pendiente' && c.safeDate && c.safeDate > now2);
-        _renderQueueCard(firstPending || null);
-
-        // Categorize
-        const pending = allCitas.filter(c => c.estado === 'pendiente');
-        const confirmed = allCitas.filter(c => c.estado === 'confirmada');
-        const cancelled = allCitas.filter(c => ['cancelada', 'rechazada'].includes(c.estado));
-
-        // NEXT APPOINTMENT BANNER
-        const bannerEl = document.getElementById('medi-next-appointment');
-        if (bannerEl) {
-          const now = new Date();
-          const upcoming = activas
-            .filter(c => c.safeDate && c.safeDate > now)
-            .sort((a, b) => a.safeDate - b.safeDate);
-
-          if (upcoming.length > 0) {
-            const next = upcoming[0];
-            console.log("[Medi] Next Appointment Data:", next); // DEBUG
-            const dateText = next.safeDate.toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' });
-            const timeText = next.safeDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            const dateCap = dateText.charAt(0).toUpperCase() + dateText.slice(1);
-            const statusBadge = next.estado === 'confirmada'
-              ? '<span class="badge bg-success rounded-pill">Confirmada</span>'
-              : '<span class="badge bg-warning text-dark rounded-pill">Pendiente</span>';
-            const encoded = encodeURIComponent(JSON.stringify(next));
-
-            bannerEl.innerHTML = `
-              <div class="medi-next-appt p-3 d-flex flex-column flex-sm-row align-items-start align-items-sm-center gap-3">
-                <div class="flex-grow-1">
-                  <div class="d-flex align-items-center gap-2 mb-1">
-                    <i class="bi bi-bell-fill text-primary"></i>
-                    <span class="fw-bold small text-primary">Tu pr\u00f3xima cita</span>
-                    ${statusBadge}
-                  </div>
-                  <div class="fw-bold text-dark">${dateCap}</div>
-                  <div class="d-flex align-items-center gap-3 text-muted small">
-                    <span><i class="bi bi-clock me-1"></i>${timeText}</span>
-                    <span><i class="bi bi-${next.tipoServicio === 'Psicologo' ? 'chat-heart' : 'bandaid'} me-1"></i>${next.tipoServicio === 'Psicologo' ? 'Psicolog\u00eda' : 'M\u00e9dico General'}</span>
-                  </div>
-                </div>
-                <div class="d-flex gap-2 flex-shrink-0">
-                  ${next.profesionalId ? `
-                  <button class="btn btn-sm btn-outline-primary rounded-pill px-3" onclick="Medi.startChatWithProfessional('${next.profesionalId}', '${next.profesionalName || 'Doctor'}', '${next.profesionalProfileId || ''}')">
-                    <i class="bi bi-chat-dots me-1"></i>Contactar
-                  </button>` : ''}
-                  <button class="btn btn-sm btn-outline-secondary rounded-pill px-3" onclick="Medi.prepararEdicion('${encoded}')">
-                    <i class="bi bi-pencil me-1"></i>Cambiar
-                  </button>
-                  <button class="btn btn-sm btn-outline-danger rounded-pill px-3" onclick="Medi.solicitarCancelacion('${next.id}')">
-                    <i class="bi bi-x-lg me-1"></i>Cancelar
-                  </button>
-                </div>
-              </div>`;
-            bannerEl.classList.remove('d-none');
-          } else {
-            bannerEl.classList.add('d-none');
-            bannerEl.innerHTML = '';
-          }
-        }
-
-        // Helper Render Function
-        const renderCarousel = (container, list, type, highlights = new Set()) => {
-
-          if (list.length === 0) {
-            container.innerHTML = `
-            <div class="text-center w-100 py-4 text-muted small">
-              <i class="bi bi-inbox me-2"></i>No hay citas ${type}.
-            </div>`;
-            return;
-          }
-
-          // Limit to 5 for carousel view
-          const visible = list.slice(0, 5);
-          const hasMore = list.length > 5;
-
-          container.innerHTML = visible.map(c => {
-            const fecha = c.safeDate || new Date();
-            const dateStr = fecha.toLocaleDateString('es-MX', { day: 'numeric', month: 'short' });
-            const timeStr = fecha.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }).toLowerCase();
-            const encoded = encodeURIComponent(JSON.stringify(c));
-
-            // Card Design based on Type
-            if (type === 'pendientes') {
-              // E2: Queue position placeholder (async loaded)
-              const queueId = 'queue-pos-' + c.id;
-              _loadQueuePosition(c.id, c.tipoServicio, c.safeDate);
-
-              return `
-              <div class="card border-0 shadow-sm rounded-4 flex-shrink-0 bg-white medi-cita-card" style="width: 280px; scroll-snap-align: start;">
-                <div class="card-body p-3">
-                  <div class="d-flex justify-content-between align-items-start mb-2">
-                    <div class="bg-warning bg-opacity-10 text-warning px-2 py-1 rounded-3">
-                      <i class="bi bi-clock-history me-1"></i><span class="fw-bold small">Pendiente</span>
-                    </div>
-                    <div class="dropdown">
-                        <button class="btn btn-sm btn-light rounded-circle" data-bs-toggle="dropdown"><i class="bi bi-three-dots-vertical"></i></button>
-                        <ul class="dropdown-menu shadow-sm border-0">
-                             <li><a class="dropdown-item small" href="#" onclick="Medi.prepararEdicion('${encoded}')"><i class="bi bi-pencil me-2"></i>Re-agendar</a></li>
-                             <li><a class="dropdown-item small text-danger" href="#" onclick="Medi.solicitarCancelacion('${c.id}')"><i class="bi bi-x-circle me-2"></i>Cancelar Solicitud</a></li>
-                        </ul>
-                    </div>
-                  </div>
-                  <h5 class="fw-bold text-dark mb-0">${dateStr}</h5>
-                  <div class="fs-4 fw-bold text-dark mb-1">${timeStr}</div>
-                  <div class="small text-muted mb-1">${c.tipoServicio}</div>
-                  <div id="${queueId}" class="mb-2" style="font-size:.75rem;"></div>
-
-                  <div class="d-flex gap-2">
-                     <button class="btn btn-light btn-sm flex-fill rounded-pill fw-bold py-1 text-secondary" style="font-size: 0.8rem; background-color: #f8f9fa;" onclick="Medi.prepararEdicion('${encoded}')">
-                        <i class="bi bi-pencil me-1"></i>Editar
-                     </button>
-                     <button class="btn btn-light btn-sm flex-fill rounded-pill fw-bold py-1 text-danger" style="font-size: 0.8rem; background-color: #fff5f5;" onclick="Medi.solicitarCancelacion('${c.id}')">
-                        <i class="bi bi-x-lg me-1"></i>Cancelar
-                     </button>
-                  </div>
-                  ${c.profesionalId ? `
-                  <button class="btn btn-sm btn-outline-secondary w-100 rounded-pill mt-2 py-1" style="font-size:0.8rem;" onclick="Medi.startChatWithProfessional('${c.profesionalId}', '${c.profesionalName || 'Doctor'}', '${c.profesionalProfileId || ''}')">
-                    <i class="bi bi-chat-dots me-1"></i>Contactar
-                  </button>` : ''}
-                </div>
-              </div>`;
-            } else if (type === 'confirmadas') {
-              const docName = c.profesionalEmail ? c.profesionalEmail.split('@')[0] : 'Especialista';
-              const isNew = highlights.has(c.id);
-              const animClass = isNew ? 'medi-card-confirmada' : '';
-              return `
-              <div class="card border-0 shadow-sm rounded-4 flex-shrink-0 medi-cita-card ${animClass}" style="width: 280px; scroll-snap-align: start; background: rgba(255,255,255,0.7); backdrop-filter: blur(10px); border-left: 4px solid #198754;">
-                <div class="card-body p-3">
-                  <div class="d-flex justify-content-between align-items-start mb-2">
-                    <span class="badge bg-success shadow-sm">Confirmada</span>
-                     <button class="btn btn-sm btn-light text-danger rounded-circle shadow-sm" data-bs-toggle="tooltip" title="Cancelar Cita" onclick="Medi.solicitarCancelacion('${c.id}')">
-                        <i class="bi bi-x-lg"></i>
-                     </button>
-                  </div>
-                  <h5 class="fw-bold text-dark mb-0">${dateStr}</h5>
-                  <div class="display-6 fw-bold text-dark mb-2 lh-1">${timeStr}</div>
-                  
-                  <div class="d-flex align-items-center gap-2 mb-2">
-                    <div class="bg-white rounded-circle p-1 text-success shadow-sm"><i class="bi bi-person-fill"></i></div>
-                    <span class="small fw-bold text-success-emphasis text-truncate">Dr(a). ${docName}</span>
-                  </div>
-                  <div class="small text-muted fst-italic text-truncate mb-2">${c.motivo || 'Consulta General'}</div>
-                  
-                  <button class="btn btn-sm btn-light w-100 rounded-pill text-success fw-bold" onclick="Medi.startChatWithProfessional('${c.profesionalId}', '${docName}', '${c.profesionalProfileId || ''}')">
-                    <i class="bi bi-chat-dots-fill me-1"></i>Mensaje
-                  </button>
-                </div>
-              </div>`;
-            } else { // Canceladas
-              return `
-              <div class="card border-0 shadow-sm rounded-4 flex-shrink-0 medi-cita-card" style="width: 280px; scroll-snap-align: start; background-color: rgba(220, 53, 69, 0.08); border-left: 4px solid #dc3545;">
-                <div class="card-body p-3">
-                  <div class="d-flex justify-content-between mb-2">
-                     <span class="badge bg-danger bg-opacity-75">Cancelada</span>
-                     <small class="text-muted fw-bold">${dateStr}</small>
-                  </div>
-                  <div class="fw-bold text-muted mb-1 text-decoration-line-through fs-5">${timeStr}</div>
-                  <div class="small text-danger text-truncate fst-italic"><i class="bi bi-info-circle me-1"></i>${c.motivoCancelacion || 'Sin motivo'}</div>
-                </div>
-              </div>`;
-            }
-          }).join('');
-
-          // "View All" Card
-          if (hasMore) {
-            container.innerHTML += `
-               <div class="card border-0 shadow-none bg-transparent flex-shrink-0 d-flex align-items-center justify-content-center" style="width: 100px; scroll-snap-align: start;">
-                  <button class="btn btn-outline-primary rounded-circle p-3 shadow-sm hover-scale" onclick="alert('Historial completo disponible próximamente')">
-                    <i class="bi bi-arrow-right fs-4"></i>
-                  </button>
-                  <small class="text-muted mt-2 fw-bold">Ver más</small>
-               </div>
-             `;
-          }
-        };
-
-        renderCarousel(cPend, pending, 'pendientes');
-        renderCarousel(cConf, confirmed, 'confirmadas', newlyConfirmed);
-
-        renderCarousel(cCanc, cancelled, 'canceladas');
-      }
-
-      // 2. MEDICAL RECORDS (Expedientes) - Keep vertical list
-      if (items.type === 'expedientes') {
-        // [NEW] Store for full history modal
-        _lastConsultasFull = items.data || [];
-
-        // E3: Check for follow-up recommendations
-        _renderFollowUpBanner(items.data);
-
-        if (items.data.length === 0) {
-          expList.innerHTML = '<div class="text-center p-4 text-muted small"><i class="bi bi-folder2-open d-block fs-2 mb-2"></i>Tu expediente está vacío.</div>';
-        } else {
-          // [MOD] Show only last 3
-          const visible = items.data.slice(0, 3);
-          const hiddenCount = items.data.length - 3;
-
-          let html = visible.map(e => `
-              <div class="card mb-2 border-0 shadow-sm border-start border-3 border-info card-hover-effect">
-                 <div class="card-body p-3">
-                    <div class="d-flex justify-content-between align-items-start mb-1">
-                       <span class="fw-bold text-primary small">${e.safeDate ? e.safeDate.toLocaleDateString() : '-'}</span>
-                       <span class="badge bg-light text-dark border-0 shadow-none" style="font-size: 0.65rem;">${e.tipoServicio}</span>
-                    </div>
-                    <div class="small text-dark fw-bold text-truncate">${e.diagnostico || 'Consulta general'}</div>
-                    <div class="d-flex justify-content-between align-items-center mt-2 pt-2 border-top border-light">
-                       <div class="text-muted extra-small text-truncate" style="max-width: 70%;">${e.plan || 'Sin indicaciones...'}</div>
-                       <button class="btn btn-xs btn-outline-primary rounded-pill py-0 px-2 fw-bold" 
-                               style="font-size: 0.65rem;"
-                               onclick="Medi.showConsultationDetails('${encodeURIComponent(JSON.stringify(e))}')">
-                          Ver más <i class="bi bi-chevron-right ms-1"></i>
-                       </button>
-                    </div>
-                 </div>
-              </div>
-            `).join('');
-
-          if (hiddenCount > 0) {
-            html += `
-                <div class="text-center mt-2">
-                    <button class="btn btn-sm btn-link text-decoration-none fw-bold" onclick="Medi.showFullHistory()">
-                        Ver historial completo (${hiddenCount} más) <i class="bi bi-arrow-right"></i>
-                    </button>
-                </div>`;
-          }
-
-          expList.innerHTML = html;
-        } // else
-      } // if (expedientes)
-    }); // callback
-  } // function
-
-
-
-  // E3: Render follow-up banner for student
-  function _renderFollowUpBanner(expedientes) {
-    const banner = document.getElementById('medi-followup-banner');
-    if (!banner) return;
-
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    // Find most recent consultation with followUp.required
-    const withFollowUp = (expedientes || []).filter(e => e.followUp && e.followUp.required);
-    if (withFollowUp.length === 0) { banner.classList.add('d-none'); return; }
-
-    const latest = withFollowUp[0]; // Already sorted newest first
-    const fDate = latest.followUp.date ? new Date(latest.followUp.date) : null;
-    const isOverdue = fDate && fDate < today;
-    const dateStr = fDate ? fDate.toLocaleDateString('es-MX', { day: 'numeric', month: 'long' }) : 'pronto';
-
-    const bgClass = isOverdue ? 'bg-danger-subtle border-danger' : 'bg-warning-subtle border-warning';
-    const iconClass = isOverdue ? 'bi-exclamation-triangle-fill text-danger' : 'bi-calendar-check text-warning';
-    const label = isOverdue ? 'Seguimiento pendiente vencido' : 'Seguimiento recomendado';
-
-    banner.innerHTML = `
-      <div class="${bgClass} border rounded-4 p-3">
-        <div class="d-flex align-items-center gap-3">
-          <i class="bi ${iconClass} fs-4"></i>
-          <div class="flex-grow-1">
-            <div class="fw-bold small text-dark">${label}</div>
-            <div class="text-muted" style="font-size:.75rem;">
-              Tu profesional recomendo seguimiento para el <strong>${dateStr}</strong>.
-              ${latest.followUp.notes ? '<br>' + escapeHtml(latest.followUp.notes) : ''}
-            </div>
-          </div>
-          <div class="d-flex gap-2 flex-shrink-0">
-            <button class="btn btn-sm ${isOverdue ? 'btn-danger' : 'btn-warning'} rounded-pill px-3 fw-bold" onclick="Medi._switchMediTab('medi-tab-agendar')">
-              <i class="bi bi-calendar-plus me-1"></i>Agendar
-            </button>
-            <button class="btn btn-sm btn-outline-secondary rounded-pill px-2" title="Ocultar"
-                    onclick="document.getElementById('medi-followup-banner').classList.add('d-none');">
-              <i class="bi bi-x-lg"></i>
-            </button>
-          </div>
-        </div>
-      </div>`;
-    banner.classList.remove('d-none');
-  }
-
-  // ============================================================
-  // NEW FUNCTIONS — Hero, Quick Actions, Tab Switch, Queue, Tour
-  // ============================================================
-
-  /** Personaliza el hero banner con nombre del usuario */
-  function _updateHeroGreeting(user) {
-    const greetEl = document.getElementById('medi-hero-greeting');
-    const subEl = document.getElementById('medi-hero-subtitle');
-    if (!greetEl) return;
-
-    const hour = new Date().getHours();
-    let saludo = 'Buenos dias';
-    if (hour >= 12 && hour < 18) saludo = 'Buenas tardes';
-    else if (hour >= 18) saludo = 'Buenas noches';
-
-    const nombre = (user.displayName || '').split(' ')[0] || 'Estudiante';
-    greetEl.textContent = `${saludo}, ${nombre}`;
-
-    if (subEl) {
-      const frases = [
-        'Tu salud es lo mas importante.',
-        'Estamos aqui para cuidarte.',
-        'Agenda tu cita en segundos.'
-      ];
-      subEl.textContent = frases[Math.floor(Math.random() * frases.length)];
-    }
-  }
-
-  /** Badge en hero mostrando proxima cita */
-  function _renderHeroNextAppointment(cita) {
-    const badge = document.getElementById('medi-hero-next-badge');
-    if (!badge) return;
-
-    if (!cita || !cita.safeDate) {
-      badge.classList.add('d-none');
-      badge.innerHTML = '';
-      return;
-    }
-
-    const now = new Date();
-    const diff = Math.ceil((cita.safeDate - now) / (1000 * 60 * 60 * 24));
-    let label = '';
-    if (diff <= 0) label = 'Hoy';
-    else if (diff === 1) label = 'Manana';
-    else label = `En ${diff} dias`;
-
-    const timeStr = cita.safeDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    const icon = cita.tipoServicio === 'Psicologo' ? 'chat-heart' : 'bandaid';
-
-    badge.innerHTML = `
-      <span class="badge bg-white text-dark shadow-sm rounded-pill px-3 py-2" style="font-size:0.75rem;">
-        <i class="bi bi-${icon}-fill me-1 text-primary"></i>
-        <strong>${label}</strong> · ${timeStr}
-      </span>`;
-    badge.classList.remove('d-none');
-  }
-
-  /** Card en Tab Inicio con posicion en cola y tiempo estimado */
-  function _renderQueueCard(pendingCita) {
-    const container = document.getElementById('medi-queue-card');
-    if (!container) return;
-
-    if (!pendingCita) {
-      container.classList.add('d-none');
-      container.innerHTML = '';
-      return;
-    }
-
-    const fecha = pendingCita.safeDate || new Date();
-    const dateStr = fecha.toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' });
-    const timeStr = fecha.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    const encoded = encodeURIComponent(JSON.stringify(pendingCita));
-
-    container.innerHTML = `
-      <div class="card border-0 shadow-sm rounded-4 medi-queue-live" style="border-left: 4px solid #f59e0b !important;">
-        <div class="card-body p-3">
-          <div class="d-flex align-items-center gap-2 mb-2">
-            <span class="badge bg-warning text-dark rounded-pill">
-              <i class="bi bi-hourglass-split me-1"></i>En Sala de Espera
-            </span>
-            <div id="queue-pos-home-${pendingCita.id}" class="small"></div>
-          </div>
-          <div class="fw-bold text-dark mb-1">${dateStr}</div>
-          <div class="d-flex align-items-center gap-3 text-muted small mb-2">
-            <span><i class="bi bi-clock me-1"></i>${timeStr}</span>
-            <span><i class="bi bi-${pendingCita.tipoServicio === 'Psicologo' ? 'chat-heart' : 'bandaid'} me-1"></i>${pendingCita.tipoServicio}</span>
-          </div>
-          <div class="d-flex gap-2">
-            <button class="btn btn-sm btn-outline-warning rounded-pill flex-fill fw-bold" onclick="Medi.prepararEdicion('${encoded}')">
-              <i class="bi bi-pencil me-1"></i>Re-agendar
-            </button>
-            <button class="btn btn-sm btn-outline-danger rounded-pill flex-fill fw-bold" onclick="Medi.solicitarCancelacion('${pendingCita.id}')">
-              <i class="bi bi-x-lg me-1"></i>Cancelar
-            </button>
-          </div>
-        </div>
-      </div>`;
-    container.classList.remove('d-none');
-
-    // Load queue position into the home card too
-    _loadQueuePosition(pendingCita.id, pendingCita.tipoServicio, pendingCita.safeDate, `queue-pos-home-${pendingCita.id}`);
-  }
-
-  /** Grid 2x2 de acciones rapidas */
-  function _renderQuickActions() {
-    const container = document.getElementById('medi-quick-actions');
-    if (!container) return;
-
-    const actions = [
-      { icon: 'calendar-plus-fill', label: 'Nueva Cita', color: '#0d6efd', bg: 'rgba(13,110,253,0.08)', tab: 'medi-tab-agendar' },
-      { icon: 'calendar-week', label: 'Mis Citas', color: '#0dcaf0', bg: 'rgba(13,202,240,0.08)', tab: 'medi-tab-citas' },
-      { icon: 'chat-dots-fill', label: 'Mensajes', color: '#6f42c1', bg: 'rgba(111,66,193,0.08)', action: 'chat' },
-      { icon: 'clipboard2-pulse-fill', label: 'Expediente', color: '#198754', bg: 'rgba(25,135,84,0.08)', tab: 'medi-tab-historial' }
-    ];
-
-    container.innerHTML = actions.map(a => {
-      const onclick = a.action === 'chat'
-        ? `Medi.toggleStudentChat()`
-        : `Medi._switchMediTab('${a.tab}')`;
-      return `
-      <div class="col-6">
-        <div class="medi-quick-card card border-0 shadow-sm rounded-4 text-center p-3" onclick="${onclick}">
-          <div class="mx-auto mb-2 d-flex align-items-center justify-content-center rounded-circle" style="width:44px;height:44px;background:${a.bg};">
-            <i class="bi bi-${a.icon}" style="font-size:1.2rem;color:${a.color};"></i>
-          </div>
-          <div class="fw-bold small text-dark">${a.label}</div>
-        </div>
-      </div>`;
-    }).join('');
-  }
-
-  /** Cambio programatico de tab principal */
-  function _switchMediTab(tabPaneId) {
-    const tabsContainer = document.getElementById('medi-student-tabs');
-    if (!tabsContainer) return;
-
-    const targetBtn = tabsContainer.querySelector(`[data-bs-target="#${tabPaneId}"]`);
-    if (targetBtn && window.bootstrap) {
-      const tab = new bootstrap.Tab(targetBtn);
-      tab.show();
-      // Scroll to top of tabs area
-      const app = document.getElementById('medi-student-app');
-      if (app) app.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-  }
-
-  /** Badge de mensajes no leidos en Quick Actions */
-  function _updateChatBadgeOnTab(count) {
-    // Update the quick action card for messages
-    const quickActions = document.getElementById('medi-quick-actions');
-    if (!quickActions) return;
-    const msgBadge = quickActions.querySelector('.medi-chat-badge-qa');
-    if (count > 0 && !msgBadge) {
-      const msgCard = quickActions.querySelectorAll('.medi-quick-card')[2];
-      if (msgCard) {
-        const badge = document.createElement('span');
-        badge.className = 'medi-chat-badge-qa position-absolute top-0 end-0 translate-middle badge rounded-pill bg-danger';
-        badge.style.fontSize = '0.6rem';
-        badge.textContent = count > 9 ? '9+' : count;
-        msgCard.style.position = 'relative';
-        msgCard.appendChild(badge);
-      }
-    } else if (msgBadge) {
-      if (count === 0) msgBadge.remove();
-      else msgBadge.textContent = count > 9 ? '9+' : count;
-    }
-  }
-
-  /** Helper: timestamp relativo ("hace 5 min", "ayer", etc.) */
-  function _relativeTime(date) {
-    const now = new Date();
-    const diff = Math.floor((now - date) / 1000);
-    if (diff < 60) return 'ahora';
-    if (diff < 3600) return `hace ${Math.floor(diff / 60)} min`;
-    if (diff < 86400) return `hace ${Math.floor(diff / 3600)}h`;
-    if (diff < 172800) return 'ayer';
-    return date.toLocaleDateString('es-MX', { day: 'numeric', month: 'short' });
-  }
-
-  /** Verifica localStorage y lanza tutorial en primera visita */
-  function initMediTutorial(uid) {
-    // Usamos la misma clave que usa internamente el componente sia-onboarding-tour (_markCompleted)
-    // para que no reaparezca tras haber sido completado.
-    const SIA_TOUR_VERSION = 'v2';
-    const componentKey = `sia_tutorial_done_${SIA_TOUR_VERSION}_${uid}`;
-    // Clave adicional especifica del modulo medico
-    const mediKey = `sia_medi_tour_v1_${uid}`;
-
-    if (localStorage.getItem(componentKey) || localStorage.getItem(mediKey)) return;
-    // Delay para que el DOM este listo
-    setTimeout(() => launchMediTutorial(), 800);
-  }
-
-  /** Crea instancia de sia-onboarding-tour con pasos del modulo medico */
-  function launchMediTutorial() {
-    const uid = _ctx && _ctx.user ? _ctx.user.uid : '';
-    const mediKey = `sia_medi_tour_v1_${uid}`;
-
-    // Remove existing tour if any
-    const existing = document.querySelector('sia-onboarding-tour.medi-tour');
-    if (existing) existing.remove();
-
-    // Pasos del tutorial del modulo medico
-    const mediSteps = [
-      {
-        target: null,
-        title: 'Bienvenido al Servicio Medico',
-        description: 'Aqui puedes agendar citas medicas y de psicologia, ver tu historial y chatear con profesionales de salud.',
-        position: 'center'
-      },
-      {
-        target: '#medi-hero',
-        title: 'Tu Dashboard Medico',
-        description: 'Tu panel principal con informacion personalizada y acceso rapido a tu proxima cita.',
-        position: 'bottom'
-      },
-      {
-        target: '#medi-emergency-chip',
-        title: 'Datos de Emergencia',
-        description: 'Manten actualizados tu tipo de sangre, alergias y contacto de emergencia. Toca "Editar" para actualizarlos.',
-        position: 'bottom'
-      },
-      {
-        target: '#medi-quick-actions',
-        title: 'Acciones Rapidas',
-        description: 'Accede rapidamente a las funciones mas usadas: agendar cita, ver tus citas, mensajes y expediente.',
-        position: 'top'
-      },
-      {
-        target: '[data-bs-target="#medi-tab-agendar"]',
-        title: 'Agendar una Cita',
-        description: 'Selecciona el tipo de servicio, elige fecha y hora disponible, y confirma tu reservacion.',
-        position: 'bottom'
-      },
-      {
-        target: '[data-bs-target="#medi-tab-citas"]',
-        title: 'Tus Citas Activas',
-        description: 'Revisa el estado de tus citas: pendientes, confirmadas o canceladas. Puedes re-agendar o cancelar desde aqui.',
-        position: 'bottom'
-      },
-      {
-        target: '[data-bs-target="#medi-tab-historial"]',
-        title: 'Tu Historial Medico',
-        description: 'Consulta tu expediente con diagnosticos, tratamientos y notas de tus consultas anteriores.',
-        position: 'bottom'
-      },
-      {
-        target: null,
-        title: 'Todo listo!',
-        description: 'Ya conoces las herramientas del servicio medico. Si necesitas ayuda, toca el boton "Tutorial" en cualquier momento.',
-        position: 'center'
-      }
-    ];
-
-    const tour = document.createElement('sia-onboarding-tour');
-    tour.className = 'medi-tour';
-
-    // IMPORTANTE: appendChild dispara connectedCallback → _defineSteps() que sobreescribe _steps.
-    // Por eso asignamos los steps DESPUES de insertar en el DOM.
-    document.body.appendChild(tour);
-
-    // Ahora sobrescribimos los steps del dashboard con los del modulo medico
-    tour._steps = mediSteps;
-
-    // Parchamos _markCompleted para que guarde tambien nuestra clave de modulo
-    const _origMarkCompleted = tour._markCompleted.bind(tour);
-    tour._markCompleted = function () {
-      _origMarkCompleted();
-      localStorage.setItem(mediKey, 'done');
-    };
-
-    // Start tour
-    if (typeof tour.start === 'function') {
-      tour.start();
-    }
-  }
-
-  function loadWellnessFeed() {
-    const container = document.getElementById('medi-wellness-tips');
-    if (!container) return;
-
-    const tips = [
-      { icon: 'cup-hot', title: 'Hidrataci\u00f3n', text: 'Bebe al menos 2L de agua al d\u00eda para mantener tu rendimiento acad\u00e9mico.', color: 'info' },
-      { icon: 'brightness-high', title: 'Descanso', text: 'Dormir 7-8 horas mejora tu memoria y reduce el estr\u00e9s.', color: 'warning' },
-      { icon: 'apple', title: 'Nutrici\u00f3n', text: 'Come frutas y verduras. Evita el exceso de comida chatarra.', color: 'success' },
-      { icon: 'activity', title: 'Actividad', text: 'Camina 30 mins al d\u00eda. \u00a1Usa las canchas del tec!', color: 'danger' },
-      { icon: 'eye', title: 'Vista', text: 'Cada 20 min de pantalla, mira 20 seg algo a 20 pies de distancia.', color: 'primary' },
-      { icon: 'emoji-smile', title: 'Bienestar', text: 'Si sientes ansiedad o estr\u00e9s, no dudes en agendar con psicolog\u00eda.', color: 'primary' }
-    ];
-
-    // Show 3 random tips
-    const shuffled = tips.sort(() => 0.5 - Math.random()).slice(0, 3);
-
-    container.innerHTML = shuffled.map(t => `
-        <div class="d-flex align-items-start gap-3 p-2 mb-2 border rounded-3 bg-white shadow-sm">
-             <div class="bg-${t.color} bg-opacity-10 p-2 rounded-3 text-${t.color} flex-shrink-0">
-               <i class="bi bi-${t.icon}"></i>
-             </div>
-             <div>
-                <div class="fw-bold small text-dark">${t.title}</div>
-                <p class="text-muted mb-0" style="font-size: 0.75rem;">${t.text}</p>
-             </div>
-        </div>
-      `).join('');
-  }
-
-  function showFullHistory() {
-    // Re-use logic or fetch again? 
-    // We can use the same stream data if we store it, or just use the DOM logic?
-    // Better: Show a simple modal with the full list.
-    // Since we don't have the full list in a variable easily accessible without dirty global scopes,
-    // let's grab it from the stream callback if we had stored it.
-    // Alternative: The stream callback updates the UI.
-    // Let's modify the stream callback to store 'allCitas' or 'allExpedientes' in a module-level variable.
-
-    // For now, let's assume we can fetch it or we change the UI to "Expanded Mode".
-    // Simplest: Change the CSS/DOM to unhide the hidden items? 
-    // But we sliced them.
-
-    // OK, let's make the stream callback store the data in _lastConsultasFull
-
-    if (!_lastConsultasFull || _lastConsultasFull.length === 0) return;
-
-    const html = _lastConsultasFull.map(e => `
-            <div class="list-group-item border-0 border-bottom p-3">
-               <div class="d-flex justify-content-between align-items-start mb-1">
-                  <span class="fw-bold text-primary small">${e.safeDate ? e.safeDate.toLocaleDateString() : '-'}</span>
-                  <span class="badge bg-light text-dark border-0 shadow-none" style="font-size: 0.65rem;">${e.tipoServicio}</span>
-               </div>
-               <div class="small text-dark fw-bold">${e.diagnostico || 'Consulta general'}</div>
-               <div class="text-muted extra-small mt-1">${e.plan || 'Sin indicaciones...'}</div>
-               <div class="text-end mt-2">
-                   <button class="btn btn-xs btn-outline-primary rounded-pill py-0 px-2 fw-bold" 
-                           onclick="bootstrap.Modal.getInstance(document.getElementById('modalFullHistory')).hide(); Medi.showConsultationDetails('${encodeURIComponent(JSON.stringify(e))}')">
-                      Ver detalle
-                   </button>
-               </div>
-            </div>
-      `).join('');
-
-    // Create modal on the fly if not exists
-    let modal = document.getElementById('modalFullHistory');
-    if (!modal) {
-      const d = document.createElement('div');
-      d.innerHTML = `
-            <div class="modal fade" id="modalFullHistory" tabindex="-1">
-              <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
-                <div class="modal-content border-0 shadow-lg rounded-4">
-                  <div class="modal-header border-0 pb-0">
-                    <h5 class="fw-bold">Historial Completo</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                  </div>
-                  <div class="modal-body p-0">
-                     <div class="list-group list-group-flush" id="full-history-list"></div>
-                  </div>
-                </div>
-              </div>
-            </div>`;
-      document.body.appendChild(d.firstElementChild);
-      modal = document.getElementById('modalFullHistory');
-    }
-
-    document.getElementById('full-history-list').innerHTML = html;
-    new bootstrap.Modal(modal).show();
-  }
   let _lastConsultasFull = [];
-
-
-  // --- E1: STUDENT CHAT UI ---
-  function renderStudentChat(uid, name) {
-    if (!window.MediChatService) return;
-
-    // 1. Inject Floating Button
-    if (!document.getElementById('medi-chat-float-btn')) {
-      const btn = document.createElement('div');
-      btn.id = 'medi-chat-float-btn';
-      // [FIX] Increased bottom margin/position to avoid Mobile Navbar overlap (approx 60-80px)
-      // Was: bottom-0 m-4 (~24px). Now: bottom-0 style="bottom: 80px; right: 20px;"
-      btn.className = 'position-fixed';
-      btn.style.bottom = '90px'; // Clear standard navbar
-      btn.style.right = '20px';
-      btn.style.zIndex = '2000';
-      btn.innerHTML = `
-        <button class="btn btn-primary rounded-circle shadow-lg d-flex align-items-center justify-content-center position-relative" style="width: 60px; height: 60px;" onclick="Medi.toggleStudentChat()">
-            <i class="bi bi-chat-dots-fill fs-4"></i>
-            <span id="stu-chat-badge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger border border-light d-none">
-                0
-            </span>
-        </button>
-      `;
-      document.body.appendChild(btn);
-    }
-
-    // 2. Inject Chat Modal/Panel
-    if (!document.getElementById('medi-student-chat-panel')) {
-      const panel = document.createElement('div');
-      panel.id = 'medi-student-chat-panel';
-      // [FIX] Adjusted position to match button and ensure height fits viewport
-      panel.className = 'position-fixed bg-white shadow-lg rounded-4 d-none overflow-hidden d-flex flex-column';
-      panel.style.bottom = '100px'; // Above the button slightly or same level
-      panel.style.right = '20px';
-      panel.style.width = '350px';
-      // Responsive height: max 70vh to ensure keyboard doesn't hide input on mobile
-      panel.style.height = 'auto'; // Let flex grow
-      panel.style.maxHeight = '65vh'; // Safety limit
-      panel.style.minHeight = '400px';
-      panel.style.zIndex = '2001'; // Above detail modal and everything
-
-      panel.innerHTML = `
-        <div class="text-white p-3 d-flex justify-content-between align-items-center flex-shrink-0" style="background: linear-gradient(135deg, #1B396A 0%, #0d6efd 100%); border-radius: 1rem 1rem 0 0;">
-            <div class="fw-bold"><i class="bi bi-chat-dots me-2"></i>Mis Mensajes</div>
-            <button class="btn btn-sm btn-link text-white p-0" onclick="Medi.toggleStudentChat()"><i class="bi bi-x-lg"></i></button>
-        </div>
-            
-            <!-- List View -->
-            <div id="stu-chat-list" class="flex-grow-1 overflow-auto p-2">
-                <div class="text-center py-5 text-muted small"><span class="spinner-border spinner-border-sm"></span></div>
-            </div>
-
-            <!-- Thread View (Hidden by default) -->
-  <div id="stu-chat-thread" class="flex-grow-1 d-none d-flex flex-column h-100 bg-white position-absolute top-0 start-0 w-100" style="z-index:2;">
-    <div class="bg-light border-bottom p-2 d-flex align-items-center gap-2 flex-shrink-0">
-      <button class="btn btn-sm btn-light rounded-circle" onclick="document.getElementById('stu-chat-thread').classList.add('d-none')"><i class="bi bi-arrow-left"></i></button>
-      <div class="fw-bold text-truncate small flex-grow-1" id="stu-chat-pro-name">Profesional</div>
-    </div>
-    <div id="stu-chat-msgs" class="flex-grow-1 overflow-auto p-2 bg-light bg-opacity-10"></div>
-    <div class="p-2 border-top bg-white">
-      <div class="input-group input-group-sm">
-        <input type="text" id="stu-chat-input" class="form-control rounded-pill" placeholder="Escribe un mensaje..." onkeypress="if(event.key==='Enter')Medi.sendStudentMessage()">
-          <button class="btn btn-primary rounded-circle ms-1" onclick="Medi.sendStudentMessage()" style="width:30px;height:30px;padding:0;"><i class="bi bi-send-fill" style="font-size:0.7rem"></i></button>
-      </div>
-    </div>
-  </div>
-`;
-      document.body.appendChild(panel);
-    }
-
-    // 3. Subscription for Unread & List
-    MediChatService.streamConversations(_ctx, uid, 'student', null, (convs) => {
-      _renderStudentConvList(convs);
-
-      // Update total unread
-      const total = convs.reduce((acc, c) => acc + (c.unreadByStudent || 0), 0);
-      const badge = document.getElementById('stu-chat-badge');
-      if (badge) {
-        badge.textContent = total;
-        badge.classList.toggle('d-none', total === 0);
-      }
-      // [NEW] Update quick action badge
-      _updateChatBadgeOnTab(total);
-    });
-  }
-
-  function _renderStudentConvList(convs) {
-    const list = document.getElementById('stu-chat-list');
-    if (!list) return;
-
-    if (convs.length === 0) {
-      list.innerHTML = `<div class="text-center py-5 text-muted small px-3">
-          <i class="bi bi-chat-square-text display-4 opacity-25 mb-3 d-block"></i>
-          Aún no tienes mensajes.<br> Inicia un chat desde tus citas o espera a que te contacten.
-        </div>`;
-      return;
-    }
-
-    list.innerHTML = convs.map(c => {
-      const unread = c.unreadByStudent || 0;
-      const time = c.lastMessageAt ? (typeof c.lastMessageAt.toDate === 'function' ? c.lastMessageAt.toDate() : new Date(c.lastMessageAt)) : null;
-      const timeStr = time ? _relativeTime(time) : '';
-
-      return `
-        <div class="card border-0 shadow-sm mb-2 cursor-pointer hover-bg-light transition-all" onclick="Medi.openStudentThread('${c.id}', '${escapeHtml(c.profesionalName)}', '${c.profesionalId}')">
-            <div class="card-body p-2 d-flex align-items-center gap-2">
-            <div class="bg-primary bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center text-primary fw-bold flex-shrink-0" style="width:40px;height:40px;">
-                ${(c.profesionalName || 'P')[0]}
-            </div>
-            <div class="flex-grow-1" style="min-width:0;">
-                <div class="d-flex justify-content-between align-items-start">
-                <h6 class="mb-0 fw-bold small text-truncate">${escapeHtml(c.profesionalName)}</h6>
-                <small class="text-muted" style="font-size:0.6rem;">${timeStr}</small>
-                </div>
-                <div class="d-flex justify-content-between align-items-end mt-1">
-                <div class="text-muted text-truncate small" style="max-width: 160px; font-size: 0.75rem;">${escapeHtml(c.lastMessage || '...')}</div>
-                ${unread > 0 ? `<span class="badge bg-danger rounded-pill" style="font-size:0.6rem;">${unread}</span>` : ''}
-                </div>
-            </div>
-            </div>
-        </div>
-  `;
-    }).join('');
-  }
-
+  let _lastCitasFull = [];
   let _activeStudentConvId = null;
   let _stuMsgsUnsub = null;
+  let _stuConvUnsub = null;
+  let _activeConvData = {};
+  let _chatTypingTimer = null;
+  let _prevUnreadTotal = 0;
 
-  function toggleStudentChat() {
-    const panel = document.getElementById('medi-student-chat-panel');
-    if (panel) panel.classList.toggle('d-none');
-  }
 
-  function openStudentThread(convId, proName, proId) {
-    _activeStudentConvId = convId;
-    document.getElementById('stu-chat-pro-name').textContent = proName;
-    document.getElementById('stu-chat-thread').classList.remove('d-none');
-
-    // Subscribe to messages
-    if (_stuMsgsUnsub) _stuMsgsUnsub();
-    _stuMsgsUnsub = MediChatService.streamMessages(_ctx, convId, (msgs) => {
-      const container = document.getElementById('stu-chat-msgs');
-      if (!container) return;
-
-      container.innerHTML = msgs.map(m => {
-        const isMe = m.senderRole === 'student';
-        const time = m.createdAt ? (typeof m.createdAt.toDate === 'function' ? m.createdAt.toDate() : new Date(m.createdAt)) : null;
-        return `
-  < div class="d-flex ${isMe ? 'justify-content-end' : 'justify-content-start'} mb-2" >
-    <div class="px-3 py-2 rounded-4 ${isMe ? 'bg-primary text-white rounded-bottom-end-0' : 'bg-white shadow-sm border rounded-bottom-start-0'}"
-      style="max-width:85%; font-size: 0.85rem;">
-      <div>${escapeHtml(m.text)}</div>
-      <div class="${isMe ? 'text-white-50' : 'text-muted'} text-end" style="font-size:0.6rem;">${time ? time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}</div>
-    </div>
-                </div >
-  `;
-      }).join('');
-      container.scrollTop = container.scrollHeight;
-    });
-
-    MediChatService.markAsRead(_ctx, convId, 'student');
-  }
+  function renderStudentChat(...args) { return _studentChat.renderStudentChat?.(...args); }
+  function toggleStudentChat(...args) { return _studentChat.toggleStudentChat?.(...args); }
+  function openStudentChat(...args) { return _studentChat.openStudentChat?.(...args); }
+  function openStudentThread(...args) { return _studentChat.openStudentThread?.(...args); }
+  function _insertQuickReply(...args) { return _studentChat._insertQuickReply?.(...args); }
+  function _onChatInputChange(...args) { return _studentChat._onChatInputChange?.(...args); }
+  function _closeChatThread(...args) { return _studentChat._closeChatThread?.(...args); }
+  function sendStudentMessage(...args) { return _studentChat.sendStudentMessage?.(...args); }
+  function startChatWithProfessional(...args) { return _studentChat.startChatWithProfessional?.(...args); }
+  function startChatWithStudent(...args) { return _studentChat.startChatWithStudent?.(...args); }
+  function showConsultationDetails(...args) { return _studentAppointments.showConsultationDetails?.(...args); }
+  function solicitarCancelacion(...args) { return _studentAppointments.solicitarCancelacion?.(...args); }
+  function prepararEdicion(...args) { return _studentAppointments.prepararEdicion?.(...args); }
+  function _reschedSelectDate(...args) { return _studentAppointments._reschedSelectDate?.(...args); }
+  function saveState(...args) { return _studentAppointments.saveState?.(...args); }
+  function restoreState(...args) { return _studentAppointments.restoreState?.(...args); }
 
   // --- MISSING STUDENT FUNCTIONS IMPORTED FROM ADMIN.MEDI.JS ---
-
-  function showConsultationDetails(jsonExp) {
-    const exp = JSON.parse(decodeURIComponent(jsonExp));
-
-    // Header y Doctor
-    const dateObj = exp.safeDate ? new Date(exp.safeDate) : new Date();
-    document.getElementById('detail-date-header').textContent = `${exp.tipoServicio} • ${dateObj.toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' })} `;
-    document.getElementById('detail-doctor').textContent = exp.autorEmail || 'Profesional de Salud';
-
-    // Signos Vitales — el admin guarda en campos raiz (exp.temp, exp.presion...)
-    // pero algunos registros anteriores pueden usar exp.signos. Soportamos ambos.
-    const v = exp.signos || {};
-    const temp    = exp.temp    || v.temp    || null;
-    const presion = exp.presion || v.presion || null;
-    const peso    = exp.peso    || v.peso    || null;
-    const talla   = exp.talla   || v.talla   || null;
-
-    document.getElementById('detail-temp').textContent    = temp    ? `${temp}°C` : '--';
-    document.getElementById('detail-presion').textContent = presion || '--';
-    document.getElementById('detail-peso').textContent    = peso    ? `${peso} kg` : '--';
-
-    // Mostrar talla si el elemento existe
-    const detailTalla = document.getElementById('detail-talla');
-    if (detailTalla) detailTalla.textContent = talla ? `${talla} cm` : '--';
-
-    // Contenido SOAP
-    document.getElementById('detail-subjetivo').textContent = exp.subjetivo || 'No registrado';
-    document.getElementById('detail-diagnosis').textContent = exp.diagnostico || 'No registrado';
-    document.getElementById('detail-plan').textContent = exp.plan || (exp.meds ? exp.meds : 'Seguir indicaciones generales.');
-
-    // Acción del Botón Imprimir
-    const btnPrint = document.getElementById('btn-print-receta');
-    const newBtn = btnPrint.cloneNode(true);
-    btnPrint.parentNode.replaceChild(newBtn, btnPrint);
-
-    newBtn.onclick = () => {
-      // Obtenemos perfil del alumno para la receta
-      const studentProfile = _ctx.profile || {};
-
-      // Llamada al generador profesional
-      PDFGenerator.generateProfessionalPrescription({
-        doctor: {
-          name: exp.autorEmail.split('@')[0].toUpperCase(),
-          specialty: exp.tipoServicio,
-          email: exp.autorEmail,
-          cedula: exp.cedula || '' // Usar la cedula guardada en el doc
-        },
-        student: {
-          name: studentProfile.displayName || _ctx.user.email,
-          matricula: studentProfile.matricula || '--',
-          carrera: studentProfile.carrera || '--'
-        },
-        consultation: {
-          date: dateObj,
-          signs: { temp, presion, peso, talla },
-          diagnosis: exp.diagnostico,
-          treatment: exp.plan || exp.meds
-        }
-      });
-    };
-
-    // Z-INDEX FIX: Ensure Details Modal is above Full Record
-    const detailModalEl = document.getElementById('modalDetalleConsulta');
-    detailModalEl.style.zIndex = "1061";
-
-    const dSubjetivo = document.getElementById('detail-subjetivo');
-    const dDiagnosis = document.getElementById('detail-diagnosis');
-    const dPlan = document.getElementById('detail-plan');
-    const dDate = document.getElementById('detail-date-header');
-
-    dDate.innerHTML = `<i class="bi bi-calendar-event me-1"></i> ${dateObj.toLocaleDateString()} ${dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} `;
-    dSubjetivo.textContent = exp.subjetivo || "Sin detalles subjetivos.";
-    dDiagnosis.textContent = exp.diagnostico || "Sin diagnóstico registrado.";
-    dPlan.textContent = exp.plan || "Sin plan de tratamiento.";
-
-    if (document.getElementById('detail-doctor')) {
-      document.getElementById('detail-doctor').textContent = `${exp.autorEmail || 'Profesional de Salud'} (${exp.tipoServicio || 'General'})`;
-    }
-
-    // Modal show depends on Bootstrap
-    const detailModal = new bootstrap.Modal(document.getElementById('modalDetalleConsulta'));
-    detailModal.show();
-  }
-
-  function solicitarCancelacion(citaId) {
-    const modalEl = document.getElementById('modalMediCancelParams');
-    if (!modalEl) {
-      // Fallback a modal simple si el de parametros no esta (En medi.js esta como modalCancelCita en unos lados, pero el ID principal es modalCancelCita o modalMediCancelParams)
-      const altModalEl = document.getElementById('modalCancelCita');
-      if (altModalEl) {
-        const altModal = new bootstrap.Modal(altModalEl);
-        const confirmBtn = document.getElementById('btn-confirm-cancel');
-        confirmBtn.onclick = async () => {
-          const reason = document.getElementById('cancel-reason').value.trim() || 'Cancelado por el estudiante';
-          const org = confirmBtn.innerHTML;
-          confirmBtn.disabled = true;
-          confirmBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
-          try {
-            await MediService.cancelarCitaEstudiante(_ctx, citaId, reason);
-            showToast("Cita cancelada", "success");
-            altModal.hide();
-          } catch (err) {
-            console.error(err);
-            showToast("Error cancelando", "danger");
-          } finally {
-            confirmBtn.disabled = false;
-            confirmBtn.innerHTML = org;
-          }
-        };
-        altModal.show();
-        return;
-      }
-      return showToast("Modal de cancelación no encontrado", "danger");
-    }
-
-    const modal = new bootstrap.Modal(modalEl);
-
-    document.getElementById('cancel-cita-id').value = citaId;
-    document.getElementById('cancel-other').value = "";
-
-    const form = document.getElementById('form-medi-cancel-reason');
-
-    form.onsubmit = async (e) => {
-      e.preventDefault();
-      const reason = document.getElementById('cancel-other').value.trim();
-      if (!reason) return showToast("Indica un motivo", "warning");
-
-      const btn = form.querySelector('button[type="submit"]');
-      const org = btn.innerHTML;
-      btn.disabled = true;
-      btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
-
-      try {
-        await MediService.cancelarCitaEstudiante(_ctx, citaId, reason);
-        showToast("Cita cancelada", "success");
-        modal.hide();
-      } catch (err) {
-        console.error(err);
-        showToast("Error cancelando", "danger");
-      } finally {
-        btn.disabled = false;
-        btn.innerHTML = org;
-      }
-    };
-
-    modal.show();
-  }
-
-  function prepararEdicion(jsonCita) {
-    const cita = JSON.parse(decodeURIComponent(jsonCita));
-    const modalEl = document.getElementById('modalMediReschedule');
-    const modal = new bootstrap.Modal(modalEl);
-
-    // Fill hidden inputs
-    document.getElementById('resched-cita-id').value = cita.id;
-    document.getElementById('resched-old-slot').value = cita.slotId;
-    document.getElementById('resched-tipo').value = cita.tipoServicio || 'Médico';
-    document.getElementById('resched-date').value = '';
-    document.getElementById('resched-time').value = '';
-
-    // Reset UI
-    const btnConfirm = document.getElementById('btn-resched-confirm');
-    if (btnConfirm) btnConfirm.disabled = true;
-    const summaryEl = document.getElementById('resched-summary');
-    if (summaryEl) summaryEl.classList.add('d-none');
-    const timeGrid = document.getElementById('resched-time-grid');
-    if (timeGrid) { timeGrid.innerHTML = ''; timeGrid.classList.add('d-none'); }
-    const timeMsg = document.getElementById('resched-time-msg');
-    if (timeMsg) { timeMsg.classList.remove('d-none'); timeMsg.innerHTML = '<i class="bi bi-calendar-check d-block mb-1"></i> Selecciona un d\\u00eda primero'; }
-
-    // Render date cards
-    const dateSelector = document.getElementById('resched-date-selector');
-    const days = [];
-    let curr = new Date();
-    while (days.length < 10) {
-      if (isWeekday(curr)) days.push(new Date(curr));
-      curr.setDate(curr.getDate() + 1);
-    }
-
-    dateSelector.innerHTML = days.map(d => {
-      const isoDate = MediService.toISO(d);
-      const isToday = d.getDate() === new Date().getDate() && d.getMonth() === new Date().getMonth();
-      const displayDay = isToday ? 'HOY' : d.toLocaleDateString('es-MX', { weekday: 'short' }).toUpperCase();
-      return `
-        <div class="date-option p-2 text-center border rounded-3 bg-white shadow-sm flex-shrink-0"
-             style="min-width: 70px; cursor: pointer;" data-date="${isoDate}"
-             onclick="Medi._reschedSelectDate(this, '${isoDate}')">
-          <div class="small text-muted mb-0">${displayDay}</div>
-          <div class="fw-bold fs-5">${d.getDate()}</div>
-          <div class="small text-primary fw-bold">${d.toLocaleDateString('es-MX', { month: 'short' }).toUpperCase()}</div>
-        </div>`;
-    }).join('');
-
-    // Form submit handler
-    const form = document.getElementById('form-medi-reschedule');
-    form.onsubmit = async (e) => {
-      e.preventDefault();
-      const newDateStr = document.getElementById('resched-date').value;
-      const newTimeStr = document.getElementById('resched-time').value;
-
-      if (!newDateStr || !newTimeStr) return showToast("Selecciona fecha y hora", "warning");
-
-      const btn = document.getElementById('btn-resched-confirm');
-      const original = btn.innerHTML;
-      btn.disabled = true;
-      btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
-
-      try {
-        const [y, m, day] = newDateStr.split('-').map(Number);
-        const [hh, mm] = newTimeStr.split(':').map(Number);
-        const newDate = new Date(y, m - 1, day, hh, mm);
-        const tipo = document.getElementById('resched-tipo').value || cita.tipoServicio;
-
-        await MediService.modificarCita(_ctx, cita.id, {
-          date: newDate,
-          slotId: `${MediService.slotIdFromDate(newDate)}_${tipo}`,
-          tipo: tipo,
-          motivo: cita.motivo
-        });
-        showToast("Cita re-agendada con éxito", "success");
-        modal.hide();
-      } catch (err) {
-        console.error(err);
-        showToast(err.message || "Error al reagendar", "danger");
-      } finally {
-        btn.disabled = false;
-        btn.innerHTML = original;
-      }
-    };
-
-    modal.show();
-  }
-
-  // Reschedule helpers (called from onclick in modal)
-  async function _reschedSelectDate(el, dateStr) {
-    // Update hidden input
-    document.getElementById('resched-date').value = dateStr;
-    document.getElementById('resched-time').value = '';
-    document.getElementById('btn-resched-confirm').disabled = true;
-    document.getElementById('resched-summary').classList.add('d-none');
-
-    // Visual selection
-    el.closest('.medi-resched-dates').querySelectorAll('.date-option').forEach(c => {
-      c.classList.remove('bg-primary', 'text-white', 'border-primary');
-      c.classList.add('bg-white');
-    });
-    el.classList.remove('bg-white');
-    el.classList.add('bg-primary', 'text-white', 'border-primary');
-
-    // Load slots
-    const timeGrid = document.getElementById('resched-time-grid');
-    const timeMsg = document.getElementById('resched-time-msg');
-    timeGrid.classList.add('d-none');
-    timeMsg.classList.remove('d-none');
-    timeMsg.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Buscando disponibilidad...';
-
-    const targetDate = new Date(dateStr + 'T12:00:00');
-    const slots = buildSlotsForDate(targetDate);
-    const tipo = document.getElementById('resched-tipo').value || 'Médico';
-    let occupied = [];
-
-    try {
-      occupied = await MediService.getOccupiedSlots(_ctx, targetDate, tipo);
-    } catch (e) { console.error("Error fetching slots for reschedule:", e); }
-
-    timeGrid.innerHTML = '';
-    slots.forEach(slot => {
-      const tStr = `${slot.getHours().toString().padStart(2, '0')}:${slot.getMinutes().toString().padStart(2, '0')}`;
-      const baseId = MediService.slotIdFromDate(slot);
-      const slotId = `${baseId}_${tipo}`;
-      const isTaken = occupied.includes(slotId);
-
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = `btn btn-sm rounded-pill fw-bold ${isTaken ? 'btn-light text-muted pe-none opacity-50' : 'btn-outline-primary'}`;
-      btn.style.cssText = 'min-width: 70px;';
-      btn.textContent = tStr;
-      if (isTaken) btn.innerHTML = `<s>${tStr}</s>`;
-
-      if (!isTaken) {
-        btn.onclick = () => {
-          timeGrid.querySelectorAll('button').forEach(b => {
-            b.classList.remove('btn-primary', 'text-white');
-            b.classList.add('btn-outline-primary');
-          });
-          btn.classList.remove('btn-outline-primary');
-          btn.classList.add('btn-primary', 'text-white');
-
-          document.getElementById('resched-time').value = tStr;
-          document.getElementById('btn-resched-confirm').disabled = false;
-
-          // Update summary
-          const dParts = dateStr.split('-');
-          const dateObj = new Date(dParts[0], dParts[1] - 1, dParts[2]);
-          const dateTextFull = dateObj.toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' });
-          const sumText = document.getElementById('resched-summary-text');
-          sumText.textContent = `${dateTextFull.charAt(0).toUpperCase() + dateTextFull.slice(1)} • ${tStr} hrs`;
-          document.getElementById('resched-summary').classList.remove('d-none');
-        };
-      }
-      timeGrid.appendChild(btn);
-    });
-
-    if (slots.length === 0) {
-      timeGrid.innerHTML = '<div class="text-muted small w-100 text-center py-2">No hay horarios disponibles.</div>';
-    }
-
-    timeMsg.classList.add('d-none');
-    timeGrid.classList.remove('d-none');
-  }
-
-  async function sendStudentMessage() {
-    const input = document.getElementById('stu-chat-input');
-    const text = input.value.trim();
-    if (!text || !_activeStudentConvId) return;
-
-    input.value = '';
-    const name = _ctx.profile.displayName || _ctx.user.email;
-
-    try {
-      await MediChatService.sendMessage(_ctx, _activeStudentConvId, _ctx.user.uid, name, 'student', text);
-    } catch (e) {
-      console.error(e);
-      showToast('Error al enviar', 'danger');
-    }
-  }
-
-  async function startChatWithProfessional(profId, profName, profileIdOverride = null) {
-    if (!window.MediChatService) return;
-
-    // Open panel first
-    const panel = document.getElementById('medi-student-chat-panel');
-    if (panel && panel.classList.contains('d-none')) panel.classList.remove('d-none');
-
-    try {
-      const student = _ctx.user;
-      // [FIX] Use profileIdOverride if provided to enforce distinct conversations (e.g. Médico vs Psicologo)
-      // even if they share the same Admin UID.
-      const targetProfileId = profileIdOverride || profId;
-
-      const conv = await MediChatService.getOrCreateConversation(
-        _ctx,
-        student.uid,
-        student.displayName || student.email,
-        profId, // profesionalId (User ID)
-        profName,
-        'student',
-        targetProfileId // [FIX] Pass as profileId too
-      );
-      openStudentThread(conv.id, profName, profId);
-    } catch (e) {
-      console.error("Error starting chat:", e);
-      showToast("Error al iniciar chat", "danger");
-    }
-  }
 
   // [NEW] Recent Activity Renderer
   function _loadRecentActivity() {
@@ -3399,64 +3430,6 @@ var Medi = (function () {
     });
   }
 
-  // Admin Helper
-  async function startChatWithStudent(studentUid, studentName) {
-    if (!window.MediChatService) return;
-
-    try {
-      let profId = _currentProfile ? _currentProfile.id : _myUid;
-      const profName = _currentProfile ? _currentProfile.displayName : (_ctx.user.displayName || 'Profesional');
-
-      // [FIX] Admin Context Alignment
-      // If we are operating as 'Médico' or 'Psicologo' but distinct from the base user ID context,
-      // we must use the Composite Profile ID to match what the Student sees.
-      // E.g. If I am 'Médico', I should use 'UID_Médico' as my profileId if I don't have a specific Shift Profile.
-      // This ensures the student sees 'Atención Médica' chat, not 'Admin' chat.
-
-      let profileContextId = _currentProfile ? _currentProfile.id : null;
-
-      if (!profileContextId && (_myRole === 'Médico' || _myRole === 'Psicologo')) {
-        profileContextId = `${_myUid}_${_myRole} `;
-        profId = _myUid; // Keep original UID as owner
-      }
-
-      const conv = await MediChatService.getOrCreateConversation(
-        _ctx,
-        profId,
-        profName,
-        studentUid,
-        studentName,
-        'profesional', // My Role
-        profileContextId // Profile Context (Real or Composite)
-      );
-
-      // Force UI Switch
-      const tab = document.getElementById('medi-tab-messages');
-      if (tab) tab.classList.remove('d-none');
-      _switchContextTab('messages');
-
-      // Ensure the chat list is visible (it might be hidden by conversation view)
-      const list = document.getElementById('medi-chat-list');
-      const panel = document.getElementById('medi-chat-conversation');
-      // Reset state so openAdminConversation transitions cleanly
-      if (list) list.classList.remove('d-none');
-      if (panel) panel.classList.add('d-none');
-
-      // Use requestAnimationFrame to ensure DOM paint/layout update before opening
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          console.log(`[Medi] Opening admin conversation for ${studentName}(convId: ${conv.id})`);
-          openConversation(conv.id, studentName);
-        });
-      });
-
-    } catch (e) {
-      console.error("Error starting chat with student:", e);
-      showToast("Error al iniciar chat", "danger");
-    }
-  }
-
-
   // --- RECENT ACTIVITY MODALS ---
 
   // 1. Show All Recent (Modal with Filters)
@@ -3482,7 +3455,7 @@ var Medi = (function () {
   
           <div class="modal-body p-0">
             <!-- Filtros -->
-            <div class="px-4 py-3 bg-light border-bottom sticky-top" style="z-index:1020;">
+            <div class="px-4 py-3  border-bottom sticky-top" style="z-index:1020;">
               <div class="d-flex gap-2">
                 <button class="btn btn-sm btn-dark rounded-pill px-3 fw-bold filter-btn active" onclick="Medi._setRecentFilter('all', this)">Todas</button>
                 <button class="btn btn-sm btn-outline-secondary rounded-pill px-3 fw-bold filter-btn" onclick="Medi._setRecentFilter('registered', this)">Registradas</button>
@@ -3631,7 +3604,7 @@ onclick = "Medi.showConsultationQuickDetail('${encoded}')" >
           </div>
           <div class="modal-body p-4">
             <!-- Header Info -->
-            <div class="d-flex align-items-center gap-3 mb-4 p-3 bg-light rounded-3 border">
+            <div class="d-flex align-items-center gap-3 mb-4 p-3  rounded-3 border">
               <div class="rounded-circle bg-white shadow-sm d-flex align-items-center justify-content-center text-primary fw-bold fs-4" style="width:50px; height:50px;">
                 ${(c.patientName || 'E')[0].toUpperCase()}
               </div>
@@ -3663,7 +3636,7 @@ onclick = "Medi.showConsultationQuickDetail('${encoded}')" >
             </div>
 
             ${c.signos ? `
-                      <div class="d-flex gap-2 justify-content-between text-center bg-light-subtle p-2 rounded border mb-4">
+                      <div class="d-flex gap-2 justify-content-between text-center -subtle p-2 rounded border mb-4">
                           <div><small class="d-block extra-small text-muted fw-bold">TEMP</small><span class="fw-bold small">${c.signos.temp || '--'}</span></div>
                           <div><small class="d-block extra-small text-muted fw-bold">PRESION</small><span class="fw-bold small">${c.signos.presion || '--'}</span></div>
                           <div><small class="d-block extra-small text-muted fw-bold">PESO</small><span class="fw-bold small">${c.signos.peso || '--'}</span></div>
@@ -3717,8 +3690,61 @@ onclick = "Medi.showConsultationQuickDetail('${encoded}')" >
 
 
 
+  // --- CLEANUP / DESTROY ---
+  /** Elimina elementos flotantes globales (chat btn, SOS btn, chat panel) */
+  function _cleanupGlobalElements() {
+    ['medi-chat-float-btn', 'medi-student-chat-panel', 'medi-sos-btn'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.remove();
+    });
+    const badge = document.querySelector('.medi-chat-badge-qa');
+    if (badge) badge.remove();
+    _disableStudentFloatingStack();
+  }
+
+  /**
+   * Limpia todos los recursos del módulo: listeners, timers y elementos del DOM global.
+   * El router llama a Medi.destroy?.() antes de cambiar de vista.
+   */
+  function destroy() {
+    _cleanupListeners();
+    _cleanupGlobalElements();
+    if (_stuMsgsUnsub) { _stuMsgsUnsub(); _stuMsgsUnsub = null; }
+    if (_stuConvUnsub) { _stuConvUnsub(); _stuConvUnsub = null; }
+    if (_chatTypingTimer) { clearTimeout(_chatTypingTimer); _chatTypingTimer = null; }
+    if (_activeStudentConvId && window.MediChatService?.setTyping) {
+      try { MediChatService.setTyping(_ctx, _activeStudentConvId, 'student', false); } catch (_) { }
+    }
+    _activeStudentConvId = null;
+    _activeConvData = {};
+  }
+
+  // Escuchar cambios de vista para limpiar elementos globales inmediatamente
+  window.addEventListener('sia-view-changed', (e) => {
+    if (e.detail && e.detail.viewId !== 'view-medi') {
+      _cleanupGlobalElements();
+      if (_unsubs.studentChatStream) {
+        _unsubs.studentChatStream();
+        _unsubs.studentChatStream = null;
+      }
+      if (_unsubs.studentHistory) {
+        _unsubs.studentHistory();
+        _unsubs.studentHistory = null;
+      }
+      if (_stuMsgsUnsub) { _stuMsgsUnsub(); _stuMsgsUnsub = null; }
+      if (_stuConvUnsub) { _stuConvUnsub(); _stuConvUnsub = null; }
+      if (_chatTypingTimer) { clearTimeout(_chatTypingTimer); _chatTypingTimer = null; }
+      if (_activeStudentConvId && window.MediChatService?.setTyping) {
+        try { MediChatService.setTyping(_ctx, _activeStudentConvId, 'student', false); } catch (_) { }
+      }
+      _activeStudentConvId = null;
+      _activeConvData = {};
+    }
+  });
+
   return {
     initStudent,
+    destroy,
     _switchWorkTab,
     _switchContextTab,
     _selectWaitingPatient,
@@ -3733,6 +3759,7 @@ onclick = "Medi.showConsultationQuickDetail('${encoded}')" >
     showFullHistory,
     renderStudentChat,
     toggleStudentChat,
+    openStudentChat,
     openStudentThread,
     sendStudentMessage,
     startChatWithProfessional,
@@ -3745,157 +3772,34 @@ onclick = "Medi.showConsultationQuickDetail('${encoded}')" >
     showConsultationDetails,
     _reschedSelectDate,
     restoreState,
-    // [NEW] Exported for onclick handlers
+    // Exported for onclick handlers
     _switchMediTab,
-    launchMediTutorial
+    launchMediTutorial,
+    _filterHistory,
+    _openWellnessTipsModal,
+    _filterTipsModal,
+    _focusBookingSection,
+    _selectStudentService,
+    _refreshSlotsOnTypeChange,
+    _showSOSModal,
+    _showHealthProfileModal,
+    _addToCalendar,
+    _submitCheckin,
+    _toggleCheckinHistory,
+    _dismissFollowUp,
+    _setSurveyRating,
+    _skipSurvey,
+    _submitSurvey,
+    _downloadConsultationPrescription,
+    renderFollowUpBanner,
+    // Chat helpers (used from inline onclick)
+    _insertQuickReply,
+    _onChatInputChange,
+    _closeChatThread
   };
 
 
-  function saveState() {
-    const state = {
-      timestamp: Date.now(),
-      formData: {},
-      selectedValues: {},
-      scrollPosition: window.pageYOffset || document.documentElement.scrollTop
-    };
-
-    const forms = [
-      'form-medi-nueva-cita',
-      'form-medi-consulta',
-      'form-buscar-paciente'
-    ];
-
-    forms.forEach(formId => {
-      const form = document.getElementById(formId);
-      if (form) {
-        const formData = new FormData(form);
-        state.formData[formId] = {};
-        for (let [key, value] of formData.entries()) {
-          state.formData[formId][key] = value;
-        }
-      }
-    });
-
-    // Guardar selecciones de fecha/hora (inputs hidden)
-    const dateInput = document.getElementById('medi-cita-fecha');
-    const timeInput = document.getElementById('medi-cita-hora');
-    if (dateInput) state.selectedValues.date = dateInput.value;
-    if (timeInput) state.selectedValues.time = timeInput.value;
-
-    // Guardar tab activo si hay pestañas (sub-tabs de citas)
-    const activeTab = document.querySelector('#medi-citas-tabs .nav-link.active');
-    if (activeTab) {
-      state.activeTab = activeTab.getAttribute('data-bs-target');
-    }
-
-    // [NEW] Guardar tab principal activo
-    const mainTab = document.querySelector('#medi-student-tabs .nav-link.active');
-    if (mainTab) {
-      state.activeMainTab = mainTab.getAttribute('data-bs-target');
-    }
-
-    // Guardar qué sección está visible
-    const sections = ['medi-student', 'medi-medico', 'medi-psicologo', 'medi-admin'];
-    sections.forEach(sectionId => {
-      const section = document.getElementById(sectionId);
-      if (section && !section.classList.contains('d-none')) {
-        state.activeSection = sectionId;
-      }
-    });
-
-    console.log('[Medi] Estado guardado:', state);
-    return state;
-  }
-
-  /**
-   * Restaura el estado previo del módulo
-   * @param {object} state - Estado previamente guardado
-   */
-
-  function restoreState(state) {
-    if (!state) return;
-
-    console.log('[Medi] Restaurando estado:', state);
-
-    // Restaurar valores de formularios
-    if (state.formData) {
-      Object.keys(state.formData).forEach(formId => {
-        const form = document.getElementById(formId);
-        if (form) {
-          Object.keys(state.formData[formId]).forEach(fieldName => {
-            const field = form.elements[fieldName];
-            if (field) {
-              field.value = state.formData[formId][fieldName];
-            }
-          });
-        }
-      });
-    }
-
-    // Restaurar selecciones de fecha/hora
-    if (state.selectedValues) {
-      const dateInput = document.getElementById('medi-cita-fecha');
-      const timeInput = document.getElementById('medi-cita-hora');
-
-      if (dateInput && state.selectedValues.date) {
-        dateInput.value = state.selectedValues.date;
-
-        // Re-trigger date selection to load time slots
-        const dateBtn = document.querySelector(`[data - date="${state.selectedValues.date}"]`);
-        if (dateBtn) {
-          setTimeout(() => dateBtn.click(), 100);
-        }
-      }
-
-      if (timeInput && state.selectedValues.time) {
-        timeInput.value = state.selectedValues.time;
-
-        // Re-select time slot visually
-        setTimeout(() => {
-          const timeBtn = document.querySelector(`[data - time= "${state.selectedValues.time}"]`);
-          if (timeBtn) timeBtn.click();
-        }, 200);
-      }
-    }
-
-    // [NEW] Restaurar tab principal
-    if (state.activeMainTab) {
-      setTimeout(() => _switchMediTab(state.activeMainTab.replace('#', '')), 200);
-    }
-
-    // Restaurar sub-tab activo (citas)
-    if (state.activeTab) {
-      const tabButton = document.querySelector(`[data-bs-target="${state.activeTab}"]`);
-      if (tabButton) {
-        setTimeout(() => {
-          const tab = new bootstrap.Tab(tabButton);
-          tab.show();
-        }, 300);
-      }
-    }
-
-    // Restaurar scroll position (inmediato + con delay para asegurar)
-    if (state.scrollPosition) {
-      // Restauración inmediata
-      window.scrollTo(0, state.scrollPosition);
-      document.documentElement.scrollTop = state.scrollPosition;
-      document.body.scrollTop = state.scrollPosition;
-
-      // Backup después del render (por si el DOM aún no está listo)
-      requestAnimationFrame(() => {
-        window.scrollTo(0, state.scrollPosition);
-      });
-
-      // Final backup después de que se carguen tabs/contenido dinámico
-      setTimeout(() => {
-        window.scrollTo(0, state.scrollPosition);
-      }, 150);
-    }
-
-    console.log('[Medi] Estado restaurado exitosamente');
-  }
-
 })();
 
-window.Medi = Medi;
+window.Medi = Object.assign(window.Medi || {}, Medi);
 console.log("[Medi] Module Loaded & Globalized");

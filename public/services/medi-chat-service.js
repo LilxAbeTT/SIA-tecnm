@@ -1,6 +1,12 @@
 window.MediChatService = (function () {
   const C_CONVS = 'medi-conversations';
   const C_MSGS = 'messages';
+  const buildConversationId = (studentId, professionalUid, profileId = null) => {
+    const scopeKey = profileId ? `profile_${profileId}` : `user_${professionalUid}`;
+    return ['medi', studentId, scopeKey]
+      .map((part) => encodeURIComponent(String(part || '').trim()))
+      .join('__');
+  };
 
   // 1. Create or Get existing conversation
   async function getOrCreateConversation(ctx, myUid, myName, otherUid, otherName, myRole, profileId = null) {
@@ -33,29 +39,36 @@ window.MediChatService = (function () {
       return { id: snap.docs[0].id, ...snap.docs[0].data() };
     }
 
-    // Create new
-    const docRef = ctx.db.collection(C_CONVS).doc();
+    const studentId = myRole === 'student' ? myUid : otherUid;
+    const studentName = myRole === 'student' ? myName : otherName;
+    const professionalUid = myRole === 'student' ? otherUid : myUid;
+    const professionalName = myRole === 'student' ? otherName : myName;
+    const docRef = ctx.db.collection(C_CONVS).doc(buildConversationId(studentId, professionalUid, profileId));
     const now = firebase.firestore.FieldValue.serverTimestamp();
 
     const data = {
       createdAt: now,
       updatedAt: now,
-      studentId: myRole === 'student' ? myUid : otherUid,
-      studentName: myRole === 'student' ? myName : otherName,
-      profesionalId: myRole === 'student' ? otherUid : myUid,
-      profesionalName: myRole === 'student' ? otherName : myName,
+      studentId,
+      studentName,
+      profesionalId: professionalUid,
+      profesionalName: professionalName,
       profesionalProfileId: profileId || null,
-      participants: [myUid, otherUid], // Basic UID array for security rules
+      participants: Array.from(new Set([studentId, professionalUid, profileId].filter(Boolean))),
       lastMessage: '',
       lastMessageAt: now,
       unreadByStudent: 0,
       unreadByProfesional: 0
     };
 
-    if (profileId) data.participants.push(profileId); // Add profile ID to participants for rules if needed
-
-    await docRef.set(data);
-    return { id: docRef.id, ...data };
+    return ctx.db.runTransaction(async (tx) => {
+      const existing = await tx.get(docRef);
+      if (existing.exists) {
+        return { id: existing.id, ...existing.data() };
+      }
+      tx.set(docRef, data);
+      return { id: docRef.id, ...data };
+    });
   }
 
   // 2. Send Message
@@ -170,12 +183,21 @@ window.MediChatService = (function () {
     });
   }
 
+  // 7. Set Typing Status (best-effort, no throw)
+  async function setTyping(ctx, convId, senderRole, isTyping) {
+    const field = senderRole === 'student' ? 'isTypingStudent' : 'isTypingProfesional';
+    try {
+      await ctx.db.collection(C_CONVS).doc(convId).update({ [field]: isTyping });
+    } catch (e) { /* typing status is best-effort */ }
+  }
+
   return {
     getOrCreateConversation,
     sendMessage,
     markAsRead,
     streamConversations,
     streamMessages,
-    streamUnreadCount
+    streamUnreadCount,
+    setTyping
   };
 })();

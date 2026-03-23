@@ -149,7 +149,7 @@ class VocacionalLanding extends HTMLElement {
                 </section>
 
                 <!-- CARRERAS SECTION -->
-                <section class="careers-section py-5 bg-light position-relative">
+                <section class="careers-section py-5  position-relative">
                     <div class="container">
                         <div class="text-center mb-5 animate-fade-up">
                             <h2 class="fw-bold mb-2">Conoce Nuestras Carreras</h2>
@@ -179,7 +179,7 @@ class VocacionalLanding extends HTMLElement {
                                         <h5 class="fw-bolder text-dark mb-2" style="font-size: 1.15rem;">${career.title}</h5>
                                         <p class="text-muted small mb-4" style="line-height: 1.6;">${career.desc}</p>
                                         
-                                        <div class="mt-auto bg-light rounded-3 p-3 position-relative border">
+                                        <div class="mt-auto  rounded-3 p-3 position-relative border">
                                             <i class="bi bi-chat-quote-fill position-absolute text-primary opacity-25" style="top: -10px; right: 10px; font-size: 2rem;"></i>
                                             <span class="badge bg-dark mb-2">💡 El Tip</span>
                                             <p class="mb-0 small fst-italic fw-medium text-dark">${career.tip}</p>
@@ -222,23 +222,23 @@ class VocacionalLanding extends HTMLElement {
                                             <!-- Nombre -->
                                             <div class="col-md-12">
                                                 <label class="form-label fw-bold small text-muted">Nombre Completo <span class="text-danger">*</span></label>
-                                                <input type="text" class="form-control bg-light border-0 py-2 py-md-3" id="v-name" placeholder="Ej. Juan Pérez García" required>
+                                                <input type="text" class="form-control  border-0 py-2 py-md-3" id="v-name" placeholder="Ej. Juan Pérez García" required>
                                             </div>
                                             
                                             <!-- Teléfono & Email -->
                                             <div class="col-md-6">
                                                 <label class="form-label fw-bold small text-muted">Teléfono Móvil <span class="text-danger">*</span></label>
-                                                <input type="tel" class="form-control bg-light border-0 py-2 py-md-3" id="v-phone" placeholder="10 dígitos" minlength="10" maxlength="10" pattern="[0-9]{10}" required>
+                                                <input type="tel" class="form-control  border-0 py-2 py-md-3" id="v-phone" placeholder="10 dígitos" minlength="10" maxlength="10" pattern="[0-9]{10}" required>
                                             </div>
                                             <div class="col-md-6">
                                                 <label class="form-label fw-bold small text-muted">Correo (Opcional)</label>
-                                                <input type="email" class="form-control bg-light border-0 py-2 py-md-3" id="v-email" placeholder="correo@ejemplo.com">
+                                                <input type="email" class="form-control  border-0 py-2 py-md-3" id="v-email" placeholder="correo@ejemplo.com">
                                             </div>
 
                                             <!-- Preparatoria -->
                                             <div class="col-md-12 mt-3">
                                                  <label class="form-label fw-bold small text-muted">¿De qué preparatoria provienes? <span class="text-danger">*</span></label>
-                                                 <select class="form-select bg-light border-0 py-2 py-md-3" id="v-highschool" required>
+                                                 <select class="form-select  border-0 py-2 py-md-3" id="v-highschool" required>
                                                     <option value="" disabled selected>-- Selecciona tu preparatoria --</option>
                                                     <optgroup label="Bachilleratos Públicos">
                                                         ${VocacionalService.VOCACIONAL_CATALOGS.highSchools.filter(h => h.type === 'public').map(h => `<option value="${h.id}">${h.name}</option>`).join('')}
@@ -253,7 +253,7 @@ class VocacionalLanding extends HTMLElement {
                                             <!-- Otra Preparatoria Manual -->
                                             <div class="col-md-12 mt-3 d-none animate-fade-in" id="v-other-hs-container">
                                                 <label class="form-label fw-bold small text-muted">Escribe el nombre de tu preparatoria <span class="text-danger">*</span></label>
-                                                <input type="text" class="form-control bg-light border-0 py-2 py-md-3" id="v-highschool-other" placeholder="Nombre y ciudad de la prepa">
+                                                <input type="text" class="form-control  border-0 py-2 py-md-3" id="v-highschool-other" placeholder="Nombre y ciudad de la prepa">
                                             </div>
 
                                             <!-- Especialidad Técnica (Dinámico) -->
@@ -292,12 +292,12 @@ class VocacionalLanding extends HTMLElement {
                         <form id="recovery-form" onsubmit="event.preventDefault();">
                             <div class="mb-3">
                                 <label class="form-label fw-bold small">Teléfono (10 dígitos)</label>
-                                <input type="tel" class="form-control bg-light border-0 py-2" id="recover-phone" placeholder="5512345678" pattern="[0-9]{10}">
+                                <input type="tel" class="form-control  border-0 py-2" id="recover-phone" placeholder="5512345678" pattern="[0-9]{10}">
                             </div>
                             <div class="text-center mb-3 fw-bold text-muted small">O</div>
                             <div class="mb-4">
                                 <label class="form-label fw-bold small">Correo Institucional/Personal</label>
-                                <input type="email" class="form-control bg-light border-0 py-2" id="recover-email" placeholder="correo@ejemplo.com">
+                                <input type="email" class="form-control  border-0 py-2" id="recover-email" placeholder="correo@ejemplo.com">
                             </div>
                             <button type="submit" class="btn btn-primary w-100 rounded-pill fw-bold py-2 shadow-sm" id="btn-submit-recovery">Buscar Test</button>
                         </form>

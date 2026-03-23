@@ -1,0 +1,125 @@
+
+/* Animación de Entrada: Baja suavemente */
+@keyframes toast-slide-down {
+    from {
+        transform: translateY(-100%);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+/* Animación de Salida: Sube y desaparece */
+@keyframes toast-slide-up {
+    from {
+        transform: translateY(0);
+        opacity: 1;
+    }
+
+    to {
+        transform: translateY(-150%);
+        opacity: 0;
+    }
+}
+
+.toast-animate-enter {
+    animation: toast-slide-down 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+.toast-animate-exit {
+    animation: toast-slide-up 0.4s ease-in forwards;
+}
+
+/* Estilo visual mejorado (Glass/Moderno) */
+.toast-custom {
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+    border-radius: 50rem;
+    /* Pill shape */
+    min-width: 300px;
+    font-weight: 500;
+    border: none;
+}
+
+/* Iconos un poco más grandes */
+.toast-icon-box {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 50%;
+    margin-right: 0.75rem;
+}
+
+/* --- NUEVO SELECTOR DE HORARIOS (MEDI) --- */
+.time-slot-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+    gap: 0.75rem;
+    margin-top: 0.5rem;
+}
+
+/* --- MOBILE BOTTOM NAVIGATION (APP FEEL) --- */
+
+.bottom-nav-item {
+    color: #94a3b8;
+    text-decoration: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    font-size: 0.7rem;
+    font-weight: 600;
+    width: 60px;
+    transition: all 0.2s ease;
+    position: relative;
+}
+
+/* Active States */
+.bottom-nav-item.active {
+    color: var(--primary);
+}
+
+/* Indicador de módulo activo */
+.bottom-nav-item[data-module="aula"].active {
+    color: var(--aula);
+}
+
+.bottom-nav-item[data-module="medi"].active {
+    color: var(--med);
+}
+
+.bottom-nav-item[data-module="biblio"].active {
+    color: var(--biblio);
+}
+
+/* --- PERFIL PRO V2 --- */
+.profile-cover-image {
+    height: 200px;
+    background: linear-gradient(135deg, var(--primary), #1e1b4b);
+    position: relative;
+}
+
+.kardex-stat-box {
+    background: var(--surface-muted);
+    border-radius: 1rem;
+    padding: 1rem;
+    text-align: center;
+    border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+/* Digital Credential Flip Effect (Opcional, por ahora estático elegante) */
+.digital-id-card {
+    background: linear-gradient(135deg, #0f172a 0%, #334155 100%);
+    color: white;
+    border-radius: 16px;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+    aspect-ratio: 1.586;
+}

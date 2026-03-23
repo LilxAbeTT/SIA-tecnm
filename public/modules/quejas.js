@@ -7,7 +7,14 @@ if (!window.Quejas) {
         let _ctx = null;
         let _profile = null;
         let _isAdmin = false;
-        // ... (rest of the module) ...
+
+        let _studentLastDoc = null;
+        let _adminLastDoc = null;
+        let _studentHasMore = true;
+        let _adminHasMore = true;
+        let _isLoading = false;
+        let _legacyMigrationSweepStarted = false;
+
         const show = (el) => el?.classList.remove('d-none');
         const hide = (el) => el?.classList.add('d-none');
         const formatDate = (date) => {
@@ -15,6 +22,43 @@ if (!window.Quejas) {
             return new Date(date).toLocaleDateString('es-MX', {
                 day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'
             });
+        };
+        const esc = (value) => typeof window.escapeHtml === 'function'
+            ? window.escapeHtml(String(value ?? ''))
+            : String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
+        const sanitizeUrl = (value) => {
+            if (!value) return '';
+            try {
+                const url = new URL(value, window.location.origin);
+                if (!['http:', 'https:'].includes(url.protocol)) return '';
+                return esc(url.toString());
+            } catch (error) {
+                return '';
+            }
+        };
+        const getPublicResponseCount = (ticket) => {
+            if (Number.isInteger(ticket?.publicResponseCount)) return ticket.publicResponseCount;
+            const history = Array.isArray(ticket?.history) ? ticket.history : [];
+            return history.filter(entry => entry?.type !== 'internal').length;
+        };
+        const getLastInternalNote = (ticket) => {
+            if (typeof ticket?.lastInternalNotePreview === 'string' && ticket.lastInternalNotePreview) {
+                return { message: ticket.lastInternalNotePreview };
+            }
+            const history = Array.isArray(ticket?.history) ? ticket.history : [];
+            return history.filter(entry => entry?.type === 'internal').pop() || null;
+        };
+        const isQuejasAdminProfile = (profile) => {
+            if (window.QuejasService?.isQuejasAdminProfile) return window.QuejasService.isQuejasAdminProfile(profile);
+            const role = String(profile?.role || '').toLowerCase();
+            const permission = String(profile?.permissions?.quejas || '').toLowerCase();
+            const email = String(profile?.email || profile?.emailInstitucional || '').toLowerCase();
+            return role === 'superadmin' || (role === 'department_admin' && permission === 'admin') || email === 'calidad@loscabos.tecnm.mx';
+        };
+        const csvCell = (value) => {
+            const text = String(value ?? '').replace(/\r?\n/g, ' ').trim();
+            const safe = /^[=+\-@]/.test(text) ? `'${text}` : text;
+            return `"${safe.replace(/"/g, '""')}"`;
         };
 
         const CANNED_RESPONSES = {
@@ -53,7 +97,7 @@ if (!window.Quejas) {
             }
 
             // 1. Check Permissions
-            _isAdmin = _profile.permissions?.quejas === 'admin' || _profile.email === 'calidad@loscabos.tecnm.mx';
+            _isAdmin = isQuejasAdminProfile(_profile);
 
             // 2. Render Layout
             renderLayout(container);
@@ -88,7 +132,7 @@ if (!window.Quejas) {
                 ui.classList.add('d-none');
             } catch (err) {
                 console.error("Error accessing camera:", err);
-                alert("No se pudo acceder a la cámara. Por favor verifica los permisos.");
+                showToast("No se pudo acceder a la cámara. Verifica los permisos del navegador.", "warning");
             }
         }
 
@@ -285,19 +329,19 @@ if (!window.Quejas) {
                                         <label class="form-label small fw-bold text-muted mb-2">¿Qué deseas enviar?</label>
                                         <div class="d-flex gap-2">
                                             <input type="radio" class="btn-check" name="q-tipo" id="t-queja" value="queja" checked>
-                                            <label class="btn btn-outline-light text-dark border-0 bg-light flex-grow-1 shadow-sm rounded-3 py-3 btn-card-select" for="t-queja">
+                                            <label class="btn btn-outline-light text-dark border-0  flex-grow-1 shadow-sm rounded-3 py-3 btn-card-select" for="t-queja">
                                                 <i class="bi bi-exclamation-triangle-fill d-block fs-4 mb-1 text-warning"></i>
                                                 <span class="small fw-bold">Queja</span>
                                             </label>
 
                                             <input type="radio" class="btn-check" name="q-tipo" id="t-sugerencia" value="sugerencia">
-                                            <label class="btn btn-outline-light text-dark border-0 bg-light flex-grow-1 shadow-sm rounded-3 py-3 btn-card-select" for="t-sugerencia">
+                                            <label class="btn btn-outline-light text-dark border-0  flex-grow-1 shadow-sm rounded-3 py-3 btn-card-select" for="t-sugerencia">
                                                 <i class="bi bi-lightbulb-fill d-block fs-4 mb-1 text-info"></i>
                                                 <span class="small fw-bold">Sugerencia</span>
                                             </label>
 
                                             <input type="radio" class="btn-check" name="q-tipo" id="t-felicitacion" value="felicitacion">
-                                            <label class="btn btn-outline-light text-dark border-0 bg-light flex-grow-1 shadow-sm rounded-3 py-3 btn-card-select" for="t-felicitacion">
+                                            <label class="btn btn-outline-light text-dark border-0  flex-grow-1 shadow-sm rounded-3 py-3 btn-card-select" for="t-felicitacion">
                                                 <i class="bi bi-heart-fill d-block fs-4 mb-1 text-danger"></i>
                                                 <span class="small fw-bold">Felicitación</span>
                                             </label>
@@ -309,32 +353,32 @@ if (!window.Quejas) {
                                         <label class="form-label small fw-bold text-muted mb-2">Categoría</label>
                                         <div class="d-grid gap-2" style="grid-template-columns: 1fr 1fr;">
                                             <input type="radio" class="btn-check" name="q-cat" id="c-infra" value="infraestructura" checked>
-                                            <label class="btn btn-outline-light text-start text-dark border-0 bg-light shadow-sm rounded-3 p-3 btn-card-select" for="c-infra">
+                                            <label class="btn btn-outline-light text-start text-dark border-0  shadow-sm rounded-3 p-3 btn-card-select" for="c-infra">
                                                 <i class="bi bi-building-fill me-2 text-secondary"></i>Infraestructura
                                             </label>
 
                                             <input type="radio" class="btn-check" name="q-cat" id="c-serv" value="servicios">
-                                            <label class="btn btn-outline-light text-start text-dark border-0 bg-light shadow-sm rounded-3 p-3 btn-card-select" for="c-serv">
+                                            <label class="btn btn-outline-light text-start text-dark border-0  shadow-sm rounded-3 p-3 btn-card-select" for="c-serv">
                                                 <i class="bi bi-router-fill me-2 text-secondary"></i>Servicios
                                             </label>
 
                                             <input type="radio" class="btn-check" name="q-cat" id="c-doc" value="docentes">
-                                            <label class="btn btn-outline-light text-start text-dark border-0 bg-light shadow-sm rounded-3 p-3 btn-card-select" for="c-doc">
+                                            <label class="btn btn-outline-light text-start text-dark border-0  shadow-sm rounded-3 p-3 btn-card-select" for="c-doc">
                                                 <i class="bi bi-book-half me-2 text-secondary"></i>Docentes
                                             </label>
 
                                             <input type="radio" class="btn-check" name="q-cat" id="c-adm" value="administrativo">
-                                            <label class="btn btn-outline-light text-start text-dark border-0 bg-light shadow-sm rounded-3 p-3 btn-card-select" for="c-adm">
+                                            <label class="btn btn-outline-light text-start text-dark border-0  shadow-sm rounded-3 p-3 btn-card-select" for="c-adm">
                                                 <i class="bi bi-file-earmark-text-fill me-2 text-secondary"></i>Trámites
                                             </label>
 
                                             <input type="radio" class="btn-check" name="q-cat" id="c-limp" value="limpieza">
-                                            <label class="btn btn-outline-light text-start text-dark border-0 bg-light shadow-sm rounded-3 p-3 btn-card-select" for="c-limp">
+                                            <label class="btn btn-outline-light text-start text-dark border-0  shadow-sm rounded-3 p-3 btn-card-select" for="c-limp">
                                                 <i class="bi bi-stars me-2 text-secondary"></i>Limpieza
                                             </label>
 
                                             <input type="radio" class="btn-check" name="q-cat" id="c-otro" value="otro">
-                                            <label class="btn btn-outline-light text-start text-dark border-0 bg-light shadow-sm rounded-3 p-3 btn-card-select" for="c-otro">
+                                            <label class="btn btn-outline-light text-start text-dark border-0  shadow-sm rounded-3 p-3 btn-card-select" for="c-otro">
                                                 <i class="bi bi-three-dots me-2 text-secondary"></i>Otro
                                             </label>
                                         </div>
@@ -342,7 +386,7 @@ if (!window.Quejas) {
 
                                     <div class="mb-4">
                                         <label class="form-label small fw-bold text-muted">Descripción</label>
-                                        <textarea class="form-control border-0 bg-light shadow-inner" id="q-desc" rows="4" required placeholder="Describe la situación con el mayor detalle posible..."></textarea>
+                                        <textarea class="form-control border-0  shadow-inner" id="q-desc" rows="4" required placeholder="Describe la situación con el mayor detalle posible..."></textarea>
                                     </div>
 
                                     <!-- 3. EVIDENCIA (Mobile Optimized) -->
@@ -365,7 +409,7 @@ if (!window.Quejas) {
 
                                         <!-- Preview -->
                                         <div id="evidence-preview-container" class="position-relative mt-3 d-none animate-fade-in">
-                                            <div class="ratio ratio-16x9 rounded-4 overflow-hidden border shadow-sm bg-light">
+                                            <div class="ratio ratio-16x9 rounded-4 overflow-hidden border shadow-sm ">
                                                 <img id="evidence-preview-img" class="object-fit-cover w-100 h-100" alt="Vista previa">
                                             </div>
                                             <button type="button" class="btn btn-sm btn-danger rounded-circle position-absolute top-0 end-0 m-2 shadow" onclick="Quejas.clearEvidence()" style="width: 32px; height: 32px; z-index: 10;">
@@ -394,7 +438,7 @@ if (!window.Quejas) {
                                     </div>
 
                                     <div class="mb-4">
-                                        <div class="form-check form-switch p-3 bg-light rounded-3">
+                                        <div class="form-check form-switch p-3  rounded-3">
                                             <input class="form-check-input ms-0 me-2" type="checkbox" id="q-anon" style="float: none;">
                                             <label class="form-check-label small fw-bold text-muted" for="q-anon">
                                                 Enviar como Anónimo <i class="bi bi-info-circle-fill ms-1" title="Tu reporte será tratado con discreción."></i>
@@ -446,7 +490,7 @@ if (!window.Quejas) {
         function askForConfirmation() {
             const desc = document.getElementById('q-desc').value;
             if (desc.trim().length < 10) {
-                alert("Por favor detalla un poco más la descripción.");
+                showToast("Por favor detalla un poco más la descripción.", "warning");
                 return;
             }
             const modal = new bootstrap.Modal(document.getElementById('modalConfirmSubmit'));
@@ -461,9 +505,22 @@ if (!window.Quejas) {
 
             const btn = document.getElementById('btn-queja-submit');
             // Get values from Radios
-            const tipo = document.querySelector('input[name="q-tipo"]:checked').value;
-            const cat = document.querySelector('input[name="q-cat"]:checked').value;
-            const desc = document.getElementById('q-desc').value;
+            const tipoInput = document.querySelector('input[name="q-tipo"]:checked');
+            const catInput = document.querySelector('input[name="q-cat"]:checked');
+            const desc = document.getElementById('q-desc').value.trim();
+
+            if (!tipoInput || !catInput) {
+                showToast('Selecciona el tipo y la categoria del reporte.', 'warning');
+                return;
+            }
+
+            if (desc.length < 10) {
+                showToast('Describe un poco mejor el caso antes de enviarlo.', 'warning');
+                return;
+            }
+
+            const tipo = tipoInput.value;
+            const cat = catInput.value;
 
             btn.disabled = true;
             btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Enviando...';
@@ -513,25 +570,49 @@ if (!window.Quejas) {
             }
         }
 
-        async function initStudentView() {
+        async function initStudentView(append = false) {
+            if (_isLoading) return;
             const list = document.getElementById('student-tickets-list');
-            // Check if list exists (might not if we are in admin view or weird state)
             if (!list) return;
 
+            if (!append) {
+                _studentLastDoc = null;
+                _studentHasMore = true;
+                list.innerHTML = `<div class="text-center py-5 text-muted"><span class="spinner-border spinner-border-sm"></span> Cargando...</div>`;
+            } else {
+                const lm = document.getElementById('btn-load-more-student');
+                if (lm) lm.remove();
+                list.insertAdjacentHTML('beforeend', `<div id="row-loading" class="text-center py-3 text-muted"><span class="spinner-border spinner-border-sm"></span> Buscando...</div>`);
+            }
+
+            _isLoading = true;
             try {
-                const tickets = await QuejasService.getTicketsByUser(_ctx, _ctx.user.uid);
-                renderTicketList(tickets, list);
+                const tickets = await QuejasService.getTicketsByUser(_ctx, _ctx.user.uid, {
+                    limit: 20,
+                    lastDoc: _studentLastDoc
+                });
+
+                _isLoading = false;
+                const loadingRow = document.getElementById('row-loading');
+                if (loadingRow) loadingRow.remove();
+
+                if (tickets.length < 20) _studentHasMore = false;
+                if (tickets.length > 0) _studentLastDoc = tickets[tickets.length - 1]._doc;
+
+                renderTicketList(tickets, list, append);
             } catch (e) {
+                _isLoading = false;
                 console.error(e);
-                list.innerHTML = `<div class="alert alert-danger border-0 small">Error al cargar tickets.</div>`;
+                if (!append) list.innerHTML = `<div class="alert alert-danger border-0 small">Error al cargar tickets.</div>`;
             }
         }
 
-        function renderTicketList(tickets, container) {
-            container.innerHTML = '';
-            if (tickets.length === 0) {
+        function renderTicketList(tickets, container, append = false) {
+            if (!append) container.innerHTML = '';
+
+            if (!append && tickets.length === 0) {
                 container.innerHTML = `
-                    <div class="text-center py-5 text-muted bg-light rounded-4 border border-dashed">
+                    <div class="text-center py-5 text-muted  rounded-4 border border-dashed">
                         <i class="bi bi-inbox fs-1 d-block mb-2 opacity-50"></i>
                         <p class="small mb-0">No has enviado ninguna solicitud aún.</p>
                     </div>
@@ -547,7 +628,8 @@ if (!window.Quejas) {
                     'rechazado': 'bg-danger text-white'
                 };
                 const badge = statusColors[t.status] || 'bg-secondary text-white';
-                const statusLabel = t.status.replace('-', ' ').toUpperCase();
+                const statusLabel = String(t.status || 'pendiente').replace('-', ' ').toUpperCase();
+                const publicResponses = getPublicResponseCount(t);
 
                 const card = document.createElement('div');
                 card.className = 'card border-0 shadow-sm rounded-4 hover-scale cursor-pointer';
@@ -556,15 +638,23 @@ if (!window.Quejas) {
                     <div class="card-body p-3">
                         <div class="d-flex justify-content-between align-items-start mb-2">
                             <span class="badge ${badge} rounded-pill shadow-sm">${statusLabel}</span>
-                            <small class="text-muted fw-bold">${formatDate(t.createdAt)}</small>
+                            <small class="text-muted fw-bold">${formatDate(t.updatedAt || t.createdAt)}</small>
                         </div>
-                        <h6 class="fw-bold text-dark mb-1 text-truncate">${t.tipo.toUpperCase()}: ${t.categoria}</h6>
-                        <p class="small text-muted mb-0 text-truncate">${t.descripcion}</p>
-                        ${t.history?.length > 0 ? `<div class="mt-2 extra-small text-primary fw-bold"><i class="bi bi-chat-dots me-1"></i>${t.history.length} respuesta(s)</div>` : ''}
+                        <h6 class="fw-bold text-dark mb-1 text-truncate">${esc(String(t.tipo || '').toUpperCase())}: ${esc(t.categoria)}</h6>
+                        <p class="small text-muted mb-0 text-truncate">${esc(t.descripcion)}</p>
+                        ${publicResponses > 0 ? `<div class="mt-2 extra-small text-primary fw-bold"><i class="bi bi-chat-dots me-1"></i>${publicResponses} respuesta(s)</div>` : ''}
                     </div>
                 `;
                 container.appendChild(card);
             });
+
+            if (_studentHasMore) {
+                container.insertAdjacentHTML('beforeend', `
+                    <button id="btn-load-more-student" class="btn btn-outline-primary btn-sm rounded-pill mt-2" onclick="Quejas.initStudentView(true)">
+                        <i class="bi bi-arrow-down-circle"></i> Cargar más
+                    </button>
+                `);
+            }
         }
 
         // ==========================================
@@ -595,17 +685,18 @@ if (!window.Quejas) {
                              <button class="btn btn-sm btn-outline-success rounded-pill fw-bold" onclick="Quejas.downloadCSV()">
                                 <i class="bi bi-file-earmark-spreadsheet me-1"></i> Exportar
                              </button>
-                             <select class="form-select form-select-sm rounded-pill bg-light border-0 fw-bold" id="admin-filter-status" onchange="Quejas.initAdminView()">
+                             <select class="form-select form-select-sm rounded-pill  border-0 fw-bold" id="admin-filter-status" onchange="Quejas.initAdminView()">
                                 <option value="all">Todos los estados</option>
                                 <option value="pendiente">Pendientes</option>
                                 <option value="en-proceso">En Proceso</option>
                                 <option value="resuelto">Resueltos</option>
+                                <option value="rechazado">Rechazados</option>
                             </select>
                         </div>
                     </div>
                     <div class="table-responsive">
                         <table class="table align-middle table-hover mb-0">
-                            <thead class="bg-light small text-muted text-uppercase">
+                            <thead class=" small text-muted text-uppercase">
                                 <tr>
                                     <th class="ps-4">Folio/Fecha</th>
                                     <th>Usuario</th>
@@ -623,21 +714,62 @@ if (!window.Quejas) {
             `;
         }
 
-        async function initAdminView() {
+        async function initAdminView(append = false) {
+            if (_isLoading) return;
             const filter = document.getElementById('admin-filter-status')?.value || 'all';
 
-            // 1. Load Stats
-            QuejasService.getStats(_ctx).then(renderAdminStats);
+            // 1. Load Stats (only on initial load)
+            if (!append) {
+                if (_isAdmin && !_legacyMigrationSweepStarted && window.QuejasService?.migrateAllLegacyTickets) {
+                    _legacyMigrationSweepStarted = true;
+                    QuejasService.migrateAllLegacyTickets(_ctx).catch(error => {
+                        console.warn('[Quejas] Barrido de migracion legacy pendiente:', error);
+                    });
+                }
+
+                QuejasService.getStats(_ctx)
+                    .then(renderAdminStats)
+                    .catch(() => {
+                        const container = document.getElementById('admin-kpis');
+                        if (container) container.innerHTML = '<div class="col-12 text-danger small">No se pudieron cargar las estadísticas.</div>';
+                    });
+            }
 
             // 2. Load Tickets
             const tbody = document.getElementById('admin-ticket-table');
-            tbody.innerHTML = '<tr><td colspan="5" class="text-center py-4 text-muted"><span class="spinner-border spinner-border-sm"></span></td></tr>';
+
+            if (!append) {
+                _adminLastDoc = null;
+                _adminHasMore = true;
+                tbody.innerHTML = '<tr><td colspan="5" class="text-center py-4 text-muted"><span class="spinner-border spinner-border-sm"></span> Cargando...</td></tr>';
+            } else {
+                const lm = document.getElementById('row-load-more-admin');
+                if (lm) lm.remove();
+                tbody.insertAdjacentHTML('beforeend', '<tr id="row-loading-admin"><td colspan="5" class="text-center py-3 text-muted"><span class="spinner-border spinner-border-sm"></span> Buscando...</td></tr>');
+            }
+
+            _isLoading = true;
 
             try {
-                const tickets = await QuejasService.getAllTickets(_ctx, { status: filter });
-                renderAdminTable(tickets, tbody);
+                const tickets = await QuejasService.getAllTickets(_ctx, { status: filter }, { limit: 20, lastDoc: _adminLastDoc });
+                _isLoading = false;
+
+                const loader = document.getElementById('row-loading-admin');
+                if (loader) loader.remove();
+
+                if (tickets.length < 20) _adminHasMore = false;
+                if (tickets.length > 0) _adminLastDoc = tickets[tickets.length - 1]._doc;
+
+                renderAdminTable(tickets, tbody, append);
+
+                if (tickets.length && _isAdmin && window.QuejasService?.migrateLegacyTickets) {
+                    QuejasService.migrateLegacyTickets(_ctx, tickets).catch(error => {
+                        console.warn('[Quejas] Migracion legacy pendiente:', error);
+                    });
+                }
             } catch (e) {
-                tbody.innerHTML = '<tr><td colspan="5" class="text-center text-danger py-4">Error cargando datos.</td></tr>';
+                _isLoading = false;
+                if (!append) tbody.innerHTML = '<tr><td colspan="5" class="text-center text-danger py-4">Error cargando datos.</td></tr>';
             }
         }
 
@@ -671,7 +803,7 @@ if (!window.Quejas) {
                     </div>
                 </div>
                 <div class="col-6 col-md-3">
-                    <div class="card border-0 bg-light h-100 rounded-4">
+                    <div class="card border-0  h-100 rounded-4">
                         <div class="card-body text-center p-3">
                             <h2 class="fw-bold text-dark mb-0 display-4">${stats.total}</h2>
                             <span class="small fw-bold text-muted text-uppercase">Total Histórico</span>
@@ -681,9 +813,10 @@ if (!window.Quejas) {
             `;
         }
 
-        function renderAdminTable(tickets, tbody) {
-            tbody.innerHTML = '';
-            if (tickets.length === 0) {
+        function renderAdminTable(tickets, tbody, append = false) {
+            if (!append) tbody.innerHTML = '';
+
+            if (!append && tickets.length === 0) {
                 tbody.innerHTML = '<tr><td colspan="5" class="text-center py-4 text-muted">No se encontraron tickets.</td></tr>';
                 return;
             }
@@ -698,40 +831,53 @@ if (!window.Quejas) {
                     'en-proceso': 'bg-info text-white',
                     'resuelto': 'bg-success text-white',
                     'rechazado': 'bg-danger text-white'
-                }[t.status] || 'bg-light text-dark';
+                }[t.status] || ' text-dark';
 
                 // Find latest internal note
-                const lastInternal = (t.history || []).filter(h => h.type === 'internal').pop();
+                const lastInternal = getLastInternalNote(t);
+                const activityDate = t.updatedAt || t.createdAt;
 
                 tr.innerHTML = `
                     <td class="ps-4">
-                        <div class="fw-bold text-dark">#${t.id.slice(0, 6)}</div>
-                        <div class="extra-small text-muted">${formatDate(t.createdAt)}</div>
+                        <div class="fw-bold text-dark">#${esc(t.id.slice(0, 6))}</div>
+                        <div class="extra-small text-muted">${formatDate(activityDate)}</div>
                     </td>
                     <td>
                         <div class="small fw-bold text-dark">
-                            ${t.userName} 
+                            ${esc(t.userName)} 
                             ${t.isAnonymous ? '<span class="badge bg-dark ms-1"><i class="bi bi-incognito"></i></span>' : ''}
                         </div>
-                        <div class="extra-small text-muted">${t.matricula || 'N/A'}</div>
+                        <div class="extra-small text-muted">${esc(t.matricula || 'N/A')}</div>
                     </td>
                     <td>
-                        <div class="badge bg-light text-dark mb-1 border">${t.tipo}</div>
-                        <div class="small text-muted">${t.categoria}</div>
+                        <div class="badge  text-dark mb-1 border">${esc(t.tipo)}</div>
+                        <div class="small text-muted">${esc(t.categoria)}</div>
                         ${lastInternal ? `
                             <div class="mt-1 p-1 bg-warning bg-opacity-10 border border-warning border-opacity-25 rounded-2 d-inline-block" style="max-width: 200px;">
                                 <div class="d-flex align-items-center text-warning-emphasis extra-small fw-bold">
                                     <i class="bi bi-lock-fill me-1"></i> Nota Interna
                                 </div>
-                                <div class="text-truncate extra-small text-dark opacity-75">${lastInternal.message}</div>
+                                <div class="text-truncate extra-small text-dark opacity-75">${esc(lastInternal.message)}</div>
                             </div>
                         ` : ''}
                     </td>
-                    <td><span class="badge ${badgeClass} rounded-pill">${t.status}</span></td>
+                    <td><span class="badge ${badgeClass} rounded-pill">${esc(t.status)}</span></td>
                     <td><button class="btn btn-sm btn-light rounded-circle shadow-sm"><i class="bi bi-chevron-right"></i></button></td>
                 `;
                 tbody.appendChild(tr);
             });
+
+            if (_adminHasMore) {
+                tbody.insertAdjacentHTML('beforeend', `
+                    <tr id="row-load-more-admin">
+                        <td colspan="5" class="text-center py-3">
+                            <button class="btn btn-outline-primary btn-sm rounded-pill" onclick="Quejas.initAdminView(true)">
+                                <i class="bi bi-arrow-down-circle"></i> Cargar más
+                            </button>
+                        </td>
+                    </tr>
+                `);
+            }
         }
 
         // ==========================================
@@ -739,7 +885,186 @@ if (!window.Quejas) {
         // ==========================================
         let _activeTicket = null;
 
-        function openDetailModal(ticket) {
+        function renderHistoryEntrySafe(entry) {
+            const entryDate = entry.date || entry.createdAt;
+
+            if (entry.type === 'internal') {
+                if (!_isAdmin) return '';
+                return `
+                    <div class="d-flex mb-3 justify-content-center">
+                        <div class="card border-0 shadow-sm rounded-4 bg-warning bg-opacity-10 border-warning border-opacity-25" style="width: 85%;">
+                            <div class="card-body p-2">
+                                <div class="d-flex align-items-center mb-1 text-warning-emphasis">
+                                    <i class="bi bi-lock-fill me-2"></i>
+                                    <strong class="extra-small">Nota Interna (${esc(entry.author)})</strong>
+                                    <span class="extra-small ms-auto opacity-75">${formatDate(entryDate)}</span>
+                                </div>
+                                <p class="small mb-0 text-dark opacity-75 fst-italic">${esc(entry.message)}</p>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            const isStatusChange = entry.type === 'status_change';
+            const isMe = (_isAdmin && entry.role === 'admin') || (!_isAdmin && entry.role !== 'admin');
+            const alignment = isStatusChange ? 'justify-content-center' : (isMe ? 'justify-content-end' : 'justify-content-start');
+            const cardBg = isStatusChange ? 'bg-light border' : (isMe ? 'bg-primary bg-opacity-10 border-primary border-opacity-10' : '');
+            const authorClass = isStatusChange ? 'text-muted text-uppercase extra-small fw-bold' : (isMe ? 'text-primary' : 'text-muted');
+            const authorLabel = isStatusChange ? 'Cambio de Estado' : esc(entry.author);
+
+            return `
+                <div class="d-flex mb-3 ${alignment}">
+                    <div class="card border-0 shadow-sm rounded-4 ${cardBg}" style="max-width: 85%;">
+                        <div class="card-body p-3">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <strong class="extra-small ${authorClass}">${authorLabel}</strong>
+                                <span class="extra-small text-muted ms-3">${formatDate(entryDate)}</span>
+                            </div>
+                            <p class="small mb-0 text-dark">${esc(entry.message)}</p>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderDetailModalSafe(ticket) {
+            const modalEl = document.getElementById('modalQuejaDetail');
+            const modalBody = document.getElementById('modal-queja-body');
+            let bsModal = bootstrap.Modal.getInstance(modalEl);
+            if (!bsModal) bsModal = new bootstrap.Modal(modalEl);
+
+            const badgeClass = {
+                'pendiente': 'bg-warning text-dark',
+                'en-proceso': 'bg-info text-white',
+                'resuelto': 'bg-success text-white',
+                'rechazado': 'bg-danger text-white'
+            }[ticket.status] || 'bg-secondary text-white';
+            const historyHtml = (ticket.responses || []).map(renderHistoryEntrySafe).join('');
+            let adminControls = '';
+            let cannedResponsesHtml = '';
+
+            if (_isAdmin) {
+                const opts = (CANNED_RESPONSES[ticket.tipo] || CANNED_RESPONSES['general']).concat(CANNED_RESPONSES['general']);
+                const uniqueOpts = [...new Set(opts)];
+
+                cannedResponsesHtml = `
+                    <div class="mb-2">
+                        <select class="form-select form-select-sm border-0 text-muted" onchange="document.getElementById('detail-reply-input').value = this.value; this.value='';">
+                            <option value="">Respuestas Rapidas...</option>
+                            ${uniqueOpts.map(r => `<option value="${esc(r)}">${esc(r.substring(0, 50))}...</option>`).join('')}
+                        </select>
+                    </div>
+                `;
+
+                adminControls = `
+                    <hr class="my-4">
+                    <h6 class="fw-bold small mb-3">Administrar Ticket</h6>
+                    <div class="row g-2 mb-3">
+                        <div class="col-auto">
+                            <select class="form-select form-select-sm" id="detail-new-status">
+                                <option value="pendiente" ${ticket.status === 'pendiente' ? 'selected' : ''}>Pendiente</option>
+                                <option value="en-proceso" ${ticket.status === 'en-proceso' ? 'selected' : ''}>En Proceso</option>
+                                <option value="resuelto" ${ticket.status === 'resuelto' ? 'selected' : ''}>Resuelto</option>
+                                <option value="rechazado" ${ticket.status === 'rechazado' ? 'selected' : ''}>Rechazado</option>
+                            </select>
+                        </div>
+                        <div class="col">
+                            <button class="btn btn-sm btn-dark w-100" onclick="Quejas.updateTicketStatus()">Actualizar Estado</button>
+                        </div>
+                    </div>
+                `;
+            }
+
+            const safeEvidenceUrl = sanitizeUrl(ticket.evidenciaUrl);
+
+            modalBody.innerHTML = `
+                <div class="d-flex justify-content-between align-items-start mb-3">
+                    <h5 class="fw-bold mb-0">Ticket #${esc(ticket.id.slice(0, 6))}</h5>
+                    <span class="badge ${badgeClass} rounded-pill px-3">${esc(String(ticket.status || '').toUpperCase())}</span>
+                </div>
+
+                <div class="p-3 rounded-4 mb-4">
+                    <div class="d-flex justify-content-between mb-2">
+                        <div class="row g-2 w-100">
+                            <div class="col-6"><small class="text-muted fw-bold d-block">Categoria</small><span class="text-dark small">${esc(ticket.categoria)}</span></div>
+                            <div class="col-6"><small class="text-muted fw-bold d-block">Tipo</small><span class="text-dark small">${esc(ticket.tipo)}</span></div>
+                        </div>
+                    </div>
+
+                    ${ticket.isAnonymous ? '<div class="badge bg-dark bg-opacity-75 mb-2"><i class="bi bi-incognito me-1"></i>Reporte Anonimo</div>' : ''}
+
+                    <small class="text-muted fw-bold d-block">Descripcion Original</small>
+                    <p class="text-dark small mb-0 mt-1 text-break">${esc(ticket.descripcion)}</p>
+
+                    ${safeEvidenceUrl ? `
+                        <div class="mt-3">
+                            <small class="text-muted fw-bold d-block mb-1">Evidencia Adjunta</small>
+                            <a href="${safeEvidenceUrl}" target="_blank" rel="noopener noreferrer">
+                                <img src="${safeEvidenceUrl}" class="img-fluid rounded-3 border shadow-sm" style="max-height: 200px; object-fit: cover;">
+                            </a>
+                        </div>
+                    ` : ''}
+                </div>
+
+                <h6 class="fw-bold small mb-3">Seguimiento y Respuestas</h6>
+                <div class="history-container mb-3 px-1" id="history-scroll-area" style="max-height: 300px; overflow-y: auto;">
+                    ${historyHtml.length ? historyHtml : '<p class="text-muted extra-small text-center fst-italic py-4">No hay respuestas aun.</p>'}
+                </div>
+
+                ${adminControls}
+
+                ${_isAdmin ? cannedResponsesHtml : ''}
+                <div class="card border-0 rounded-4 mt-3">
+                    <div class="card-body p-2">
+                        <div class="input-group mb-2">
+                            <textarea class="form-control border-0 bg-transparent shadow-none small" id="detail-reply-input" rows="2" placeholder="Escribe una respuesta..."></textarea>
+                            <button class="btn btn-primary rounded-3 shadow-sm ms-2" style="width: 40px;" onclick="Quejas.sendReply()">
+                                <i class="bi bi-send-fill text-white small"></i>
+                            </button>
+                        </div>
+                        ${_isAdmin ? `
+                            <div class="form-check form-switch ms-1">
+                                <input class="form-check-input" type="checkbox" id="detail-internal-check">
+                                <label class="form-check-label extra-small fw-bold text-muted" for="detail-internal-check"><i class="bi bi-lock-fill me-1"></i>Nota Interna (Solo Admin)</label>
+                            </div>
+                        ` : ''}
+                    </div>
+                </div>
+            `;
+
+            bsModal.show();
+
+            setTimeout(() => {
+                const area = document.getElementById('history-scroll-area');
+                if (area) area.scrollTop = area.scrollHeight;
+            }, 200);
+        }
+
+        async function openDetailModalSafe(ticket) {
+            const modalEl = document.getElementById('modalQuejaDetail');
+            const modalBody = document.getElementById('modal-queja-body');
+            let bsModal = bootstrap.Modal.getInstance(modalEl);
+            if (!bsModal) bsModal = new bootstrap.Modal(modalEl);
+
+            modalBody.innerHTML = '<div class="text-center py-5"><span class="spinner-border text-primary"></span></div>';
+            bsModal.show();
+
+            _activeTicket = await QuejasService.getTicketDetail(_ctx, ticket.id);
+            renderDetailModalSafe(_activeTicket);
+        }
+
+        async function openDetailModal(ticket) {
+            try {
+                return await openDetailModalSafe(ticket);
+            } catch (error) {
+                console.error(error);
+                showToast('No se pudo cargar el detalle del ticket.', 'danger');
+                return;
+            }
+        }
+
+        /*
             _activeTicket = ticket;
             const modalEl = document.getElementById('modalQuejaDetail');
             const modalBody = document.getElementById('modal-queja-body');
@@ -784,7 +1109,7 @@ if (!window.Quejas) {
 
                 const alignment = isMe ? 'justify-content-end' : 'justify-content-start';
                 // Styles: "Me" gets a distinct color (e.g., Primary/Light Blue), "Them" gets Gray/White
-                const cardBg = isMe ? 'bg-primary bg-opacity-10 border-primary border-opacity-10' : 'bg-light';
+                const cardBg = isMe ? 'bg-primary bg-opacity-10 border-primary border-opacity-10' : '';
                 const textColor = 'text-dark';
 
                 return `
@@ -813,7 +1138,7 @@ if (!window.Quejas) {
 
                 cannedResponsesHtml = `
                     <div class="mb-2">
-                        <select class="form-select form-select-sm bg-light border-0 text-muted" onchange="document.getElementById('detail-reply-input').value = this.value; this.value='';">
+                        <select class="form-select form-select-sm  border-0 text-muted" onchange="document.getElementById('detail-reply-input').value = this.value; this.value='';">
                             <option value="">⚡ Respuestas Rápidas...</option>
                             ${uniqueOpts.map(r => `<option value="${r}">${r.substring(0, 50)}...</option>`).join('')}
                         </select>
@@ -846,7 +1171,7 @@ if (!window.Quejas) {
                     <span class="badge ${badgeClass} rounded-pill px-3">${ticket.status.toUpperCase()}</span>
                 </div>
                 
-                <div class="bg-light p-3 rounded-4 mb-4">
+                <div class=" p-3 rounded-4 mb-4">
                     <div class="d-flex justify-content-between mb-2">
                         <div class="row g-2 w-100">
                             <div class="col-6"><small class="text-muted fw-bold d-block">Categoría</small><span class="text-dark small">${ticket.categoria}</span></div>
@@ -878,7 +1203,7 @@ if (!window.Quejas) {
     
                 <!-- Reply Form (Both) -->
                 ${_isAdmin ? cannedResponsesHtml : ''}
-                <div class="card bg-light border-0 rounded-4 mt-3">
+                <div class="card  border-0 rounded-4 mt-3">
                     <div class="card-body p-2">
                         <div class="input-group mb-2">
                             <textarea class="form-control border-0 bg-transparent shadow-none small" id="detail-reply-input" rows="2" placeholder="Escribe una respuesta..."></textarea>
@@ -904,6 +1229,7 @@ if (!window.Quejas) {
                 if (area) area.scrollTop = area.scrollHeight;
             }, 200);
         }
+        */
 
         async function updateTicketStatus() {
             const newStatus = document.getElementById('detail-new-status').value;
@@ -911,12 +1237,12 @@ if (!window.Quejas) {
 
             try {
                 await QuejasService.updateStatus(_ctx, _activeTicket.id, newStatus, `Estado actualizado a ${newStatus.toUpperCase()}`);
+                _activeTicket.status = newStatus;
                 showToast('Estado actualizado', 'success');
-                // Refresh
-                const modal = bootstrap.Modal.getInstance(document.getElementById('modalQuejaDetail'));
-                modal.hide();
                 initAdminView();
+                await openDetailModal(_activeTicket);
             } catch (e) {
+                console.error(e);
                 showToast("Error actualizando", "danger");
             }
         }
@@ -927,9 +1253,9 @@ if (!window.Quejas) {
             if (!msg) return;
 
             const role = _isAdmin ? 'admin' : 'student';
-            const name = _isAdmin ? 'Administración' : (_profile.displayName.split(' ')[0]);
+            const name = _isAdmin ? 'Administracion' : ((_profile.displayName || 'Usuario').split(' ')[0]);
+            const button = document.querySelector('#modalQuejaDetail .btn.btn-primary.rounded-3');
 
-            // Internal Note Check
             const isInternal = _isAdmin && document.getElementById('detail-internal-check')?.checked;
             const type = isInternal ? 'internal' : 'public';
 
@@ -942,108 +1268,99 @@ if (!window.Quejas) {
             };
 
             try {
-                // 1. Send to Backend
+                if (button) button.disabled = true;
                 await QuejasService.addResponse(_ctx, _activeTicket.id, msg, name, role, type);
                 input.value = '';
+                if (_isAdmin) {
+                    const internalCheck = document.getElementById('detail-internal-check');
+                    if (internalCheck) internalCheck.checked = false;
+                }
 
-                // 2. Optimistic Update (Append to view immediately)
-                _activeTicket.history = _activeTicket.history || [];
-                _activeTicket.history.push(newEntry);
+                // Si admin responde publicamente al ticket, notificar al estudiante
+                if (_isAdmin && !isInternal && _activeTicket.userId && window.Notify) {
+                    Notify.send(_activeTicket.userId, {
+                        tipo: 'quejas',
+                        titulo: 'Respuesta a tu ticket',
+                        mensaje: `Tu reporte "${_activeTicket.tipo}: ${_activeTicket.categoria}" tiene una nueva respuesta.`,
+                        link: '#/quejas'
+                    });
+                }
+
+                _activeTicket.responses = _activeTicket.responses || [];
+                _activeTicket.responses.push(newEntry);
+                _activeTicket.updatedAt = new Date();
+                if (type === 'internal') {
+                    _activeTicket.internalNoteCount = (_activeTicket.internalNoteCount || 0) + 1;
+                    _activeTicket.lastInternalNotePreview = msg;
+                } else {
+                    _activeTicket.publicResponseCount = (_activeTicket.publicResponseCount || 0) + 1;
+                }
 
                 const area = document.getElementById('history-scroll-area');
                 if (area) {
-                    // Remove "No responses" message if it exists
                     if (area.querySelector('.text-center.fst-italic')) {
                         area.innerHTML = '';
                     }
 
-                    // Render buble (Internal or Public)
                     const div = document.createElement('div');
-
-                    if (isInternal) {
-                        div.className = `d-flex mb-3 justify-content-center animate-fade-in`;
-                        div.innerHTML = `
-                            <div class="card border-0 shadow-sm rounded-4 bg-warning bg-opacity-10 border-warning border-opacity-25" style="width: 85%;">
-                                <div class="card-body p-2">
-                                    <div class="d-flex align-items-center mb-1 text-warning-emphasis">
-                                        <i class="bi bi-lock-fill me-2"></i>
-                                        <strong class="extra-small">Nota Interna (${newEntry.author})</strong>
-                                        <span class="extra-small ms-auto opacity-75">Ahora</span>
-                                    </div>
-                                    <p class="small mb-0 text-dark opacity-75 fst-italic">${newEntry.message}</p>
-                                </div>
-                            </div>
-                        `;
-                    } else {
-                        // Public message
-                        div.className = `d-flex mb-3 justify-content-end animate-fade-in`;
-                        div.innerHTML = `
-                            <div class="card border-0 shadow-sm rounded-4 bg-primary bg-opacity-10 border-primary border-opacity-10" style="max-width: 85%;">
-                                <div class="card-body p-3">
-                                    <div class="d-flex justify-content-between align-items-center mb-1">
-                                        <strong class="extra-small text-primary">${newEntry.author}</strong>
-                                        <span class="extra-small text-muted ms-3">Ahora</span>
-                                    </div>
-                                    <p class="small mb-0 text-dark">${newEntry.message}</p>
-                                </div>
-                            </div>
-                        `;
-                    }
-
-
+                    div.className = 'animate-fade-in';
+                    div.innerHTML = renderHistoryEntrySafe(newEntry);
                     area.appendChild(div);
                     area.scrollTop = area.scrollHeight;
                 }
 
                 showToast('Respuesta enviada', 'success');
-
-                // 3. Background Refresh of List (to keep counts updated)
-                if (_isAdmin) QuejasService.getAllTickets(_ctx);
+                if (_isAdmin) initAdminView();
+                else initStudentView();
 
             } catch (e) {
+                console.error(e);
                 showToast("Error enviando respuesta", "danger");
+            } finally {
+                if (button) button.disabled = false;
             }
         }
 
         async function downloadCSV() {
             try {
-                const tickets = await QuejasService.getAllTickets(_ctx); // Get all, ignore filters for export? Or use current filter? Let's export ALL for report.
+                const filter = document.getElementById('admin-filter-status')?.value || 'all';
+                const tickets = await QuejasService.getAllTicketsForExport(_ctx, { status: filter });
 
                 if (!tickets.length) {
                     showToast('No hay datos para exportar', 'warning');
                     return;
                 }
 
-                let csvContent = "data:text/csv;charset=utf-8,";
-                // Header
-                csvContent += "ID,Fecha,Usuario,Matricula,Tipo,Categoría,Estado,Descripcion,Ultimo_Comentario_Interno\n";
+                let csvContent = "ID,Fecha,Usuario,Matricula,Tipo,Categoria,Estado,Descripcion,Ultima_Nota_Interna\n";
 
                 tickets.forEach(t => {
-                    const date = formatDate(t.createdAt).replace(',', '');
-                    const lastInternal = (t.history || []).filter(h => h.type === 'internal').pop();
-                    const internalMsg = lastInternal ? lastInternal.message.replace(/,/g, ' ') : '';
+                    const activityDate = t.updatedAt || t.createdAt;
+                    const date = activityDate ? new Date(activityDate).toISOString() : '';
+                    const lastInternal = getLastInternalNote(t);
 
                     const row = [
-                        t.id,
-                        date,
-                        t.isAnonymous ? 'ANONIMO' : (t.userName || '').replace(/,/g, ''),
-                        (t.matricula || '').replace(/,/g, ''),
-                        t.tipo,
-                        t.categoria,
-                        t.status,
-                        (t.descripcion || '').replace(/,/g, ' ').replace(/\n/g, ' '),
-                        internalMsg
+                        csvCell(t.id),
+                        csvCell(date),
+                        csvCell(t.isAnonymous ? 'ANONIMO' : (t.userName || '')),
+                        csvCell(t.matricula || ''),
+                        csvCell(t.tipo || ''),
+                        csvCell(t.categoria || ''),
+                        csvCell(t.status || ''),
+                        csvCell(t.descripcion || ''),
+                        csvCell(lastInternal?.message || '')
                     ].join(",");
                     csvContent += row + "\n";
                 });
 
-                const encodedUri = encodeURI(csvContent);
+                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                const encodedUri = URL.createObjectURL(blob);
                 const link = document.createElement("a");
                 link.setAttribute("href", encodedUri);
                 link.setAttribute("download", `reporte_quejas_${new Date().toISOString().slice(0, 10)}.csv`);
                 document.body.appendChild(link);
                 link.click();
                 document.body.removeChild(link);
+                URL.revokeObjectURL(encodedUri);
 
             } catch (e) {
                 console.error(e);

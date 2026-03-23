@@ -5,9 +5,20 @@
 const MediService = (function () {
     const C_CITAS = 'citas-medi';
     const C_EXP = 'expedientes-clinicos';
+    const C_PRIVATE_CONSULTAS = 'consultas-privadas';
     const SLOTS_COLL = 'medi-slots'; // Legacy — ya no se usa para nuevas reservas
     const CONFIG_COLL = 'medi-config';
     const MAX_CITAS_PER_SLOT = 4; // 1 agendada + 3 en cola
+    const DEFAULT_MEDICAL_PROFESSIONAL = Object.freeze({
+        name: 'Dra. Ang\u00E9lica Guadalupe Manr\u00EDquez Cota',
+        displayName: 'Dra. Ang\u00E9lica Guadalupe Manr\u00EDquez Cota',
+        specialty: 'M\u00E9dico General U.A.G',
+        cedula: '132456789',
+        cedulaLabel: 'CP 132456789',
+        phone: '6121053936',
+        email: 'atencionmedica@loscabos.tecnm.mx'
+    });
+    const DEFAULT_PRESCRIPTION_TEMPLATE_URL = '/images/Receta.png';
 
     // Default config (fallback si no hay en Firestore)
     let config = {
@@ -17,7 +28,11 @@ const MediService = (function () {
         slotDuration: 60, // [NEW] Default duration in minutes (45 or 60)
         diasHabiles: [1, 2, 3, 4, 5], // Lun-Vie
         availableMédico: true,
-        availablePsicologo: true
+        availablePsicologo: true, // Legacy (will be mapped to Mat/Vesp if needed or kept for backwards compatibility)
+        availablePsicologoMatutino: true,
+        availablePsicologoVespertino: true,
+        disabledHours_Médico: [],
+        disabledHours_Psicologo: []
     };
 
 
@@ -35,8 +50,42 @@ const MediService = (function () {
         if (val instanceof Date) return val;
         return new Date(val);
     };
+    const normalizePinInput = (pin) => String(pin ?? '').trim();
+    const normalizeSigns = (data = {}) => {
+        const signs = data.signos || {};
+        return {
+            temp: signs.temp ?? data.temp ?? null,
+            presion: signs.presion ?? data.presion ?? null,
+            peso: signs.peso ?? data.peso ?? null,
+            talla: signs.talla ?? data.talla ?? null,
+        };
+    };
 
     const ts = d => firebase.firestore.Timestamp.fromDate(d);
+
+    async function hashPinValue(pin) {
+        const normalizedPin = normalizePinInput(pin);
+        if (!normalizedPin) return null;
+        if (!window.crypto?.subtle || typeof TextEncoder === 'undefined') return null;
+
+        const data = new TextEncoder().encode(normalizedPin);
+        const digest = await window.crypto.subtle.digest('SHA-256', data);
+        return Array.from(new Uint8Array(digest))
+            .map((b) => b.toString(16).padStart(2, '0'))
+            .join('');
+    }
+
+    async function profilePinMatches(profile = {}, candidatePin) {
+        const normalizedPin = normalizePinInput(candidatePin);
+        if (!normalizedPin) return false;
+
+        if (profile.pinHash) {
+            const hashedCandidate = await hashPinValue(normalizedPin);
+            return !!hashedCandidate && hashedCandidate === profile.pinHash;
+        }
+
+        return normalizePinInput(profile.pin) === normalizedPin;
+    }
 
     // --- CONFIG MANAGEMENT ---
     async function loadConfig(ctx) {
@@ -73,31 +122,318 @@ const MediService = (function () {
     function getConfig() {
         return config;
     }
+
+    function normalizeServiceRole(role) {
+        return String(role || '').toLowerCase().includes('psic') ? 'Psicologo' : 'Médico';
+    }
+
+    function normalizeShiftTag(shift, fallbackDate = null) {
+        const directDate = safeDate(shift);
+        if (directDate && !Number.isNaN(directDate.getTime())) {
+            return directDate.getHours() < 15 ? 'Matutino' : 'Vespertino';
+        }
+
+        const raw = String(shift || '').toLowerCase();
+        if (raw.includes('mat')) return 'Matutino';
+        if (raw.includes('vesp')) return 'Vespertino';
+
+        const date = safeDate(fallbackDate);
+        if (!date || Number.isNaN(date.getTime())) return null;
+        return date.getHours() < 15 ? 'Matutino' : 'Vespertino';
+    }
+
+    function getScopedConfigKeys(prefix, role, shiftTag = null, profileId = null) {
+        const normalizedRole = normalizeServiceRole(role);
+        const normalizedShift = normalizeShiftTag(shiftTag);
+        const keys = [];
+
+        if (profileId) keys.push(`${prefix}_profile_${profileId}`);
+        if (normalizedShift) keys.push(`${prefix}_${normalizedRole}_${normalizedShift}`);
+        keys.push(`${prefix}_${normalizedRole}`);
+
+        if (normalizedRole === 'Psicologo') keys.push(`${prefix}_Psicologo`);
+        if (normalizedRole === 'Médico') keys.push(`${prefix}_Médico`);
+
+        return Array.from(new Set(keys.filter(Boolean)));
+    }
+
+    function readScopedConfigValue(cfg, keys, fallbackValue) {
+        for (const key of keys) {
+            if (cfg && Object.prototype.hasOwnProperty.call(cfg, key) && cfg[key] != null) {
+                return cfg[key];
+            }
+        }
+        return fallbackValue;
+    }
+
+    function getSlotDurationForContext(cfg = config, role, shiftTag = null, profileId = null) {
+        const raw = readScopedConfigValue(
+            cfg,
+            getScopedConfigKeys('slotDuration', role, shiftTag, profileId),
+            cfg?.slotDuration || 60
+        );
+        const parsed = parseInt(raw, 10);
+        return Number.isFinite(parsed) && parsed > 0 ? parsed : 60;
+    }
+
+    function getDisabledHoursForContext(cfg = config, role, shiftTag = null, profileId = null) {
+        const raw = readScopedConfigValue(
+            cfg,
+            getScopedConfigKeys('disabledHours', role, shiftTag, profileId),
+            []
+        );
+        return Array.isArray(raw) ? raw : [];
+    }
+
+    function getAvailabilityKeyForContext(role, shiftTag = null) {
+        const normalizedRole = normalizeServiceRole(role);
+        const normalizedShift = normalizeShiftTag(shiftTag);
+
+        if (normalizedRole === 'Psicologo') {
+            if (normalizedShift === 'Matutino') return 'availablePsicologoMatutino';
+            if (normalizedShift === 'Vespertino') return 'availablePsicologoVespertino';
+            return 'availablePsicologo';
+        }
+
+        return 'availableMédico';
+    }
+
+    function getPauseUntilKeyForContext(role, shiftTag = null, profileId = null) {
+        return getScopedConfigKeys('pauseUntil', role, shiftTag, profileId)[0] || 'pauseUntil_MÃ©dico';
+    }
+
+    function getPauseUntilForContext(cfg = config, role, shiftTag = null, profileId = null) {
+        const pauseRaw = readScopedConfigValue(
+            cfg,
+            getScopedConfigKeys('pauseUntil', role, shiftTag, profileId),
+            null
+        );
+        const pauseDate = safeDate(pauseRaw);
+        if (!pauseDate || Number.isNaN(pauseDate.getTime())) return null;
+        return pauseDate.getTime() > Date.now() ? pauseDate : null;
+    }
+
+    function isServiceEnabledForContext(cfg = config, role, shiftTag = null, profileId = null) {
+        const availabilityEnabled = cfg?.[getAvailabilityKeyForContext(role, shiftTag)] !== false;
+        const pauseUntil = getPauseUntilForContext(cfg, role, shiftTag, profileId);
+        return availabilityEnabled && !pauseUntil;
+    }
+
+    function matchesPsychologyScope(data, ownerUid, shiftTag, profileId, dateValue = null, ownerField = 'autorId') {
+        if (!data) return false;
+
+        const storedOwner = data[ownerField] || data.profesionalId || null;
+        if (ownerUid && storedOwner && storedOwner !== ownerUid) return false;
+
+        const storedProfileId = data.profesionalProfileId || null;
+        if (profileId && storedProfileId) {
+            return storedProfileId === profileId;
+        }
+
+        const effectiveShift = normalizeShiftTag(
+            data.shift || data.profesionalShift,
+            dateValue || data.fechaHoraSlot || data.createdAt
+        );
+
+        if (shiftTag) {
+            return effectiveShift === normalizeShiftTag(shiftTag);
+        }
+
+        return true;
+    }
+
+    function matchesConsultationScope(data, role, ownerUid, shiftTag, profileId) {
+        const normalizedRole = normalizeServiceRole(role);
+        if (normalizedRole === 'Psicologo') {
+            return matchesPsychologyScope(data, ownerUid, shiftTag, profileId, data.createdAt, 'autorId');
+        }
+
+        if (!data) return false;
+        if (ownerUid && data?.autorId && data.autorId !== ownerUid) return false;
+
+        const storedProfileId = data.profesionalProfileId || null;
+        if (profileId && storedProfileId && storedProfileId !== profileId) return false;
+
+        const effectiveShift = normalizeShiftTag(
+            data.shift || data.profesionalShift,
+            data.createdAt
+        );
+        if (shiftTag && effectiveShift && effectiveShift !== normalizeShiftTag(shiftTag)) return false;
+
+        return true;
+    }
+
+    function matchesAppointmentScope(data, role, ownerUid, shiftTag, profileId, { includeUnassignedMedical = true } = {}) {
+        const normalizedRole = normalizeServiceRole(role);
+        if (normalizedRole === 'Psicologo') {
+            return matchesPsychologyScope(data, ownerUid, shiftTag, profileId, data.fechaHoraSlot, 'profesionalId');
+        }
+
+        if (!data) return false;
+        if (ownerUid && data?.profesionalId && data.profesionalId !== ownerUid) return false;
+        if (!ownerUid) return true;
+        if (!data?.profesionalId) return includeUnassignedMedical;
+
+        const storedProfileId = data.profesionalProfileId || null;
+        if (profileId && storedProfileId && storedProfileId !== profileId) return false;
+
+        const effectiveShift = normalizeShiftTag(
+            data.shift || data.profesionalShift,
+            data.fechaHoraSlot
+        );
+        if (shiftTag && effectiveShift && effectiveShift !== normalizeShiftTag(shiftTag)) return false;
+
+        return data.profesionalId === ownerUid;
+    }
+
+    function normalizeShiftProfileRole(role) {
+        const raw = String(role || '').toLowerCase();
+        return raw.includes('psic') ? 'psicologo' : 'medico';
+    }
+
+    function normalizeShiftProfileShift(shift) {
+        const raw = String(shift || '').toLowerCase();
+        return raw.includes('vesp') ? 'vespertino' : 'matutino';
+    }
+
+    function getShiftProfileDocId(role, shift) {
+        return `${normalizeShiftProfileRole(role)}_${normalizeShiftProfileShift(shift)}`;
+    }
+
+    function getShiftProfileAliases(role, shift) {
+        return Array.from(new Set([
+            getShiftProfileDocId(role, shift),
+            `${String(role || '').toLowerCase()}_${String(shift || '').toLowerCase()}`,
+            `${role}_${shift}`
+        ].filter(Boolean)));
+    }
+
+    function normalizeShiftProfileData(role, shift, data = {}) {
+        const name = data.name || data.displayName || '';
+        return {
+            ...data,
+            name,
+            displayName: data.displayName || name,
+            cedula: data.cedula || '',
+            cedulaLabel: data.cedulaLabel || (data.cedula ? `CP ${data.cedula}` : ''),
+            specialty: data.specialty || data.especialidad || '',
+            phone: data.phone || data.telefono || '',
+            email: data.email || '',
+            legacyShift: data.legacyShift || (normalizeShiftProfileShift(shift) === 'vespertino' ? 'Vespertino' : 'Matutino'),
+            role: data.role || normalizeShiftProfileRole(role)
+        };
+    }
+
+    function getDefaultProfessionalProfile(role, shift = null) {
+        const normalizedRole = normalizeServiceRole(role);
+        const effectiveShift = shift || normalizeShiftTag(null, new Date()) || 'Matutino';
+
+        if (normalizedRole === 'Médico') {
+            return {
+                id: getShiftProfileDocId(normalizedRole, effectiveShift),
+                ...normalizeShiftProfileData(normalizedRole, effectiveShift, {
+                    ...DEFAULT_MEDICAL_PROFESSIONAL,
+                    role: 'medico',
+                    legacyShift: effectiveShift
+                })
+            };
+        }
+
+        return {
+            id: getShiftProfileDocId(normalizedRole, effectiveShift),
+            ...normalizeShiftProfileData(normalizedRole, effectiveShift, {})
+        };
+    }
+
+    function resolveProfessionalIdentity(profileData = {}, role = 'Médico', shift = null) {
+        const normalizedRole = normalizeServiceRole(role);
+        const fallback = getDefaultProfessionalProfile(normalizedRole, shift);
+        const safe = profileData || {};
+        const explicitName = safe.displayName || safe.name || '';
+        const explicitSpecialty = safe.specialty || safe.especialidad || safe.tipoServicio || '';
+        const explicitPhone = safe.phone || safe.telefono || safe.telefonoContacto || '';
+        const explicitEmail = safe.email || safe.correo || safe.autorEmail || '';
+        const explicitCedula = safe.cedula || '';
+        const explicitShift = safe.legacyShift || shift || fallback.legacyShift;
+        const resolved = normalizeShiftProfileData(normalizedRole, explicitShift, {
+            ...fallback,
+            ...safe,
+            name: explicitName || fallback.name || 'Profesional',
+            displayName: explicitName || fallback.displayName || fallback.name || 'Profesional',
+            specialty: explicitSpecialty || fallback.specialty || (normalizedRole === 'Psicologo' ? 'Psicología' : 'Médico General U.A.G.'),
+            phone: explicitPhone || fallback.phone || '',
+            email: explicitEmail || fallback.email || '',
+            cedula: explicitCedula || fallback.cedula || '',
+            cedulaLabel: safe.cedulaLabel || (explicitCedula ? `CP ${explicitCedula}` : fallback.cedulaLabel || '')
+        });
+
+        return {
+            ...resolved,
+            id: safe.id || safe.profileId || fallback.id || null,
+            profileId: safe.profileId || safe.id || fallback.id || null
+        };
+    }
+
+    function getDefaultPrescriptionTemplateUrl() {
+        return DEFAULT_PRESCRIPTION_TEMPLATE_URL;
+    }
+
     // --- SHIFT PROFILE MANAGEMENT ---
     async function getShiftProfile(ctx, role, shift) {
-        if (!role || !shift) return null;
+        if (!role) return null;
+        if (!shift && normalizeServiceRole(role) === 'Médico') {
+            return getDefaultProfessionalProfile(role, normalizeShiftTag(null, new Date()));
+        }
+        if (!shift) return null;
+        const docIds = getShiftProfileAliases(role, shift);
         try {
-            const key = `${role.toLowerCase()}_${shift.toLowerCase()}`;
-            const docRef = ctx.db.collection(CONFIG_COLL).doc('staff_directory');
-            const snap = await docRef.get();
-            if (snap.exists && snap.data()[key]) {
-                return snap.data()[key];
+            const [legacySnap, ...directSnaps] = await Promise.all([
+                ctx.db.collection(CONFIG_COLL).doc('staff_directory').get()
+                    .catch(() => null),
+                ...docIds.map((docId) => ctx.db.collection('medi-shift-profiles').doc(docId).get().catch(() => null))
+            ]);
+
+            for (const snap of directSnaps) {
+                if (snap?.exists) {
+                    return { id: snap.id, ...normalizeShiftProfileData(role, shift, snap.data()) };
+                }
+            }
+
+            if (legacySnap?.exists) {
+                const legacyData = legacySnap.data();
+                for (const docId of docIds) {
+                    if (legacyData[docId]) {
+                        return { id: docId, ...normalizeShiftProfileData(role, shift, legacyData[docId]) };
+                    }
+                }
             }
         } catch (e) { console.error("Error reading shift profile:", e); }
+
+        if (normalizeServiceRole(role) === 'Médico') {
+            return getDefaultProfessionalProfile(role, shift);
+        }
         return null;
     }
 
-    async function updateShiftProfile(ctx, role, shift, { name, cedula }) {
-        const key = `${role.toLowerCase()}_${shift.toLowerCase()}`;
-        const updateData = {};
-        updateData[key] = {
-            name: name,
-            cedula: cedula,
+    async function updateShiftProfile(ctx, role, shift, profileData) {
+        const docIds = getShiftProfileAliases(role, shift);
+        const normalized = normalizeShiftProfileData(role, shift, {
+            ...profileData,
+            ownerUid: profileData?.ownerUid || ctx.auth.currentUser.uid,
             updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
             updatedBy: ctx.auth.currentUser.uid
-        };
-        // Use set with merge to ensure doc exists
-        return ctx.db.collection(CONFIG_COLL).doc('staff_directory').set(updateData, { merge: true });
+        });
+        const legacyUpdate = {};
+        docIds.forEach((docId) => {
+            legacyUpdate[docId] = normalized;
+        });
+
+        await Promise.all([
+            ...docIds.map((docId) => ctx.db.collection('medi-shift-profiles').doc(docId).set(normalized, { merge: true })),
+            ctx.db.collection(CONFIG_COLL).doc('staff_directory').set(legacyUpdate, { merge: true })
+        ]);
+
+        return { id: docIds[0], ...normalized };
     }
 
     // [NEW] Strict Resolution for Booking (Matricula + Shift Profile)
@@ -106,6 +442,24 @@ const MediService = (function () {
         if (tipo === 'Médico') targetMatricula = 'atencionmedica';
         else if (tipo === 'Psicologo') targetMatricula = 'atencionpsicopedagogica';
         else return null;
+
+        const targetShift = normalizeShiftTag(null, date);
+
+        try {
+            const shiftProfile = await getShiftProfile(ctx, tipo, targetShift);
+            if (shiftProfile?.ownerUid) {
+                const ownerSnap = await ctx.db.collection('usuarios').doc(shiftProfile.ownerUid).get().catch(() => null);
+                const ownerData = ownerSnap?.exists ? ownerSnap.data() : {};
+                return {
+                    id: shiftProfile.ownerUid,
+                    displayName: shiftProfile.displayName || shiftProfile.name || ownerData.displayName || (tipo === 'Médico' ? 'Atención Médica' : 'Atención Psicopedagógica'),
+                    email: ownerData.email || '',
+                    profileId: shiftProfile.linkedProfileId || shiftProfile.profileId || shiftProfile.id || null
+                };
+            }
+        } catch (shiftProfileErr) {
+            console.warn('[MediService] Shift profile resolution failed, using matricula fallback.', shiftProfileErr);
+        }
 
         try {
             // A. Find Main User Account by Matricula
@@ -128,26 +482,29 @@ const MediService = (function () {
             };
 
             // B. If Psicologo, find specific Profile based on Time
+            // NOTE: usuarios/{uid}/profiles requires isOwner || isSuperAdmin in Firestore rules.
+            // Students don't have that permission, so this read is wrapped in its own try-catch
+            // to avoid nullifying the entire result (mainUid is still valid for booking).
             if (tipo === 'Psicologo') {
                 const hour = date.getHours();
-                // Logic: Matutino (Edrey) until 15:00, Vespertino (Carmen) after 15:00
+                // Logic: Matutino until 15:00, Vespertino after 15:00
                 const targetShift = hour < 15 ? 'Matutino' : 'Vespertino';
 
-                const profilesSnap = await ctx.db.collection('usuarios').doc(mainUid).collection('profiles').get();
-                if (!profilesSnap.empty) {
-                    // Find match by legacyShift (or role if we wanted generic)
-                    const match = profilesSnap.docs.find(d => {
-                        const p = d.data();
-                        return p.legacyShift === targetShift;
-                    });
-
-                    if (match) {
-                        const pData = match.data();
-                        result.profileId = match.id;
-                        // Use ShortName for friendlier chat header if available
-                        result.displayName = pData.shortName || pData.displayName || result.displayName;
-                        console.log(`[MediService] Resolved Profile for Booking: ${result.displayName} (${targetShift})`);
+                try {
+                    const profilesSnap = await ctx.db.collection('usuarios').doc(mainUid).collection('profiles').get();
+                    if (!profilesSnap.empty) {
+                        const match = profilesSnap.docs.find(d => d.data().legacyShift === targetShift);
+                        if (match) {
+                            const pData = match.data();
+                            result.profileId = match.id;
+                            result.displayName = pData.shortName || pData.displayName || result.displayName;
+                            console.log(`[MediService] Resolved Profile for Booking: ${result.displayName} (${targetShift})`);
+                        }
                     }
+                } catch (profileErr) {
+                    // Student callers can't read the profiles subcollection (Firestore rules).
+                    // Gracefully continue — the appointment will use mainUid without a specific profileId.
+                    console.warn('[MediService] Could not read psicólogo profiles (expected for student callers):', profileErr.code);
                 }
             }
 
@@ -162,15 +519,15 @@ const MediService = (function () {
     // --- PUBLIC METHODS ---
 
     async function checkActiveAppointment(ctx, studentId) {
-        // [NEW] Strict Check: Only one active appointment allowed (Pending or Confirmed)
-        // Refactored to avoid composite index requirements (created + studentId + estado) which might be missing.
-        // We fetch all active appointments for this student (low volume) and sort in memory.
+        // Blocking appointment for booking UI:
+        // only confirmed / in-progress appointments should prevent a new booking.
+        // Pending appointments can still be managed from "Mis Citas".
 
         try {
             const q = await ctx.db.collection(C_CITAS)
                 .where('studentId', '==', studentId)
-                .where('estado', 'in', ['pendiente', 'confirmada'])
-                .get(); // No orderBy here to avoid index error
+                .where('estado', 'in', ['confirmada', 'en_proceso'])
+                .get();
 
             if (q.empty) return null;
 
@@ -180,10 +537,16 @@ const MediService = (function () {
                 safeDate: safeDate(d.data().fechaHoraSlot)
             }));
 
-            // Sort by date desc (newest first)
-            docs.sort((a, b) => b.safeDate - a.safeDate);
+            const now = new Date();
+            const upcoming = docs
+                .filter((item) => item.safeDate && item.safeDate >= now)
+                .sort((a, b) => a.safeDate - b.safeDate);
+            if (upcoming.length > 0) return upcoming[0];
 
-            return docs[0]; // Return the latest one
+            const datedPast = docs
+                .filter((item) => item.safeDate)
+                .sort((a, b) => b.safeDate - a.safeDate);
+            return datedPast[0] || docs[0];
         } catch (e) {
             console.error("Error checking active appointment:", e);
             return null; // Fail safe
@@ -195,8 +558,33 @@ const MediService = (function () {
     // Un slot está BLOQUEADO (ocupado) si tiene >= MAX_CITAS_PER_SLOT citas activas
     // Un slot está EN COLA si tiene >= 1 pero < MAX_CITAS_PER_SLOT citas activas
     async function getOccupiedSlots(ctx, date, tipo) {
-        const start = new Date(date); start.setHours(0, 0, 0, 0);
-        const end = new Date(date); end.setHours(23, 59, 59, 999);
+        const looksLikeServiceType = (value) => {
+            const normalized = String(value || '')
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .toLowerCase();
+            return normalized.includes('psic') || normalized.includes('med');
+        };
+        if (looksLikeServiceType(date) && !looksLikeServiceType(tipo)) {
+            const temp = date;
+            date = tipo;
+            tipo = temp;
+        }
+        const normalizedDate = safeDate(date);
+        if (normalizedDate) {
+            date = toISO(normalizedDate);
+        }
+        // [FIX] Auto-correct inverted arguments passed by UI (role, date instead of date, role)
+        if (date && (date === 'Médico' || date === 'Psicologo' || date === 'Medico' || !date.includes('-'))) {
+            const temp = date;
+            date = tipo;
+            tipo = temp;
+        }
+
+        // [FIX] timezone parse bug. Add 'T12:00:00' so new Date is correct local timezone.
+        const safeDateStr = date.includes('T') ? date : date + 'T12:00:00';
+        const start = new Date(safeDateStr); start.setHours(0, 0, 0, 0);
+        const end = new Date(safeDateStr); end.setHours(23, 59, 59, 999);
 
         let query = ctx.db.collection(C_CITAS)
             .where('fechaHoraSlot', '>=', firebase.firestore.Timestamp.fromDate(start))
@@ -246,7 +634,7 @@ const MediService = (function () {
     // Primera cita a un horario → confirmada (auto-agendada)
     // Siguientes → pendiente (cola de espera)
     // Máximo MAX_CITAS_PER_SLOT por horario
-    async function reservarCita(ctx, { user, date, slotId, tipo, motivo, replaceCitaId, profesionalId, profesionalName, profesionalProfileId }) {
+    async function reservarCita(ctx, { user, date, slotId, tipo, motivo, replaceCitaId, profesionalId, profesionalName, profesionalProfileId, extraData }) {
         const h = date.getHours();
         const computedShift = h < 15 ? 'Matutino' : 'Vespertino';
 
@@ -282,21 +670,24 @@ const MediService = (function () {
             resolvedProfesional = await resolveProfessionalForBooking(ctx, tipo, date);
         }
 
-        // 5. Si reemplaza una cita anterior, cancelarla
+        // 5. Si reemplaza una cita anterior, prepararla para cancelar de forma atomica
+        let replacedAppointment = null;
+        let oldRef = null;
         if (replaceCitaId) {
-            const oldRef = ctx.db.collection(C_CITAS).doc(replaceCitaId);
+            oldRef = ctx.db.collection(C_CITAS).doc(replaceCitaId);
             const oldSnap = await oldRef.get();
             if (oldSnap.exists) {
-                await oldRef.update({
-                    estado: 'cancelada',
-                    motivoCancelacion: 'Re-agendada por usuario',
-                    fechaCancelacion: firebase.firestore.FieldValue.serverTimestamp()
-                });
+                replacedAppointment = { id: oldSnap.id, ...oldSnap.data() };
             }
         }
 
-        // 6. Crear la nueva cita
+        // 6. Crear la nueva cita con re-verificación atómica
+        // NOTA: Firestore web SDK no soporta queries con 'in' dentro de transacciones.
+        // Usamos una re-verificación antes de crear para minimizar race conditions.
         const ref = ctx.db.collection(C_CITAS).doc();
+        // [FIX] Auto-agendar (confirmar) la primera cita del horario para que el profesional siempre la vea en su agenda
+        const finalEstado = isAutoAgendada ? 'confirmada' : 'pendiente';
+
         const citaData = {
             studentId: user.uid,
             studentEmail: user.email,
@@ -308,24 +699,47 @@ const MediService = (function () {
             motivo: motivo,
             shift: computedShift,
             profesionalShift: computedShift, // Added for dashboard filtering
-            estado: isAutoAgendada ? 'confirmada' : 'pendiente',
-            autoAgendada: isAutoAgendada,
+            estado: finalEstado,
+            autoAgendada: finalEstado === 'confirmada',
             queuePosition: queuePosition,
-            profesionalId: isAutoAgendada && resolvedProfesional ? resolvedProfesional.id : (profesionalId || null),
-            profesionalName: isAutoAgendada && resolvedProfesional ? resolvedProfesional.displayName : (profesionalName || null),
-            profesionalProfileId: isAutoAgendada && resolvedProfesional ? resolvedProfesional.profileId : (profesionalProfileId || null)
+            profesionalId: finalEstado === 'confirmada' ? (resolvedProfesional?.id || profesionalId || null) : (profesionalId || null),
+            profesionalName: finalEstado === 'confirmada' ? (resolvedProfesional?.displayName || profesionalName || null) : (profesionalName || null),
+            profesionalProfileId: finalEstado === 'confirmada' ? (resolvedProfesional?.profileId || profesionalProfileId || null) : (profesionalProfileId || null),
+            ...(extraData && typeof extraData === 'object' ? extraData : {})
         };
 
-        await ref.set(citaData);
+        // Re-verificar disponibilidad justo antes de crear (reduce ventana de race condition)
+        const recheck = await ctx.db.collection(C_CITAS)
+            .where('fechaHoraSlot', '>=', firebase.firestore.Timestamp.fromDate(slotStart))
+            .where('fechaHoraSlot', '<', firebase.firestore.Timestamp.fromDate(slotEnd))
+            .where('estado', 'in', ['pendiente', 'confirmada'])
+            .where('tipoServicio', '==', tipo)
+            .get();
+        if (recheck.size >= MAX_CITAS_PER_SLOT) {
+            throw new Error('Este horario ya alcanzó el límite de reservas. Por favor selecciona otro horario.');
+        }
 
-        // 7. Notificar
-        if (isAutoAgendada && window.Notify) {
-            Notify.send(user.uid, {
-                title: 'Cita Agendada Automáticamente',
-                message: `Tu cita ha sido agendada con ${resolvedProfesional ? resolvedProfesional.displayName : 'un especialista'}.`,
-                type: 'medi', link: '/medi'
+        const batch = ctx.db.batch();
+        batch.set(ref, citaData);
+        if (oldRef && replacedAppointment) {
+            batch.update(oldRef, {
+                estado: 'cancelada',
+                motivoCancelacion: 'Re-agendada por usuario',
+                fechaCancelacion: firebase.firestore.FieldValue.serverTimestamp()
             });
         }
+        await batch.commit();
+
+        if (replacedAppointment?.estado === 'confirmada' && replacedAppointment.fechaHoraSlot && replacedAppointment.tipoServicio) {
+            const oldDate = safeDate(replacedAppointment.fechaHoraSlot);
+            const movedToSameSlot = oldDate
+                && oldDate.getTime() === date.getTime()
+                && replacedAppointment.tipoServicio === tipo;
+            if (!movedToSameSlot) {
+                await promoteNextInQueue(ctx, replacedAppointment.fechaHoraSlot, replacedAppointment.tipoServicio);
+            }
+        }
+
 
         return { citaId: ref.id, isQueued: !isAutoAgendada, queuePosition: queuePosition };
     }
@@ -360,6 +774,81 @@ const MediService = (function () {
     }
 
 
+    async function modificarCita(ctx, citaId, { date, slotId, tipo, motivo, profesionalId = null, profesionalName = null, profesionalProfileId = null }) {
+        const citaRef = ctx.db.collection(C_CITAS).doc(citaId);
+        const citaSnap = await citaRef.get();
+        if (!citaSnap.exists) throw new Error("La cita no existe.");
+
+        const oldData = citaSnap.data();
+        const nextDate = safeDate(date);
+        if (!nextDate || Number.isNaN(nextDate.getTime())) {
+            throw new Error("La nueva fecha no es valida.");
+        }
+
+        const nextTipo = normalizeServiceRole(tipo || oldData.tipoServicio);
+        const nextSlotId = slotId || `${slotIdFromDate(nextDate)}_${nextTipo}`;
+        const nextShift = normalizeShiftTag(oldData.shift, nextDate);
+        const previousDate = safeDate(oldData.fechaHoraSlot);
+        const changedSlot = oldData.slotId !== nextSlotId
+            || oldData.tipoServicio !== nextTipo
+            || !previousDate
+            || previousDate.getTime() !== nextDate.getTime();
+
+        const slotStart = new Date(nextDate);
+        slotStart.setSeconds(0, 0);
+        const slotEnd = new Date(slotStart.getTime() + 60000);
+
+        const existingQuery = await ctx.db.collection(C_CITAS)
+            .where('fechaHoraSlot', '>=', firebase.firestore.Timestamp.fromDate(slotStart))
+            .where('fechaHoraSlot', '<', firebase.firestore.Timestamp.fromDate(slotEnd))
+            .where('estado', 'in', ['pendiente', 'confirmada'])
+            .where('tipoServicio', '==', nextTipo)
+            .get();
+
+        const otherActive = existingQuery.docs.filter((doc) => doc.id !== citaId);
+        if (otherActive.length >= MAX_CITAS_PER_SLOT) {
+            throw new Error("El nuevo horario ya alcanzo el limite de citas activas.");
+        }
+
+        let resolvedProfesional = null;
+        try {
+            resolvedProfesional = await resolveProfessionalForBooking(ctx, nextTipo, nextDate);
+        } catch (e) {
+            console.warn("[MediService] No se pudo resolver el profesional al reagendar:", e);
+        }
+
+        const hasConfirmed = otherActive.some((doc) => doc.data().estado === 'confirmada');
+        const finalEstado = hasConfirmed ? 'pendiente' : 'confirmada';
+        const queuePosition = finalEstado === 'pendiente' ? otherActive.length : 0;
+
+        await citaRef.update({
+            fechaHoraSlot: firebase.firestore.Timestamp.fromDate(nextDate),
+            slotId: nextSlotId,
+            tipoServicio: nextTipo,
+            motivo: motivo ?? oldData.motivo ?? '',
+            shift: nextShift,
+            profesionalShift: nextShift,
+            estado: finalEstado,
+            autoAgendada: finalEstado === 'confirmada',
+            queuePosition,
+            promovidaDeCola: false,
+            profesionalId: resolvedProfesional?.id || profesionalId || oldData.profesionalId || null,
+            profesionalName: resolvedProfesional?.displayName || profesionalName || oldData.profesionalName || null,
+            profesionalProfileId: resolvedProfesional?.profileId || profesionalProfileId || oldData.profesionalProfileId || null,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+        if (changedSlot && oldData.estado === 'confirmada' && oldData.fechaHoraSlot && oldData.tipoServicio) {
+            await promoteNextInQueue(ctx, oldData.fechaHoraSlot, oldData.tipoServicio);
+        }
+
+        return {
+            finalStatus: finalEstado,
+            isQueued: finalEstado === 'pendiente',
+            queuePosition
+        };
+    }
+
     async function cancelarCitaEstudiante(ctx, citaId, motivo) {
         const ref = ctx.db.collection(C_CITAS).doc(citaId);
         const snap = await ref.get();
@@ -391,11 +880,15 @@ const MediService = (function () {
             .where('studentId', '==', uid)
             .onSnapshot(snap => {
                 console.log(`[MediService] Stream Citas Update: ${snap.size} docs found for ${uid}`);
-                const citas = snap.docs.map(d => ({
-                    id: d.id,
-                    ...d.data(),
-                    safeDate: safeDate(d.data().fechaHoraSlot)
-                }));
+                const citas = snap.docs.map(d => {
+                    const data = d.data();
+                    return {
+                        id: d.id,
+                        ...data,
+                        tipoServicio: data.tipoServicio ? normalizeServiceRole(data.tipoServicio) : '',
+                        safeDate: safeDate(data.fechaHoraSlot)
+                    };
+                });
 
                 // Ordenamos manualmente por fecha descendente en el cliente
                 citas.sort((a, b) => (b.safeDate || 0) - (a.safeDate || 0));
@@ -407,13 +900,18 @@ const MediService = (function () {
         // Estructura: expedientes-clinicos/{uid}/consultas/{consultaId}
         const unsubExp = ctx.db.collection(C_EXP).doc(uid).collection('consultas')
             .orderBy('createdAt', 'desc') // Ahora sí podemos usar orderBy porque es una colección simple por usuario
-            .limit(20) // Traemos más para el "Ver más"
             .onSnapshot(snap => {
-                const exps = snap.docs.map(d => ({
-                    id: d.id,
-                    ...d.data(),
-                    safeDate: safeDate(d.data().createdAt)
-                }));
+                const exps = snap.docs.map(d => {
+                    const data = d.data();
+                    const cleanData = { ...data };
+                    delete cleanData.notasPrivadas;
+                    return {
+                        id: d.id,
+                        ...cleanData,
+                        tipoServicio: cleanData.tipoServicio ? normalizeServiceRole(cleanData.tipoServicio) : '',
+                        safeDate: safeDate(cleanData.createdAt)
+                    };
+                });
                 // Orden ya viene del query
                 callback({ type: 'expedientes', data: exps });
             }, err => {
@@ -426,12 +924,13 @@ const MediService = (function () {
     }
 
     function streamSalaEspera(ctx, role, shiftTag, callback) {
-        console.log(`[MediService] Abriendo Sala de Espera para area: ${role} [Shift: ${shiftTag || 'All'}]`);
+        const normalizedRole = normalizeServiceRole(role);
+        console.log(`[MediService] Abriendo Sala de Espera para area: ${normalizedRole} [Shift: ${shiftTag || 'All'}]`);
 
         // Base Query
         let ref = ctx.db.collection(C_CITAS)
             .where('estado', '==', 'pendiente')
-            .where('tipoServicio', '==', role);
+            .where('tipoServicio', '==', normalizedRole);
 
         return ref.onSnapshot(snap => {
             let docs = snap.docs.map(d => ({
@@ -451,19 +950,16 @@ const MediService = (function () {
             //    - OR: User asked to "Filter data". 
             //    Let's filter by time for Sala de Espera if it's Psicologo.
 
-            if (role === 'Psicologo' && shiftTag) {
-                // [MOD] Filtrado por Turno (Matutino vs Vespertino)
-                // Solicitud explícita: Matutino ve hasta las 2 PM (14:59), Vespertino ve desde las 3 PM (15:00).
-
+            if (shiftTag) {
                 docs = docs.filter(d => {
-                    // 1. Si la cita ya tiene turno asignado, lo respetamos (prioridad)
-                    if (d.shift) return d.shift === shiftTag;
+                    const storedShift = normalizeShiftTag(
+                        d.shift || d.profesionalShift,
+                        d.safeDate
+                    );
+                    if (storedShift) return storedShift === normalizeShiftTag(shiftTag);
 
-                    // 2. Fallback (Citas viejas o sin turno): Filtrar por hora
-                    // Matutino: < 15:00
-                    // Vespertino: >= 15:00
                     const h = d.safeDate ? d.safeDate.getHours() : 0;
-                    if (shiftTag === 'Matutino') return h < 15;
+                    if (normalizeShiftTag(shiftTag) === 'Matutino') return h < 15;
                     return h >= 15;
                 });
             }
@@ -725,16 +1221,29 @@ const MediService = (function () {
         snap = await ctx.db.collection('usuarios').where('email', '==', t.toLowerCase()).get();
         if (!snap.empty) return { id: snap.docs[0].id, ...snap.docs[0].data() };
 
-        // 3. Try by Name (Prefix search - Case Sensitive)
-        // Note: Firestore is case-sensitive. This assumes Title Case or exact match.
+        // 3. Try by Name — prefix range query (avoids full-collection download)
+        // Firestore lacks ILIKE, so we use >= / <= prefix matching on displayName.
+        // Max 2 Firestore reads total (was 150 reads before).
         try {
+            // Attempt A: as typed (handles ALL-CAPS or already-formatted input)
             snap = await ctx.db.collection('usuarios')
                 .where('displayName', '>=', t)
                 .where('displayName', '<=', t + '\uf8ff')
-                .limit(5)
+                .limit(1)
                 .get();
             if (!snap.empty) return { id: snap.docs[0].id, ...snap.docs[0].data() };
-        } catch (e) { console.warn("Search error:", e); }
+
+            // Attempt B: Title Case ('juan' → 'Juan' — most common displayName format)
+            const titleT = t.charAt(0).toUpperCase() + t.slice(1).toLowerCase();
+            if (titleT !== t) {
+                snap = await ctx.db.collection('usuarios')
+                    .where('displayName', '>=', titleT)
+                    .where('displayName', '<=', titleT + '\uf8ff')
+                    .limit(1)
+                    .get();
+                if (!snap.empty) return { id: snap.docs[0].id, ...snap.docs[0].data() };
+            }
+        } catch (e) { console.warn('Search error:', e); }
 
         return null;
     }
@@ -766,8 +1275,22 @@ const MediService = (function () {
 
     async function verifyPin(ctx, uid, pin) {
         const profiles = await getProfiles(ctx, uid);
-        const match = profiles.find(p => p.pin === pin);
-        return match || null;
+        for (const profile of profiles) {
+            if (await profilePinMatches(profile, pin)) {
+                if (!profile.pinHash && profile.pin) {
+                    const hashedPin = await hashPinValue(pin);
+                    if (hashedPin) {
+                        ctx.db.collection('usuarios').doc(uid).collection('profiles').doc(profile.id).set({
+                            pinHash: hashedPin,
+                            pin: firebase.firestore.FieldValue.delete(),
+                            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                        }, { merge: true }).catch(() => { });
+                    }
+                }
+                return profile;
+            }
+        }
+        return null;
     }
 
     // Self-seeding for development/migration
@@ -778,6 +1301,8 @@ const MediService = (function () {
         if (snap.empty) {
             console.log("Seeding initial profiles for:", uid);
             const batch = ctx.db.batch();
+            const pinMatutinoHash = await hashPinValue('2024');
+            const pinVespertinoHash = await hashPinValue('2025');
 
             // Profile 1: Matutino
             const p1Ref = profilesRef.doc();
@@ -785,9 +1310,11 @@ const MediService = (function () {
                 displayName: "Psic. Edrey Ruiz",
                 shortName: "Edrey",
                 cedula: "12345678",
-                pin: "2024",
+                ...(pinMatutinoHash ? { pinHash: pinMatutinoHash } : { pin: "2024" }),
                 legacyShift: "Matutino",
-                role: "psicologo"
+                role: "psicologo",
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
             });
 
             // Profile 2: Vespertino
@@ -796,9 +1323,11 @@ const MediService = (function () {
                 displayName: "Psic. Carmen Espinoza",
                 shortName: "Carmen",
                 cedula: "87654321",
-                pin: "2025",
+                ...(pinVespertinoHash ? { pinHash: pinVespertinoHash } : { pin: "2025" }),
                 legacyShift: "Vespertino",
-                role: "psicologo"
+                role: "psicologo",
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
             });
 
             await batch.commit();
@@ -807,44 +1336,152 @@ const MediService = (function () {
         return false;
     }
 
+    async function updateProfilePin(ctx, uid, profileId, currentPin, newPin) {
+        const normalizedCurrentPin = normalizePinInput(currentPin);
+        const normalizedNewPin = normalizePinInput(newPin);
+
+        if (!uid || !profileId) throw new Error('Perfil de acceso no valido.');
+        if (!normalizedCurrentPin) throw new Error('Ingresa tu PIN actual.');
+        if (normalizedNewPin.length < 4) throw new Error('El nuevo PIN debe tener al menos 4 caracteres.');
+        if (normalizedNewPin === normalizedCurrentPin) throw new Error('El nuevo PIN debe ser diferente al actual.');
+
+        const profileRef = ctx.db.collection('usuarios').doc(uid).collection('profiles').doc(profileId);
+        const profileSnap = await profileRef.get();
+        if (!profileSnap.exists) throw new Error('No se encontro el perfil a actualizar.');
+
+        const profileData = profileSnap.data() || {};
+        const isValidCurrentPin = await profilePinMatches(profileData, normalizedCurrentPin);
+        if (!isValidCurrentPin) throw new Error('El PIN actual no es correcto.');
+
+        const hashedNewPin = await hashPinValue(normalizedNewPin);
+        const updateData = {
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            pinLastChangedAt: firebase.firestore.FieldValue.serverTimestamp()
+        };
+
+        if (hashedNewPin) {
+            updateData.pinHash = hashedNewPin;
+            updateData.pin = firebase.firestore.FieldValue.delete();
+        } else {
+            updateData.pin = normalizedNewPin;
+        }
+
+        await profileRef.set(updateData, { merge: true });
+        return true;
+    }
+
+    function buildPrivateConsultaScopeMeta(meta = {}) {
+        return {
+            autorId: meta.autorId || meta.ownerUid || null,
+            profesionalProfileId: meta.profesionalProfileId || meta.profileId || null,
+            shift: meta.shift || meta.profesionalShift || null,
+            tipoServicio: meta.tipoServicio || null,
+            createdAt: meta.createdAt || meta.updatedAt || null
+        };
+    }
+
+    function canReadPrivateConsultaNote(noteData = {}, scope = null, consultationMeta = null) {
+        if (!scope) return true;
+
+        const noteScopeMeta = buildPrivateConsultaScopeMeta(noteData);
+        const hasNoteScope = !!(noteScopeMeta.autorId || noteScopeMeta.profesionalProfileId || noteScopeMeta.shift || noteScopeMeta.tipoServicio);
+        if (hasNoteScope) {
+            return matchesConsultationScope(noteScopeMeta, scope.role, scope.ownerUid, scope.shift, scope.profileId);
+        }
+
+        const fallbackMeta = buildPrivateConsultaScopeMeta(consultationMeta || {});
+        const hasFallbackScope = !!(fallbackMeta.autorId || fallbackMeta.profesionalProfileId || fallbackMeta.shift || fallbackMeta.tipoServicio);
+        if (!hasFallbackScope) return true;
+
+        return matchesConsultationScope(fallbackMeta, scope.role, scope.ownerUid, scope.shift, scope.profileId);
+    }
+
+    async function getPrivateConsultaNote(ctx, studentId, consultaId, scope = null, consultationMeta = null) {
+        if (!studentId || !consultaId) return '';
+        try {
+            const privateRef = ctx.db.collection(C_EXP)
+                .doc(studentId)
+                .collection(C_PRIVATE_CONSULTAS)
+                .doc(consultaId);
+            const snap = await privateRef.get();
+
+            if (!snap.exists) return '';
+            const data = snap.data() || {};
+            if (!canReadPrivateConsultaNote(data, scope, consultationMeta)) return '';
+
+            const note = String(data.note || '').trim();
+            const currentMeta = buildPrivateConsultaScopeMeta(data);
+            const fallbackMeta = buildPrivateConsultaScopeMeta(consultationMeta || {});
+            const needsBackfill = note && consultationMeta
+                && !(currentMeta.autorId || currentMeta.profesionalProfileId || currentMeta.shift || currentMeta.tipoServicio)
+                && (fallbackMeta.autorId || fallbackMeta.profesionalProfileId || fallbackMeta.shift || fallbackMeta.tipoServicio);
+
+            if (needsBackfill) {
+                privateRef.set({
+                    ...fallbackMeta,
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                }, { merge: true }).catch(() => { });
+            }
+
+            return note;
+        } catch (e) {
+            console.warn('[MediService] Error reading private consultation note:', e);
+            return '';
+        }
+    }
+
+    async function migrateLegacyPrivateConsultaNote(ctx, studentId, consultaId, rawNote, meta = null) {
+        const note = String(rawNote || '').trim();
+        if (!studentId || !consultaId || !note) return false;
+
+        try {
+            const expedienteRef = ctx.db.collection(C_EXP).doc(studentId);
+            const privateRef = expedienteRef.collection(C_PRIVATE_CONSULTAS).doc(consultaId);
+            const consultaRef = expedienteRef.collection('consultas').doc(consultaId);
+            let effectiveMeta = meta;
+
+            if (!effectiveMeta) {
+                const consultaSnap = await consultaRef.get().catch(() => null);
+                if (consultaSnap?.exists) effectiveMeta = consultaSnap.data() || null;
+            }
+
+            await privateRef.set({
+                note,
+                migratedFromLegacy: true,
+                ...buildPrivateConsultaScopeMeta(effectiveMeta || {}),
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            }, { merge: true });
+
+            await consultaRef.update({
+                hasPrivateNotes: true,
+                notasPrivadas: firebase.firestore.FieldValue.delete(),
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            }).catch(() => { });
+
+            return true;
+        } catch (e) {
+            console.warn('[MediService] Error migrating private consultation note:', e);
+            return false;
+        }
+    }
+
 
     // [NEW] Check Slot Conflict Internal
-    async function checkSlotConflict(ctx, date) {
+    async function checkSlotConflict(ctx, date, tipoServicio) {
         // Check confirmed appointments at this exact time
-        const q = ctx.db.collection(C_CITAS)
+        let q = ctx.db.collection(C_CITAS)
             .where('estado', '==', 'confirmada')
             .where('fechaHoraSlot', '==', date);
+
+        if (tipoServicio) {
+            q = q.where('tipoServicio', '==', tipoServicio);
+        }
+
         const snap = await q.get();
         return !snap.empty;
     }
 
-    // [NEW] Get Occupied Slots for a Day (Public)
-    async function getOccupiedSlots(ctx, role, isoDate) {
-        // Start/End of Day
-        // We need to check 'confirmada' appointments for the whole day
-        const start = new Date(isoDate + 'T00:00:00');
-        const end = new Date(isoDate + 'T23:59:59');
-
-        // Query Citas Confirmadas
-        // Note: Ideally we filter by Role (Médico/Psicologo) if they share the same schedule/slots?
-        // Or if they have different rooms.
-        // Assuming shared slots for simplicity or filter by tipoServicio if needed.
-        // For now, let's assume if ANYONE booked it, it's busy (Single Resource Model).
-        // OR: Filter by 'tipoServicio' == role.
-
-        // Let's filter by role to allow concurrent Medical/Psych appointments if they are different resources
-        let q = ctx.db.collection(C_CITAS)
-            .where('estado', '==', 'confirmada')
-            .where('fechaHoraSlot', '>=', start)
-            .where('fechaHoraSlot', '<=', end);
-
-        if (role) {
-            q = q.where('tipoServicio', '==', role);
-        }
-
-        const snap = await q.get();
-        return snap.docs.map(d => d.data().fechaHoraSlot.toDate().toISOString());
-    }
+    // [REMOVED] Duplicate getOccupiedSlots override (caused logic bug where queue status was always 0)
 
     // --- PUBLIC METHODS (UPDATED) ---
 
@@ -867,7 +1504,7 @@ const MediService = (function () {
 
             // Validar conflicto horario (DOBLE VERIFICACION)
             // Aunque getOccupiedSlots lo usa el UI, el backend debe protegerse
-            const isOccupied = await checkSlotConflict(ctx, cita.fechaHoraSlot);
+            const isOccupied = await checkSlotConflict(ctx, cita.fechaHoraSlot, cita.tipoServicio);
             if (isOccupied) throw new Error("Este horario ya fue ocupado por otra persona.");
 
             // Validar conflicto horario
@@ -888,14 +1525,14 @@ const MediService = (function () {
                 estado: 'confirmada',
                 profesionalId: profesionalId, // Auth UID
                 profesionalEmail: profesionalEmail,
-                profesionalShift: shiftTag || null // Legacy Shift or Profile Shift
+                profesionalShift: shiftTag || null, // Legacy Shift or Profile Shift
+                profesionalName: profileData?.displayName || ctx.profile?.displayName || profesionalEmail || null,
+                profesionalCedula: profileData?.cedula || ctx.profile?.cedula || null
             };
 
             // NEW: Add Profile Info if available
             if (profileData) {
                 updateData.profesionalProfileId = profileData.id;
-                updateData.profesionalName = profileData.displayName;
-                updateData.profesionalCedula = profileData.cedula;
             }
 
             tx.update(ref, updateData);
@@ -915,6 +1552,45 @@ const MediService = (function () {
     }
 
     async function reservarCitaAdmin(ctx, { student, date, slotId, tipo, motivo, shift, profileData }) {
+        const normalizedTipo = normalizeServiceRole(tipo);
+        const normalizedShift = normalizeShiftTag(shift, date);
+        let operationalProfessional = null;
+
+        if (profileData) {
+            operationalProfessional = {
+                id: profileData.ownerUid || ctx.auth.currentUser.uid,
+                displayName: profileData.displayName || profileData.name || ctx.profile?.displayName || ctx.auth.currentUser.email || 'Profesional',
+                email: ctx.auth.currentUser.email || '',
+                profileId: profileData.linkedProfileId || profileData.id || null,
+                cedula: profileData.cedula || ctx.profile?.cedula || ''
+            };
+        }
+
+        if (!operationalProfessional) {
+            operationalProfessional = await resolveProfessionalForBooking(ctx, normalizedTipo, date).catch(() => null);
+        }
+
+        if (!operationalProfessional && normalizedShift) {
+            const shiftProfile = await getShiftProfile(ctx, normalizedTipo, normalizedShift).catch(() => null);
+            if (shiftProfile) {
+                operationalProfessional = {
+                    id: shiftProfile.ownerUid || ctx.auth.currentUser.uid,
+                    displayName: shiftProfile.displayName || shiftProfile.name || ctx.profile?.displayName || ctx.auth.currentUser.email || 'Profesional',
+                    email: ctx.auth.currentUser.email || '',
+                    profileId: shiftProfile.linkedProfileId || shiftProfile.profileId || shiftProfile.id || null,
+                    cedula: shiftProfile.cedula || ctx.profile?.cedula || ''
+                };
+            }
+        }
+
+        operationalProfessional = operationalProfessional || {
+            id: ctx.auth.currentUser.uid,
+            displayName: ctx.profile?.displayName || ctx.auth.currentUser.email || 'Profesional',
+            email: ctx.auth.currentUser.email || '',
+            profileId: profileData?.id || null,
+            cedula: profileData?.cedula || ctx.profile?.cedula || ''
+        };
+
         return ctx.db.runTransaction(async tx => {
             const slotRef = ctx.db.collection(SLOTS_COLL).doc(slotId);
             const slotSnap = await tx.get(slotRef);
@@ -923,7 +1599,6 @@ const MediService = (function () {
             tx.set(slotRef, { holder: student.uid, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
 
             const newCitaRef = ctx.db.collection(C_CITAS).doc();
-
             const docData = {
                 studentId: student.uid,
                 studentEmail: student.email,
@@ -931,27 +1606,31 @@ const MediService = (function () {
                 fechaSolicitud: firebase.firestore.FieldValue.serverTimestamp(),
                 fechaHoraSlot: firebase.firestore.Timestamp.fromDate(date),
                 slotId: slotId,
-                tipoServicio: tipo,
+                tipoServicio: normalizedTipo,
                 motivo: motivo,
                 estado: 'confirmada',
-                profesionalId: ctx.auth.currentUser.uid,
-                profesionalShift: shift,
-                shift: shift
+                profesionalId: operationalProfessional.id,
+                profesionalEmail: operationalProfessional.email || '',
+                profesionalName: operationalProfessional.displayName,
+                profesionalCedula: operationalProfessional.cedula || '',
+                profesionalShift: normalizedShift,
+                shift: normalizedShift
             };
 
-            if (profileData) {
-                docData.profesionalProfileId = profileData.id;
-                docData.profesionalName = profileData.displayName;
+            if (operationalProfessional.profileId) {
+                docData.profesionalProfileId = operationalProfessional.profileId;
+                docData.profesionalName = operationalProfessional.displayName;
             }
 
             tx.set(newCitaRef, docData);
         });
     }
 
-    // Refactor streamAgenda to support Profile ID filtering
-    function streamAgenda(ctx, profesionalId, shiftTag, profileId, callback) {
+    // Refactor streamAgenda to support Profile ID filtering and Role filtering
+    function streamAgenda(ctx, role, profesionalId, shiftTag, profileId, callback) {
+        const normalizedRole = normalizeServiceRole(role);
         let ref = ctx.db.collection(C_CITAS)
-            .where('profesionalId', '==', profesionalId)
+            .where('tipoServicio', '==', normalizedRole)
             .where('estado', '==', 'confirmada');
 
         return ref.onSnapshot(snap => {
@@ -961,23 +1640,37 @@ const MediService = (function () {
                 safeDate: safeDate(d.data().fechaHoraSlot)
             }));
 
-            // Filter logic
-            if (profileId) {
-                // If we have a profile ID, show appointments for this profile OR legacy appointments for this shift
+            // Filter logic based on Role
+            if (normalizedRole === 'Médico') {
+                // Médico sees ALL confirmed médico appointments, regardless of who picked them up
+                // No extra filtering needed
+            } else if (normalizedRole === 'Psicologo') {
+                // Psicologo sees ONLY confirmed psicologo appointments matching their shift
                 docs = docs.filter(d => {
-                    if (d.profesionalProfileId) return d.profesionalProfileId === profileId;
-                    const shiftToCheck = d.profesionalShift || d.shift;
-                    if (shiftTag && shiftToCheck) return shiftToCheck === shiftTag;
-                    return false;
+                    const shiftToCheck = d.shift || d.profesionalShift;
+                    if (shiftToCheck && shiftTag) {
+                        return shiftToCheck === shiftTag;
+                    }
+
+                    // Fallback to time-based filtering if it has no shift assigned
+                    const h = d.safeDate ? d.safeDate.getHours() : 0;
+                    if (shiftTag === 'Matutino') return h < 15;
+                    return h >= 15;
                 });
-            } else if (shiftTag) {
-                // Legacy strict shift filter
-                docs = docs.filter(d => (d.profesionalShift || d.shift) === shiftTag);
             }
 
+            docs = docs.filter(d => matchesAppointmentScope(d, normalizedRole, profesionalId, shiftTag, profileId));
             docs.sort((a, b) => (a.safeDate || 0) - (b.safeDate || 0));
             callback(docs);
-        }, err => console.error("❌ Error en Stream Agenda:", err));
+        }, err => {
+            console.error("❌ Error en Stream Agenda:", err);
+            if (err.code === 'permission-denied') {
+                if (window.showToast) showToast("Error de permisos: No puedes leer las citas agendadas.", "danger");
+            } else if (err.code === 'failed-precondition') {
+                console.warn("Falta Índice en Firestore para Citas confirmadas.");
+                if (window.showToast) showToast("Error de Base de Datos (Falta Índice). Revisa la consola.", "danger");
+            }
+        });
     }
 
     // Refactor getExpedienteHistory to support Profile ID
@@ -990,7 +1683,12 @@ const MediService = (function () {
                 .where('studentId', '==', studentId)
                 .where('tipoServicio', '==', 'Médico')
                 .get();
-            legacyMedSnap.forEach(d => docs.push({ id: d.id, ...d.data(), safeDate: safeDate(d.data().createdAt), source: 'legacy' }));
+            legacyMedSnap.forEach(d => {
+                const val = d.data();
+                if (matchesConsultationScope(val, role, profesionalId, shiftTag, profileId)) {
+                    docs.push({ id: d.id, ...val, signos: normalizeSigns(val), safeDate: safeDate(val.createdAt), source: 'legacy' });
+                }
+            });
         }
 
         if (role === 'Psicologo') {
@@ -1009,7 +1707,7 @@ const MediService = (function () {
                 // If it's a legacy doc without profileId but we are viewing from a profile, relying on shift is the Way.
 
                 if (include) {
-                    docs.push({ id: d.id, ...val, safeDate: safeDate(val.createdAt), source: 'legacy' });
+                    docs.push({ id: d.id, ...val, signos: normalizeSigns(val), safeDate: safeDate(val.createdAt), source: 'legacy' });
                 }
             });
         }
@@ -1052,7 +1750,7 @@ const MediService = (function () {
                     }
 
                 } else {
-                    include = true;
+                    include = matchesConsultationScope(val, role, profesionalId, shiftTag, profileId);
                 }
 
                 if (include) {
@@ -1063,7 +1761,7 @@ const MediService = (function () {
                 }
 
                 if (include) {
-                    docs.push({ id: d.id, ...val, safeDate: safeDate(val.createdAt), source: 'new' });
+                    docs.push({ id: d.id, ...val, signos: normalizeSigns(val), safeDate: safeDate(val.createdAt), source: 'new' });
                 }
             });
 
@@ -1072,14 +1770,41 @@ const MediService = (function () {
         }
 
         docs.sort((a, b) => (b.safeDate || 0) - (a.safeDate || 0));
+
+        const isHealthViewer = role === 'Médico' || role === 'Psicologo';
+        docs.forEach((doc) => {
+            if (doc?.source === 'new' && doc?.notasPrivadas && isHealthViewer) {
+                migrateLegacyPrivateConsultaNote(ctx, studentId, doc.id, doc.notasPrivadas, doc).catch(() => { });
+            }
+            if (!isHealthViewer && doc?.notasPrivadas) {
+                delete doc.notasPrivadas;
+            }
+        });
+
         return docs;
     }
 
     // Updated saveConsulta to include profile info
     async function saveConsulta(ctx, payload, citaId) {
         return ctx.db.runTransaction(async (tx) => {
+            let citaRef = null;
+            let cSnap = null;
+            const privateNote = String(payload?.notasPrivadas || '').trim();
+            const publicPayload = { ...payload };
+            delete publicPayload.notasPrivadas;
+
+            // 1. REALIZAR LECTURAS PRIMERO (Regla de Firestore Transactions)
+            if (citaId && citaId !== 'null' && !citaId.startsWith('walkin_')) {
+                if (payload.estado === 'finalizada') {
+                    citaRef = ctx.db.collection(C_CITAS).doc(citaId);
+                    cSnap = await tx.get(citaRef);
+                }
+            }
+
+            // 2. REALIZAR ESCRITURAS DESPUÉS
             const masterRef = ctx.db.collection(C_EXP).doc(payload.studentId);
             const consultaRef = masterRef.collection('consultas').doc();
+            const privateRef = masterRef.collection(C_PRIVATE_CONSULTAS).doc(consultaRef.id);
 
             const masterData = {
                 studentId: payload.studentId,
@@ -1088,34 +1813,48 @@ const MediService = (function () {
             };
 
             tx.set(masterRef, masterData, { merge: true });
-            tx.set(consultaRef, payload);
+            tx.set(consultaRef, {
+                ...publicPayload,
+                hasPrivateNotes: !!privateNote,
+                signos: normalizeSigns(publicPayload)
+            });
 
-            if (citaId && citaId !== 'null' && !citaId.startsWith('walkin_')) {
-                // [FIX] Only finalize the appointment slot if the consultation is truly finalized.
-                // If paused, we might want to keep it 'confirmada' or update to 'en_proceso' (if column existed),
-                // but definitely NOT 'finalizada'.
-                if (payload.estado === 'finalizada') {
-                    const citaRef = ctx.db.collection(C_CITAS).doc(citaId);
-                    // Check if doc exists before update to prevent "No document to update" error
-                    const cSnap = await tx.get(citaRef);
-                    if (cSnap.exists) {
-                        tx.update(citaRef, { estado: 'finalizada' });
-                    }
-                }
+            if (privateNote) {
+                tx.set(privateRef, {
+                    note: privateNote,
+                    ...buildPrivateConsultaScopeMeta(publicPayload),
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+            }
+
+            if (cSnap && cSnap.exists) {
+                tx.update(citaRef, {
+                    estado: 'finalizada',
+                    fechaConfirmacion: firebase.firestore.FieldValue.serverTimestamp()
+                });
             }
         });
     }
 
     // [NEW] DASHBOARD HELPER (STREAM)
-    function streamRecentConsultations(ctx, role, uid, profileId, limit = 5, callback) {
+    function streamRecentConsultations(ctx, role, uid, profileId, limit = 5, callback, shiftTag = null) {
         try {
             console.log(`[MediService] Stream Recent Request -> Role: ${role}, UID: ${uid}, Profile: ${profileId}`);
-            let q = ctx.db.collectionGroup('consultas');
+            const effectiveUid = uid || (ctx.auth.currentUser ? ctx.auth.currentUser.uid : null);
+            if (!effectiveUid) {
+                console.error("[MediService] UID missing/null for streamRecentConsultations - Aborting query.");
+                callback([]);
+                return () => { };
+            }
+
+            const normalizedRole = normalizeServiceRole(role);
+            let q = ctx.db.collectionGroup('consultas')
+                .where('autorId', '==', effectiveUid);
 
             // Filter logic
-            if (role === 'Psicologo' && profileId) {
-                // Strict Profile Filtering
-                q = q.where('profesionalProfileId', '==', profileId);
+            if (normalizedRole === 'Psicologo' && profileId) {
+                // Legacy compatibility: filter later in memory so old docs without profileId are still visible.
+                q = q;
             } else {
                 // Legacy / General User Filtering (Médico)
                 // STRICT: Must match autorId to the current user
@@ -1128,13 +1867,13 @@ const MediService = (function () {
                 }
 
                 console.log(`[MediService] Filtering by autorId: ${effectiveUid}`);
-                q = q.where('autorId', '==', effectiveUid);
+                q = q;
             }
 
             // Order & Limit
             // [FIX] Filter by finalized only to hide paused/drafts from "Recent" list
             q = q.where('estado', '==', 'finalizada');
-            q = q.orderBy('createdAt', 'desc').limit(limit);
+            q = q.orderBy('createdAt', 'desc').limit(Math.max(limit * 4, 20));
 
             const unsubscribe = q.onSnapshot(async (snap) => {
                 console.log(`[MediService] Stream Recent Update: ${snap.size} docs found.`);
@@ -1142,6 +1881,7 @@ const MediService = (function () {
                 // Process docs sequentially to fetch names if needed
                 for (const d of snap.docs) {
                     const val = d.data();
+                    if (!matchesConsultationScope(val, normalizedRole, effectiveUid, shiftTag, profileId)) continue;
                     let patientName = val.studentName || val.pacienteNombre;
 
                     // If name is missing, try to fetch from 'usuarios' (Optimized: In a real app we'd cache this)
@@ -1157,11 +1897,14 @@ const MediService = (function () {
                     docs.push({
                         id: d.id,
                         ...val,
+                        signos: normalizeSigns(val),
+                        isAnonymous: typeof val.studentId === 'string' && val.studentId.startsWith('anon_'),
                         patientName: patientName || val.studentEmail || "Estudiante", // Fallback
                         safeDate: safeDate(val.createdAt)
                     });
                 }
-                callback(docs);
+                docs.sort((a, b) => (b.safeDate || 0) - (a.safeDate || 0));
+                callback(docs.slice(0, limit));
             }, (error) => {
                 console.error("Error streaming recent consultations:", error);
                 callback([]);
@@ -1177,23 +1920,22 @@ const MediService = (function () {
     }
 
     // --- C1: Day Stats for Dashboard ---
-    async function getDayStats(ctx, role, uid, profileId) {
+    async function getDayStats(ctx, role, uid, profileId, shiftTag = null) {
         const now = new Date();
         const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const normalizedRole = normalizeServiceRole(role);
+        const normalizedShift = normalizeShiftTag(shiftTag);
 
         // 1. Consultations completed today
         let q = ctx.db.collectionGroup('consultas')
             .where('createdAt', '>=', startOfDay)
-            .where('estado', '==', 'finalizada');
-
-        if (role === 'Psicologo' && profileId) {
-            q = q.where('profesionalProfileId', '==', profileId);
-        } else {
-            q = q.where('autorId', '==', uid);
-        }
+            .where('estado', '==', 'finalizada')
+            .where('autorId', '==', uid);
 
         const snap = await q.get();
-        const consultas = snap.docs.map(d => d.data());
+        const consultas = snap.docs
+            .map(d => d.data())
+            .filter((data) => matchesConsultationScope(data, normalizedRole, uid, normalizedShift, profileId));
 
         const totalAtendidos = consultas.length;
 
@@ -1216,25 +1958,28 @@ const MediService = (function () {
 
         // 4. Pending appointments today (waiting room)
         let pendQ = ctx.db.collection(C_CITAS)
-            .where('estado', '==', 'pendiente')
-            .where('fechaSolicitud', '>=', startOfDay);
+            .where('estado', '==', 'pendiente');
 
-        if (role === 'Psicologo' && profileId) {
-            // Psicologos filter by their service type
-        } else {
-            pendQ = pendQ.where('tipoServicio', '==', role);
-        }
+        pendQ = pendQ.where('tipoServicio', '==', normalizedRole);
 
         let enEspera = 0;
         try {
             const pendSnap = await pendQ.get();
-            enEspera = pendSnap.size;
+            enEspera = pendSnap.docs.filter((doc) => {
+                const data = doc.data();
+                const slotDate = safeDate(data.fechaHoraSlot || data.fechaSolicitud);
+                return !!slotDate &&
+                    slotDate >= startOfDay &&
+                    matchesAppointmentScope(data, normalizedRole, uid, normalizedShift, profileId, {
+                        includeUnassignedMedical: true
+                    });
+            }).length;
         } catch (e) { /* index may not exist */ }
 
         // 5. Average wait time (from fechaSolicitud to fechaConfirmacion for today's finalized citas)
         let citasQ = ctx.db.collection(C_CITAS)
             .where('estado', '==', 'finalizada')
-            .where('fechaSolicitud', '>=', startOfDay);
+            .where('tipoServicio', '==', normalizedRole);
 
         let avgEspera = 0;
         try {
@@ -1242,9 +1987,12 @@ const MediService = (function () {
             const waits = [];
             citasSnap.docs.forEach(d => {
                 const data = d.data();
+                if (!matchesAppointmentScope(data, normalizedRole, uid, normalizedShift, profileId, {
+                    includeUnassignedMedical: false
+                })) return;
                 const sol = safeDate(data.fechaSolicitud);
                 const conf = safeDate(data.fechaConfirmacion);
-                if (sol && conf) {
+                if (sol && conf && sol >= startOfDay) {
                     const diffMin = Math.round((conf.getTime() - sol.getTime()) / 60000);
                     if (diffMin > 0 && diffMin < 480) waits.push(diffMin);
                 }
@@ -1256,30 +2004,29 @@ const MediService = (function () {
     }
 
     // --- C7: Follow-ups ---
-    async function getFollowUps(ctx, role, uid, profileId) {
+    async function getFollowUps(ctx, role, uid, profileId, shiftTag = null) {
+        const normalizedRole = normalizeServiceRole(role);
+        const normalizedShift = normalizeShiftTag(shiftTag);
         let q = ctx.db.collectionGroup('consultas')
             .where('followUp.required', '==', true)
-            .where('estado', '==', 'finalizada');
+            .where('estado', '==', 'finalizada')
+            .where('autorId', '==', uid);
 
-        if (role === 'Psicologo' && profileId) {
-            q = q.where('profesionalProfileId', '==', profileId);
-        } else {
-            q = q.where('autorId', '==', uid);
-        }
-
-        const snap = await q.orderBy('createdAt', 'desc').limit(20).get();
-        return snap.docs.map(d => {
-            const data = d.data();
-            return {
-                id: d.id,
+        const snap = await q.limit(200).get();
+        return snap.docs
+            .map(d => ({ id: d.id, ...d.data() }))
+            .filter((data) => matchesConsultationScope(data, normalizedRole, uid, normalizedShift, profileId))
+            .sort((a, b) => (safeDate(b.createdAt) || 0) - (safeDate(a.createdAt) || 0))
+            .map((data) => ({
+                id: data.id,
                 studentId: data.studentId,
                 studentEmail: data.studentEmail,
+                studentName: data.studentName || data.studentEmail || 'Estudiante',
                 diagnostico: data.diagnostico,
                 followUpDate: data.followUp?.date || null,
                 followUpNotes: data.followUp?.notes || '',
                 createdAt: safeDate(data.createdAt)
-            };
-        });
+            }));
     }
 
     async function getStudentFollowUps(ctx, studentId) {
@@ -1300,59 +2047,169 @@ const MediService = (function () {
         }));
     }
 
-    // --- Shift Profiles (Missing Definitions) ---
-    async function getShiftProfile(ctx, type, shift) {
-        const docId = `${type}_${shift}`;
-        console.log(`[MediService] Requesting Shift Profile: ${docId}`);
+    async function getPatientOperationalSnapshot(ctx, studentId, scope = {}) {
+        const emptySnapshot = {
+            totalConsultas: 0,
+            lastDiagnosis: '',
+            lastConsultationDate: null,
+            lastService: '',
+            activeAppointments: 0,
+            noShowCount: 0,
+            followUp: null
+        };
+
+        if (!studentId || String(studentId).startsWith('anon_')) return emptySnapshot;
+
+        const normalizedRole = normalizeServiceRole(scope.role);
+        const ownerUid = scope.ownerUid || scope.uid || ctx.auth.currentUser?.uid || null;
+        const normalizedShift = normalizeShiftTag(scope.shift);
+        const profileId = scope.profileId || null;
+
+        let history = [];
         try {
-            const snap = await ctx.db.collection('medi-shift-profiles').doc(docId).get();
-            if (snap.exists) {
-                return snap.data();
-            } else {
-                console.warn(`[MediService] Shift Profile NOT found for ${docId}. Attempting auto-recovery...`);
+            history = await getExpedienteHistory(
+                ctx,
+                studentId,
+                normalizedRole,
+                ownerUid,
+                normalizedShift,
+                profileId
+            );
+        } catch (err) {
+            console.warn('[MediService] Error loading patient operational history:', err);
+        }
 
-                // Fallback: Find ANY user with this role
-                const usersRef = ctx.db.collection('usuarios');
-                const q = usersRef.where('role', '==', type.toLowerCase()).limit(1);
-                const uSnap = await q.get();
+        const lastConsultation = history[0] || null;
+        const pendingFollowUp = history.find((item) => item?.followUp?.required) || null;
 
-                let newProfile = {
-                    id: 'fallback_' + Date.now(),
-                    displayName: `Profesional ${shift}`,
-                    cedula: "PENDIENTE",
-                    legacyShift: shift,
-                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        let activeAppointments = 0;
+        let noShowCount = 0;
+        try {
+            const citasSnap = await ctx.db.collection(C_CITAS).where('studentId', '==', studentId).get();
+            const startOfDay = new Date();
+            startOfDay.setHours(0, 0, 0, 0);
+
+            citasSnap.docs.forEach((doc) => {
+                const data = doc.data() || {};
+                const slotDate = safeDate(data.fechaHoraSlot || data.fechaSolicitud);
+                if (
+                    ['pendiente', 'confirmada', 'en_proceso'].includes(data.estado)
+                    && (!slotDate || slotDate >= startOfDay)
+                ) {
+                    activeAppointments += 1;
+                }
+                if (data.noShow === true || /no asist/i.test(String(data.motivoCancelacion || ''))) {
+                    noShowCount += 1;
+                }
+            });
+        } catch (err) {
+            console.warn('[MediService] Error loading patient appointment snapshot:', err);
+        }
+
+        const followUpDate = safeDate(pendingFollowUp?.followUp?.date);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        return {
+            totalConsultas: history.length,
+            lastDiagnosis: lastConsultation?.diagnostico || lastConsultation?.motivo || '',
+            lastConsultationDate: safeDate(lastConsultation?.safeDate || lastConsultation?.createdAt),
+            lastService: lastConsultation?.tipoServicio || '',
+            activeAppointments,
+            noShowCount,
+            followUp: pendingFollowUp ? {
+                date: followUpDate,
+                notes: pendingFollowUp?.followUp?.notes || '',
+                overdue: !!(followUpDate && followUpDate < today)
+            } : null
+        };
+    }
+
+    async function getPatientInsights(ctx, role, uid, profileId, shiftTag = null, limit = 6) {
+        const normalizedRole = normalizeServiceRole(role);
+        const normalizedShift = normalizeShiftTag(shiftTag);
+        const safeLimit = Math.max(parseInt(limit, 10) || 6, 1);
+        const results = { recent: [], frequent: [] };
+
+        if (!uid) return results;
+
+        try {
+            const snap = await ctx.db.collectionGroup('consultas')
+                .where('autorId', '==', uid)
+                .where('estado', '==', 'finalizada')
+                .orderBy('createdAt', 'desc')
+                .limit(Math.max(safeLimit * 12, 48))
+                .get();
+
+            const grouped = new Map();
+            const recent = [];
+
+            snap.docs.forEach((doc) => {
+                const data = doc.data() || {};
+                if (!matchesConsultationScope(data, normalizedRole, uid, normalizedShift, profileId)) return;
+
+                const studentId = data.studentId;
+                if (!studentId || String(studentId).startsWith('anon_')) return;
+
+                const item = {
+                    uid: studentId,
+                    displayName: data.studentName || data.patientName || data.studentEmail || 'Estudiante',
+                    email: data.studentEmail || '',
+                    diagnosis: data.diagnostico || data.motivo || '',
+                    lastDate: safeDate(data.createdAt),
+                    matricula: data.pacienteMatricula || '',
+                    carrera: '',
+                    totalVisits: 1
                 };
 
-                if (!uSnap.empty) {
-                    const uData = uSnap.docs[0].data();
-                    newProfile = {
-                        id: uSnap.docs[0].id,
-                        displayName: uData.displayName || uData.email || "Profesional Asignado",
-                        cedula: uData.cedula || "",
-                        legacyShift: shift,
-                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                    };
+                if (!grouped.has(studentId)) {
+                    grouped.set(studentId, { ...item });
+                    if (recent.length < safeLimit) recent.push(item);
                 } else {
-                    console.error(`[MediService] CRITICAL: No users found with role ${type}. Using generic fallback.`);
+                    const current = grouped.get(studentId);
+                    current.totalVisits += 1;
+                    if (!current.lastDate || (item.lastDate && item.lastDate > current.lastDate)) {
+                        current.lastDate = item.lastDate;
+                        current.diagnosis = item.diagnosis;
+                        current.displayName = item.displayName || current.displayName;
+                    }
                 }
+            });
 
-                await updateShiftProfile(ctx, type, shift, newProfile);
-                console.log(`[MediService] Auto-created Shift Profile for ${docId}`, newProfile);
-                return newProfile;
-            }
-        } catch (e) { console.error("Error getting shift profile:", e); }
-        return null;
+            const idsToEnrich = Array.from(grouped.keys()).slice(0, safeLimit * 2);
+            const userDocs = await Promise.all(idsToEnrich.map((studentId) =>
+                ctx.db.collection('usuarios').doc(studentId).get().catch(() => null)
+            ));
+
+            userDocs.forEach((snapDoc, index) => {
+                if (!snapDoc?.exists) return;
+                const studentId = idsToEnrich[index];
+                const data = snapDoc.data() || {};
+                const current = grouped.get(studentId);
+                if (!current) return;
+                current.displayName = data.displayName || current.displayName;
+                current.email = data.email || current.email;
+                current.matricula = data.matricula || current.matricula;
+                current.carrera = data.carrera || current.carrera;
+            });
+
+            results.recent = recent
+                .map((item) => grouped.get(item.uid) || item)
+                .slice(0, safeLimit);
+
+            results.frequent = Array.from(grouped.values())
+                .sort((a, b) => {
+                    if (b.totalVisits !== a.totalVisits) return b.totalVisits - a.totalVisits;
+                    return (b.lastDate || 0) - (a.lastDate || 0);
+                })
+                .slice(0, safeLimit);
+
+            return results;
+        } catch (err) {
+            console.warn('[MediService] Error building patient insights:', err);
+            return results;
+        }
     }
-
-    async function updateShiftProfile(ctx, type, shift, profileData) {
-        const docId = `${type}_${shift}`;
-        const ref = ctx.db.collection('medi-shift-profiles').doc(docId);
-        await ref.set(profileData, { merge: true });
-        return profileData;
-    }
-
-
 
     return {
         loadConfig,
@@ -1378,11 +2235,16 @@ const MediService = (function () {
         getProfiles,
         getExpedienteHistory,
         verifyPin,
+        updateProfilePin,
         seedInitialProfiles,
+        getPrivateConsultaNote,
+        migrateLegacyPrivateConsultaNote,
         rechazarCita,
         streamRecentConsultations,
         buscarPaciente,
         getDayStats, getFollowUps, getStudentFollowUps,
+        getPatientOperationalSnapshot,
+        getPatientInsights,
 
         // Sistema de Cola (Nuevo)
         promoteNextInQueue,
@@ -1392,7 +2254,18 @@ const MediService = (function () {
         // Shift Profile Management (Newly Added)
         getShiftProfile,
         updateShiftProfile,
+        getDefaultProfessionalProfile,
+        resolveProfessionalIdentity,
+        getDefaultPrescriptionTemplateUrl,
         resolveProfessionalForBooking,
+        getSlotDurationForContext,
+        getDisabledHoursForContext,
+        getAvailabilityKeyForContext,
+        getPauseUntilKeyForContext,
+        getPauseUntilForContext,
+        isServiceEnabledForContext,
+        normalizeServiceRole,
+        normalizeShiftTag,
 
         // Utils
         pad, toISO, slotIdFromDate, calculateAge

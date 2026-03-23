@@ -1,0 +1,143 @@
+{
+  "version": "1.0",
+  "task": "generate_marketing_flyer",
+  "language": "es-MX",
+  "output": {
+    "aspect_ratio": "9:16",
+    "width": 1080,
+    "height": 1920,
+    "format": "png"
+  },
+  "brand": {
+    "name": "SIA",
+    "full_name": "Sistema de Integracion Academico",
+    "institution": "TecNM Campus Los Cabos",
+    "style_keywords": [
+      "institucional",
+      "moderno",
+      "premium",
+      "tecnologico",
+      "juvenil",
+      "editorial"
+    ],
+    "primary_colors": [
+      "#1B396A",
+      "#2F6FD8",
+      "#59D6FF"
+    ],
+    "secondary_colors": [
+      "#F0BE4E",
+      "#3FD194",
+      "#07111D"
+    ],
+    "logo_usage": {
+      "include_sia_logo": true,
+      "include_tecnm_logo": true,
+      "placement": "top area, balanced, premium, no distortion",
+      "notes": "use logos cleanly on dark background, preserve proportions, do not invent alternative marks"
+    }
+  },
+  "creative_direction": {
+    "composition": "vertical poster with strong top header, dominant hero title, structured information block in the middle, clear CTA at the bottom",
+    "background": "deep navy gradient with subtle cyan glow, glassmorphism panels, fine grid texture, geometric cube-inspired shapes that echo the SIA logo",
+    "typography": {
+      "headline_style": "editorial serif, bold, elegant, highly legible",
+      "body_style": "clean sans serif, modern, compact",
+      "hierarchy": "very clear, high contrast, easy to read on phone screen"
+    },
+    "mood": "welcome, aspirational, trustworthy, institutional but visually striking",
+    "visual_constraints": [
+      "avoid generic stock-photo look",
+      "avoid clutter",
+      "avoid purple-dominant palettes",
+      "avoid cartoonish style",
+      "avoid excessive 3D icons",
+      "keep a premium campus-tech feel"
+    ]
+  },
+  "content": {
+    "headline": "Bienvenido a SIA",
+    "subheadline": "Tu campus digital empieza aqui.",
+    "support_copy": "SIA reune acceso institucional, modulos clave, credencial y avisos del TecNM Campus Los Cabos en un solo lugar.",
+    "important_points": [
+      {
+        "title": "Accede con tu correo institucional",
+        "description": "Inicia sesion con tu cuenta Microsoft del TecNM y entra a tu espacio de forma segura."
+      },
+      {
+        "title": "Revisa tus modulos",
+        "description": "Aula, Biblioteca, Salud Integral, Foro, Encuestas y mas desde una sola plataforma."
+      },
+      {
+        "title": "Activa tu credencial y avisos",
+        "description": "Consulta tu QR digital, novedades del campus y recordatorios importantes."
+      },
+      {
+        "title": "Llevalo a tu celular",
+        "description": "Instala SIA en tu pantalla de inicio para abrir el campus digital con un toque."
+      }
+    ],
+    "feature_tags": [
+      "Aula Virtual",
+      "Biblioteca",
+      "Salud Integral",
+      "Foro",
+      "Mi QR",
+      "Avisos"
+    ],
+    "cta": {
+      "label": "Ingresa hoy",
+      "title": "Activa tu experiencia SIA",
+      "url": "sia.loscabos.tecnm.mx",
+      "button_text": "Acceso institucional"
+    },
+    "footer_note": "Formato vertical 9:16 para historia, reel cover o pantalla movil."
+  },
+  "layout": {
+    "top_zone": [
+      "SIA logo",
+      "TecNM logo",
+      "small campus label"
+    ],
+    "middle_zone": [
+      "main title",
+      "short welcome paragraph",
+      "4 premium info rows with number chips or minimalist icons"
+    ],
+    "bottom_zone": [
+      "feature tags as pills",
+      "strong CTA block",
+      "url visible and readable"
+    ]
+  },
+  "rendering_notes": {
+    "text_handling": [
+      "respect all Spanish copy exactly as written",
+      "prioritize legibility over decorative effects",
+      "do not truncate text"
+    ],
+    "logo_handling": [
+      "do not alter official logos",
+      "keep logo edges clean",
+      "use enough negative space around logos"
+    ],
+    "export_requirements": [
+      "final image must be crisp at 1080x1920",
+      "safe margins for Instagram story",
+      "all text centered within safe area",
+      "high contrast for mobile viewing"
+    ]
+  },
+  "negative_prompt": [
+    "blurry text",
+    "misspelled Spanish",
+    "random extra icons",
+    "stock people",
+    "busy collage",
+    "low contrast typography",
+    "purple neon aesthetic",
+    "flat corporate template",
+    "watermark",
+    "distorted logos"
+  ]
+}

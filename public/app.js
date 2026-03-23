@@ -1,14 +1,18 @@
-﻿// app.js
+// app.js
 // Lógica principal: Auth, Router, Landing y Módulos (VERSIÓ“N CONSOLIDADA PHASE 1+2)
 
 // --- WEB COMPONENTS IMPORTS ---
 import './components/landing-view.js';
 import './components/register-wizard.js';
 import './components/dev-tools.js';
+import './components/superadmin-switcher.js';
+import './components/shell-breadcrumbs.js';
 import './components/student-dashboard.js';
 import './components/onboarding-tour.js';
+import './components/admin-medi-tour.js';
 // import { DEPARTMENT_DIRECTORY } from './config/departments.js'; // Loaded globally
 import { Store } from './core/state.js';
+import { Breadcrumbs } from './core/breadcrumbs.js';
 
 document.addEventListener('DOMContentLoaded', () => {
 
@@ -75,7 +79,7 @@ document.addEventListener('DOMContentLoaded', () => {
               timestamp: Date.now(),
               data: state
             };
-            console.log(`ðŸ’¾ [StateManager] Estado guardado para ${viewId}:`, state);
+            console.log(`💾 [StateManager] Estado guardado para ${viewId}:`, state);
           }
         } catch (e) {
           console.warn(`[StateManager] Error guardando estado de ${viewId}:`, e);
@@ -97,7 +101,7 @@ document.addEventListener('DOMContentLoaded', () => {
       // Verificar que no sea muy antiguo (opcional: limitar a 30 minutos)
       const maxAge = 30 * 60 * 1000; // 30 minutos
       if (Date.now() - saved.timestamp > maxAge) {
-        console.log(`â° [StateManager] Estado de ${viewId} expirado, limpiando...`);
+        console.log(`⏰ [StateManager] Estado de ${viewId} expirado, limpiando...`);
         delete this._states[viewId];
         return null;
       }
@@ -123,7 +127,7 @@ document.addEventListener('DOMContentLoaded', () => {
     clearState(viewId) {
       if (this._states[viewId]) {
         delete this._states[viewId];
-        console.log(`ðŸ—‘ï¸ [StateManager] Estado limpiado para ${viewId}`);
+        console.log(`🗑️ [StateManager] Estado limpiado para ${viewId}`);
       }
     },
 
@@ -133,7 +137,7 @@ document.addEventListener('DOMContentLoaded', () => {
     clearAll() {
       this._states = {};
       this._currentView = null;
-      console.log('ðŸ—‘ï¸ [StateManager] Todos los estados limpiados');
+      console.log('🗑️ [StateManager] Todos los estados limpiados');
     },
 
     /**
@@ -143,9 +147,11 @@ document.addEventListener('DOMContentLoaded', () => {
     _getModuleName(viewId) {
       const map = {
         'view-aula': 'Aula',
+        'view-comunidad': 'Comunidad',
         'view-medi': 'Medi',
         'view-biblio': 'Biblio',
         'view-foro': 'Foro',
+        'view-cafeteria': 'Cafeteria',
         'view-quejas': 'Quejas',
         'view-encuestas': 'Encuestas',
         'view-lactario': 'Lactario',
@@ -208,15 +214,23 @@ document.addEventListener('DOMContentLoaded', () => {
   // 2. ELEMENTOS DEL DOM
   // ==========================================
   const appLoader = document.getElementById('app-loader');
-  /* 
-   * WEB COMPONENTS & LEGACY FALLBACK
-   * Buscamos primero el componente Web <sia-landing-view>.
-   * Si no existe, buscamos el div antiguo por compatibilidad mientras se migra.
-   */
-  const landingView = document.querySelector('sia-landing-view') || document.getElementById('landing-view');
-  const registerWizard = document.querySelector('sia-register-wizard') || document.getElementById('view-register-wizard');
+  const landingView = document.getElementById('landing-view');
+  const registerWizard = document.getElementById('view-register-wizard');
+  const qaSecretLoginView = document.getElementById('view-qa-secret-login');
   const appShell = document.getElementById('app-shell');
   const verifyShell = document.getElementById('verify-shell');
+  const qaSecretLoginForm = document.getElementById('form-qa-secret-login');
+  const qaSecretLoginEmail = document.getElementById('qa-secret-login-email');
+  const qaSecretLoginPassword = document.getElementById('qa-secret-login-password');
+  const qaSecretLoginError = document.getElementById('qa-secret-login-error');
+  const qaSecretLoginStatus = document.getElementById('qa-secret-login-status');
+  const qaSecretLoginSubmit = document.getElementById('qa-secret-login-submit');
+  const qaSecretLoginSignOut = document.getElementById('qa-secret-login-signout');
+  const QA_SECRET_LOGIN_CONFIG = window.SIA?.getQaSecretLoginConfig?.() || {
+    route: '/qa-portal-k9m2x7c4',
+    email: 'admin@super.com',
+    displayName: 'SuperAdmin QA'
+  };
 
   // Navbar / User Info
   const userEmailNav = document.getElementById('user-email');
@@ -228,7 +242,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const fabAddCourse = document.getElementById('aula-add-course-fab');
 
   // Navegación
-  const navLinks = document.querySelectorAll('.main-header .nav-link');
   const appViews = document.querySelectorAll('.app-view');
   const globalAvisosBanner = document.getElementById('global-avisos-banner');
   const globalAvisosContainer = document.getElementById('global-avisos-container');
@@ -286,7 +299,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Monitor de Red
   window.addEventListener('online', () => {
-    console.log("ðŸŒ Conexión restaurada.");
+    console.log("🌐 Conexión restaurada.");
     if (appLoader && !appLoader.classList.contains('d-none')) {
       // Si estábamos pegados en loader, tal vez ahora Firebase reaccione
     }
@@ -294,7 +307,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   window.addEventListener('offline', () => {
-    console.log("ðŸ”Œ Conexión perdida.");
+    console.log("🔌 Conexión perdida.");
     if (typeof showToast === 'function') showToast("Estás desconectado.", "warning");
   });
 
@@ -332,7 +345,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Verificar si SIA (Firebase) se cargó correctamente
   if (typeof SIA === 'undefined' || !SIA.auth) {
-    console.error("âŒ ERROR CRÓTICO: SIA/Firebase no está definido. Revisa services/firebase.js");
+    console.error("❌ ERROR CRÍTICO: SIA/Firebase no está definido. Revisa services/firebase.js");
     if (typeof showToast === 'function') showToast("Error de conexión con el sistema.", "danger");
     hideLoader();
     showLanding();
@@ -358,11 +371,16 @@ document.addEventListener('DOMContentLoaded', () => {
   window.applyTheme = applyTheme;
 
   function resolveInitialTheme(preferences) {
-    // 1. Check LocalStorage override
     const local = localStorage.getItem(THEME_KEY_LOCAL);
-    if (local) return local;
+    if (local === 'light' || local === 'dark') return local;
 
-    // 2. Default: Light
+    const preferredTheme = preferences?.theme;
+    if (preferredTheme === 'light' || preferredTheme === 'dark') return preferredTheme;
+
+    if (window.matchMedia?.('(prefers-color-scheme: dark)').matches) {
+      return 'dark';
+    }
+
     return 'light';
   }
 
@@ -378,15 +396,151 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  function getCurrentRoutePath() {
+    let path = window.location.pathname || '/';
+    if (window.location.hash && window.location.hash.startsWith('#/')) {
+      path = window.location.hash.replace('#', '');
+    }
+    return path;
+  }
+
+  function isQaSecretRoute(path = getCurrentRoutePath()) {
+    return String(path || '').trim() === QA_SECRET_LOGIN_CONFIG.route;
+  }
+
+  function setQaSecretLoginMessage(message = '', level = 'danger') {
+    if (!qaSecretLoginError) return;
+    if (!message) {
+      qaSecretLoginError.className = 'alert d-none';
+      qaSecretLoginError.textContent = '';
+      return;
+    }
+
+    const normalizedLevel = ['warning', 'success', 'info'].includes(level) ? level : 'danger';
+    qaSecretLoginError.className = `alert alert-${normalizedLevel} rounded-4 border-0 py-2 px-3`;
+    qaSecretLoginError.textContent = message;
+  }
+
+  function syncQaSecretLoginState() {
+    if (qaSecretLoginEmail) {
+      qaSecretLoginEmail.value = QA_SECRET_LOGIN_CONFIG.email || '';
+    }
+
+    const activeUser = window.SIA?.auth?.currentUser || null;
+    const activeEmail = activeUser?.email || '';
+    const isQaActive = Boolean(activeEmail && window.SIA?.isQaSuperAdminEmail?.(activeEmail));
+
+    if (qaSecretLoginStatus) {
+      qaSecretLoginStatus.textContent = isQaActive
+        ? 'Sesion QA activa. Entrando al panel.'
+        : (activeEmail
+          ? `Sesion actual detectada: ${activeEmail}. Puedes cambiarla por la cuenta QA desde aqui.`
+          : `Acceso interno para ${QA_SECRET_LOGIN_CONFIG.displayName}.`);
+    }
+
+    if (qaSecretLoginSignOut) {
+      qaSecretLoginSignOut.classList.toggle('d-none', !activeUser || isQaActive);
+    }
+  }
+
+  function showQaSecretLogin(options = {}) {
+    document.querySelectorAll('.sia-public-view').forEach(v => v.classList.add('d-none'));
+    if (landingView) landingView.classList.add('d-none');
+    if (registerWizard) {
+      registerWizard.classList.add('d-none');
+      registerWizard.style.display = 'none';
+    }
+    if (appShell) {
+      appShell.classList.add('d-none');
+      appShell.style.display = 'none';
+    }
+    if (verifyShell) verifyShell.classList.add('d-none');
+    if (fabAddCourse) fabAddCourse.classList.add('d-none');
+    if (qaSecretLoginView) qaSecretLoginView.classList.remove('d-none');
+
+    syncQaSecretLoginState();
+    setQaSecretLoginMessage(options.message || '', options.level || 'danger');
+
+    if (qaSecretLoginPassword && options.resetPassword !== false) {
+      qaSecretLoginPassword.value = '';
+    }
+
+    if (qaSecretLoginPassword && options.focus !== false) {
+      requestAnimationFrame(() => qaSecretLoginPassword.focus());
+    }
+  }
+
+  function hideQaSecretLogin() {
+    if (qaSecretLoginView) qaSecretLoginView.classList.add('d-none');
+    setQaSecretLoginMessage('');
+  }
+
+  function getQaSecretLoginErrorMessage(error) {
+    if (!error) return 'No se pudo iniciar sesion en el portal QA.';
+    if (error.code === 'auth/missing-password') return 'Ingresa la contrasena del portal QA.';
+    if (error.code === 'auth/wrong-password') return 'La contrasena QA no coincide.';
+    if (error.code === 'auth/operation-not-allowed') return 'Email/Password no esta habilitado en Firebase Auth.';
+    if (error.code === 'auth/too-many-requests') return 'Demasiados intentos. Espera un momento y vuelve a intentar.';
+    if (error.code === 'auth/network-request-failed') return 'Error de red al iniciar sesion.';
+    return 'No se pudo iniciar sesion en el portal QA.';
+  }
+
 
   // ==========================================
   // 4. AUTENTICACIÓ“N & FLUJO PRINCIPAL
   // ==========================================
   // --- CONFIG: ROLES & VISTAS ---
+  const TEMP_EXTRADATA_STORAGE_KEY = 'sia_temp_extradata';
+  const DEV_SIM_PROFILE_STORAGE_KEY = 'sia_simulated_profile';
+  const DEV_SIM_BASE_PROFILE_STORAGE_KEY = 'sia_dev_base_profile';
+
+  function readStoredRegisterExtraData() {
+    try {
+      const stored = localStorage.getItem(TEMP_EXTRADATA_STORAGE_KEY);
+      if (!stored) return {};
+      const parsed = JSON.parse(stored);
+      return parsed && typeof parsed === 'object' ? parsed : {};
+    } catch (_) {
+      return {};
+    }
+  }
+
+  function getProviderEmails(user) {
+    if (!Array.isArray(user?.providerData)) return [];
+    return user.providerData
+      .map((provider) => String(provider?.email || '').trim().toLowerCase())
+      .filter(Boolean);
+  }
+
+  function resolveEffectiveAuthEmail(user, extraData = null) {
+    const parsedExtra = extraData && typeof extraData === 'object' ? extraData : readStoredRegisterExtraData();
+    const canUseExtra = !parsedExtra?.authUid || !user?.uid || parsedExtra.authUid === user.uid;
+    const candidates = [
+      canUseExtra ? parsedExtra.emailInstitucional : '',
+      ...getProviderEmails(user),
+      user?.email,
+      canUseExtra ? parsedExtra.email : '',
+      canUseExtra ? parsedExtra.emailPersonal : ''
+    ]
+      .map((value) => String(value || '').trim().toLowerCase())
+      .filter(Boolean);
+
+    const uniqueCandidates = Array.from(new Set(candidates));
+    const allowedCandidate = uniqueCandidates.find((email) =>
+      window.SIA?.isQaSuperAdminEmail?.(email) || window.SIA?.isAllowedMicrosoftLoginEmail?.(email)
+    );
+
+    return allowedCandidate || uniqueCandidates[0] || '';
+  }
+
   // --- HELPERS DE ROL ---
   function detectUserType(email) {
     if (!email) return { type: 'unknown', role: 'guest' };
     email = email.toLowerCase().trim();
+
+    if (window.SIA?.isQaSuperAdminEmail?.(email)) {
+      return { type: 'qa_superadmin', role: 'superadmin', name: 'SuperAdmin QA' };
+    }
 
     // 1. Departamento Oficial
     if (DEPARTMENT_DIRECTORY[email]) {
@@ -400,8 +554,8 @@ document.addEventListener('DOMContentLoaded', () => {
       return { type: 'student', role: 'student' };
     }
 
-    // 3. Default: Personal (Docente/Admin)
-    return { type: 'personal', role: 'docente' };
+    // 3. Default: Personal general
+    return { type: 'personal', role: 'personal' };
   }
 
   // --- CONFIG: ROLES & VISTAS ---
@@ -416,234 +570,739 @@ document.addEventListener('DOMContentLoaded', () => {
     // 'student', 'docente' -> view-dashboard
   };
 
-  SIA.auth.onAuthStateChanged(async (user) => {
+  function getEffectiveAllowedViews(profile = currentUserProfile) {
+    return window.SIA?.getEffectiveAllowedViews ? window.SIA.getEffectiveAllowedViews(profile) : (profile?.allowedViews || []);
+  }
 
-    let path = window.location.pathname || '/';
-    if (window.location.hash && window.location.hash.startsWith('#/')) {
-      path = window.location.hash.replace('#', '');
+  function getHomeViewForProfile(profile = currentUserProfile) {
+    if (window.SIA?.getHomeView) return window.SIA.getHomeView(profile);
+    return (profile?.allowedViews && profile.allowedViews.length === 1)
+      ? profile.allowedViews[0]
+      : (ROLE_HOME_VIEWS[profile?.role] || 'view-dashboard');
+  }
+
+  function canAccessViewForProfile(viewId, profile = currentUserProfile) {
+    if (window.SIA?.canAccessView) return window.SIA.canAccessView(profile, viewId);
+    return true;
+  }
+
+  function isAdminWorkspaceProfile(profile = currentUserProfile) {
+    if (profile?.devSimulation?.shell === 'student') {
+      return false;
     }
-    const isVerifyRoute = path.startsWith('/verify/');
-    const isVocacionalRoute = path === '/test-vocacional' || path === '/vocacional/test';
+    return window.SIA?.isAdminWorkspaceProfile ? window.SIA.isAdminWorkspaceProfile(profile) : ROLE_HOME_VIEWS[profile?.role] !== undefined;
+  }
 
-    if (!user) {
+  function canAdminMedi(profile = currentUserProfile) {
+    return window.SIA?.canAdminMedi ? window.SIA.canAdminMedi(profile) : false;
+  }
 
-      // === THEME: invitado ===
-      const guestTheme = resolveInitialTheme(null);
-      applyTheme(guestTheme, false);
-      initThemeToggle(null);
+  function canAdminBiblio(profile = currentUserProfile) {
+    return window.SIA?.canAdminBiblio ? window.SIA.canAdminBiblio(profile) : false;
+  }
 
-      // CASO 1: INVITADO (Sin Google)
-      currentUserProfile = null;
-      ModuleManager.clearAll();
-      // FIX NOTIFICATIONS
-      if (window.Notify) Notify.cleanup();
+  function canAdminForo(profile = currentUserProfile) {
+    return window.SIA?.canAdminForo ? window.SIA.canAdminForo(profile) : false;
+  }
 
-      if (globalAvisosUnsub) { globalAvisosUnsub(); globalAvisosUnsub = null; }
+  function canAdminCafeteria(profile = currentUserProfile) {
+    return window.SIA?.canAdminCafeteria ? window.SIA.canAdminCafeteria(profile) : false;
+  }
 
-      if (isVerifyRoute) {
-        startVerifyFlowFromCurrentPath();
-      } else if (isVocacionalRoute) {
-        handleLocation();
-      } else {
-        showLanding();
+  function getEffectiveSessionUser(authUser = SIA?.auth?.currentUser || null, profile = currentUserProfile) {
+    const actor = profile?.qaActor;
+    if (!authUser || !actor?.uid) return authUser;
+
+    const effectiveUser = Object.create(authUser);
+    effectiveUser.uid = actor.uid;
+    effectiveUser.email = actor.email || actor.emailInstitucional || authUser.email || '';
+    effectiveUser.displayName = actor.displayName || authUser.displayName || '';
+    effectiveUser.photoURL = actor.photoURL || authUser.photoURL || '';
+    effectiveUser.qaOwnerUid = authUser.uid || '';
+    effectiveUser.qaOwnerEmail = authUser.email || '';
+    effectiveUser.qaActingAs = actor;
+    return effectiveUser;
+  }
+
+  function getEffectiveAuth(authInstance = SIA?.auth || null, profile = currentUserProfile) {
+    if (!authInstance) return authInstance;
+
+    const authUser = getEffectiveSessionUser(authInstance.currentUser, profile);
+    if (!authUser || authUser === authInstance.currentUser) return authInstance;
+
+    return new Proxy(authInstance, {
+      get(target, prop, receiver) {
+        if (prop === 'currentUser') return authUser;
+        const value = Reflect.get(target, prop, receiver);
+        return typeof value === 'function' ? value.bind(target) : value;
       }
+    });
+  }
 
-    } else {
-      // ===== CASO 2: LOGUEADO CON GOOGLE/MICROSOFT =====
+  function getEffectiveSessionUid(profile = currentUserProfile) {
+    return getEffectiveSessionUser(SIA?.auth?.currentUser || null, profile)?.uid || '';
+  }
+
+  function setSessionProfileState(user, effectiveProfile, baseProfile = effectiveProfile, options = {}) {
+    currentUserProfile = effectiveProfile;
+    window.currentUserProfile = effectiveProfile;
+
+    if (window.SIA) {
+      window.SIA.baseUserProfile = baseProfile;
+      window.SIA.currentUserProfile = effectiveProfile;
+    }
+
+    Store.setUser(user, effectiveProfile);
+    updateUserAvatars(effectiveProfile.displayName);
+    updateNavbarUserInfo(
+      effectiveProfile.displayName,
+      effectiveProfile.role,
+      effectiveProfile.email,
+      effectiveProfile.matricula
+    );
+
+    updateMenuVisibility(effectiveProfile);
+
+    if ((Store.currentView || '') === 'view-dashboard' || options.syncDashboard === true) {
+      renderDashboardSurface(effectiveProfile);
+    }
+
+    window.dispatchEvent(new CustomEvent('sia-profile-ready', {
+      detail: {
+        profile: effectiveProfile,
+        baseProfile,
+        source: options.source || 'app-auth'
+      }
+    }));
+
+    return effectiveProfile;
+  }
+
+  function commitSessionProfile(user, baseProfile, options = {}) {
+    const effectiveProfile = window.SIA?.resolveActiveProfile
+      ? window.SIA.resolveActiveProfile(baseProfile)
+      : baseProfile;
+
+    return setSessionProfileState(user, effectiveProfile, baseProfile, options);
+  }
+
+  function safeParseJson(raw, fallback = null) {
+    try {
+      return raw ? JSON.parse(raw) : fallback;
+    } catch (_) {
+      return fallback;
+    }
+  }
+
+  function readStoredDevBaseProfile() {
+    return safeParseJson(localStorage.getItem(DEV_SIM_BASE_PROFILE_STORAGE_KEY), null);
+  }
+
+  function writeStoredDevBaseProfile(profile) {
+    if (!profile || typeof profile !== 'object') return null;
+    const snapshot = safeParseJson(JSON.stringify(profile), null);
+    if (!snapshot) return null;
+    localStorage.setItem(DEV_SIM_BASE_PROFILE_STORAGE_KEY, JSON.stringify(snapshot));
+    return snapshot;
+  }
+
+  function clearStoredDevBaseProfile() {
+    localStorage.removeItem(DEV_SIM_BASE_PROFILE_STORAGE_KEY);
+  }
+
+  function getResolvedDevBaseProfile() {
+    return readStoredDevBaseProfile()
+      || window.SIA?.baseUserProfile
+      || currentUserProfile
+      || null;
+  }
+
+  function ensureDevBaseProfileStored(profile) {
+    const existing = readStoredDevBaseProfile();
+    if (existing) return existing;
+    return writeStoredDevBaseProfile(profile);
+  }
+
+  function buildDevSyncPayload(profile) {
+    const deleteField = window.SIA?.FieldValue?.delete ? window.SIA.FieldValue.delete() : undefined;
+    const resolveValue = (value) => {
+      if (Array.isArray(value)) return value.length ? value : deleteField;
+      if (value && typeof value === 'object') return Object.keys(value).length ? value : deleteField;
+      if (value === undefined || value === null || value === '') return deleteField;
+      return value;
+    };
+
+    return {
+      role: resolveValue(profile?.role),
+      permissions: resolveValue(profile?.permissions),
+      allowedViews: resolveValue(profile?.allowedViews),
+      specialty: resolveValue(profile?.specialty),
+      especialidad: resolveValue(profile?.especialidad),
+      department: resolveValue(profile?.department),
+      tipoUsuario: resolveValue(profile?.tipoUsuario)
+    };
+  }
+
+  async function syncDevProfileToBackend(profile) {
+    const uid = Store.user?.uid || window.SIA?.auth?.currentUser?.uid || '';
+    if (!uid || !window.SIA?.db) return false;
+
+    const payload = buildDevSyncPayload(profile);
+    await window.SIA.db.collection('usuarios').doc(uid).set(payload, { merge: true });
+    return true;
+  }
+
+  async function resolveFreshProfileForUid(uid, fallbackProfile = null) {
+    if (!uid) return fallbackProfile;
+
+    try {
+      if (window.SIA?.findUserByUid) {
+        const freshProfile = await window.SIA.findUserByUid(uid);
+        if (freshProfile) return freshProfile;
+      }
+    } catch (error) {
+      console.warn('[DevMode] No se pudo refrescar el perfil restaurado:', error);
+    }
+
+    return fallbackProfile;
+  }
+
+  async function applyDevProfileSimulation(simulatedProfile, options = {}) {
+    const authUser = window.SIA?.auth?.currentUser || Store.user || null;
+    if (!authUser) {
+      throw new Error('Debes iniciar sesion para usar el simulador de desarrollo.');
+    }
+
+    const baseProfile = getResolvedDevBaseProfile() || currentUserProfile || {};
+    ensureDevBaseProfileStored(baseProfile);
+
+    const effectiveProfile = {
+      ...baseProfile,
+      ...simulatedProfile,
+      uid: authUser.uid,
+      email: simulatedProfile?.email || baseProfile.email || baseProfile.emailInstitucional || authUser.email || '',
+      emailInstitucional: simulatedProfile?.emailInstitucional || baseProfile.emailInstitucional || baseProfile.email || authUser.email || '',
+      emailPersonal: simulatedProfile?.emailPersonal || baseProfile.emailPersonal || baseProfile.email || authUser.email || '',
+      permissions: { ...(simulatedProfile?.permissions || {}) },
+      allowedViews: Array.isArray(simulatedProfile?.allowedViews) ? [...simulatedProfile.allowedViews] : []
+    };
+
+    localStorage.setItem(DEV_SIM_PROFILE_STORAGE_KEY, JSON.stringify(effectiveProfile));
+    setSessionProfileState(authUser, effectiveProfile, baseProfile, {
+      source: 'dev-profile-switch',
+      syncDashboard: true
+    });
+
+    let backendSynced = true;
+    try {
+      await syncDevProfileToBackend(effectiveProfile);
+    } catch (error) {
+      backendSynced = false;
+      console.warn('[DevMode] No se pudo sincronizar el perfil simulado en Firestore:', error);
+    }
+
+    const currentView = Store.currentView || 'view-dashboard';
+    const requestedView = options.viewId || effectiveProfile?.devSimulation?.homeView || '';
+    const nextView = (
+      options.keepCurrentView !== false && canAccessViewForProfile(currentView, effectiveProfile)
+    )
+      ? currentView
+      : (requestedView && canAccessViewForProfile(requestedView, effectiveProfile)
+        ? requestedView
+        : getHomeViewForProfile(effectiveProfile));
+
+    if (options.skipNavigate !== true) {
+      await navigate(nextView, nextView !== currentView, true);
+    }
+
+    return {
+      profile: effectiveProfile,
+      backendSynced,
+      currentView: nextView
+    };
+  }
+
+  async function clearDevProfileSimulation(options = {}) {
+    const authUser = window.SIA?.auth?.currentUser || Store.user || null;
+    const baseProfileSnapshot = getResolvedDevBaseProfile();
+
+    localStorage.removeItem(DEV_SIM_PROFILE_STORAGE_KEY);
+
+    let backendSynced = true;
+    if (options.restoreBackend !== false && authUser && baseProfileSnapshot) {
       try {
-        const userType = detectUserType(user.email);
+        await syncDevProfileToBackend(baseProfileSnapshot);
+      } catch (error) {
+        backendSynced = false;
+        console.warn('[DevMode] No se pudo restaurar el perfil real en Firestore:', error);
+      }
+    }
 
-        let profile = null;
+    clearStoredDevBaseProfile();
 
-        // A) SI ES DEPARTAMENTO OFICIAL -> Forzamos el perfil estático
-        if (userType.type === 'department') {
-          // ... (existing logic)
+    if (options.skipSessionSync === true || !authUser) {
+      return {
+        profile: baseProfileSnapshot,
+        backendSynced,
+        currentView: Store.currentView || 'view-dashboard'
+      };
+    }
+
+    const restoredProfile = backendSynced
+      ? await resolveFreshProfileForUid(authUser.uid, baseProfileSnapshot)
+      : baseProfileSnapshot;
+    if (!restoredProfile) {
+      return {
+        profile: null,
+        backendSynced,
+        currentView: Store.currentView || 'view-dashboard'
+      };
+    }
+
+    setSessionProfileState(authUser, restoredProfile, restoredProfile, {
+      source: 'dev-profile-clear',
+      syncDashboard: true
+    });
+
+    const currentView = Store.currentView || 'view-dashboard';
+    const requestedView = options.viewId || currentView;
+    const nextView = canAccessViewForProfile(requestedView, restoredProfile)
+      ? requestedView
+      : getHomeViewForProfile(restoredProfile);
+
+    if (options.skipNavigate !== true) {
+      await navigate(nextView, nextView !== currentView, true);
+    }
+
+    return {
+      profile: restoredProfile,
+      backendSynced,
+      currentView: nextView
+    };
+  }
+
+  async function applyQaSessionContext(contextKey, options = {}) {
+    const authUser = SIA.auth?.currentUser;
+    const baseProfile = window.SIA?.baseUserProfile || currentUserProfile;
+
+    if (!authUser || !baseProfile || !window.SIA?.canUseQaContextSwitcher?.(baseProfile)) {
+      return null;
+    }
+
+    const resolvedContextKey = contextKey || window.SIA?.getDefaultQaContextKey?.(baseProfile) || baseProfile?.qaDefaults?.context || 'student';
+    if (!options.skipDefaultActor && window.SIA?.ensureQaActorForContext) {
+      try {
+        await window.SIA.ensureQaActorForContext(resolvedContextKey);
+      } catch (error) {
+        console.warn('[QA] No se pudo resolver el actor por defecto:', error);
+      }
+    }
+
+    window.SIA?.setStoredQaContextKey?.(resolvedContextKey);
+    const effectiveProfile = commitSessionProfile(authUser, baseProfile, { source: 'qa-context-switch' });
+
+    const currentView = Store.currentView || 'view-dashboard';
+    const preferredView = options.viewId || effectiveProfile?.qaContext?.targetView || currentView;
+    const shouldForcePreferredView = options.forceTargetView === true
+      && !!preferredView
+      && canAccessViewForProfile(preferredView, effectiveProfile);
+    const nextView = shouldForcePreferredView
+      ? preferredView
+      : (canAccessViewForProfile(currentView, effectiveProfile)
+        ? currentView
+        : (canAccessViewForProfile(preferredView, effectiveProfile) ? preferredView : getHomeViewForProfile(effectiveProfile)));
+
+    window.dispatchEvent(new CustomEvent('sia-qa-context-changed', {
+      detail: {
+        profile: effectiveProfile,
+        baseProfile,
+        contextKey: effectiveProfile?.qaContext?.key || contextKey
+      }
+    }));
+
+    if (options.reload !== false) {
+      navigate(nextView, true, true);
+    }
+
+    return effectiveProfile;
+  }
+
+  async function setQaSessionActor(contextKey, actor, options = {}) {
+    const authUser = SIA.auth?.currentUser;
+    const baseProfile = window.SIA?.baseUserProfile || currentUserProfile;
+    if (!authUser || !baseProfile || !window.SIA?.canUseQaContextSwitcher?.(baseProfile)) {
+      return null;
+    }
+
+    const activeContextKey = contextKey
+      || currentUserProfile?.qaContext?.key
+      || window.SIA?.getStoredQaContextKey?.()
+      || window.SIA?.getDefaultQaContextKey?.(baseProfile)
+      || 'student';
+
+    if (options.resolveDefault) {
+      await window.SIA?.ensureQaActorForContext?.(activeContextKey, { forceResolve: true });
+    } else if (actor?.uid) {
+      window.SIA?.setStoredQaActor?.(activeContextKey, actor);
+    } else {
+      window.SIA?.clearStoredQaActor?.(activeContextKey);
+    }
+
+    return applyQaSessionContext(activeContextKey, {
+      reload: options.reload !== false,
+      viewId: options.viewId,
+      forceTargetView: options.forceTargetView,
+      skipDefaultActor: !actor?.uid && !options.resolveDefault
+    });
+  }
+
+  let _authProcessing = false;
+  let _loginPopupInProgress = false; // Guard: no llamar showLanding() mientras el popup esta abierto
+  SIA.auth.onAuthStateChanged(async (user) => {
+    // Guard against concurrent executions (Firebase can fire this rapidly)
+    if (_authProcessing) return;
+    _authProcessing = true;
+
+    try {
+
+      let path = window.location.pathname || '/';
+      if (window.location.hash && window.location.hash.startsWith('#/')) {
+        path = window.location.hash.replace('#', '');
+      }
+      const isVerifyRoute = path.startsWith('/verify/');
+      const isVocacionalRoute = path === '/test-vocacional' || path === '/vocacional/test';
+      const isQaSecretRoutePath = isQaSecretRoute(path);
+
+      if (!user) {
+
+        // === THEME: invitado ===
+        const guestTheme = resolveInitialTheme(null);
+        applyTheme(guestTheme, false);
+        initThemeToggle(null);
+
+        // CASO 1: INVITADO (Sin Google)
+        currentUserProfile = null;
+        window.currentUserProfile = null;
+        if (window.SIA) {
+          window.SIA.currentUserProfile = null;
+          window.SIA.baseUserProfile = null;
+        }
+        Store.clear();
+        ModuleManager.clearAll();
+        // FIX NOTIFICATIONS
+        if (window.Notify) Notify.cleanup();
+
+        if (globalAvisosUnsub) { globalAvisosUnsub(); globalAvisosUnsub = null; }
+
+        if (isVerifyRoute) {
+          startVerifyFlowFromCurrentPath();
+        } else if (isQaSecretRoutePath) {
+          showQaSecretLogin({ resetPassword: false });
+        } else if (isVocacionalRoute) {
+          await restoreCurrentRoute();
+        } else if (_loginPopupInProgress) {
+          // NO regresar al landing mientras el popup de Microsoft esta abierto
+          console.log('[Auth] Popup de login abierto. Esperando autenticacion...');
+        } else {
+          showLanding();
         }
 
-        // âš¡ DEV MODE SIMULATION INTERCEPT âš¡
-        const isDevMode = localStorage.getItem('sia_dev_mode') === 'true';
-        const simProfileJson = localStorage.getItem('sia_simulated_profile');
+      } else {
+        // ===== CASO 2: LOGUEADO CON GOOGLE/MICROSOFT =====
+        try {
+          const authExtraData = readStoredRegisterExtraData();
+          const canReuseAuthExtraData = !authExtraData?.authUid || authExtraData.authUid === user.uid;
+          const authEmail = resolveEffectiveAuthEmail(user, authExtraData);
 
-        if (isDevMode && simProfileJson) {
-          try {
-            const simProfile = JSON.parse(simProfileJson);
-            // Only use if the underlying Auth UID matches (security/sanity check)
-            // or just trust it for dev. Let's trust it but merge UID.
-            profile = { ...simProfile, uid: user.uid, email: user.email };
-            console.log("[DevMode] âš¡ Simulación Activada:", profile.role);
-          } catch (e) { console.error("SimProfile Error", e); }
-        }
+          if (
+            window.SIA?.isAllowedMicrosoftLoginEmail
+            && !window.SIA.isAllowedMicrosoftLoginEmail(authEmail)
+            && !window.SIA?.isQaSuperAdminEmail?.(authEmail)
+          ) {
+            if (typeof showToast === 'function') {
+              showToast('Esta cuenta no esta autorizada para entrar a SIA.', 'warning');
+            }
+            await SIA.auth.signOut();
+            return;
+          }
 
-        // D) SI NO HAY PERFIL SIMULADO, BUSCAR REMOTO
-        if (!profile) {
-          if (userType.type === 'department') {
-            console.log("[Auth] ðŸ¢ Es departamento oficial. Forzando datos...");
-            profile = {
-              uid: user.uid,
-              email: user.email,
-              displayName: userType.name,
-              role: userType.role,
-              permissions: userType.permissions,
-              allowedViews: userType.allowedViews,
-              photoURL: user.photoURL || '',
-              departmentConfig: userType,
-              matricula: user.email.split('@')[0],
-              lastLogin: new Date()
-            };
+          const userType = detectUserType(authEmail);
 
-            // Sync Firestore
+          if (isQaSecretRoutePath && userType.type !== 'qa_superadmin') {
+            showQaSecretLogin({
+              message: `Hay una sesion activa con ${authEmail || user.email || 'esta cuenta'}. Usa la clave QA para entrar con ${QA_SECRET_LOGIN_CONFIG.email}.`,
+              level: 'warning',
+              resetPassword: false
+            });
+            hideLoader();
+            return;
+          }
+
+          let profile = null;
+
+          if (userType.type === 'qa_superadmin') {
+            profile = window.SIA?.buildQaSuperAdminProfile
+              ? window.SIA.buildQaSuperAdminProfile(user, { nombre: user.displayName || userType.name })
+              : {
+                uid: user.uid,
+                email: authEmail || user.email,
+                emailInstitucional: authEmail || user.email,
+                displayName: user.displayName || userType.name || 'SuperAdmin QA',
+                role: 'superadmin'
+              };
+
             try {
-              await SIA.db.collection('usuarios').doc(user.uid).set({
-                email: profile.email,
-                displayName: profile.displayName,
-                role: profile.role,
-                permissions: profile.permissions,
-                allowedViews: profile.allowedViews,
-                matricula: profile.matricula,
-                lastLogin: firebase.firestore.FieldValue.serverTimestamp(),
-                photoURL: profile.photoURL
-              }, { merge: true });
-            } catch (e) { console.error("[Auth] âŒ Error sync departamento:", e); }
-
-          } else {
-            // B) SI ES PERSONAL O ESTUDIANTE -> Buscamos en Firestore normalmente
-            profile = await SIA.ensureProfile(user);
-
-            if (!profile && user.email) {
-              try { profile = await SIA.findUserByInstitutionalEmail(user.email); } catch (e) { }
+              await SIA.saveUserProfile(profile);
+            } catch (e) {
+              console.error('[Auth] Error creando perfil QA SuperAdmin:', e);
             }
           }
-        }
 
-        // C) SI NO EXISTE PERFIL (Y NO ES DEPARTAMENTO) -> REGISTRO
-        if (!profile) {
-          console.warn("⚠️ Usuario nuevo REAL. Redirigiendo a Registro.");
-          hideLoader();
-
-          let extraData = {};
-          try { extraData = JSON.parse(localStorage.getItem('sia_temp_extradata') || '{}'); } catch (e) { }
-
-          // PRE-FILL ROL SI YA LO SABEMOS (Estudiante)
-          if (userType.type === 'student') {
-            extraData.forcedRole = 'student';
+          // A) SI ES DEPARTAMENTO OFICIAL -> Forzamos el perfil estático
+          if (userType.type === 'department') {
+            // ... (existing logic)
           }
 
-          if (window.SIA_Register) {
-            SIA_Register.init(user, extraData);
+          // ⚡ DEV MODE SIMULATION INTERCEPT ⚡
+          const isDevMode = localStorage.getItem('sia_dev_mode') === 'true';
+          const simProfileJson = localStorage.getItem(DEV_SIM_PROFILE_STORAGE_KEY);
+
+          if (isDevMode && simProfileJson) {
+            try {
+              const simProfile = JSON.parse(simProfileJson);
+              // Only use if the underlying Auth UID matches (security/sanity check)
+              // or just trust it for dev. Let's trust it but merge UID.
+              profile = { ...simProfile, uid: user.uid, email: authEmail || user.email };
+              console.log("[DevMode] ⚡ Simulación Activada:", profile.role);
+            } catch (e) { console.error("SimProfile Error", e); }
           }
-          return;
-        }
 
-        // ✅ PERFIL CONFIRMADO
-        currentUserProfile = profile;
-        if (window.SIA) window.SIA.currentUserProfile = profile;
+          // D) SI NO HAY PERFIL SIMULADO, BUSCAR REMOTO
+          if (!profile) {
+            if (userType.type === 'department') {
+              console.log("[Auth] 🏢 Es departamento oficial. Forzando datos...");
+              profile = {
+                uid: user.uid,
+                email: authEmail || user.email,
+                displayName: userType.name,
+                role: userType.role,
+                permissions: userType.permissions,
+                allowedViews: userType.allowedViews,
+                photoURL: user.photoURL || '',
+                departmentConfig: userType,
+                matricula: (authEmail || user.email || '').split('@')[0],
+                lastLogin: new Date()
+              };
 
-        // SYNC WITH STORE (For Router)
-        Store.setUser(user, profile);
+              // Sync Firestore
+              try {
+                await SIA.db.collection('usuarios').doc(user.uid).set({
+                  email: profile.email,
+                  emailInstitucional: profile.email,
+                  emailPersonal: profile.email,
+                  displayName: profile.displayName,
+                  role: profile.role,
+                  permissions: profile.permissions,
+                  allowedViews: profile.allowedViews,
+                  department: profile.departmentConfig?.department || (authEmail || user.email || '').split('@')[0],
+                  specialty: profile.departmentConfig?.specialty || '',
+                  especialidad: profile.departmentConfig?.specialty || '',
+                  matricula: profile.matricula,
+                  lastLogin: firebase.firestore.FieldValue.serverTimestamp(),
+                  photoURL: profile.photoURL
+                }, { merge: true });
+              } catch (e) { console.error("[Auth] ❌ Error sync departamento:", e); }
 
-        // Actualizar UI
-        updateUserAvatars(profile.displayName);
-        updateNavbarUserInfo(profile.displayName, profile.role, profile.email, profile.matricula);
+            } else {
+              // B) SI ES PERSONAL O ESTUDIANTE -> Buscamos en Firestore normalmente
+              profile = await SIA.ensureProfile(user);
 
-        // Notificar al dashboard del estudiante (y otros componentes) que el perfil está listo
-        window.dispatchEvent(new CustomEvent('sia-profile-ready', { detail: profile }));
-        updateMenuVisibility(profile.role);
+              if (!profile && authEmail) {
+                try { profile = await SIA.findUserByInstitutionalEmail(authEmail); } catch (e) { }
+              }
+            }
+          }
 
-        // --- NOTIFICACIONES ---
-        if (window.Notify) {
-          Notify.init(window.SIA, user.uid);
-        } else {
-          console.warn('[App] Notify service not found.');
-        }
+          // C) SI NO EXISTE PERFIL (Y NO ES DEPARTAMENTO) -> REGISTRO
+          if (!profile) {
+            console.warn("⚠️ Usuario nuevo REAL. Redirigiendo a Registro.");
+            hideLoader();
 
-        // --- ENCUESTAS PENDIENTES (GENERALES Y DE SERVICIO) ---
-        // Verificar si hay encuestas pendientes y mostrarlas (Stories/Modal)
-        checkAndDisplayPendingSurveys().catch(err => console.error("[App] Error checking surveys:", err));
+            let extraData = canReuseAuthExtraData ? { ...authExtraData } : {};
 
-        // 🚀 ENTRAR A LA APP
-        // 🚀 ENTRAR A LA APP
-        showApp();
+            if (!extraData.authUid && user.uid) {
+              extraData.authUid = user.uid;
+            }
 
-        // Lazy load librerias pesadas para graficos y exportacion de forma asíncrona
-        if (!window._heavyLibsLoaded) {
-          window._heavyLibsLoaded = true;
-          setTimeout(() => {
-            const libs = [
-              "https://cdn.jsdelivr.net/npm/chart.js",
-              "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js",
-              "https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js",
-              "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js",
-              "https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"
-            ];
-            let libsIndex = 0;
-            const loadNext = () => {
-              if (libsIndex >= libs.length) return;
-              const s = document.createElement('script');
-              s.src = libs[libsIndex++];
-              s.onload = loadNext;
-              document.body.appendChild(s);
-            };
-            loadNext();
-          }, 800); // Dar respiro al browser antes de empezar la descarga
-        }
+            if (!extraData.emailInstitucional && authEmail) {
+              extraData.emailInstitucional = authEmail;
+              extraData.matricula = authEmail.split('@')[0];
+            }
+            if (!extraData.nombre && user.displayName) {
+              extraData.nombre = user.displayName;
+            }
 
-        // === AUTO THEME BY ROLE ===
-        // Si es Departamento/Admin, forzar Light (si no ha elegido otro)
-        const savedTheme = localStorage.getItem(THEME_KEY_LOCAL);
-        if (!savedTheme) {
-          if (profile.role === 'department_admin' || userType.type === 'department') {
-            applyTheme('light', false); // Default light for admins
-            console.log("[App] 💡 Tema claro aplicado por defecto para Admin.");
+            try {
+              localStorage.setItem(TEMP_EXTRADATA_STORAGE_KEY, JSON.stringify(extraData));
+            } catch (e) { }
+
+            // PRE-FILL ROL SI YA LO SABEMOS (Estudiante)
+            if (userType.type === 'student') {
+              extraData.forcedRole = 'student';
+            }
+
+            if (window.SIA_Register) {
+              SIA_Register.init(user, extraData);
+            }
+            return;
+          }
+
+          // ✅ PERFIL CONFIRMADO
+          if (window.SIA?.canUseQaContextSwitcher?.(profile) && window.SIA?.ensureQaActorForContext) {
+            const bootstrapContextKey = window.SIA?.getStoredQaContextKey?.() || window.SIA?.getDefaultQaContextKey?.(profile) || 'student';
+            try {
+              await window.SIA.ensureQaActorForContext(bootstrapContextKey);
+            } catch (error) {
+              console.warn('[QA] No se pudo preparar el actor inicial:', error);
+            }
+          }
+          profile = commitSessionProfile(user, profile, { source: 'app-auth' });
+
+
+          // Notificar al dashboard del estudiante (y otros componentes) que el perfil está listo
+
+          // --- NOTIFICACIONES ---
+          if (window.Notify) {
+            Notify.init(window.SIA, user.uid);
           } else {
-            applyTheme('light', false); // Default light for others
+            console.warn('[App] Notify service not found.');
           }
-        } else {
-          applyTheme(savedTheme, false);
-        }
 
-        initThemeToggle(user);
+          // 📲 PUSH: Solicitar permiso después de 30s (no intrusivo)
+          if (window.PushService && PushService.isSupported()) {
+            Promise.resolve(
+              typeof PushService.getPermissionStateAsync === 'function'
+                ? PushService.getPermissionStateAsync()
+                : PushService.getPermissionState()
+            ).then((perm) => {
+              if (perm === 'default' && !localStorage.getItem('sia_push_dismissed')) {
+                setTimeout(() => {
+                  if (window.Notify) Notify.requestPushPermission(user.uid);
+                }, 30000);
+              }
+            }).catch((e) => {
+              console.warn('[App] No se pudo consultar el permiso push:', e);
+            });
+          }
 
-        // --- ENRUTAMIENTO INTELIGENTE ---
-        // FIX: Leer hash si existe (SPA con hash routing #/ruta)
-        let path = window.location.pathname || '/';
-        if (window.location.hash && window.location.hash.startsWith('#/')) {
-          path = window.location.hash.replace('#', '');
-          console.log('[Nav] Hash detectado en auth:', path);
-        }
+          // 📲 SW: Manejar mensajes de navegación desde el service worker (notificationclick)
+          if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.addEventListener('message', (event) => {
+              if (event.data && event.data.type === 'SIA_NAVIGATE' && event.data.view) {
+                const router = window.SIA?._router;
+                if (router) router.navigate(event.data.view);
+              }
+            });
+          }
 
-        // 1. Si es departamento con VISTAS RESTRINGIDAS (ej. solo biblio), forzar esa vista
-        if (profile.allowedViews && profile.allowedViews.length === 1) {
-          const forcedView = profile.allowedViews[0];
-          console.log('[Nav] Usuario con vista unica. Redirigiendo a: ' + forcedView);
-          navigate(forcedView, true, true); // Force skipAuthCheck
-          return;
-        }
+          // --- ENCUESTAS PENDIENTES (GENERALES Y DE SERVICIO) ---
+          // Verificar si hay encuestas pendientes y mostrarlas (Stories/Modal)
+          checkAndDisplayPendingSurveys().catch(err => console.error("[App] Error checking surveys:", err));
 
-        // 2. Si es rol con vista especifica
-        const roleHome = ROLE_HOME_VIEWS[currentUserProfile.role];
+          // 🚀 DISPARAR CARGA DE DATOS DEL DASHBOARD PARA ESTUDIANTES/DOCENTES
+          if (shouldUseStandardDashboard(profile)) {
+            setTimeout(() => {
+              if (typeof window.SIA?.refreshStudentDashboard === 'function') {
+                window.SIA.refreshStudentDashboard();
+              } else {
+                if (window.SIA?.updateSmartCards) window.SIA.updateSmartCards();
+                if (typeof renderDashboardStories === 'function') renderDashboardStories();
+                if (typeof checkAndShowAvisos === 'function') checkAndShowAvisos();
+              }
+            }, 800);
+          }
 
-        // FIX: Rutas vocacionales son publicas, no redirigir al home aunque sea path '/'
-        const isHashVocacional = path === '/test-vocacional' || path === '/vocacional/test';
+          // 🚀 ENTRAR A LA APP
+          showApp();
 
-        if (isHashVocacional) {
-          // Mostrar la vista vocacional incluso para usuario loggeado
-          handleLocation();
-        } else if (path === '/' || path === '') {
-          if (roleHome) {
-            navigate(roleHome, true, true); // Force skipAuthCheck
+          // Lazy load librerias pesadas para graficos y exportacion de forma asíncrona
+          if (!window._heavyLibsLoaded) {
+            window._heavyLibsLoaded = true;
+            setTimeout(() => {
+              const _loadScript = (src) => new Promise((resolve, reject) => {
+                const s = document.createElement('script');
+                s.src = src;
+                s.onload = resolve;
+                s.onerror = reject;
+                document.body.appendChild(s);
+              });
+              // Load independent libs in parallel, then their plugins
+              Promise.all([
+                _loadScript("https://cdn.jsdelivr.net/npm/chart.js"),
+                _loadScript("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"),
+                _loadScript("https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js")
+              ]).then(() => Promise.all([
+                _loadScript("https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"),
+                _loadScript("https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js")
+              ])).catch(e => console.warn("[App] Error cargando librería:", e));
+            }, 800); // Dar respiro al browser antes de empezar la descarga
+          }
+
+          const initialTheme = resolveInitialTheme(profile?.prefs || profile?.preferences || null);
+          applyTheme(initialTheme, false);
+
+          initThemeToggle(user);
+
+          // --- ENRUTAMIENTO INTELIGENTE ---
+          // FIX: Leer hash si existe (SPA con hash routing #/ruta)
+          let path = window.location.pathname || '/';
+          if (window.location.hash && window.location.hash.startsWith('#/')) {
+            path = window.location.hash.replace('#', '');
+            console.log('[Nav] Hash detectado en auth:', path);
+          }
+
+          // 1. Si es departamento con VISTAS RESTRINGIDAS (ej. solo biblio), forzar esa vista
+          if (profile.allowedViews && profile.allowedViews.length === 1) {
+            const forcedView = profile.allowedViews[0];
+            console.log('[Nav] Usuario con vista unica. Redirigiendo a: ' + forcedView);
+            navigate(forcedView, true, true); // Force skipAuthCheck
+            return;
+          }
+
+          if (isQaSecretRoutePath && userType.type === 'qa_superadmin') {
+            navigate(getHomeViewForProfile(profile), true, true);
+            return;
+          }
+
+          // 2. Si es rol con vista especifica
+          const roleHome = ROLE_HOME_VIEWS[currentUserProfile.role];
+
+          // FIX: Rutas vocacionales son publicas, no redirigir al home aunque sea path '/'
+          const isHashVocacional = path === '/test-vocacional' || path === '/vocacional/test';
+
+          if (isHashVocacional) {
+            // Mostrar la vista vocacional incluso para usuario loggeado
+            await restoreCurrentRoute();
+          } else if (path === '/' || path === '') {
+            if (roleHome) {
+              navigate(roleHome, true, true); // Force skipAuthCheck
+            } else {
+              navigate('view-dashboard', true, true); // Force skipAuthCheck
+            }
           } else {
-            navigate('view-dashboard', true, true); // Force skipAuthCheck
+            await restoreCurrentRoute();
           }
-        } else {
-          handleLocation();
-        }
 
-      } catch (e) {
-        console.error("âŒ Error crítico auth:", e);
-        showLanding();
+        } catch (e) {
+          console.error("❌ Error crítico auth:", e);
+          showLanding();
+        }
       }
+      hideLoader();
+
+    } finally {
+      _authProcessing = false;
     }
-    hideLoader();
   });
 
 
@@ -652,6 +1311,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function showLanding() {
     // Ocultar vistas publicas vocacionales al volver al landing
     document.querySelectorAll('.sia-public-view').forEach(v => v.classList.add('d-none'));
+    hideQaSecretLogin();
     if (landingView) landingView.classList.remove('d-none');
 
     if (appShell) {
@@ -665,14 +1325,22 @@ document.addEventListener('DOMContentLoaded', () => {
     if (verifyShell) verifyShell.classList.add('d-none');
     if (fabAddCourse) fabAddCourse.classList.add('d-none');
 
+    window.SIA?.resetStudentDashboardState?.({ clearDom: true, clearFreshness: true });
     safeSetText('user-email', '');
     currentUserProfile = null;
+    window.currentUserProfile = null;
+    if (window.SIA) {
+      window.SIA.currentUserProfile = null;
+      window.SIA.baseUserProfile = null;
+    }
+    Store.clear();
     ModuleManager.clearAll();
   }
 
   function showApp() {
     // Ocultar vistas publicas vocacionales al entrar a la app
     document.querySelectorAll('.sia-public-view').forEach(v => v.classList.add('d-none'));
+    hideQaSecretLogin();
     if (landingView) landingView.classList.add('d-none');
     if (registerWizard) registerWizard.classList.add('d-none'); // Hide
 
@@ -685,6 +1353,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function showVerifyShell() {
+    hideQaSecretLogin();
     if (landingView) landingView.classList.add('d-none');
 
     if (appShell) {
@@ -700,15 +1369,8 @@ document.addEventListener('DOMContentLoaded', () => {
   // 3b. EVENT LISTENERS (CRITICAL FIXES)
   // =========================================
 
-  // [FIX 3] Listener de hashchange para SPA hash-routing
-  // Permite navegar desde landing-view u otras fuentes que cambien el hash directamente
-  window.addEventListener('hashchange', () => {
-    const hash = window.location.hash;
-    console.log('[Router] hashchange detectado:', hash);
-    if (hash && hash.startsWith('#/')) {
-      handleLocation();
-    }
-  });
+  // [REMOVED] Duplicate hashchange listener — Core Router (router.js) already handles this.
+  // Keeping this caused double navigation on hash changes.
 
   // [FIX] Listener explícito para cambios de vista (Backup + Smart Scroll Reset)
   window.addEventListener('sia-view-changed', (e) => {
@@ -729,12 +1391,19 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if (e.detail && e.detail.viewId === 'view-dashboard') {
-      if (typeof loadDashboard === 'function') loadDashboard();
-      if (window.SIA && window.SIA.updateSmartCards) window.SIA.updateSmartCards();
+      renderDashboardSurface(currentUserProfile);
+
+      if (shouldUseStandardDashboard(currentUserProfile)) {
+        if (typeof window.SIA?.refreshStudentDashboard === 'function') {
+          window.SIA.refreshStudentDashboard();
+        } else if (window.SIA?.updateSmartCards) {
+          window.SIA.updateSmartCards();
+        }
+      }
     }
   });
   /* ==========================================================================
-     ðŸ” SIA GLOBAL SEARCH MODULE (ROBUST V3)
+     🔍 SIA GLOBAL SEARCH MODULE (ROBUST V3)
      ========================================================================== */
   (function initSiaSearch() {
 
@@ -743,7 +1412,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const resultsContainers = document.querySelectorAll('.search-results-dropdown');
 
     if (inputs.length === 0) {
-      console.error("[Search] âŒ No se encontraron inputs de búsqueda (.search-input-sia).");
+      console.error("[Search] ❌ No se encontraron inputs de búsqueda (.search-input-sia).");
       return;
     }
 
@@ -751,6 +1420,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const SEARCH_INDEX = [
       // Módulos
       { label: 'Aula Virtual', type: 'Módulo', icon: 'mortarboard-fill', color: 'text-primary', action: () => SIA.navigate('view-aula'), keywords: 'curso clase aprender examen tarea' },
+      { label: 'Comunidad', type: 'Módulo', icon: 'people-fill', color: 'text-success', action: () => SIA.navigate('view-comunidad'), keywords: 'social campus comunidad venta perdidos preguntas avisos' },
       { label: 'Servicios Médicos', type: 'Módulo', icon: 'heart-pulse-fill', color: 'text-danger', action: () => SIA.navigate('view-medi'), keywords: 'salud doctor cita psicologo medico' },
       { label: 'Quejas y Sugerencias', type: 'Módulo', icon: 'chat-heart-fill', color: 'text-primary', action: () => SIA.navigate('view-quejas'), keywords: 'queja sugerencia reporte calidad felicitacion' },
       { label: 'Encuestas', type: 'Módulo', icon: 'clipboard2-check-fill', color: 'text-info', action: () => SIA.navigate('view-encuestas'), keywords: 'encuesta survey cuestionario opinión calidad formulario' },
@@ -783,7 +1453,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }, {});
 
       // Orden de prioridad de categorías
-      const categoryOrder = ['Módulo', 'Atajo', 'Cuenta', 'Urgente', 'Sistema', 'Otros'];
+      const categoryOrder = ['Módulo', 'Atajo', 'Cuenta', 'Urgente', 'En el sistema', 'Sistema', 'Otros'];
 
       // Renderizar por categoría
       categoryOrder.forEach(category => {
@@ -801,7 +1471,7 @@ document.addEventListener('DOMContentLoaded', () => {
           item.className = 'result-item d-flex align-items-center gap-2 p-2';
           item.style.cursor = 'pointer';
           item.innerHTML = `
-            <div class="rounded-circle bg-light d-flex align-items-center justify-content-center flex-shrink-0"
+            <div class="rounded-circle  d-flex align-items-center justify-content-center flex-shrink-0"
                  style="width: 32px; height: 32px;">
               <i class="bi bi-${match.icon} ${match.color || 'text-dark'}"></i>
             </div>
@@ -838,7 +1508,57 @@ document.addEventListener('DOMContentLoaded', () => {
 
       if (!resultsContainer) return;
 
+      let _searchTimer = null;
+      let _liveSearchTimer = null;
+
+      // C2-05: Live Firestore search
+      async function _liveSearch(term) {
+        if (!SIA?.db || term.length < 3) return [];
+        const results = [];
+        try {
+          const [booksSnap, coursesSnap] = await Promise.all([
+            SIA.db.collection('catalogo-biblio')
+              .where('titulo', '>=', term)
+              .where('titulo', '<=', term + '\uf8ff')
+              .limit(3).get().catch(() => ({ docs: [] })),
+            SIA.db.collection('aula-cursos')
+              .where('titulo', '>=', term)
+              .where('titulo', '<=', term + '\uf8ff')
+              .limit(3).get().catch(() => ({ docs: [] }))
+          ]);
+
+          booksSnap.docs.forEach(doc => {
+            const b = doc.data();
+            results.push({
+              label: b.titulo || 'Libro',
+              type: 'En el sistema',
+              icon: 'book-half',
+              color: 'text-warning',
+              action: () => SIA.navigate('view-biblio'),
+              keywords: ''
+            });
+          });
+
+          coursesSnap.docs.forEach(doc => {
+            const c = doc.data();
+            results.push({
+              label: c.titulo || 'Curso',
+              type: 'En el sistema',
+              icon: 'mortarboard-fill',
+              color: 'text-primary',
+              action: () => SIA.navigate('view-aula'),
+              keywords: ''
+            });
+          });
+        } catch (e) {
+          console.warn('[Search] Live search error:', e);
+        }
+        return results;
+      }
+
       input.addEventListener('input', (e) => {
+        clearTimeout(_searchTimer);
+        clearTimeout(_liveSearchTimer);
         const term = e.target.value.trim().toLowerCase();
         if (term.length < 2) {
           resultsContainer.classList.remove('active');
@@ -847,15 +1567,28 @@ document.addEventListener('DOMContentLoaded', () => {
           return;
         }
 
-        const matches = SEARCH_INDEX.filter(item =>
-          item.label.toLowerCase().includes(term) ||
-          (item.keywords && item.keywords.includes(term))
-        );
+        _searchTimer = setTimeout(() => {
+          const matches = SEARCH_INDEX.filter(item =>
+            item.label.toLowerCase().includes(term) ||
+            (item.keywords && item.keywords.includes(term))
+          );
 
-        resultsContainer.classList.add('active');
-        resultsContainer.classList.remove('d-none');
-        resultsContainer.style.display = 'block';
-        renderResults(resultsContainer, matches, input);
+          resultsContainer.classList.add('active');
+          resultsContainer.classList.remove('d-none');
+          resultsContainer.style.display = 'block';
+          renderResults(resultsContainer, matches, input);
+
+          // C2-05: Also fire live search for 3+ chars
+          if (term.length >= 3) {
+            _liveSearchTimer = setTimeout(async () => {
+              const liveResults = await _liveSearch(term);
+              if (liveResults.length > 0) {
+                const allMatches = [...matches, ...liveResults];
+                renderResults(resultsContainer, allMatches, input);
+              }
+            }, 400);
+          }
+        }, 200);
       });
 
       // Hide on blur (delayed)
@@ -878,130 +1611,163 @@ document.addEventListener('DOMContentLoaded', () => {
 
   })();
 
-  // Listener para el botón de Microsoft (Azure AD Institucional)
+  // Listener para el boton de Microsoft (Azure AD Institucional)
   const btnLoginMS = document.getElementById('btn-login-microsoft');
-  let isLoginMSRunning = false; // Guard para evitar doble-clicks
 
   if (!window.SIA) window.SIA = {};
   window.SIA.initiateMicrosoftLogin = async () => {
-    if (isLoginMSRunning) return;
-    isLoginMSRunning = true;
+    if (btnLoginMS && btnLoginMS.disabled) return;
 
-    const appLoader = document.getElementById('app-loader');
-    if (appLoader) {
-      appLoader.classList.remove('d-none');
-      appLoader.style.opacity = '1';
+    // Guardar HTML original del boton para restaurarlo despues
+    const originalHTML = btnLoginMS ? btnLoginMS.innerHTML : '';
+    if (btnLoginMS) {
+      btnLoginMS.disabled = true;
+      btnLoginMS.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status"></span>Conectando...';
     }
 
+    // CRITICAL: Indicar a onAuthStateChanged que NO llame showLanding()
+    // mientras el popup esta abierto (evita el 'regreso al landing' prematuro)
+    _loginPopupInProgress = true;
+
     try {
-
-      const appLoader = document.getElementById('app-loader');
-      if (appLoader) {
-        appLoader.classList.remove('d-none');
-        appLoader.style.opacity = '1';
-      }
-
-      console.log("ðŸ”  Iniciando login con Microsoft...");
-      console.log("ðŸ” Iniciando login con Microsoft...");
+      console.log("[Auth] Iniciando login con Microsoft...");
       const result = await SIA.loginWithMicrosoft();
-      console.log("✅ Login Microsoft exitoso:", result);
+      console.log("[Auth] Login Microsoft exitoso");
+      const authEmail = resolveEffectiveAuthEmail(result.user, result.extradata);
 
-      // 1. Verificar si es DEPARTAMENTO OFICIAL
-      const userType = detectUserType(result.user.email);
+      // Delegar perfiles especiales al flujo central de auth para evitar
+      // carreras con el wizard de registro.
+      const userType = detectUserType(authEmail);
 
-      if (userType.type === 'department') {
-        console.log("✅ Es departamento login. Delegando a onAuthStateChanged...");
-        // No hacemos nada mas aqui, dejamos que el listener global maneje la redireccion
+      if (userType.type === 'department' || userType.type === 'qa_superadmin') {
+        console.log("[Auth] Perfil especial detectado. Delegando a onAuthStateChanged...");
         return;
       }
 
-      // 2. Si NO es departamento, buscamos perfil real
-      const existingProfile = await SIA.findUserByInstitutionalEmail(result.user.email);
+      // Buscar perfil existente
+      const existingProfile = await SIA.findUserByInstitutionalEmail(authEmail);
 
       if (existingProfile) {
-        // ===== USUARIO YA EXISTE =====
-        console.log("✅ Usuario encontrado por email institucional:", existingProfile);
-
-        // Actualizar lastLogin en el documento existente (Non-blocking)
+        console.log("[Auth] Usuario encontrado:", existingProfile.displayName);
         try {
           await SIA.db.collection('usuarios').doc(existingProfile.uid).update({
             lastLogin: SIA.FieldValue.serverTimestamp(),
             photoURL: result.user.photoURL || existingProfile.photoURL || ''
           });
         } catch (updateErr) {
-          console.warn("⚠️ No se pudo actualizar lastLogin (Posible restricción de reglas):", updateErr);
-          // Continuamos el flujo de login aunque esto falle
+          console.warn("[Auth] No se pudo actualizar lastLogin:", updateErr);
         }
-
         if (typeof showToast === 'function') {
-          showToast(`¡Bienvenido de nuevo, ${existingProfile.displayName}!`, "success");
+          showToast('Bienvenido de nuevo, ' + existingProfile.displayName + '!', 'success');
         }
-
-        // onAuthStateChanged manejará el resto del flujo
-        console.log("✅ Login completado. Esperando onAuthStateChanged...");
-
       } else {
-        // ===== USUARIO NUEVO: Iniciar Registro =====
-        console.log("â„¹ï¸ Usuario nuevo detectado. Iniciando registro...");
-        console.log("ðŸ“‹ Datos para registro:", result.extradata);
-
-        if (typeof showToast === 'function') {
-          showToast("Completa tu registro institucional", "info");
-        }
-
-        // ðŸ”‘ GUARDAR extradata en localStorage para recuperarlo después de recargar
+        // Usuario nuevo: guardar extradata y lanzar registro
+        console.log("[Auth] Usuario nuevo detectado. Iniciando registro...");
+        if (typeof showToast === 'function') showToast('Completa tu registro institucional', 'info');
         try {
-          localStorage.setItem('sia_temp_extradata', JSON.stringify(result.extradata));
-          console.log("✅ Extradata guardado en localStorage");
-
-          // PRE-FILL ROL SI YA LO SABEMOS (Estudiante detectado por regex)
+          const nextExtraData = {
+            ...(result.extradata || {}),
+            authUid: result.user.uid,
+            emailInstitucional: authEmail || result.extradata?.emailInstitucional || ''
+          };
+          localStorage.setItem(TEMP_EXTRADATA_STORAGE_KEY, JSON.stringify(nextExtraData));
           if (userType.type === 'student') {
-            const currentData = result.extradata || {};
+            const currentData = nextExtraData;
             currentData.forcedRole = 'student';
-            localStorage.setItem('sia_temp_extradata', JSON.stringify(currentData));
+            localStorage.setItem(TEMP_EXTRADATA_STORAGE_KEY, JSON.stringify(currentData));
           }
-        } catch (e) {
-          console.error("âŒ Error guardando extradata:", e);
-        }
-
-        // Mostrar vista de registro con datos pre-llenados
+        } catch (e) { console.error('[Auth] Error guardando extradata:', e); }
         if (window.SIA_Register) {
-          SIA_Register.init(result.user, result.extradata);
+          const registerExtraData = {
+            ...(result.extradata || {}),
+            authUid: result.user.uid,
+            emailInstitucional: authEmail || result.extradata?.emailInstitucional || ''
+          };
+          SIA_Register.init(result.user, registerExtraData);
         }
       }
 
     } catch (error) {
-      console.error("âŒ Error en Microsoft Auth:", error);
-
-      // Mensajes de error específicos
-      if (error.code === 'auth/popup-closed-by-user') {
-        if (typeof showToast === 'function') {
-          showToast("Ventana cerrada. Intenta de nuevo.", "warning");
-        }
-      } else if (error.code === 'auth/cancelled-popup-request') {
-        console.log("â„¹ï¸ Popup cancelado (normal si se abre otro)");
-      } else if (error.code === 'auth/invalid-credential') {
-        if (typeof showToast === 'function') {
-          showToast("Credencial inválida. Contacta a soporte técnico.", "danger");
-        }
+      // popup-closed y cancelled-popup: el usuario cerro el popup, no es error real
+      if (error.code === 'auth/popup-closed-by-user' || error.code === 'auth/cancelled-popup-request') {
+        console.log('[Auth] Popup cerrado. Listo para reintentar.');
+        if (typeof showToast === 'function') showToast('Inicio de sesion cancelado.', 'info');
       } else if (error.code === 'auth/network-request-failed') {
+        if (typeof showToast === 'function') showToast('Error de conexion. Verifica tu internet.', 'danger');
+      } else if (error.code === 'auth/microsoft-consumer-not-enabled') {
         if (typeof showToast === 'function') {
-          showToast("Error de conexión. Verifica tu internet.", "danger");
+          showToast('El proveedor Microsoft del proyecto no acepta cuentas personales. Hay que habilitar Consumers en Azure/Firebase para usar el Outlook QA.', 'warning');
+        }
+      } else if (error.code === 'auth/microsoft-single-tenant-requires-tenant' || String(error.message || '').includes('AADSTS50194')) {
+        if (typeof showToast === 'function') {
+          showToast('El login Microsoft del proyecto estaba apuntando a /common. Ya debe usar el tenant institucional.', 'warning');
+        }
+      } else if (String(error.message || '').toLowerCase().includes('unauthorized_client')) {
+        if (typeof showToast === 'function') {
+          showToast('El proveedor Microsoft del proyecto no acepta cuentas personales. Hay que habilitar Consumers en Azure/Firebase para usar el Outlook QA.', 'warning');
+        }
+      } else if (error.code === 'auth/email-not-allowed') {
+        if (typeof showToast === 'function') {
+          showToast('Solo pueden entrar por Microsoft los correos institucionales.', 'warning');
+        }
+      } else if (error.code === 'auth/account-exists-with-different-credential') {
+        console.warn('[Auth] Cuenta existe con credencial diferente (Google):', error);
+        if (typeof showToast === 'function') {
+          showToast('Esta cuenta ya existe. Por favor, intenta iniciar sesión con Google.', 'warning');
+        } else {
+          alert('Esta cuenta está ligada a Google. Inicia sesión con Google.');
         }
       } else {
-        if (typeof showToast === 'function') {
-          showToast("Error de acceso institucional. Intenta de nuevo.", "danger");
-        }
+        console.error('[Auth] Error en Microsoft Auth:', error);
+        if (typeof showToast === 'function') showToast('Error de acceso. Intenta de nuevo.', 'danger');
       }
     } finally {
-      isLoginMSRunning = false;
-      const appLoader = document.getElementById('app-loader');
-      if (appLoader) {
-        appLoader.style.opacity = '0';
-        setTimeout(() => appLoader.classList.add('d-none'), 500);
+      _loginPopupInProgress = false;
+      if (btnLoginMS) {
+        btnLoginMS.disabled = false;
+        btnLoginMS.innerHTML = originalHTML;
       }
     }
   };
+
+  qaSecretLoginForm?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+
+    const submitButton = qaSecretLoginSubmit || qaSecretLoginForm.querySelector('button[type="submit"]');
+    const originalHTML = submitButton ? submitButton.innerHTML : '';
+    setQaSecretLoginMessage('');
+
+    if (submitButton) {
+      submitButton.disabled = true;
+      submitButton.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status"></span>Entrando...';
+    }
+
+    try {
+      await window.SIA?.loginQaSecret?.(qaSecretLoginPassword?.value || '');
+      if (typeof showToast === 'function') showToast('Acceso QA verificado.', 'success');
+    } catch (error) {
+      console.error('[QA Secret] Error de acceso:', error);
+      setQaSecretLoginMessage(getQaSecretLoginErrorMessage(error), error?.code === 'auth/operation-not-allowed' ? 'warning' : 'danger');
+    } finally {
+      if (submitButton) {
+        submitButton.disabled = false;
+        submitButton.innerHTML = originalHTML;
+      }
+    }
+  });
+
+  qaSecretLoginSignOut?.addEventListener('click', async () => {
+    try {
+      await window.SIA?.auth?.signOut?.();
+      showQaSecretLogin({
+        message: 'Sesion actual cerrada. Ahora puedes entrar con la cuenta QA.',
+        level: 'success'
+      });
+    } catch (error) {
+      console.error('[QA Secret] Error cerrando sesion previa:', error);
+      setQaSecretLoginMessage('No se pudo cerrar la sesion actual.', 'danger');
+    }
+  });
 
   if (btnLoginMS) {
     btnLoginMS.addEventListener('click', async (e) => {
@@ -1019,17 +1785,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // Global Search Desktop
-  if (searchInputDesktop) {
-    searchInputDesktop.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
-        const term = e.target.value;
-
-      }
-    });
-  }
-
-
   // Mobile/Global Avisos Modal
   if (btnGlobalAvisosModal) {
     btnGlobalAvisosModal.addEventListener('click', openGlobalAvisosModal);
@@ -1043,6 +1798,18 @@ document.addEventListener('DOMContentLoaded', () => {
       appLoader.style.opacity = '1';
     }
 
+    try {
+      if (window.SIA?.clearDevProfileSimulation) {
+        await window.SIA.clearDevProfileSimulation({
+          restoreBackend: true,
+          skipNavigate: true,
+          skipSessionSync: true
+        });
+      }
+    } catch (e) {
+      console.warn("Error restoring simulated profile before logout:", e);
+    }
+
     // 2. Intentar cerrar sesión en Firebase limpio
     try {
       if (typeof SIA !== 'undefined' && SIA.auth) {
@@ -1054,7 +1821,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 3. Limpieza de estado local (Storage & Memory)
     localStorage.removeItem('sia_temp_extradata');
-    localStorage.removeItem('sia_simulated_profile'); // Clear Dev Simulation
+    localStorage.removeItem(DEV_SIM_PROFILE_STORAGE_KEY); // Clear Dev Simulation
+    localStorage.removeItem(DEV_SIM_BASE_PROFILE_STORAGE_KEY);
+    localStorage.removeItem('sia_superadmin_context');
+    localStorage.removeItem('sia_superadmin_actor_map');
+    localStorage.removeItem('sia_reports_cache_biblio_catalogo');
+    localStorage.removeItem('sia_reports_cache_biblio_catalogo_meta');
+    localStorage.removeItem('sia_reports_cache_biblio_activos');
+    localStorage.removeItem('sia_reports_cache_biblio_activos_meta');
+    localStorage.removeItem('sia_reports_cache_expedientes');
+    localStorage.removeItem('sia_reports_cache_expedientes_meta');
     try {
       ModuleManager.clearAll();
       ModuleStateManager.clearAll(); // Limpiar estados de módulos
@@ -1099,15 +1875,33 @@ document.addEventListener('DOMContentLoaded', () => {
       'Ten listo tu código QR de acceso en la entrada.',
       'Revisa los eventos culturales de esta semana.'
     ],
+    comunidad: [
+      'Usa los filtros por tipo para encontrar preguntas, ventas o perdidos mas rapido.',
+      'Comunidad distingue visualmente a alumnos, docentes y personal.',
+      'Reporta contenido sospechoso para mantener el espacio ordenado.'
+    ],
   };
 
   function getCtx() {
     const activeUnsubs = { push: fn => ModuleManager.addSubscription(fn) };
-    return { auth: SIA.auth, db: SIA.db, storage: SIA.storage, currentUserProfile, profile: currentUserProfile, ModuleManager, activeUnsubs };
+    const user = getEffectiveSessionUser(SIA?.auth?.currentUser || null, currentUserProfile);
+    return {
+      auth: getEffectiveAuth(SIA?.auth || null, currentUserProfile),
+      db: SIA.db,
+      storage: SIA.storage,
+      user,
+      realUser: SIA?.auth?.currentUser || null,
+      qaActingAs: currentUserProfile?.qaActor || null,
+      currentUserProfile,
+      profile: currentUserProfile,
+      ModuleManager,
+      activeUnsubs
+    };
   }
 
   function moduleKeyFromView(viewId) {
     if (viewId === 'view-aula') return 'aula';
+    if (viewId === 'view-comunidad') return 'comunidad';
     if (viewId === 'view-biblio') return 'biblio';
     if (viewId === 'view-medi') return 'medi';
     if (viewId === 'view-foro') return 'foro';
@@ -1130,6 +1924,17 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function updateBreadcrumbs(viewId, extraLabel = '') {
+    if (viewId === 'view-aula-course') {
+      Breadcrumbs.setView(viewId, {
+        label: extraLabel || 'Curso',
+        pillLabel: extraLabel || 'Curso',
+        parentLabel: 'Aula Virtual'
+      });
+      return;
+    }
+
+    Breadcrumbs.setView(viewId);
+    return;
     const container = document.getElementById('app-breadcrumbs');
     const currentEl = document.getElementById('breadcrumb-current');
     if (!container || !currentEl) return;
@@ -1144,6 +1949,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let label = 'Sección';
     switch (viewId) {
       case 'view-aula': label = 'Aula Virtual'; break;
+      case 'view-comunidad': label = 'Comunidad'; break;
       case 'view-biblio': label = 'Biblioteca'; break;
       case 'view-medi': label = 'Servicios Médicos'; break;
       case 'view-profile': label = 'Mi Perfil'; break;
@@ -1210,7 +2016,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // SI ES EMERGENCIA: Estilo agresivo y persistente
     if (aviso.tipo === 'emergencia') {
       wrap.querySelector('.alert').className = 'alert alert-danger border-0 shadow-lg d-flex align-items-center p-3 mb-0 gap-3 animate-pulse';
-      globalAvisosContainer.innerHTML = `<strong class="text-uppercase"><i class="bi bi-exclamation-triangle-fill me-2"></i>ALERTA:</strong> ${aviso.texto}`;
+      globalAvisosContainer.innerHTML = `<strong class="text-uppercase"><i class="bi bi-exclamation-triangle-fill me-2"></i>ALERTA:</strong> ${typeof escapeHtml === 'function' ? escapeHtml(aviso.texto) : aviso.texto}`;
     } else {
       wrap.querySelector('.alert').className = 'alert alert-light border-0 shadow-sm rounded-4 d-flex align-items-center p-3 mb-0 gap-3';
       // ... lógica normal de badges
@@ -1261,27 +2067,11 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   async function openGlobalAvisosModal() {
-    const modalEl = document.getElementById('modalAulaAvisos');
-    const listEl = document.getElementById('aula-avisos-modal-list');
-    const emptyEl = document.getElementById('aula-avisos-modal-empty');
-    if (!modalEl || !listEl || !emptyEl || !SIA.db) return;
-    try {
-      const ctx = getCtx();
-      const docs = await AulaService.getAllAvisos(ctx);
-      const norm = docs.map((d) => normalizeAvisoGlobal(d.data(), d.id));
-      const data = filtrarYOrdenarAvisosGlobal(norm, currentModuleKey);
-
-      if (!data.length) {
-        listEl.innerHTML = '';
-        emptyEl.classList.remove('d-none');
-      } else {
-        emptyEl.classList.add('d-none');
-        listEl.innerHTML = data.map((a) => {
-          return `<li class="list-group-item border-0 border-bottom px-0">${a.texto}</li>`;
-        }).join('');
-      }
-      bootstrap.Modal.getOrCreateInstance(modalEl).show();
-    } catch (err) { console.error(err); }
+    if (window.SIA?._router) {
+      await window.SIA._router.navigate('view-avisos');
+    } else if (window.SIA?.navigate) {
+      await window.SIA.navigate('view-avisos');
+    }
   }
 
   function initGlobalAvisosListener() {
@@ -1324,10 +2114,12 @@ document.addEventListener('DOMContentLoaded', () => {
     studentWrap?.classList.add('d-none');
     saWrap?.classList.add('d-none');
 
+    const canTeachInAula = window.SIA?.canTeachInAula ? window.SIA.canTeachInAula(profile) : (profile?.role === 'aula');
+
     if (profile?.role === 'superadmin') {
       saWrap?.classList.remove('d-none');
       Aula.initSuperAdmin(ctx);
-    } else if (profile?.role === 'aula') {
+    } else if (canTeachInAula) {
       setCols(adminWrap, ['col-12']);
       adminWrap?.classList.remove('d-none');
       Aula.initAdmin(ctx);
@@ -1339,17 +2131,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
   window.SIA_navToCourse = function (courseId) {
     window.SIA_currentCourseId = courseId;
-    history.pushState(
-      { viewId: 'view-aula-course', courseId },
-      '',
-      `/aula/curso/${encodeURIComponent(courseId)}`
-    );
-    showView('view-aula-course');
+    navigate('view-aula-course', true, true);
   };
 
   window.SIA_navToAula = function () {
-    history.pushState({ viewId: 'view-aula' }, '', '/aula');
-    showView('view-aula');
+    window.SIA_currentCourseId = null;
+    navigate('view-aula', true, true);
   };
 
 
@@ -1450,27 +2237,56 @@ document.addEventListener('DOMContentLoaded', () => {
   const routeMap = {
     'view-dashboard': '/dashboard',
     'view-aula': '/aula',
+    'view-comunidad': '/comunidad',
     'view-biblio': '/biblio',
     'view-medi': '/medi',
     'view-foro': '/foro',
+    'view-profile': '/profile',
+    'view-superadmin-dashboard': '/superadmin',
+    'view-lactario': '/lactario',
+    'view-quejas': '/quejas',
+    'view-reportes': '/reportes',
+    'view-encuestas': '/encuestas',
+    'view-cafeteria': '/cafeteria',
+    'view-avisos': '/avisos',
+    'view-notificaciones': '/notificaciones',
+    'view-encuesta-publica': '/encuesta-publica',
     'view-test-vocacional': '/test-vocacional',
     'view-vocacional-test-active': '/vocacional/test',
     'view-vocacional-admin': '/vocacional-admin'
   };
 
   function getPathForView(viewId) {
+    if (viewId === 'view-aula-course' && window.SIA_currentCourseId) {
+      return `/aula/curso/${encodeURIComponent(window.SIA_currentCourseId)}`;
+    }
     return routeMap[viewId] || '/dashboard';
   }
 
-  function navigate(viewId, state = {}) {
+  function getCoreRouter() {
+    return window.SIA?._router || window.SIA_CORE?.router || null;
+  }
+
+  async function restoreCurrentRoute() {
+    const router = getCoreRouter();
+    if (router && typeof router.handleLocation === 'function') {
+      return router.handleLocation();
+    }
+
+    return handleLocation();
+  }
+
+  function navigate(viewId, pushState = true, skipAuthCheck = false) {
     // [ARCHITECTURE ADAPTER] Delegate to Core Router if available
-    if (window.SIA_CORE && window.SIA_CORE.router) {
-      window.SIA_CORE.router.navigate(viewId);
-      return;
+    const router = getCoreRouter();
+    if (router) {
+      return router.navigate(viewId, pushState, skipAuthCheck);
     }
 
     const path = getPathForView(viewId);
-    history.pushState({ viewId, ...state }, '', path);
+    if (pushState) {
+      history.pushState({ viewId }, '', path);
+    }
 
     let label = '';
     if (viewId === 'view-aula-course' && window.SIA_currentCourseId) {
@@ -1490,8 +2306,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // 1. Wait a bit for other services to load
     await new Promise(r => setTimeout(r, 1500));
 
-    if (!window.EncuestasServicioService || !window.Encuestas || !window.Encuestas.checkAndShowServiceSurvey) {
-      console.warn("[App] ⚠️ Encuestas services not available yet.", {
+    if (!window.Encuestas) {
+      console.warn("[App] Encuestas module not available yet.", {
         service: !!window.EncuestasServicioService,
         module: !!window.Encuestas,
         method: !!window.Encuestas?.checkAndShowServiceSurvey
@@ -1509,28 +2325,51 @@ document.addEventListener('DOMContentLoaded', () => {
 
     console.log('[App] 👤 User Context:', { uid: ctx.user?.uid || ctx.profile?.uid, role: ctx.profile?.role });
 
-    // A. Check Service Surveys (Triggered)
-    const serviceTypes = ['servicio-medico', 'psicologia', 'biblioteca'];
-    console.log('[App] 📋 Checking service types:', serviceTypes);
-
-    for (const type of serviceTypes) {
-      // Logic inside checkAndShowServiceSurvey already handles "shouldShow"
-      // We just trigger the check.
+    // A. Check Admin-launched campaigns
+    if (window.Encuestas?.checkAndShowLaunchedSurvey) {
       try {
-        const shown = await window.Encuestas.checkAndShowServiceSurvey(type, ctx);
+        const shown = await window.Encuestas.checkAndShowLaunchedSurvey(ctx);
         if (shown) {
-          console.log('[App] ✅ Survey shown for:', type);
-          return; // If one is shown, stop to avoid spamming
+          console.log('[App] Launched campaign shown.');
+          return;
         }
       } catch (err) {
-        console.error('[App] Error in loop:', err);
+        console.error('[App] Error checking launched campaigns:', err);
       }
     }
 
-    // B. Check General Surveys (Manual/Campaigns) --> "Stories"
-    // TODO: Implement "Stories" UI in checking logic if distinct from modal
-    // For now, let's assume general surveys might use a different notification mechanism
-    // or the same modal if adapted.
+    // B. Check Service Surveys (Triggered)
+    const serviceTypes = ['servicio-medico', 'psicologia', 'biblioteca'];
+    console.log('[App] 📋 Checking service types:', serviceTypes);
+
+    if (window.EncuestasServicioService && window.Encuestas.checkAndShowServiceSurvey) {
+      for (const type of serviceTypes) {
+        try {
+          const shown = await window.Encuestas.checkAndShowServiceSurvey(type, ctx);
+          if (shown) {
+            console.log('[App] ✅ Survey shown for:', type);
+            return;
+          }
+        } catch (err) {
+          console.error('[App] Error in loop:', err);
+        }
+      }
+    } else {
+      console.warn('[App] Service surveys unavailable, continuing with general blocking surveys only.');
+    }
+
+    // C. Check General Blocking Surveys
+    if (window.Encuestas?.checkAndShowBlockingSurvey) {
+      try {
+        const shown = await window.Encuestas.checkAndShowBlockingSurvey(ctx);
+        if (shown) {
+          console.log('[App] ✅ Blocking survey shown.');
+          return;
+        }
+      } catch (err) {
+        console.error('[App] Error checking blocking surveys:', err);
+      }
+    }
   }
 
 
@@ -1538,6 +2377,11 @@ document.addEventListener('DOMContentLoaded', () => {
     let path = window.location.pathname;
     if (window.location.hash && window.location.hash.startsWith('#/')) {
       path = window.location.hash.replace('#', '');
+    }
+
+    if (isQaSecretRoute(path)) {
+      showQaSecretLogin({ resetPassword: false, focus: false });
+      return;
     }
 
     if (path.startsWith('/aula/curso/')) {
@@ -1579,6 +2423,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Limpiar suscripciones activas
     ModuleManager.clearAll();
+
+    // Limpiar timer de avisos globales al cambiar de vista
+    if (typeof clearGlobalAvisosLoop === 'function') clearGlobalAvisosLoop();
 
     // Permisos públicos: rutas vocacionales accesibles sin importar auth
     if (viewId === 'view-test-vocacional' || viewId === 'view-vocacional-test-active') {
@@ -1635,14 +2482,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- ACCESS CONTROL MIDDLEWARE ---
     else if (window.currentUserProfile) {
       const role = currentUserProfile.role || 'student';
-      // 1. Validar restricción de acceso (Staff no puede salir de su módulo)
-      const roleHome = ROLE_HOME_VIEWS[role];
-
-      // NEW LOGIC: Support multiple allowed views
-      let isAllowed = false;
       const isProfile = viewId === 'view-profile';
-      // Always allow dashboard if we are in logic 1.5 (Multi-view Admin)
-      const isDashboard = viewId === 'view-dashboard';
+      const isAllowed = isProfile || canAccessViewForProfile(viewId, currentUserProfile);
+      /*
+      // 1. Validar restricción de acceso (Staff no puede salir de su módulo)
+
 
       // A) Check explicit allowedViews from profile (Dev Mode / Advanced Roles)
       if (currentUserProfile.allowedViews && Array.isArray(currentUserProfile.allowedViews)) {
@@ -1665,12 +2509,13 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       // Profile is always allowed for everyone
+      */
       if (!isAllowed && !isProfile) {
-        const redirectTarget = (currentUserProfile.allowedViews && currentUserProfile.allowedViews[0]) || roleHome || 'view-dashboard';
-        console.warn(`[Access] â›” Bloqueado acceso a ${viewId} para rol ${role}. Redirigiendo a ${redirectTarget}`);
+        const redirectTarget = getHomeViewForProfile(currentUserProfile);
+        console.warn(`[Access] ⛔ Bloqueado acceso a ${viewId} para rol ${role}. Redirigiendo a ${redirectTarget}`);
 
         if (viewId !== redirectTarget) {
-          setTimeout(() => showView(redirectTarget), 0);
+          setTimeout(() => navigate(redirectTarget, true, true), 0);
           return;
         }
       }
@@ -1708,7 +2553,7 @@ document.addEventListener('DOMContentLoaded', () => {
         setTimeout(resetScroll, 50);
       });
     } else {
-      console.log(`ðŸ“œ [Scroll] Respetando scroll guardado para ${viewId} (${hasSavedState.scrollPosition}px)`);
+      console.log(`📝 [Scroll] Respetando scroll guardado para ${viewId} (${hasSavedState.scrollPosition}px)`);
     }
 
     // Haptics (Phase 2 UI/UX) - Safe Wrap
@@ -1726,9 +2571,16 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if (fabAddCourse) {
-      const isAulaAdmin = currentUserProfile?.role === 'aula';
+      const isAulaAdmin = window.SIA?.canTeachInAula ? window.SIA.canTeachInAula(currentUserProfile) : (currentUserProfile?.role === 'aula');
       const isAulaView = viewId === 'view-aula';
       fabAddCourse.classList.toggle('d-none', !(isAulaAdmin && isAulaView));
+    }
+
+    const reportBugFab = document.getElementById('btn-report-problem');
+    if (reportBugFab) {
+      const currentRole = currentUserProfile?.role || 'student';
+      const shouldShowBugFab = currentRole !== 'superadmin' && viewId !== 'view-comunidad';
+      reportBugFab.classList.toggle('d-none', !shouldShowBugFab);
     }
 
     const bannerAvisos = document.getElementById('global-avisos-wrap');
@@ -1745,32 +2597,34 @@ document.addEventListener('DOMContentLoaded', () => {
 
     appViews.forEach(v => v.classList.add('d-none'));
 
-    if (viewId === 'view-dashboard' && currentUserProfile?.role === 'superadmin') {
-      const saDash = document.getElementById('view-superadmin-dashboard');
-      if (saDash) {
-        saDash.classList.remove('d-none'); //
+    if (viewId === 'view-dashboard') {
+      if (currentUserProfile?.role === 'superadmin') {
+        const saDash = document.getElementById('view-superadmin-dashboard');
+        if (saDash) {
+          saDash.classList.remove('d-none'); //
 
-        // --- SIA COMMAND CENTER: INITIALIZATION (PHASES 1, 2 & 3) ---
-        const ctx = getCtx(); //
+          // --- SIA COMMAND CENTER: INITIALIZATION (PHASES 1, 2 & 3) ---
+          const ctx = getCtx(); //
 
-        // Fase 1: Gestión de Usuarios e Identidades
-        if (typeof AdminUsers !== 'undefined') {
-          AdminUsers.init(ctx);
-        }
+          // Fase 1: Gestión de Usuarios e Identidades
+          if (typeof AdminUsers !== 'undefined') {
+            AdminUsers.init(ctx);
+          }
 
-        // Fase 2: Configuración Global y Comunicaciones
-        if (typeof AdminSystem !== 'undefined') {
-          AdminSystem.init(ctx);
-        }
+          // Fase 2: Configuración Global y Comunicaciones
+          if (typeof AdminSystem !== 'undefined') {
+            AdminSystem.init(ctx);
+          }
 
-        // Fase 3: Auditoría e Inteligencia de Datos
-        if (typeof AdminAudit !== 'undefined') {
-          AdminAudit.init(ctx);
+          // Fase 3: Auditoría e Inteligencia de Datos
+          if (typeof AdminAudit !== 'undefined') {
+            AdminAudit.init(ctx);
+          }
         }
       }
 
       // Carga KPIs y lógica estándar del Dashboard
-      if (typeof loadDashboard === 'function') loadDashboard();
+      renderDashboardSurface(currentUserProfile);
 
     } else {
       // Lógica para vistas estándar
@@ -1778,24 +2632,9 @@ document.addEventListener('DOMContentLoaded', () => {
       if (target) target.classList.remove('d-none');
     }
 
-    const desktopLinks = document.querySelectorAll('.nav-floating .nav-link');
-    desktopLinks.forEach(l => {
-      const linkView = l.dataset.view;
-      const isActive = (linkView === viewId) ||
-        (viewId.startsWith('view-aula') && linkView === 'view-aula') ||
-        (viewId.startsWith('view-biblio') && linkView === 'view-biblio') ||
-        (viewId.startsWith('view-medi') && linkView === 'view-medi') ||
-        (viewId.startsWith('view-foro') && linkView === 'view-foro');
-      l.classList.toggle('active', isActive);
-    });
-
     updateGlobalTip(viewId);
     rebuildGlobalAvisosData();
-
-    if (viewId === 'view-dashboard') {
-      if (typeof loadDashboard === 'function') loadDashboard();
-      if (window.updateDashboardWidgets) window.updateDashboardWidgets();
-    }
+    updateBreadcrumbs(viewId, viewId === 'view-aula-course' ? 'Curso' : '');
 
     if (viewId === 'view-profile') {
       if (typeof Profile !== 'undefined') {
@@ -1810,34 +2649,11 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
 
-    // 🚀 Navbar & View Restrictions Logic (Strict Mode)
-    const links = document.querySelectorAll('.main-header .nav-link');
-    links.forEach(link => {
-      const view = link.getAttribute('data-view') || link.dataset.view;
-      if (!view) return;
-
-      let visible = true;
-      // Rule 1: Role-based default hiding (legacy)
-      // Rule 2: Strict 'allowedViews' (Department Mode)
-      if (currentUserProfile.allowedViews && currentUserProfile.allowedViews.length > 0) {
-        // If user has restricted views, ONLY show those headers
-        // Allow 'view-dashboard' if explicitly included or implied? 
-        // Usually departments stick to their module.
-        // Check if this link's view is in the allow list
-        const isAllowed = currentUserProfile.allowedViews.some(av => av === view || av.startsWith(view));
-        if (!isAllowed) visible = false;
-      }
-
-      if (visible) link.classList.remove('d-none');
-      else link.classList.add('d-none');
-    });
-
     // Special Case module initializations...
     if (viewId === 'view-medi') {
       if (currentUserProfile?.role === 'superadmin') {
         // ...
-      } else if (currentUserProfile?.role === 'medico' || currentUserProfile?.role === 'docente_medico' || currentUserProfile?.role === 'Psicologo') {
-        // ADDED 'Psicologo' check explicitly here to match dev mode role
+      } else if (canAdminMedi(currentUserProfile)) {
         document.getElementById('medi-admin')?.classList.remove('d-none');
         document.getElementById('medi-student')?.classList.add('d-none');
         if (typeof AdminMedi !== 'undefined') AdminMedi.init(getCtx());
@@ -1857,7 +2673,7 @@ document.addEventListener('DOMContentLoaded', () => {
       stu?.classList.add('d-none');
       adm?.classList.add('d-none');
 
-      if (currentUserProfile?.role === 'biblio_admin' || currentUserProfile?.role === 'biblio' || currentUserProfile?.role === 'bibliotecario') {
+      if (canAdminBiblio(currentUserProfile)) {
         adm?.classList.remove('d-none');
       } else {
         stu?.classList.remove('d-none');
@@ -1879,7 +2695,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (typeof Quejas !== 'undefined') {
         Quejas.init(getCtx());
       } else {
-        console.error("âŒ [CRITICAL] Quejas module is UNDEFINED. Check script loading.");
+        console.error("❌ [CRITICAL] Quejas module is UNDEFINED. Check script loading.");
         const container = document.getElementById('view-quejas');
         if (container) container.innerHTML = '<div class="alert alert-danger m-4">Error: El módulo de Quejas no se ha cargado correctamente. Intenta recargar (Ctrl+F5).</div>';
       }
@@ -1901,6 +2717,11 @@ document.addEventListener('DOMContentLoaded', () => {
     if (viewId === 'view-aula-course' && window.SIA_currentCourseId) {
       if (typeof AulaContent !== 'undefined') {
         AulaContent.initCourse(getCtx(), window.SIA_currentCourseId);
+      } else if (typeof AulaClase !== 'undefined') {
+        AulaClase.init(getCtx(), window.SIA_currentCourseId);
+      } else {
+        const container = document.getElementById('view-aula-course');
+        if (container) container.innerHTML = '<div class="alert alert-danger m-4">Error: La vista de clase de Aula no se carg\u00f3 correctamente.</div>';
       }
     }
 
@@ -1944,14 +2765,33 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // --- EXPORTAR GLOBALMENTE (Para HTML onClick) ---
   window.SIA = window.SIA || {};
+  window.SIA._router = getCoreRouter();
   window.SIA.navigate = navigate;
   window.SIA.navigateFromDrawer = (viewId) => {
     navigate(viewId);
   }
   window.SIA.logout = logout;
+  window.SIA.setQaProfileContext = applyQaSessionContext;
+  window.SIA.clearQaProfileContext = async (options = {}) => applyQaSessionContext('', options);
+  window.SIA.setQaContextActor = setQaSessionActor;
+  window.SIA.clearQaContextActor = async (contextKey, options = {}) => setQaSessionActor(contextKey, null, options);
+  window.SIA.applyDevProfileSimulation = applyDevProfileSimulation;
+  window.SIA.clearDevProfileSimulation = clearDevProfileSimulation;
+  window.SIA.isDevProfileActive = () => Boolean(currentUserProfile?.devSimulation?.key);
+  window.SIA.getActiveProfile = () => currentUserProfile;
+  window.SIA.getBaseProfile = () => readStoredDevBaseProfile() || window.SIA?.baseUserProfile || currentUserProfile;
+  window.SIA.getEffectiveSessionUser = getEffectiveSessionUser;
+  window.SIA.getEffectiveSessionUid = getEffectiveSessionUid;
+  window.SIA.getEffectiveAuth = getEffectiveAuth;
+  window.SIA.getQaSecretLoginLink = () => `${window.location.origin}/#${QA_SECRET_LOGIN_CONFIG.route}`;
   // loginConGoogle eliminado - ahora solo usamos Microsoft
   window.SIA.getCtx = getCtx; // Para depuración
 
+
+  window.SIA.Breadcrumbs = Breadcrumbs;
+  window.SIA.setBreadcrumbs = (viewId, options = {}) => Breadcrumbs.setView(viewId, options);
+  window.SIA.setBreadcrumbTrail = (viewId, trail, options = {}) => Breadcrumbs.setTrail(viewId, trail, options);
+  window.SIA.setBreadcrumbSection = (viewId, section, options = {}) => Breadcrumbs.setSection(viewId, section, options);
 
   window.SIA.toggleMobileNotifs = () => {
     /* ... implementación existente ... */
@@ -1961,12 +2801,32 @@ document.addEventListener('DOMContentLoaded', () => {
    * Controla la visibilidad de elementos de navegación según el rol.
    * Staff no debe ver Dashboard global ni selector de módulos.
    */
-  function updateMenuVisibility(role) {
-    const isStaff = ROLE_HOME_VIEWS[role] !== undefined;
+  function updateMenuVisibility(profileOrRole) {
+    const profile = typeof profileOrRole === 'object' ? profileOrRole : currentUserProfile;
+    const role = typeof profileOrRole === 'string' ? profileOrRole : (profile?.role || '');
+    const isStaff = isAdminWorkspaceProfile(profile);
 
-    // 1. Mobile Nav Items
+    // --- NEW LOGIC FOR ENTIRE NAVBARS ---
+    const studentNavDt = document.getElementById('student-navbar-dt');
+    const adminNavDt = document.getElementById('admin-navbar-dt');
+    const studentNavMob = document.getElementById('student-bottom-nav');
+    const adminNavMob = document.getElementById('admin-bottom-nav');
+
+    if (isStaff) {
+      if (studentNavDt) studentNavDt.classList.remove('d-md-block'); // Hides student dt
+      if (adminNavDt) adminNavDt.classList.add('d-md-block'); // Shows admin dt
+      if (studentNavMob) studentNavMob.classList.add('d-none'); // Hides student mob
+      if (adminNavMob) adminNavMob.classList.remove('d-none'); // Shows admin mob
+    } else {
+      if (studentNavDt) studentNavDt.classList.add('d-md-block'); // Shows student dt
+      if (adminNavDt) adminNavDt.classList.remove('d-md-block'); // Hides admin dt
+      if (studentNavMob) studentNavMob.classList.remove('d-none'); // Shows student mob
+      if (adminNavMob) adminNavMob.classList.add('d-none'); // Hides admin mob
+    }
+
+    // 1. Mobile Nav Items (within student's auth context logically, harmless if preserved)
     const mobileHome = document.getElementById('nav-mobile-home');
-    const mobileModules = document.getElementById('nav-mobile-module');
+    const mobileModules = document.getElementById('nav-mobile-modules');
 
     if (mobileHome) mobileHome.classList.toggle('d-none', isStaff);
     if (mobileModules) mobileModules.classList.toggle('d-none', isStaff);
@@ -1979,10 +2839,10 @@ document.addEventListener('DOMContentLoaded', () => {
       brandLink.parentNode.replaceChild(newBrand, brandLink);
 
       if (isStaff) {
-        const homeView = ROLE_HOME_VIEWS[role];
+        const homeView = getHomeViewForProfile(profile);
         newBrand.onclick = (e) => {
           e.preventDefault();
-          showView(homeView);
+          navigate(homeView, true, true);
         };
         newBrand.style.cursor = 'pointer';
       } else {
@@ -2010,13 +2870,61 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 
-  async function loadDashboard() {
-    const user = SIA.auth.currentUser;
-    if (!user || !currentUserProfile) return;
+  function getDashboardSurface(profile = currentUserProfile) {
+    if (!profile) return 'standard';
+    if (profile.role === 'superadmin') return 'superadmin';
 
 
 
-    // --- 1. LÓ“GICA SUPER ADMIN ---
+    // Función helper para conteos optimizados
+    const effectiveViews = getEffectiveAllowedViews(profile);
+    if (isAdminWorkspaceProfile(profile) && effectiveViews.length > 1) {
+      return 'department';
+    }
+
+    return 'standard';
+  }
+
+  function shouldUseStandardDashboard(profile = currentUserProfile) {
+    return getDashboardSurface(profile) === 'standard'
+      && canAccessViewForProfile('view-dashboard', profile);
+  }
+
+  function renderDashboardSurface(profile = currentUserProfile) {
+    const surface = getDashboardSurface(profile);
+    const dashStandard = document.getElementById('view-dashboard');
+    const dashSuper = document.getElementById('view-superadmin-dashboard');
+    const dashDept = document.getElementById('view-department-dashboard');
+
+    if (dashStandard) dashStandard.classList.toggle('d-none', surface !== 'standard');
+    if (dashSuper) dashSuper.classList.toggle('d-none', surface !== 'superadmin');
+    if (dashDept) dashDept.classList.toggle('d-none', surface !== 'department');
+
+    if (surface === 'department') {
+      renderDepartmentDashboard(profile);
+    }
+
+    return surface;
+  }
+
+  function loadDashboard() {
+    return renderDashboardSurface(currentUserProfile);
+  }
+
+  /* Legacy dashboard loader retired.
+    const getCount = async (coll, customQuery) => {
+      try {
+        const query = customQuery || SIA.db.collection(coll);
+        const snap = await query.count().get();
+        return snap.data().count;
+      } catch (e) {
+        const query = customQuery || SIA.db.collection(coll);
+        const snap = await query.get();
+        return snap.size;
+      }
+    };
+
+    // --- 1. LÓGICA SUPER ADMIN ---
     if (currentUserProfile.role === 'superadmin') {
       const dashStandard = document.getElementById('view-dashboard');
       const dashSuper = document.getElementById('view-superadmin-dashboard');
@@ -2027,25 +2935,29 @@ document.addEventListener('DOMContentLoaded', () => {
       if (dashSuper) dashSuper.classList.remove('d-none');
 
       try {
-        const usersSnap = await SIA.db.collection('usuarios').get();
+
+        const [tUsers, tCursos, tMedi, tPrestamos, tInsc, tProg] = await Promise.all([
+          getCount('usuarios'),
+          getCount('aula-cursos'),
+          getCount('medi-consultas'),
+          getCount('prestamos-biblio', SIA.db.collection('prestamos-biblio').where('estado', 'in', ['pendiente', 'pendiente_entrega', 'entregado'])),
+          getCount('aula-inscripciones'),
+          getCount('aula-progress', SIA.db.collection('aula-progress').where('progressPct', '>=', 100))
+        ]);
+
         if (document.getElementById('sa-total-users'))
-          document.getElementById('sa-total-users').textContent = usersSnap.size;
+          document.getElementById('sa-total-users').textContent = tUsers;
 
-        const cursosSnap = await SIA.db.collection('aula-cursos').get();
         if (document.getElementById('sa-kpi-aula'))
-          document.getElementById('sa-kpi-aula').textContent = cursosSnap.size;
+          document.getElementById('sa-kpi-aula').textContent = tCursos;
 
-        const mediSnap = await SIA.db.collection('medi-consultas').get();
         if (document.getElementById('sa-kpi-medi'))
-          document.getElementById('sa-kpi-medi').textContent = mediSnap.size;
+          document.getElementById('sa-kpi-medi').textContent = tMedi;
 
-        const prestamosSnap = await SIA.db.collection('prestamos-biblio').where('estado', '==', 'entregado').get();
         if (document.getElementById('sa-kpi-biblio'))
-          document.getElementById('sa-kpi-biblio').textContent = prestamosSnap.size;
+          document.getElementById('sa-kpi-biblio').textContent = tPrestamos;
 
-        const inscSnap = await SIA.db.collection('aula-inscripciones').get();
-        const progSnap = await SIA.db.collection('aula-progress').where('progressPct', '>=', 100).get();
-        const rate = inscSnap.size > 0 ? Math.round((progSnap.size / inscSnap.size) * 100) : 0;
+        const rate = tInsc > 0 ? Math.round((tProg / tInsc) * 100) : 0;
         if (document.getElementById('sa-rate-aula'))
           document.getElementById('sa-rate-aula').textContent = `${rate}%`;
 
@@ -2057,12 +2969,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- 1.5 LÓ“GICA DASHBOARD DEPARTAMENTAL ---
     // Si tiene allowedViews y NO es estudiante (o un rol que forza estudiante), y tiene más de 1 vista permitida
-    if (currentUserProfile.allowedViews &&
-      currentUserProfile.allowedViews.length > 1 &&
-      currentUserProfile.role !== 'student' &&
-      currentUserProfile.role !== 'docente') {
+    const effectiveViews = getEffectiveAllowedViews(currentUserProfile);
+    if (isAdminWorkspaceProfile(currentUserProfile) && effectiveViews.length > 1) {
 
-      console.log("[Dashboard] ðŸ¢ Renderizando Dashboard Departamental para:", currentUserProfile.role);
+      console.log("[Dashboard] 🏢 Renderizando Dashboard Departamental para:", currentUserProfile.role);
 
       const dashStandard = document.getElementById('view-dashboard');
       const dashSuper = document.getElementById('view-superadmin-dashboard');
@@ -2110,7 +3020,7 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       // MEDI COUNT
       let mediCount = 0;
-      if (currentUserProfile.role === 'medico') {
+      if (canAdminMedi(currentUserProfile)) {
         const s1 = await SIA.db.collection('citas-medi').where('estado', '==', 'pendiente').get();
         mediCount = s1.size;
       } else {
@@ -2122,25 +3032,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
       // BIBLIO COUNT
       let biblioCount = 0;
-      if (currentUserProfile.role === 'biblio') {
-        const s3 = await SIA.db.collection('prestamos-biblio').where('estado', '==', 'pendiente').get();
-        biblioCount = s3.size;
+      if (canAdminBiblio(currentUserProfile)) {
+        biblioCount = await getCount('prestamos-biblio', SIA.db.collection('prestamos-biblio').where('estado', 'in', ['pendiente', 'pendiente_entrega', 'entregado']));
       } else {
-        const s4 = await SIA.db.collection('prestamos-biblio').where('studentId', '==', user.uid).where('estado', '==', 'pendiente').get();
+        const s4 = await SIA.db.collection('prestamos-biblio').where('studentId', '==', user.uid).where('estado', 'in', ['pendiente', 'pendiente_entrega', 'entregado']).get();
         biblioCount = s4.size;
       }
       if (biblioBadge) biblioBadge.textContent = biblioCount === 1 ? '1 Activo' : `${biblioCount} Activos`;
 
-      // AULA COUNT
+      // AULA COUNT (usa colecciones actuales: aula-clases / aula-miembros)
       let aulaCount = 0;
-      if (currentUserProfile.role === 'aula') {
-        const s5 = await SIA.db.collection('aula-cursos').get();
-        aulaCount = s5.size;
+      if (window.SIA?.canTeachInAula ? window.SIA.canTeachInAula(currentUserProfile) : (currentUserProfile.role === 'aula' || currentUserProfile.role === 'aula_admin')) {
+        aulaCount = await getCount('aula-clases', SIA.db.collection('aula-clases').where('archivada', '==', false));
       } else {
-        const s6 = await SIA.db.collection('aula-inscripciones').where('studentId', '==', user.uid).get();
-        aulaCount = s6.size;
+        aulaCount = await getCount('aula-miembros', SIA.db.collection('aula-miembros').where('userId', '==', user.uid));
       }
-      if (aulaBadge) aulaBadge.textContent = `${aulaCount} Inscritos`;
+      if (aulaBadge) aulaBadge.textContent = `${aulaCount} ${aulaCount === 1 ? 'Clase' : 'Clases'}`;
       if (headerCursos) headerCursos.textContent = aulaCount;
 
 
@@ -2166,7 +3073,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const color = c.estado === 'confirmada' ? 'border-success' : 'border-warning';
 
             return `
-              <div class="d-flex align-items-center gap-2 mb-2 p-2 rounded-3 bg-light border-start border-3 ${color}">
+              <div class="d-flex align-items-center gap-2 mb-2 p-2 rounded-3  border-start border-3 ${color}">
                 <div class="fw-bold small" style="min-width: 45px;">${hora}</div>
                 <div class="extra-small text-truncate" title="${c.tipoServicio}">${c.tipoServicio}</div>
               </div>`;
@@ -2212,63 +3119,64 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       }
 
-    } catch (err) {
-      console.error('Dashboard Update Error:', err);
-    }
-  }
+  */
 
   // history.replaceState({ viewId: 'landing' }, '', '/'); // ELIMINADO: Rompe la navegación por hash directo (ej: #/test-vocacional)
 
-  let lastModuleVisited = null;
-  const MOBILE_MODULES = {
-    'view-aula': { icon: 'bi-mortarboard-fill', label: 'Aula' },
-    'view-medi': { icon: 'bi-heart-pulse-fill', label: 'Medi' },
-    'view-biblio': { icon: 'bi-book-half', label: 'Biblio' },
-    'view-foro': { icon: 'bi-chat-square-quote-fill', label: 'Foro' }
-  };
+  let lastModuleVisited = localStorage.getItem('sia_last_module_view') || null;
+  const MOBILE_MODULE_VIEWS = new Set([
+    'view-aula',
+    'view-comunidad',
+    'view-medi',
+    'view-biblio',
+    'view-foro',
+    'view-quejas',
+    'view-encuestas',
+    'view-lactario',
+    'view-cafeteria'
+  ]);
 
   function updateMobileNavState(viewId) {
-    // 1. Update Active State
-    document.querySelectorAll('.bottom-nav-item').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.bottom-nav .nav-item').forEach(el => el.classList.remove('active'));
+
+    const homeBtn = document.getElementById('nav-mobile-home');
+    const modulesBtn = document.getElementById('nav-mobile-modules');
+    const notifBtn = document.getElementById('nav-mobile-notifications');
+    const profileBtn = document.getElementById('nav-mobile-profile');
 
     if (viewId === 'view-dashboard') {
-      const homeBtn = document.getElementById('nav-mobile-home');
-      if (homeBtn) homeBtn.classList.add('active');
-
-      // Reset Module Button to Last Visited or Default
-      updateModuleButtonUI(lastModuleVisited);
-
+      homeBtn?.classList.add('active');
     } else if (viewId === 'view-profile') {
-      const profBtn = document.getElementById('nav-mobile-profile');
-      if (profBtn) profBtn.classList.add('active');
-      updateModuleButtonUI(lastModuleVisited);
-
-    } else if (MOBILE_MODULES[viewId]) {
-      // User is IN a module
+      profileBtn?.classList.add('active');
+    } else if (viewId === 'view-notificaciones') {
+      notifBtn?.classList.add('active');
+    } else if (MOBILE_MODULE_VIEWS.has(viewId)) {
+      modulesBtn?.classList.add('active');
       lastModuleVisited = viewId;
-      updateModuleButtonUI(viewId, true);
-    } else {
-      // Other view (e.g. settings) - Generic
-      updateModuleButtonUI(lastModuleVisited);
+      localStorage.setItem('sia_last_module_view', viewId);
+    }
+
+    if (window.updateModuleNavIcon) {
+      if (MOBILE_MODULE_VIEWS.has(viewId)) {
+        window.updateModuleNavIcon(viewId);
+      } else {
+        window.updateModuleNavIcon('view-dashboard');
+      }
     }
   }
 
-  function updateModuleButtonUI(viewId, isActive = false) {
-    const btn = document.getElementById('nav-mobile-module');
-    const icon = document.getElementById('nav-mobile-module-icon');
-    const text = document.getElementById('nav-mobile-module-text');
+  function updateModuleButtonUI_UNUSED(viewId, isActive = false) {
+    const btn = document.getElementById('nav-mobile-modules');
+    const text = btn?.querySelector('span');
+    if (!btn) return;
 
-    if (!btn || !icon || !text) return;
+    btn.classList.toggle('active', Boolean(isActive));
 
-    if (isActive) btn.classList.add('active');
-    else btn.classList.remove('active');
-
-    if (viewId && MOBILE_MODULES[viewId]) {
-      icon.className = `bi ${MOBILE_MODULES[viewId].icon}`;
-      text.textContent = MOBILE_MODULES[viewId].label;
+    if (text) text.textContent = 'Modulos';
+    if (window.updateModuleNavIcon) {
+      if (MOBILE_MODULE_VIEWS.has(viewId)) window.updateModuleNavIcon(viewId);
+      else window.updateModuleNavIcon('view-dashboard');
     } else {
-      // Default State (Waffle)
-      icon.className = 'bi bi-grid-fill';
       text.textContent = 'Módulos';
     }
   }
@@ -2277,17 +3185,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (lastModuleVisited && lastModuleVisited !== window.SIA_currentView) {
       navigate(lastModuleVisited);
-    } else {
-
-      const drawerBtn = document.querySelector('.dropdown button[data-bs-toggle="dropdown"]');
-
-      if (window.bootstrap) {
-
-
-        const topWaffleBtn = document.querySelector('.dropdown button[title="Aplicaciones"]');
-        if (topWaffleBtn) topWaffleBtn.click();
-      }
+      return;
     }
+
+    window.SIA?.toggleModulesDrawer?.();
   };
 
   // ==============================
@@ -2538,7 +3439,7 @@ document.addEventListener('DOMContentLoaded', () => {
           showToast("¡App instalada con éxito! 🎉", "success");
         }
       } else {
-        console.log('âŒ Usuario rechazó instalar la PWA');
+        console.log('❌ Usuario rechazó instalar la PWA');
       }
     } catch (err) {
       console.error('Error al intentar instalar PWA:', err);
@@ -2596,7 +3497,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <div class="badge bg-success mb-2">2. Reinstalar</div>
             <ul class="small mb-0">
               <li>Abre el sitio web de SIA en Chrome</li>
-              <li>Toca el menú <strong>â‹®</strong> (tres puntos)</li>
+              <li>Toca el menú <strong>⋮</strong> (tres puntos)</li>
               <li>Selecciona <strong>"Instalar app"</strong> o <strong>"Agregar a inicio"</strong></li>
             </ul>
           </div>
@@ -2709,6 +3610,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (e.detail && e.detail.viewId === 'view-dashboard') {
       setTimeout(checkAndShowPWABanner, 500);
     }
+    // Update dynamic icon
+    if (e.detail && e.detail.viewId && window.updateModuleNavIcon) {
+      window.updateModuleNavIcon(e.detail.viewId);
+    }
   });
 
   // Exponer funciones a SIA
@@ -2729,6 +3634,39 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!element) return;
     document.querySelectorAll('.bottom-nav .nav-item').forEach(el => el.classList.remove('active'));
     element.classList.add('active');
+  };
+
+  // Helper for dynamic module icon
+  window.updateModuleNavIcon = function (viewId) {
+    const iconEl = document.getElementById('nav-mobile-modules-icon');
+    if (!iconEl) return;
+
+    const iconMap = {
+      'view-aula': 'aula.ico',
+      'view-comunidad': 'images/comunidad.png',
+      'view-medi': 'medi.ico',
+      'view-biblio': 'biblio.ico',
+      'view-foro': 'foro.ico',
+      'view-cafeteria': 'sia.ico',
+      'view-lactario': 'lactario.ico',
+      'view-quejas': 'quejas.ico',
+      'view-encuestas': 'encuestas.ico',
+      'view-profile': 'perfil.ico'
+    };
+
+    if (iconMap[viewId]) {
+      iconEl.src = iconMap[viewId].includes('/') ? iconMap[viewId] : `assets/icons/${iconMap[viewId]}`;
+      // Save last module
+      localStorage.setItem('sia_last_module_view', viewId);
+    } else if (viewId === 'view-dashboard') {
+      // Restoring on dashboard return if available
+      const last = localStorage.getItem('sia_last_module_view');
+      if (last && iconMap[last]) {
+        iconEl.src = `assets/icons/${iconMap[last]}`;
+      } else {
+        iconEl.src = 'assets/icons/aula.ico';
+      }
+    }
   };
 
   window.openDigitalID = function () {
@@ -2789,6 +3727,7 @@ document.addEventListener('DOMContentLoaded', () => {
     } else {
       drawer.classList.add('d-none');
       toggleBodyScroll(false); // Unlock Scroll
+      updateMobileNavState(Store.currentView || 'view-dashboard');
     }
   };
 
@@ -2805,8 +3744,7 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    const allowedViews = currentUserProfile.allowedViews || [];
-    const role = currentUserProfile.role;
+    const allowedViews = getEffectiveAllowedViews(currentUserProfile);
 
     // Definición de todos los módulos disponibles
     const allModules = [
@@ -2818,6 +3756,15 @@ document.addEventListener('DOMContentLoaded', () => {
         color: 'aula',
         category: 'academico',
         description: 'Cursos y capacitaciones'
+      },
+      {
+        id: 'comunidad',
+        view: 'view-comunidad',
+        label: 'Comunidad',
+        icon: 'people-fill',
+        color: 'success',
+        category: 'comunidad',
+        description: 'Feed social del campus'
       },
       {
         id: 'medi',
@@ -2885,100 +3832,73 @@ document.addEventListener('DOMContentLoaded', () => {
     ];
 
     // Filtrar módulos basándose en permisos
-    let visibleModules = allModules;
-
-    if (allowedViews.length > 0 && role !== 'student' && role !== 'docente') {
-      // Usuario con permisos restringidos (ej. departamento)
-      visibleModules = allModules.filter(m =>
-        allowedViews.some(av => av === m.view || m.view.startsWith(av))
-      );
-    }
-
-    // Agrupar por categoría
-    const categories = {
-      academico: { label: 'Académico', modules: [] },
-      servicios: { label: 'Servicios', modules: [] },
-      comunidad: { label: 'Comunidad', modules: [] },
-      cuenta: { label: 'Mi Cuenta', modules: [] }
-    };
-
-    visibleModules.forEach(m => {
-      if (categories[m.category]) {
-        categories[m.category].modules.push(m);
-      }
+    const visibleModules = allModules.filter(m => {
+      if (m.view === 'view-profile') return true;
+      return allowedViews.some(av => av === m.view || m.view.startsWith(av));
     });
 
     // Renderizar
     let html = '';
 
-    Object.entries(categories).forEach(([key, cat]) => {
-      if (cat.modules.length === 0) return;
+    visibleModules.forEach(m => {
+      const iconMap = {
+        'aula': 'aula.png',
+        'comunidad': 'comunidad.png',
+        'medi': 'medi.png',
+        'biblio': 'biblio.png',
+        'foro': 'foro.png',
+        'lactario': 'lactario.png',
+        'quejas': 'quejas.png',
+        'encuestas': 'encuestas.png',
+        'vocacional': 'vocacional.png',
+        'profile': 'perfil.png'
+      };
+
+      let iconHtml = `<i class="bi bi-${m.icon}"></i>`;
+
+      if (iconMap[m.id]) {
+        iconHtml = `<img src="images/${iconMap[m.id]}" alt="${m.label}" style="width: 42px; height: 42px; object-fit: contain;">`;
+      }
 
       html += `
-        <div class="module-group mb-4">
-          <div class="group-label mb-3">${cat.label}</div>
-          <div class="modules-grid">
-      `;
-
-
-      cat.modules.forEach(m => {
-        const iconMap = {
-          'aula': 'aula.png',
-          'medi': 'medi.png',
-          'biblio': 'biblio.png',
-          'foro': 'foro.png',
-          'lactario': 'lactario.png',
-          'quejas': 'quejas.png',
-          'encuestas': 'encuestas.png',
-          'vocacional': 'vocacional.png',
-          'profile': 'perfil.png'
-        };
-
-        let iconHtml = `<i class="bi bi-${m.icon}"></i>`;
-
-        if (iconMap[m.id]) {
-          iconHtml = `<img src="images/${iconMap[m.id]}" alt="${m.label}" style="width: 42px; height: 42px; object-fit: contain;">`;
-        }
-
-        html += `
-            <div class="module-card" onclick="window.SIA.navigate('${m.view}'); window.SIA.toggleModulesDrawer();">
-              <div class="module-icon  d-flex align-items-center justify-content-center">
-                ${iconHtml}
-              </div>
-              <span class="module-label">${m.label}</span>
-              <span class="extra-small text-muted opacity-75" style="font-size: 0.65rem;">${m.description}</span>
-            </div>
-          `;
-      });
-
-      html += `
+        <div class="d-flex flex-column align-items-center flex-shrink-0" 
+             style="width: 80px; scroll-snap-align: start; cursor: pointer;"
+             onclick="window.SIA.navigate('${m.view}'); window.SIA.toggleModulesDrawer();">
+          <div class="bg-light rounded-4 shadow-sm d-flex align-items-center justify-content-center mb-2 position-relative" 
+               style="width: 60px; height: 60px; overflow: hidden;">
+            ${iconHtml}
+            <div class="position-absolute bottom-0 w-100" style="height: 4px; background-color: var(--bs-${m.color});"></div>
           </div>
+          <span class="fw-bold text-center text-wrap w-100 lh-sm" style="color: var(--text-heading); font-size: 0.65rem;">${m.label}</span>
         </div>
       `;
     });
 
     if (html === '') {
-      html = '<div class="text-center py-5 text-muted small">No hay módulos disponibles</div>';
+      html = '<div class="text-center py-5 text-muted small w-100">No hay módulos disponibles</div>';
     }
 
     drawerBody.innerHTML = html;
   }
 
-  // 3. Notifications View Logic (FIXED: No Bootstrap Modal)
+  // 3. Notifications View Logic — navega al Centro de Notificaciones
   window.SIA.toggleNotificationsView = function () {
-    const drawer = document.getElementById('sia-notifications-drawer');
-    if (!drawer) return;
-    const content = drawer.querySelector('.modules-drawer-content');
-
-    if (drawer.classList.contains('d-none')) {
-      drawer.classList.remove('d-none');
-      toggleBodyScroll(true); // Lock Scroll
-      content.style.animation = 'none';
-      content.offsetHeight;
-      content.style.animation = 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards';
+    // Navegar a la vista del Centro de Notificaciones completo (mobile-first)
+    if (window.SIA._router) {
+      window.SIA._router.navigate('view-notificaciones');
+    } else if (window.SIA.navigate) {
+      window.SIA.navigate('view-notificaciones');
     } else {
-      drawer.classList.add('d-none');
-      toggleBodyScroll(false); // Unlock Scroll
+      // Fallback: abrir el drawer antiguo si el router no está listo
+      const drawer = document.getElementById('sia-notifications-drawer');
+      if (!drawer) return;
+      if (drawer.classList.contains('d-none')) {
+        drawer.classList.remove('d-none');
+        toggleBodyScroll(true);
+      } else {
+        drawer.classList.add('d-none');
+        toggleBodyScroll(false);
+      }
     }
   };
 
@@ -3046,175 +3966,60 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   // 6. Pull-to-Refresh Logic (Mobile)
-  (function initPullToRefresh() {
-    let touchStartY = 0;
-    let touchCurrentY = 0;
-    let isPulling = false;
-    let refreshThreshold = 80; // pixels to trigger refresh
-
-    // Create refresh indicator
-    const refreshIndicator = document.createElement('div');
-    refreshIndicator.id = 'pull-to-refresh-indicator';
-    refreshIndicator.className = 'd-md-none'; // Only mobile
-    refreshIndicator.innerHTML = `
-      <div class="text-center py-3" style="transition: all 0.3s ease;">
-        <i class="bi bi-arrow-clockwise fs-5 text-primary"></i>
-        <div class="extra-small text-muted mt-1">Jala para refrescar</div>
-      </div>
-    `;
-    refreshIndicator.style.cssText = `
-      position: fixed;
-      top: -100px;
-      left: 0;
-      right: 0;
-      z-index: 9999;
-      background: var(--bs-body-bg);
-      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-      transition: top 0.3s ease;
-    `;
-
-    document.body.appendChild(refreshIndicator);
-
-    document.addEventListener('touchstart', (e) => {
-      // Only on dashboard and at top of page
-      const isDashboard = window.location.pathname === '/dashboard' ||
-        window.location.pathname === '/' ||
-        document.getElementById('view-dashboard')?.classList.contains('d-none') === false;
-
-      if (!isDashboard) return;
-      if (window.scrollY > 0) return; // Not at top
-
-      // Ignore if a Bootstrap modal is open
-      if (document.querySelector('.modal.show')) return;
-
-      // Ignore if the modules drawer is open
-      const drawer = document.getElementById('sia-modules-drawer');
-      if (drawer && !drawer.classList.contains('d-none')) return;
-
-      // Ignore if a Bootstrap dropdown is open
-      if (document.querySelector('.dropdown-menu.show')) return;
-
-      // Ignore if an offcanvas is open
-      if (document.querySelector('.offcanvas.show')) return;
-
-      // Ignore if touch originates inside a scrollable container
-      const target = e.target;
-      let el = target;
-      while (el && el !== document.body) {
-        const style = window.getComputedStyle(el);
-        const overflowY = style.overflowY;
-        if ((overflowY === 'auto' || overflowY === 'scroll') && el.scrollHeight > el.clientHeight) {
-          return; // Inside a scrollable element
-        }
-        el = el.parentElement;
-      }
-
-      touchStartY = e.touches[0].clientY;
-      isPulling = true;
-    }, { passive: true });
-
-    document.addEventListener('touchmove', (e) => {
-      if (!isPulling) return;
-      if (window.scrollY > 0) {
-        isPulling = false;
-        return;
-      }
-
-      touchCurrentY = e.touches[0].clientY;
-      const pullDistance = touchCurrentY - touchStartY;
-
-      if (pullDistance > 0 && pullDistance < 150) {
-        e.preventDefault();
-        const progress = Math.min(pullDistance / refreshThreshold, 1);
-        refreshIndicator.style.top = `${-100 + (progress * 100)}px`;
-
-        // Rotate icon based on progress
-        const icon = refreshIndicator.querySelector('.bi-arrow-clockwise');
-        if (icon) {
-          icon.style.transform = `rotate(${progress * 360}deg)`;
-        }
-
-        // Change text when threshold reached
-        const text = refreshIndicator.querySelector('.extra-small');
-        if (text) {
-          text.textContent = pullDistance >= refreshThreshold ? 'Suelta para refrescar' : 'Jala para refrescar';
-        }
-      }
-    }, { passive: false });
-
-    document.addEventListener('touchend', (e) => {
-      if (!isPulling) return;
-
-      const pullDistance = touchCurrentY - touchStartY;
-
-      if (pullDistance >= refreshThreshold) {
-        // Trigger refresh
-        refreshIndicator.style.top = '0px';
-        const icon = refreshIndicator.querySelector('.bi-arrow-clockwise');
-        if (icon) {
-          icon.classList.add('spin');
-        }
-
-        // Reload dashboard
-        setTimeout(() => {
-          if (typeof loadDashboard === 'function') {
-            loadDashboard();
-          }
-
-          // Reset indicator
-          setTimeout(() => {
-            refreshIndicator.style.top = '-100px';
-            if (icon) {
-              icon.classList.remove('spin');
-              icon.style.transform = 'rotate(0deg)';
-            }
-          }, 1000);
-        }, 500);
-      } else {
-        // Reset indicator
-        refreshIndicator.style.top = '-100px';
-        const icon = refreshIndicator.querySelector('.bi-arrow-clockwise');
-        if (icon) {
-          icon.style.transform = 'rotate(0deg)';
-        }
-      }
-
-      isPulling = false;
-      touchStartY = 0;
-      touchCurrentY = 0;
-    }, { passive: true });
-  })();
+  // Removido por peticion del usuario para evitar conflictos con el scroll nativo.
+  // Refresco de pagina delegada al comportamiento standar del navegador.
 
   window.toggleDarkMode = function () {
-    const html = document.documentElement;
     const inputs = document.querySelectorAll('#switch-dark-mode-notifs');
-    const isDark = html.getAttribute('data-bs-theme') === 'dark';
+    const currentTheme = document.documentElement.getAttribute('data-bs-theme') || 'light';
+    const nextTheme = currentTheme === 'dark' ? 'light' : 'dark';
 
-    if (isDark) {
-      html.setAttribute('data-bs-theme', 'light');
-      inputs.forEach(i => i.checked = false);
+    if (typeof window.applyTheme === 'function') {
+      window.applyTheme(nextTheme);
     } else {
-      html.setAttribute('data-bs-theme', 'dark');
-      inputs.forEach(i => i.checked = true);
+      document.documentElement.setAttribute('data-bs-theme', nextTheme);
+      localStorage.setItem(THEME_KEY_LOCAL, nextTheme);
     }
+
+    inputs.forEach(i => i.checked = nextTheme === 'dark');
   };
 
   // 4. Global Avisos / Stories Logic
-  window.openGlobalAvisosModal = function () {
-    window.SIA.toggleNotificationsView();
-  };
+  window.openGlobalAvisosModal = openGlobalAvisosModal;
 
   // Stories Data - Real Encuestas Integration
   // No more mock data - stories are populated from active surveys
 
+  let _dashboardStoriesRenderVersion = 0;
+
+  function _canCommitDashboardStoriesRender(renderVersion, container) {
+    return renderVersion === _dashboardStoriesRenderVersion
+      && !!container
+      && container.isConnected
+      && document.getElementById('dashboard-stories-wrapper') === container;
+  }
+
+  function _dedupeDashboardStories(stories) {
+    const seenStoryIds = new Set();
+    return (Array.isArray(stories) ? stories : []).filter((story) => {
+      const storyId = _getStoryStorageId(story);
+      if (seenStoryIds.has(storyId)) return false;
+      seenStoryIds.add(storyId);
+      return true;
+    });
+  }
+
   async function renderDashboardStories() {
+    const renderVersion = ++_dashboardStoriesRenderVersion;
     const container = document.getElementById('dashboard-stories-wrapper');
     if (!container) return;
 
     container.innerHTML = '';
 
     if (!currentUserProfile) {
-      _showNoNewsPlaceholder(container);
+      if (_canCommitDashboardStoriesRender(renderVersion, container)) {
+        _showNoNewsPlaceholder(container);
+      }
       return;
     }
 
@@ -3247,6 +4052,8 @@ document.addEventListener('DOMContentLoaded', () => {
       _loadServiceIfNeeded('ForoService', '/services/foro-service.js')
     ]);
 
+    if (!_canCommitDashboardStoriesRender(renderVersion, container)) return;
+
     try {
       const baseCtx = getCtx();
       const ctx = {
@@ -3255,7 +4062,9 @@ document.addEventListener('DOMContentLoaded', () => {
         profile: baseCtx.currentUserProfile || currentUserProfile
       };
       if (!ctx.user) {
-        _showNoNewsPlaceholder(container);
+        if (_canCommitDashboardStoriesRender(renderVersion, container)) {
+          _showNoNewsPlaceholder(container);
+        }
         return;
       }
 
@@ -3272,15 +4081,20 @@ document.addEventListener('DOMContentLoaded', () => {
           : []
       ]);
 
+      if (!_canCommitDashboardStoriesRender(renderVersion, container)) return;
+
       // Merge: encuestas + foro events + avisos como stories unificadas
-      const allStories = [
+      const allStories = _dedupeDashboardStories([
         ...allSurveys.map(s => ({ ...s, _source: 'encuesta' })),
         ...foroEvents.map(e => ({ ...e, _source: 'foro' })),
         ...avisosStories.map(a => ({ ...a, _source: 'aviso' }))
-      ];
+      ]);
 
       // Ordenar: nuevos primero (por createdAt descendente)
       allStories.sort((a, b) => {
+        const priorityRank = (item) => item?.priority === 'urgent' ? 0 : item?._source === 'encuesta' && !item?.responded ? 1 : 2;
+        const prDiff = priorityRank(a) - priorityRank(b);
+        if (prDiff !== 0) return prDiff;
         const getTime = (item) => {
           const d = item.createdAt;
           if (!d) return 0;
@@ -3291,6 +4105,16 @@ document.addEventListener('DOMContentLoaded', () => {
         return getTime(b) - getTime(a);
       });
 
+      if (!_canCommitDashboardStoriesRender(renderVersion, container)) return;
+
+      _dashStats.stories = allStories.map((story) => ({
+        id: _getStoryStorageId(story),
+        title: story.title || '',
+        source: story._source || 'general'
+      }));
+      _dashState.stories = _dashStats.stories;
+      _updateStoriesMeta(allStories);
+
       if (allStories.length === 0) {
         _showNoNewsPlaceholder(container);
         return;
@@ -3298,18 +4122,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const seenKey = 'sia_stories_seen';
       const seen = JSON.parse(localStorage.getItem(seenKey) || '{}');
+      const savedStories = new Set(_getSavedStoryIds());
 
       allStories.forEach((story, storyIdx) => {
-        const isSeen = !!seen[story.id];
+        const storyStorageId = _getStoryStorageId(story);
+        const storyMeta = _getStoryMeta(story);
+        const isSaved = savedStories.has(storyStorageId);
+        const isSeen = story._source === 'aviso'
+          ? !!window.AvisosService?.hasSeenLocal?.(ctx, story.id)
+          : !!seen[story.id];
         const div = document.createElement('div');
-        div.className = 'story-item text-center animate-fade-in';
+        // C1-06: Seen stories get reduced opacity instead of disappearing
+        div.className = `story-item text-center animate-fade-in${isSeen ? ' story-item-seen' : ''}`;
         div.style.animationDelay = `${storyIdx * 60}ms`;
 
         if (story._source === 'encuesta') {
-          // --- Encuesta story ---
+          // --- Encuesta story --- C1-06: Use survey-specific ring color
           const isResponded = !!story.responded;
           const ringActive = !isSeen && !isResponded;
-          const ringClass = ringActive ? 'story-ring active' : 'story-ring';
+          const ringClass = ringActive ? 'story-ring story-ring-survey active' : 'story-ring';
           const iconClass = isResponded ? 'bi-clipboard-check-fill' : 'bi-clipboard-check';
           const bgClass = isResponded ? 'bg-success-subtle text-success' : 'bg-info-subtle text-info';
 
@@ -3332,15 +4163,16 @@ document.addEventListener('DOMContentLoaded', () => {
         } else if (story._source === 'aviso') {
           // --- Aviso story (con imagen thumbnail si existe) ---
           const ringActive = !isSeen;
-          const ringClass = ringActive ? 'story-ring aviso-ring active' : 'story-ring aviso-ring';
+          // C1-06: Urgent avisos pulse
+          const urgentClass = story.priority === 'urgent' ? ' story-ring-urgent' : '';
+          const ringClass = ringActive ? `story-ring aviso-ring active${urgentClass}` : 'story-ring aviso-ring';
           const hasImage = !!(story.imageUrl && story.imageUrl.trim());
           const iconClass = story.type === 'image' ? 'bi-image-fill' : 'bi-megaphone-fill';
           const bgClass = story.priority === 'urgent' ? 'bg-danger-subtle text-danger' : 'bg-success-subtle text-success';
 
           div.onclick = () => {
-            seen[story.id] = Date.now();
-            localStorage.setItem(seenKey, JSON.stringify(seen));
-            _openAvisoStoryPreviewModal(story);
+            window.AvisosService?.markSeenLocal?.(ctx, story.id);
+            _openAvisoStoryPreviewModal(story, ctx);
             const ring = div.querySelector('.story-ring');
             if (ring) ring.classList.remove('active');
           };
@@ -3362,10 +4194,10 @@ document.addEventListener('DOMContentLoaded', () => {
             <span class="story-label">${_escStoryTitle(story.title)}</span>`;
 
         } else {
-          // --- Foro event story ---
+          // --- Foro event story --- C1-06: Use event-specific ring color
           const isRegistered = !!story.registered;
           const ringActive = !isSeen && !isRegistered;
-          const ringClass = ringActive ? 'story-ring active' : 'story-ring';
+          const ringClass = ringActive ? 'story-ring story-ring-event active' : 'story-ring';
           const iconClass = isRegistered ? 'bi-calendar-check-fill' : 'bi-calendar-event';
           const bgClass = isRegistered ? 'bg-primary-subtle text-primary' : 'bg-warning-subtle text-warning';
 
@@ -3386,9 +4218,27 @@ document.addEventListener('DOMContentLoaded', () => {
             <span class="story-label">${_escStoryTitle(story.title)}</span>`;
         }
 
+        const metaChip = document.createElement('span');
+        metaChip.className = storyMeta.className;
+        metaChip.textContent = storyMeta.label;
+        div.appendChild(metaChip);
+
+        const saveBtn = document.createElement('button');
+        saveBtn.type = 'button';
+        saveBtn.className = `story-save-btn${isSaved ? ' is-saved' : ''}`;
+        saveBtn.title = isSaved ? 'Quitar de guardadas' : 'Guardar para despues';
+        saveBtn.innerHTML = `<i class="bi ${isSaved ? 'bi-bookmark-fill' : 'bi-bookmark'}"></i>`;
+        saveBtn.addEventListener('click', async (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          await window.SIA.toggleSavedDashboardStory(storyStorageId);
+        });
+        div.appendChild(saveBtn);
+
         container.appendChild(div);
       });
     } catch (e) {
+      if (!_canCommitDashboardStoriesRender(renderVersion, container)) return;
       console.warn('[Stories] Error loading stories:', e);
       _showNoNewsPlaceholder(container);
     }
@@ -3397,20 +4247,50 @@ document.addEventListener('DOMContentLoaded', () => {
   // Helper: escapar titulo de story para HTML
   function _escStoryTitle(title) {
     if (!title) return '';
-    return title.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    if (typeof window.escapeHtml === 'function') return window.escapeHtml(String(title));
+    return String(title).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  function _getStoryStorageId(story) {
+    return `${story?._source || 'story'}:${story?.id || 'na'}`;
+  }
+
+  function _getStoryMeta(story) {
+    if (story?._source === 'encuesta') {
+      return {
+        label: story?.responded ? 'Contestada' : 'Encuesta',
+        className: story?.responded ? 'story-meta-chip story-meta-chip--ok' : 'story-meta-chip story-meta-chip--info'
+      };
+    }
+    if (story?._source === 'foro') {
+      return {
+        label: story?.registered ? 'Inscrito' : 'Evento',
+        className: story?.registered ? 'story-meta-chip story-meta-chip--primary' : 'story-meta-chip story-meta-chip--warn'
+      };
+    }
+    const priority = story?.priority === 'urgent' ? 'Urgente' : 'Aviso';
+    return {
+      label: priority,
+      className: story?.priority === 'urgent' ? 'story-meta-chip story-meta-chip--danger' : 'story-meta-chip story-meta-chip--success'
+    };
+  }
+
+  function _updateStoriesMeta(stories) {
+    const metaEl = document.getElementById('dash-stories-meta');
+    if (!metaEl) return;
+    const savedCount = _getSavedStoryIds().length;
+    const total = Array.isArray(stories) ? stories.length : 0;
+    metaEl.textContent = savedCount > 0 ? `${savedCount} guardada${savedCount === 1 ? '' : 's'}` : `${total} novedad${total === 1 ? '' : 'es'}`;
   }
 
   function _showNoNewsPlaceholder(container) {
-    const ph = document.createElement('div');
-    ph.className = 'story-item text-center animate-fade-in';
-    ph.innerHTML = `
-      <div class="story-ring mb-1">
-        <div class="story-circle bg-light text-muted d-flex align-items-center justify-content-center">
-          <i class="bi bi-check-circle"></i>
-        </div>
-      </div>
-      <span class="story-label">Al dia</span>`;
-    container.appendChild(ph);
+    _updateStoriesMeta([]);
+    container.innerHTML = `
+      <div class="d-flex align-items-center justify-content-center w-100 py-3 text-muted flex-column animate-fade-in text-center" style="opacity:0.7;">
+        <i class="bi bi-inbox fs-2 mb-2" style="color: var(--bs-secondary-bg);"></i>
+        <span class="small fw-bold">Estás al día</span>
+        <span class="extra-small">No hay avisos ni encuestas nuevas por el momento.</span>
+      </div>`;
   }
 
   // Modal de preview para stories de FORO (eventos)
@@ -3450,7 +4330,7 @@ document.addEventListener('DOMContentLoaded', () => {
     <div class="modal-footer border-0 gap-2">
       <button class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">Cerrar</button>
       <button class="btn btn-primary rounded-pill px-4 fw-bold" onclick="location.hash='#/foro'; bootstrap.Modal.getInstance(document.getElementById('foroStoryPreviewModal')).hide();">
-        <i class="bi bi-calendar-event me-1"></i>Ir a Foro</button>
+        <i class="bi bi-calendar-event me-1"></i>Ir a Eventos</button>
     </div>
   </div></div></div>`;
 
@@ -3473,13 +4353,13 @@ document.addEventListener('DOMContentLoaded', () => {
   <div class="modal-content border-0 rounded-4 shadow-lg">
     <div class="modal-header border-0 bg-info bg-opacity-10 rounded-top-4 py-3">
       <div>
-        <h6 class="fw-bold mb-0"><i class="bi bi-clipboard-data me-2"></i>${survey.title}</h6>
+        <h6 class="fw-bold mb-0"><i class="bi bi-clipboard-data me-2"></i>${_escStoryTitle(survey.title)}</h6>
         <span class="extra-small text-muted">${createdDate}${questionCount ? ' · ' + questionCount + ' preguntas' : ''}</span>
       </div>
       <button class="btn-close" data-bs-dismiss="modal"></button>
     </div>
     <div class="modal-body p-4" id="story-preview-body">
-      ${survey.description ? `<p class="text-muted small mb-3">${survey.description}</p>` : ''}
+      ${survey.description ? `<p class="text-muted small mb-3">${_escStoryTitle(survey.description)}</p>` : ''}
       ${isResponded
         ? `<div class="text-center py-3">
             <i class="bi bi-check-circle-fill text-success fs-1 d-block mb-2"></i>
@@ -3538,7 +4418,7 @@ document.addEventListener('DOMContentLoaded', () => {
             submitBtn.disabled = true;
             submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Enviando...';
             try {
-              await EncuestasService.submitResponse(ctx, survey.id, answers);
+              await EncuestasService.submitResponse(ctx, survey.id, answers, { source: 'story' });
               body.innerHTML = `<div class="text-center py-4 animate-fade-in">
                 <div class="mb-3" style="font-size:3rem">🎉</div>
                 <h5 class="fw-bold">¡Gracias por responder!</h5>
@@ -3569,27 +4449,26 @@ document.addEventListener('DOMContentLoaded', () => {
       if (q.type === 'multiple') {
         input = (q.options || []).map((o, j) => `
           <div class="form-check mb-2"><input class="form-check-input" type="radio" name="${prefix}_${q.id}" id="${prefix}_${q.id}_${j}" value="${o}">
-          <label class="form-check-label" for="${prefix}_${q.id}_${j}">${o}</label></div>`).join('');
+          <label class="form-check-label" for="${prefix}_${q.id}_${j}">${_escStoryTitle(o)}</label></div>`).join('');
       } else if (q.type === 'boolean') {
         input = `<div class="d-flex gap-3">
           <div class="form-check"><input class="form-check-input" type="radio" name="${prefix}_${q.id}" id="${prefix}_${q.id}_t" value="true"><label class="form-check-label" for="${prefix}_${q.id}_t">Verdadero</label></div>
           <div class="form-check"><input class="form-check-input" type="radio" name="${prefix}_${q.id}" id="${prefix}_${q.id}_f" value="false"><label class="form-check-label" for="${prefix}_${q.id}_f">Falso</label></div></div>`;
       } else if (q.type === 'scale') {
         const min = q.min || 1, max = q.max || 10;
-        const mid = Math.ceil((max - min) / 2) + min;
         const steps = [];
         for (let v = min; v <= max; v++) {
           steps.push(`<button type="button" class="btn btn-outline-primary btn-sm scale-btn rounded-pill px-2 py-1" data-val="${v}" onclick="this.parentNode.querySelectorAll('.scale-btn').forEach(b=>b.classList.remove('btn-primary','active'));this.classList.add('btn-primary','active');this.classList.remove('btn-outline-primary');document.getElementById('${prefix}_${q.id}_input').value=${v};document.getElementById('${prefix}_${q.id}_val').textContent=${v}">${v}</button>`);
         }
-        input = `<input type="hidden" id="${prefix}_${q.id}_input" value="${mid}">
+        input = `<input type="hidden" id="${prefix}_${q.id}_input" value="">
           <div class="d-flex flex-wrap gap-1 mb-1">${steps.join('')}</div>
-          <div class="text-center"><span class="badge bg-primary rounded-pill" id="${prefix}_${q.id}_val">${mid}</span></div>`;
+          <div class="text-center"><span class="badge bg-primary rounded-pill" id="${prefix}_${q.id}_val">Sin seleccionar</span></div>`;
       } else {
         input = `<textarea class="form-control rounded-3" id="${prefix}_${q.id}_input" rows="2" placeholder="Escribe tu respuesta..."></textarea>`;
       }
       return `<div class="mb-4 pb-3 ${i < questions.length - 1 ? 'border-bottom' : ''}" data-qid="${q.id}">
         <div class="d-flex align-items-start mb-2"><span class="badge bg-primary rounded-circle me-2" style="width:28px;height:28px;line-height:20px">${i + 1}</span>
-        <div><p class="fw-bold mb-1">${q.text}${q.required ? ' <span class="text-danger">*</span>' : ''}</p></div></div>${input}</div>`;
+        <div><p class="fw-bold mb-1">${_escStoryTitle(q.text)}${q.required ? ' <span class="text-danger">*</span>' : ''}</p></div></div>${input}</div>`;
     }).join('');
   }
 
@@ -3606,7 +4485,11 @@ document.addEventListener('DOMContentLoaded', () => {
         else if (q.required) { valid = false; }
       } else if (q.type === 'scale') {
         const el = c.querySelector(`[id$="_${q.id}_input"]`);
-        answers[q.id] = el ? Number(el.value) : null;
+        if (!el || el.value === '') {
+          if (q.required) valid = false;
+        } else {
+          answers[q.id] = Number(el.value);
+        }
       } else {
         const el = c.querySelector(`[id$="_${q.id}_input"]`);
         const val = el?.value?.trim() || '';
@@ -3619,74 +4502,1643 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // 5. Smart Cards Updater & Periodic Refresh
-  window.SIA.updateSmartCards = function () {
-    if (!currentUserProfile) return;
+  // ── Dashboard Stats Cache (shared between updateSmartCards & summary banner) ──
+  const DASHBOARD_CACHE_TTL_MS = 15 * 60 * 1000;
+  let _dashboardDataRenderVersion = 0;
+  const DASH_SCOPE_OPTIONS = new Set(['today', 'week', 'all']);
+  const DASH_SCOPE_LABELS = { today: 'hoy', week: 'esta semana', all: 'todo' };
+  const DASH_SEVERITY_ORDER = { urgent: 0, high: 1, medium: 2, low: 3 };
+  const DASH_MODULE_META = {
+    dashboard: { label: 'Dashboard', viewId: 'view-dashboard', icon: 'bi-bullseye' },
+    medi: { label: 'Medi', viewId: 'view-medi', icon: 'bi-heart-pulse-fill' },
+    biblio: { label: 'Biblioteca', viewId: 'view-biblio', icon: 'bi-book-half' },
+    aula: { label: 'Aula', viewId: 'view-aula', icon: 'bi-mortarboard-fill' },
+    comunidad: { label: 'Comunidad', viewId: 'view-comunidad', icon: 'bi-people-fill' },
+    foro: { label: 'Eventos', viewId: 'view-foro', icon: 'bi-calendar-event' },
+    avisos: { label: 'Novedades', viewId: 'view-avisos', icon: 'bi-megaphone-fill' },
+    quejas: { label: 'Quejas', viewId: 'view-quejas', icon: 'bi-chat-heart' },
+    encuestas: { label: 'Encuestas', viewId: 'view-encuestas', icon: 'bi-clipboard-check' },
+    cafeteria: { label: 'Cafeteria', viewId: 'view-cafeteria', icon: 'bi-cup-hot-fill' }
+  };
 
-    // ... (Existing Smart Card Update Logic) ...
-    // AULA
-    const aulaStatus = document.getElementById('smart-card-aula-status');
-    const aulaDot = document.getElementById('smart-dot-aula');
-    if (aulaStatus) {
-      const pending = 0; // TODO: Connect
-      if (pending > 0) {
-        aulaStatus.textContent = `${pending} pendientes`;
-        aulaStatus.className = "extra-small fw-bold text-warning mb-0";
-        if (aulaDot) aulaDot.className = "status-dot bg-warning";
-      } else {
-        aulaStatus.textContent = "Sin pendientes";
-        aulaStatus.className = "extra-small text-muted mb-0";
-        if (aulaDot) aulaDot.className = "status-dot bg-success";
+  function _createEmptyDashboardStats() {
+    return {
+      citas: 0,
+      citaHoy: null,
+      libros: 0,
+      libroUrgente: null,
+      encuestas: 0,
+      quejas: 0,
+      aulaProgress: null,
+      aulaCount: 0,
+      aulaCompleted: 0,
+      aulaCerts: 0,
+      aulaPendingTasks: 0,
+      aulaNextDeadline: null,
+      aulaTrend: null,
+      aulaRisk: 'Estable',
+      taskCenter: [],
+      recentActivity: [],
+      events: [],
+      stories: []
+    };
+  }
+
+  function _createEmptyDashboardState(scope) {
+    return {
+      scope: _normalizeDashboardScope(scope || _getDashboardPrefs()?.defaultScope || 'week'),
+      visibleEvents: [],
+      taskCenter: [],
+      recentActivity: [],
+      stories: []
+    };
+  }
+
+  let _dashStats = _createEmptyDashboardStats();
+  let _dashState = _createEmptyDashboardState();
+
+  const _fetchWithTimeout = (promise, ms = 8000) => {
+    return Promise.race([
+      promise,
+      new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms))
+    ]);
+  };
+
+  function _escapeDashHtml(value) {
+    return String(value || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function _dashToDate(value) {
+    if (!value) return null;
+    if (value.toDate) {
+      const date = value.toDate();
+      return Number.isNaN(date?.getTime?.()) ? null : date;
+    }
+    const date = value instanceof Date ? value : new Date(value);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+
+  function _dashFormatShortDate(value, includeTime) {
+    const date = _dashToDate(value);
+    if (!date) return '';
+    return date.toLocaleDateString('es-MX', {
+      day: 'numeric',
+      month: 'short',
+      ...(includeTime ? { hour: '2-digit', minute: '2-digit' } : {})
+    });
+  }
+
+  function _dashRelativeDateLabel(value) {
+    const date = _dashToDate(value);
+    if (!date) return '';
+    const now = new Date();
+    const startToday = new Date(now);
+    startToday.setHours(0, 0, 0, 0);
+    const startTarget = new Date(date);
+    startTarget.setHours(0, 0, 0, 0);
+    const dayDiff = Math.round((startTarget.getTime() - startToday.getTime()) / 86400000);
+    if (dayDiff === 0) return 'Hoy';
+    if (dayDiff === 1) return 'Manana';
+    if (dayDiff > 1) return `En ${dayDiff} dias`;
+    if (dayDiff === -1) return 'Ayer';
+    return `Hace ${Math.abs(dayDiff)} dias`;
+  }
+
+  function _getDashboardPrefs() {
+    return currentUserProfile?.prefs?.dashboard || currentUserProfile?.preferences?.dashboard || {};
+  }
+
+  function _normalizeDashboardScope(scope) {
+    return DASH_SCOPE_OPTIONS.has(scope) ? scope : 'week';
+  }
+
+  function _getDashboardScopeEnd(scope) {
+    const now = new Date();
+    const normalized = _normalizeDashboardScope(scope);
+    if (normalized === 'today') {
+      const end = new Date(now);
+      end.setHours(23, 59, 59, 999);
+      return end;
+    }
+    if (normalized === 'week') {
+      return new Date(now.getTime() + 7 * 86400000);
+    }
+    return new Date(now.getTime() + 30 * 86400000);
+  }
+
+  function _getDashboardCacheKey(uid) {
+    return uid ? `sia_dashboard_cache_${uid}` : null;
+  }
+
+  function _canCommitDashboardDataRender(renderVersion, uid) {
+    return renderVersion === _dashboardDataRenderVersion
+      && !!uid
+      && uid === getEffectiveSessionUid(currentUserProfile);
+  }
+
+  function _canCommitDashboardActivityRender(renderVersion, uid, container) {
+    return _canCommitDashboardDataRender(renderVersion, uid)
+      && !!container
+      && container.isConnected
+      && document.getElementById('dash-activity-strip') === container;
+  }
+
+  function _setDashboardStatusText(id, text, className = 'extra-small text-muted mb-0', color = '') {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = text;
+    el.className = className;
+    el.style.color = color || '';
+  }
+
+  function _setDashboardDotState(id, dotClassName) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (!dotClassName) {
+      el.className = 'status-dot bg-secondary d-none';
+      return;
+    }
+    el.className = `status-dot ${dotClassName}`;
+    el.classList.remove('d-none');
+  }
+
+  function _renderDashboardCardPlaceholders() {
+    _setDashboardStatusText('smart-card-medi-status', 'Consultando citas...');
+    _setDashboardStatusText('smart-card-biblio-status', 'Consultando prestamos...');
+    _setDashboardStatusText('smart-card-aula-status', 'Consultando cursos...');
+    _setDashboardStatusText('smart-card-foro-status', 'Consultando eventos...');
+    _setDashboardStatusText('smart-card-quejas-status', 'Consultando buzon...');
+    _setDashboardStatusText('smart-card-encuestas-status', 'Consultando encuestas...');
+    _setDashboardDotState('smart-dot-medi', null);
+    _setDashboardDotState('smart-dot-biblio', null);
+    _setDashboardDotState('smart-dot-foro', null);
+    _setDashboardDotState('smart-dot-quejas', null);
+    _setDashboardDotState('smart-dot-encuestas', null);
+    document.getElementById('smart-card-aula-progress-wrap')?.classList.add('d-none');
+  }
+
+  function _renderEmptyActivityStrip() {
+    const strip = document.getElementById('dash-activity-strip');
+    if (!strip) return;
+    strip.innerHTML = Array.from({ length: 7 }).map(() => `
+      <div class="activity-day-card skeleton-loader flex-fill rounded-4 d-flex flex-column justify-content-center align-items-center"
+           style="height: 65px; border: 2px solid rgba(0,0,0,0.15); background: linear-gradient(135deg, rgba(230,230,230,0.4), rgba(200,200,200,0.2));">
+        <div style="width: 25px; height: 12px; background: rgba(0,0,0,0.15); border-radius: 4px; margin-bottom: 4px;"></div>
+        <div style="width: 30px; height: 18px; background: rgba(0,0,0,0.2); border-radius: 4px;"></div>
+      </div>`).join('');
+  }
+
+  function _resetStudentDashboardState(options = {}) {
+    _dashboardDataRenderVersion++;
+    _dashStats = _createEmptyDashboardStats();
+    _dashState = _createEmptyDashboardState(options.scope);
+
+    if (options.clearFreshness) {
+      window._dashLastRefresh = 0;
+      const freshEl = document.getElementById('dash-data-freshness');
+      if (freshEl) {
+        freshEl.textContent = '';
+        freshEl.classList.add('d-none');
       }
+      const syncChip = document.getElementById('dash-header-sync');
+      if (syncChip) syncChip.textContent = '';
     }
 
-    // MEDI
-    const mediStatus = document.getElementById('smart-card-medi-status');
-    const mediDot = document.getElementById('smart-dot-medi');
-    if (mediStatus) {
-      const hasApptToday = false;
-      if (hasApptToday) {
-        mediStatus.textContent = "Cita hoy 16:00";
-        mediStatus.className = "extra-small fw-bold text-danger mb-0";
-        if (mediDot) { mediDot.classList.remove('d-none'); mediDot.className = "status-dot bg-danger"; }
-      } else {
-        mediStatus.textContent = "Sin citas hoy";
-        mediStatus.className = "extra-small text-muted mb-0";
-        if (mediDot) mediDot.classList.add('d-none');
+    if (options.clearDom) {
+      _renderDashboardCardPlaceholders();
+      _renderEmptyActivityStrip();
+      _renderDashboardFromState();
+    }
+  }
+
+  window.SIA.resetStudentDashboardState = function (options = {}) {
+    _resetStudentDashboardState(options);
+  };
+
+  async function _loadStudentAulaTasks(ctx, uid, clases, options = {}) {
+    const classList = (Array.isArray(clases) ? clases : []).filter((clase) => clase?.id);
+    if (!uid || !classList.length || !window.AulaService?.getPublicaciones) {
+      return { tasks: [], classTitleMap: {} };
+    }
+
+    const submittedIds = new Set((options.portfolio?.entregas || [])
+      .map((entrega) => entrega?.publicacionId)
+      .filter(Boolean));
+    const dueStart = options.dueStart ? _dashToDate(options.dueStart) : null;
+    const dueEnd = options.dueEnd ? _dashToDate(options.dueEnd) : null;
+    const publicationLimit = Number(options.publicationLimit) || 30;
+    const classTitleMap = {};
+
+    classList.forEach((clase) => {
+      classTitleMap[clase.id] = clase.titulo || clase.claseTitulo || 'Clase';
+    });
+
+    const taskBuckets = await Promise.all(classList.map(async (clase) => {
+      try {
+        const [miGrupo, publicaciones] = await Promise.all([
+          window.AulaService?.getMiGrupo
+            ? _fetchWithTimeout(AulaService.getMiGrupo(ctx, clase.id, uid), 5000).catch(() => null)
+            : Promise.resolve(null),
+          _fetchWithTimeout(AulaService.getPublicaciones(ctx, clase.id, 'tarea', publicationLimit), 7000).catch(() => [])
+        ]);
+
+        return (Array.isArray(publicaciones) ? publicaciones : [])
+          .map((pub) => {
+            if (pub.grupoId && pub.grupoId !== miGrupo?.id) return null;
+            const dueAt = _dashToDate(pub.fechaEntrega);
+            if (!dueAt) return null;
+            if (dueStart && dueAt < dueStart) return null;
+            if (dueEnd && dueAt > dueEnd) return null;
+            const isSubmitted = submittedIds.has(pub.id);
+            if (options.onlyPending && isSubmitted) return null;
+            return {
+              id: pub.id,
+              claseId: clase.id,
+              claseTitle: classTitleMap[clase.id],
+              titulo: pub.titulo || 'Entrega',
+              dueAt,
+              createdAt: _dashToDate(pub.createdAt),
+              submitted: isSubmitted
+            };
+          })
+          .filter(Boolean);
+      } catch (err) {
+        console.warn('[Dashboard] Aula tasks skipped class:', clase.id, err?.code || err?.message || err);
+        return [];
       }
-    }
+    }));
 
-    // HEADER INFO
-    const dashName = document.getElementById('dash-user-name');
-    const dashInitials = document.getElementById('dash-avatar-initials');
+    const tasks = taskBuckets
+      .flat()
+      .sort((a, b) => {
+        const byDue = (a.dueAt?.getTime?.() || 0) - (b.dueAt?.getTime?.() || 0);
+        if (byDue !== 0) return byDue;
+        return (b.createdAt?.getTime?.() || 0) - (a.createdAt?.getTime?.() || 0);
+      });
 
-    if (dashName && dashName.textContent === 'Estudiante' && currentUserProfile.displayName) {
-      dashName.textContent = currentUserProfile.displayName.split(' ')[0];
+    return { tasks, classTitleMap };
+  }
+
+  function _getSavedStoryIds() {
+    const ids = _getDashboardPrefs()?.savedStoryIds;
+    return Array.isArray(ids) ? ids : [];
+  }
+
+  function _getInterestedEventIds() {
+    const ids = _getDashboardPrefs()?.interestedEventIds;
+    return Array.isArray(ids) ? ids : [];
+  }
+
+  function _getDashboardFavoriteModules() {
+    const ids = _getDashboardPrefs()?.favoriteModules;
+    return Array.isArray(ids) ? ids : [];
+  }
+
+  function _getDashboardSemesterGoals() {
+    const rawGoals = currentUserProfile?.prefs?.semesterGoals?.items || currentUserProfile?.preferences?.semesterGoals?.items || [];
+    return (Array.isArray(rawGoals) ? rawGoals : [])
+      .map((goal, index) => ({
+        id: goal?.id || `goal_${index + 1}`,
+        type: goal?.type || 'course',
+        title: String(goal?.title || '').trim(),
+        note: String(goal?.note || '').trim(),
+        done: Boolean(goal?.done),
+        reminderAt: goal?.reminderAt || goal?.when || goal?.dueAt || null
+      }))
+      .filter((goal) => goal.title);
+  }
+
+  async function _saveDashboardPrefs(partialDashboard) {
+    const uid = getEffectiveSessionUid(currentUserProfile);
+    if (!uid) return;
+    const currentDashboard = _getDashboardPrefs();
+    const nextDashboard = {
+      ...currentDashboard,
+      ...(partialDashboard || {})
+    };
+    if (typeof window.SIA?.updateUserPreferences === 'function') {
+      await window.SIA.updateUserPreferences(uid, { dashboard: nextDashboard });
+    } else if (SIA?.db) {
+      await SIA.db.collection('usuarios').doc(uid).update({ 'prefs.dashboard': nextDashboard });
     }
-    if (dashInitials && dashInitials.textContent === 'U') {
-      dashInitials.textContent = getInitials(currentUserProfile.displayName);
+    if (currentUserProfile) {
+      if (!currentUserProfile.prefs) currentUserProfile.prefs = {};
+      currentUserProfile.prefs.dashboard = nextDashboard;
+      currentUserProfile.preferences = currentUserProfile.prefs;
+    }
+  }
+
+  function _cacheStudentDashboardState(uid) {
+    const key = _getDashboardCacheKey(uid);
+    if (!key) return;
+    try {
+      localStorage.setItem(key, JSON.stringify({
+        savedAt: Date.now(),
+        stats: _dashStats,
+        state: _dashState
+      }));
+    } catch (err) {
+      console.warn('[Dashboard] No se pudo cachear estado:', err);
+    }
+  }
+
+  function _renderDashboardFromState() {
+    _updateSummaryBanner();
+    _updateScorecard();
+    _renderTaskCenter();
+    _renderRecentActivity();
+    _renderHeaderDashboardMeta();
+    _renderEventsStrip(_dashState.visibleEvents || _dashStats.events || []);
+    _updateTipOfDay();
+  }
+
+  window.SIA.restoreStudentDashboardCache = function (options = {}) {
+    const uid = getEffectiveSessionUid(currentUserProfile);
+    const key = _getDashboardCacheKey(uid);
+    if (!key) return false;
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) {
+        if (options.resetIfMissing) _resetStudentDashboardState({ clearDom: true, clearFreshness: true });
+        return false;
+      }
+      const parsed = JSON.parse(raw);
+      const savedAt = Number(parsed?.savedAt || 0);
+      if (!parsed?.stats || !savedAt || (Date.now() - savedAt) > DASHBOARD_CACHE_TTL_MS) {
+        localStorage.removeItem(key);
+        if (options.resetIfMissing) _resetStudentDashboardState({ clearDom: true, clearFreshness: true });
+        return false;
+      }
+      _dashStats = { ..._createEmptyDashboardStats(), ...parsed.stats };
+      _dashState = {
+        ..._createEmptyDashboardState(),
+        ...(parsed.state || {}),
+        scope: _normalizeDashboardScope(parsed?.state?.scope || _getDashboardPrefs()?.defaultScope || 'week')
+      };
+      _renderDashboardFromState();
+      return true;
+    } catch (err) {
+      console.warn('[Dashboard] No se pudo restaurar cache:', err);
+      if (options.resetIfMissing) _resetStudentDashboardState({ clearDom: true, clearFreshness: true });
+      return false;
     }
   };
 
-  // Loop para mantener el dashboard "vivo"
+  async function _setDashboardScope(scope, options) {
+    const normalized = _normalizeDashboardScope(scope);
+    _dashState.scope = normalized;
+    document.querySelectorAll('[data-dash-scope]').forEach((btn) => {
+      const isActive = btn.dataset.dashScope === normalized;
+      btn.classList.toggle('active', isActive);
+      btn.classList.toggle('btn-primary', isActive);
+      btn.classList.toggle('text-white', isActive);
+      btn.classList.toggle('btn-light', !isActive);
+    });
+    if (options?.persist) {
+      await _saveDashboardPrefs({ defaultScope: normalized });
+    }
+    _renderTaskCenter();
+    _renderRecentActivity();
+    _renderEventsStrip(_dashStats.events || []);
+    _renderHeaderDashboardMeta();
+    _updateSummaryBanner();
+  }
+
+  window.SIA.setStudentDashboardScope = function (scope, options = {}) {
+    return _setDashboardScope(scope, options).catch((err) => console.warn('[Dashboard] Scope update failed:', err));
+  };
+
+  window.SIA.toggleSavedDashboardStory = async function (storyId) {
+    if (!storyId) return;
+    const current = new Set(_getSavedStoryIds());
+    if (current.has(storyId)) current.delete(storyId);
+    else current.add(storyId);
+    await _saveDashboardPrefs({ savedStoryIds: Array.from(current) });
+    _renderTaskCenter();
+    _updateSummaryBanner();
+    if (typeof renderDashboardStories === 'function') renderDashboardStories();
+  };
+
+  window.SIA.toggleDashboardEventInterest = async function (eventId) {
+    if (!eventId) return;
+    const current = new Set(_getInterestedEventIds());
+    if (current.has(eventId)) current.delete(eventId);
+    else current.add(eventId);
+    await _saveDashboardPrefs({ interestedEventIds: Array.from(current) });
+    _renderEventsStrip(_dashStats.events || []);
+    _renderTaskCenter();
+    _updateSummaryBanner();
+  };
+
+  window.SIA.exportDashboardEvents = function () {
+    const events = _dashState.visibleEvents || _dashStats.events || [];
+    if (!Array.isArray(events) || !events.length) return;
+    const body = events.map((item) => {
+      const ev = typeof item?.data === 'function' ? item.data() : item;
+      const rawDate = ev?.date || ev?.fecha;
+      const start = _dashToDate(rawDate);
+      if (!start) return '';
+      const dtStart = start.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+      const title = String(ev?.title || ev?.titulo || 'Evento').replace(/[\r\n,;]/g, ' ');
+      const location = String(ev?.location || ev?.ubicacion || '').replace(/[\r\n]/g, ' ');
+      return `BEGIN:VEVENT\r\nDTSTART:${dtStart}\r\nSUMMARY:${title}\r\n${location ? `LOCATION:${location}\r\n` : ''}END:VEVENT\r\n`;
+    }).filter(Boolean).join('');
+    if (!body) return;
+    const icsData = `BEGIN:VCALENDAR\r\nVERSION:2.0\r\n${body}END:VCALENDAR`;
+    const blob = new Blob([icsData], { type: 'text/calendar' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = 'sia-eventos.ics';
+    anchor.click();
+    URL.revokeObjectURL(url);
+  };
+
+  window.SIA.openDashboardDay = function (dateLabel, moduleId) {
+    const meta = DASH_MODULE_META[moduleId];
+    if (!meta) {
+      if (typeof window.showToast === 'function') window.showToast(`No hay detalle disponible para ${dateLabel}.`, 'info');
+      return;
+    }
+    window.SIA.navigate(meta.viewId);
+  };
+
+  window.SIA.updateSmartCards = async function () {
+    if (!currentUserProfile) return;
+    const user = getEffectiveSessionUser(SIA?.auth?.currentUser || null, currentUserProfile);
+    if (!user) return;
+    const uid = user.uid;
+    const renderVersion = ++_dashboardDataRenderVersion;
+    const studentCtx = { ...getCtx(), user, profile: currentUserProfile };
+    const studentCareer = currentUserProfile?.career || currentUserProfile?.carrera || 'GENERIC';
+    _dashState.scope = _normalizeDashboardScope(_getDashboardPrefs()?.defaultScope || _dashState.scope || 'week');
+
+    let citasDocs = [];
+    let prestamosDocs = [];
+    let clases = [];
+    let portfolio = null;
+    let comunidadReciente = [];
+    let upcomingTasks = [];
+    let tickets = [];
+    let pendingSurveys = [];
+    let relevantEvents = [];
+
+    try {
+      // ── C1-01: MEDI — Citas en vivo ──
+      const mediStatus = document.getElementById('smart-card-medi-status');
+      const mediDot = document.getElementById('smart-dot-medi');
+      if (mediStatus) {
+        const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+        const todayEnd = new Date(); todayEnd.setHours(23, 59, 59, 999);
+        const citasSnap = await _fetchWithTimeout(SIA.db.collection('citas-medi')
+          .where('studentId', '==', uid)
+          .where('estado', 'in', ['pendiente', 'confirmada'])
+          .orderBy('fechaHoraSlot', 'asc')
+          .limit(5).get()).catch(() => ({ empty: true, size: 0, docs: [] }));
+        if (!_canCommitDashboardDataRender(renderVersion, uid)) return [];
+
+        citasDocs = citasSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+        _dashStats.citas = citasSnap.size;
+        let citaHoy = null;
+        if (!citasSnap.empty) {
+          for (const doc of citasSnap.docs) {
+            const c = doc.data();
+            const slot = c.fechaHoraSlot?.toDate?.();
+            if (slot && slot >= todayStart && slot <= todayEnd) {
+              citaHoy = c;
+              break;
+            }
+          }
+        }
+        _dashStats.citaHoy = citaHoy;
+
+        if (citaHoy) {
+          const hora = citaHoy.fechaHoraSlot.toDate().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
+          const tipo = citaHoy.tipoServicio || 'Medico';
+          mediStatus.innerHTML = `<i class="bi bi-clock-fill me-1"></i>Cita hoy — ${hora}`;
+          mediStatus.className = "extra-small fw-bold mb-0";
+          mediStatus.style.color = '#10b981';
+          if (mediDot) { mediDot.classList.remove('d-none'); mediDot.className = "status-dot bg-success"; }
+        } else if (citasSnap.size > 0) {
+          const pendCount = citasSnap.docs.filter(d => d.data().estado === 'pendiente').length;
+          if (pendCount > 0) {
+            mediStatus.textContent = `${pendCount} pendiente${pendCount > 1 ? 's' : ''} de confirmar`;
+            mediStatus.className = "extra-small fw-bold text-warning mb-0";
+            mediStatus.style.color = '';
+            if (mediDot) { mediDot.classList.remove('d-none'); mediDot.className = "status-dot bg-warning"; }
+          } else {
+            mediStatus.textContent = "Cita programada";
+            mediStatus.className = "extra-small text-muted mb-0";
+            mediStatus.style.color = '';
+            if (mediDot) { mediDot.classList.remove('d-none'); mediDot.className = "status-dot bg-info"; }
+          }
+        } else {
+          mediStatus.textContent = "Sin citas activas";
+          mediStatus.className = "extra-small text-muted mb-0";
+          mediStatus.style.color = '';
+          if (mediDot) mediDot.classList.add('d-none');
+        }
+      }
+
+      // ── C1-02: BIBLIO — Prestamos con urgencia ──
+      const biblioStatus = document.getElementById('smart-card-biblio-status');
+      const biblioDot = document.getElementById('smart-dot-biblio');
+      if (biblioStatus) {
+        const prestaSnap = await _fetchWithTimeout(SIA.db.collection('prestamos-biblio')
+          .where('studentId', '==', uid)
+          .where('estado', 'in', ['pendiente', 'pendiente_entrega', 'entregado'])
+          .limit(10).get()).catch(() => ({ empty: true, size: 0, docs: [] }));
+        if (!_canCommitDashboardDataRender(renderVersion, uid)) return [];
+
+        prestamosDocs = prestaSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+        _dashStats.libros = prestaSnap.size;
+
+        if (!prestaSnap.empty) {
+          const deliveredLoans = prestaSnap.docs
+            .map(doc => doc.data())
+            .filter(data => data.estado === 'entregado' && data.fechaVencimiento?.toDate)
+            .sort((a, b) => a.fechaVencimiento.toDate() - b.fechaVencimiento.toDate());
+          const nearest = deliveredLoans[0];
+          const devDate = nearest?.fechaVencimiento?.toDate?.();
+          if (devDate) {
+            const daysLeft = Math.ceil((devDate - Date.now()) / 86400000);
+            _dashStats.libroUrgente = daysLeft;
+            if (daysLeft <= 0) {
+              biblioStatus.innerHTML = `<i class="bi bi-exclamation-triangle-fill me-1"></i>${prestaSnap.size} libro${prestaSnap.size > 1 ? 's' : ''} — Devolucion vencida`;
+              biblioStatus.className = "extra-small fw-bold mb-0";
+              biblioStatus.style.color = '#ef4444';
+              if (biblioDot) { biblioDot.classList.remove('d-none'); biblioDot.className = "status-dot bg-danger"; }
+            } else if (daysLeft <= 2) {
+              biblioStatus.textContent = `${prestaSnap.size} libro${prestaSnap.size > 1 ? 's' : ''} — Devuelve en ${daysLeft} dia${daysLeft > 1 ? 's' : ''}`;
+              biblioStatus.className = "extra-small fw-bold text-warning mb-0";
+              biblioStatus.style.color = '';
+              if (biblioDot) { biblioDot.classList.remove('d-none'); biblioDot.className = "status-dot bg-warning"; }
+            } else {
+              biblioStatus.textContent = `${prestaSnap.size} libro${prestaSnap.size > 1 ? 's' : ''} activo${prestaSnap.size > 1 ? 's' : ''}`;
+              biblioStatus.className = "extra-small text-muted mb-0";
+              biblioStatus.style.color = '';
+              if (biblioDot) { biblioDot.classList.remove('d-none'); biblioDot.className = "status-dot bg-info"; }
+            }
+          } else {
+            biblioStatus.textContent = `${prestaSnap.size} libro${prestaSnap.size > 1 ? 's' : ''} activo${prestaSnap.size > 1 ? 's' : ''}`;
+            biblioStatus.className = "extra-small text-muted mb-0";
+            biblioStatus.style.color = '';
+            if (biblioDot) biblioDot.classList.add('d-none');
+          }
+        } else {
+          biblioStatus.textContent = "Visita y llevate un libro a casa";
+          biblioStatus.className = "extra-small text-muted mb-0";
+          biblioStatus.style.color = '';
+          if (biblioDot) biblioDot.classList.add('d-none');
+          _dashStats.libroUrgente = null;
+        }
+      }
+
+      // ── C1-03: AULA — Clases activas (usa aula-miembros / aula-clases) ──
+      const aulaStatus = document.getElementById('smart-card-aula-status');
+      const aulaProgressWrap = document.getElementById('smart-card-aula-progress-wrap');
+      if (aulaStatus) {
+        // Membresías del estudiante en el nuevo sistema
+        clases = [];
+        let membSnap = { empty: true, size: 0, docs: [] };
+        if (window.AulaService?.getMisClases) {
+          clases = await _fetchWithTimeout(AulaService.getMisClases(studentCtx, uid, 30)).catch(() => []);
+        } else {
+          membSnap = await _fetchWithTimeout(SIA.db.collection('aula-miembros')
+            .where('userId', '==', uid)
+            .limit(30).get()).catch(() => ({ empty: true, docs: [] }));
+
+          const claseIds = membSnap.docs
+            .map(doc => doc.data()?.claseId)
+            .filter(Boolean);
+
+          if (claseIds.length) {
+            const batches = [];
+            for (let i = 0; i < claseIds.length; i += 10) {
+              const batch = claseIds.slice(i, i + 10);
+              batches.push(_fetchWithTimeout(
+                SIA.db.collection('aula-clases')
+                  .where(SIA.FieldPath.documentId(), 'in', batch)
+                  .get(),
+                5000
+              ).catch(() => ({ docs: [] })));
+            }
+
+            const results = await Promise.all(batches);
+            clases = results.flatMap(snap => snap.docs.map(doc => ({ id: doc.id, ...doc.data() })))
+              .filter(clase => !clase.archivada)
+              .sort((a, b) => {
+                const ta = a.updatedAt?.toDate?.()?.getTime?.() || a.createdAt?.toDate?.()?.getTime?.() || 0;
+                const tb = b.updatedAt?.toDate?.()?.getTime?.() || b.createdAt?.toDate?.()?.getTime?.() || 0;
+                return tb - ta;
+              });
+          }
+        }
+        if (!_canCommitDashboardDataRender(renderVersion, uid)) return [];
+
+        _dashStats.aulaCount = clases.length;
+        _dashStats.aulaCompleted = 0;
+        _dashStats.aulaCerts = 0;
+
+        if (clases.length > 0) {
+          // Tomar el claseId más reciente para mostrar en el status
+          const latestClase = clases[0] || {};
+          const latestClaseId = latestClase.id || null;
+          let claseTitle = latestClase.titulo || latestClase.claseTitulo || '';
+
+          // Si no viene el título en el doc de membresía, buscarlo en aula-clases
+          if (!claseTitle && latestClaseId) {
+            try {
+              const claseDoc = await _fetchWithTimeout(SIA.db.collection('aula-clases').doc(latestClaseId).get(), 5000);
+              if (claseDoc.exists) claseTitle = claseDoc.data().titulo || '';
+            } catch (_) { }
+          }
+          if (!_canCommitDashboardDataRender(renderVersion, uid)) return [];
+
+          _dashStats.aulaProgress = { title: claseTitle, clases: clases.length };
+          const title = claseTitle.length > 22 ? claseTitle.substring(0, 20) + '...' : claseTitle;
+          aulaStatus.textContent = title ? `${title} y más` : `${membSnap.size} ${membSnap.size === 1 ? 'clase activa' : 'clases activas'}`;
+          aulaStatus.className = "extra-small text-muted mb-0";
+          aulaStatus.textContent = title
+            ? (clases.length > 1 ? `${title} y mas` : title)
+            : `${clases.length} ${clases.length === 1 ? 'clase activa' : 'clases activas'}`;
+          aulaStatus.style.color = '';
+          if (aulaProgressWrap) aulaProgressWrap.classList.add('d-none');
+        } else {
+          aulaStatus.innerHTML = 'Únete a tu primera clase <i class="bi bi-arrow-right-short"></i>';
+          aulaStatus.className = "extra-small mb-0";
+          aulaStatus.style.color = 'var(--accent)';
+          aulaStatus.innerHTML = 'Unete a tu primera clase <i class="bi bi-arrow-right-short"></i>';
+          if (aulaProgressWrap) aulaProgressWrap.classList.add('d-none');
+          _dashStats.aulaProgress = null;
+        }
+      }
+
+      // ── C1-05: QUEJAS — Estado activo ──
+      const quejasStatus = document.getElementById('smart-card-quejas-status');
+      const quejasDot = document.getElementById('smart-dot-quejas');
+      if (quejasStatus) {
+        let quejasSnap = { size: 0, empty: true, docs: [] };
+        tickets = [];
+        if (window.QuejasService?.getTicketsByUser) {
+          tickets = await _fetchWithTimeout(QuejasService.getTicketsByUser(studentCtx, uid, { limit: 5 })).catch(() => []);
+        } else {
+          quejasSnap = await _fetchWithTimeout(SIA.db.collection('quejas')
+            .where('userId', '==', uid)
+            .orderBy('updatedAt', 'desc')
+            .limit(5).get()).catch(() => ({ docs: [] }));
+          tickets = quejasSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        }
+        if (!_canCommitDashboardDataRender(renderVersion, uid)) return [];
+
+        const activeStatuses = new Set(['pendiente', 'en-proceso', 'en_proceso']);
+        const activeTickets = tickets.filter(ticket => activeStatuses.has(ticket.status));
+        const latestTicket = activeTickets[0] || null;
+
+        _dashStats.quejas = activeTickets.length;
+
+        if (latestTicket) {
+          const estadoMap = {
+            'pendiente': 'Pendiente',
+            'en-proceso': 'En proceso',
+            'en_proceso': 'En proceso'
+          };
+          const label = estadoMap[latestTicket.status] || latestTicket.status || 'Pendiente';
+          const dotColor = latestTicket.status === 'pendiente' ? 'bg-warning' : 'bg-info';
+          quejasStatus.textContent = `${quejasSnap.size} queja${quejasSnap.size > 1 ? 's' : ''} — ${label}`;
+          quejasStatus.className = "extra-small fw-bold mb-0";
+          quejasStatus.textContent = `${activeTickets.length} queja${activeTickets.length > 1 ? 's' : ''} - ${label}`;
+          quejasStatus.style.color = '';
+          if (quejasDot) { quejasDot.classList.remove('d-none'); quejasDot.className = `status-dot ${dotColor}`; }
+        } else {
+          quejasStatus.textContent = "Buzon de Calidad";
+          quejasStatus.className = "extra-small text-muted mb-0";
+          quejasStatus.style.color = '';
+          if (quejasDot) quejasDot.classList.add('d-none');
+        }
+      }
+
+      // ── C1-04: ENCUESTAS — Pendientes ──
+      const encuestasStatus = document.getElementById('smart-card-encuestas-status');
+      const encuestasDot = document.getElementById('smart-dot-encuestas');
+      if (encuestasStatus) {
+        try {
+          if (window.EncuestasService?.getPendingSurveysForUser) {
+            const baseCtx = getCtx();
+            const ctx = { ...baseCtx, user: baseCtx.auth?.currentUser, profile: currentUserProfile };
+            pendingSurveys = await _fetchWithTimeout(EncuestasService.getPendingSurveysForUser(ctx)).catch(() => []);
+            _dashStats.encuestas = pendingSurveys.length;
+            if (!_canCommitDashboardDataRender(renderVersion, uid)) return [];
+
+            if (pendingSurveys.length > 0) {
+              encuestasStatus.textContent = `${pendingSurveys.length} pendiente${pendingSurveys.length > 1 ? 's' : ''}`;
+              encuestasStatus.className = "extra-small fw-bold text-warning mb-0";
+              if (encuestasDot) { encuestasDot.classList.remove('d-none'); encuestasDot.className = "status-dot bg-warning"; }
+            } else {
+              encuestasStatus.innerHTML = '<i class="bi bi-check-circle me-1 text-success"></i>Al dia';
+              encuestasStatus.className = "extra-small mb-0";
+              encuestasStatus.style.color = '#10b981';
+              if (encuestasDot) { encuestasDot.classList.remove('d-none'); encuestasDot.className = "status-dot bg-success"; }
+            }
+          } else {
+            encuestasStatus.textContent = "Tu opinion importa";
+            encuestasStatus.className = "extra-small text-muted mb-0";
+          }
+        } catch (e) {
+          encuestasStatus.textContent = "Tu opinion importa";
+          encuestasStatus.className = "extra-small text-muted mb-0";
+        }
+      }
+
+      // ── C1-04b: FORO — Proximos eventos ──
+      const foroStatus = document.getElementById('smart-card-foro-status');
+      const foroDot = document.getElementById('smart-dot-foro');
+      if (foroStatus) {
+        try {
+          const now = new Date();
+          const in14d = new Date(now.getTime() + 14 * 86400000);
+          let events = [];
+          if (window.ForoService?.getActiveEvents) {
+            events = await _fetchWithTimeout(ForoService.getActiveEvents(studentCtx)).catch(() => []);
+          } else {
+            const eventsSnap = await _fetchWithTimeout(SIA.db.collection('foro_events')
+              .where('status', '==', 'active')
+              .where('date', '>=', now)
+              .orderBy('date', 'asc')
+              .limit(20).get()).catch(() => ({ docs: [] }));
+
+            events = eventsSnap.docs
+              .map(doc => ({ id: doc.id, ...doc.data() }))
+              .filter(evt => {
+                if (!evt.targetAudience || evt.targetAudience.includes('ALL')) return true;
+                return evt.targetAudience.includes(studentCareer);
+              });
+          }
+
+          relevantEvents = events
+            .filter(evt => {
+              const rawDate = evt?.date || evt?.fecha;
+              const eventDate = rawDate?.toDate ? rawDate.toDate() : (rawDate ? new Date(rawDate) : null);
+              return eventDate && !Number.isNaN(eventDate.getTime()) && eventDate >= now && eventDate <= in14d;
+            })
+            .slice(0, 5);
+          if (!_canCommitDashboardDataRender(renderVersion, uid)) return [];
+
+          if (relevantEvents.length > 0) {
+            foroStatus.textContent = `${relevantEvents.length} evento${relevantEvents.length > 1 ? 's' : ''} próximos`;
+            foroStatus.className = "extra-small fw-bold mb-0";
+            foroStatus.style.color = 'var(--accent)';
+            if (foroDot) { foroDot.classList.remove('d-none'); foroDot.className = "status-dot bg-info"; }
+            _renderEventsStrip(relevantEvents);
+          } else {
+            foroStatus.textContent = "Conferencias y mas";
+            foroStatus.className = "extra-small text-muted mb-0";
+            foroStatus.style.color = '';
+            if (foroDot) foroDot.classList.add('d-none');
+            _renderEventsStrip([]);
+          }
+        } catch (e) {
+          foroStatus.textContent = "Conferencias y mas";
+          foroStatus.className = "extra-small text-muted mb-0";
+          foroStatus.style.color = '';
+          if (foroDot) foroDot.classList.add('d-none');
+          _renderEventsStrip([]);
+        }
+      }
+
+      // ── Update summary banner ──
+      const now = new Date();
+      const todayStart = new Date(now);
+      todayStart.setHours(0, 0, 0, 0);
+      const weekEnd = new Date(todayStart);
+      weekEnd.setDate(weekEnd.getDate() + 6);
+      weekEnd.setHours(23, 59, 59, 999);
+      let classTitleMap = {};
+      let weekAulaTasks = [];
+
+      if (clases.length > 0) {
+        if (window.AulaService?.getPortfolioGlobal) {
+          portfolio = await _fetchWithTimeout(AulaService.getPortfolioGlobal(studentCtx, uid), 7000).catch(() => null);
+        }
+        if (window.AulaService?.getComunidadRecientes) {
+          comunidadReciente = await _fetchWithTimeout(AulaService.getComunidadRecientes(studentCtx, 6), 7000).catch(() => []);
+        }
+        if (!_canCommitDashboardDataRender(renderVersion, uid)) return [];
+
+        const aulaTaskData = await _loadStudentAulaTasks(studentCtx, uid, clases, {
+          portfolio,
+          onlyPending: true,
+          publicationLimit: 30
+        });
+        if (!_canCommitDashboardDataRender(renderVersion, uid)) return [];
+
+        classTitleMap = aulaTaskData.classTitleMap || {};
+        upcomingTasks = (aulaTaskData.tasks || []).filter((task) => task.dueAt && task.dueAt >= now);
+        weekAulaTasks = (aulaTaskData.tasks || []).filter((task) => task.dueAt && task.dueAt >= todayStart && task.dueAt <= weekEnd);
+
+        const completedClasses = Object.values(portfolio?.porClase || {}).filter((entries) => Array.isArray(entries) && entries.length > 0).length;
+        _dashStats.aulaCompleted = Math.min(_dashStats.aulaCount || 0, completedClasses);
+        _dashStats.aulaPendingTasks = upcomingTasks.length;
+        _dashStats.aulaNextDeadline = upcomingTasks[0]
+          ? {
+            title: upcomingTasks[0].titulo || 'Entrega',
+            claseTitle: classTitleMap[upcomingTasks[0].claseId] || 'Clase',
+            dueAt: upcomingTasks[0].dueAt
+          }
+          : null;
+
+        const completionPct = _dashStats.aulaCount > 0
+          ? Math.round((_dashStats.aulaCompleted / _dashStats.aulaCount) * 100)
+          : 0;
+        const trendKey = `sia_dashboard_aula_progress_${uid}`;
+        let previousPct = null;
+        try {
+          const previousRaw = localStorage.getItem(trendKey);
+          if (previousRaw) previousPct = JSON.parse(previousRaw)?.percent;
+          localStorage.setItem(trendKey, JSON.stringify({ percent: completionPct, at: Date.now() }));
+        } catch (_) { }
+        _dashStats.aulaTrend = typeof previousPct === 'number' ? completionPct - previousPct : null;
+        _dashStats.aulaRisk = upcomingTasks.length >= 4 ? 'Alto'
+          : upcomingTasks.length >= 2 ? 'Atención'
+            : _dashStats.aulaCount === 0 ? 'Sin inicio'
+              : 'Estable';
+      } else {
+        _dashStats.aulaPendingTasks = 0;
+        _dashStats.aulaNextDeadline = null;
+        _dashStats.aulaTrend = null;
+        _dashStats.aulaRisk = _dashStats.aulaCount === 0 ? 'Sin inicio' : 'Estable';
+      }
+
+      const activeStatuses = new Set(['pendiente', 'en-proceso', 'en_proceso']);
+      const activeTickets = (tickets || []).filter((ticket) => activeStatuses.has(ticket.status));
+      const interestedEventIds = new Set(_getInterestedEventIds());
+      const savedStoryIds = new Set(_getSavedStoryIds());
+      const taskItems = [];
+
+      if (_dashStats.libroUrgente !== null && _dashStats.libroUrgente <= 0) {
+        taskItems.push({ id: 'book-overdue', severity: 'urgent', module: 'biblio', title: 'Libro vencido', detail: 'Devuelvelo cuanto antes para evitar bloqueo.', when: new Date(), actionLabel: 'Ir a Biblioteca' });
+      } else if (_dashStats.libroUrgente !== null && _dashStats.libroUrgente <= 2) {
+        taskItems.push({ id: 'book-soon', severity: 'high', module: 'biblio', title: 'Devolución cercana', detail: `Tu próxima devolución vence en ${_dashStats.libroUrgente} día${_dashStats.libroUrgente === 1 ? '' : 's'}.`, when: new Date(Date.now() + (_dashStats.libroUrgente * 86400000)), actionLabel: 'Revisar préstamo' });
+      }
+      if (_dashStats.citaHoy) {
+        taskItems.push({ id: 'medi-today', severity: 'high', module: 'medi', title: 'Tienes cita hoy', detail: _dashFormatShortDate(_dashStats.citaHoy.fechaHoraSlot, true), when: _dashToDate(_dashStats.citaHoy.fechaHoraSlot), actionLabel: 'Ver cita' });
+      } else if (citasDocs[0]?.fechaHoraSlot) {
+        taskItems.push({ id: 'medi-next', severity: 'medium', module: 'medi', title: 'Proxima cita', detail: _dashFormatShortDate(citasDocs[0].fechaHoraSlot, true), when: _dashToDate(citasDocs[0].fechaHoraSlot), actionLabel: 'Abrir Medi' });
+      }
+      if (pendingSurveys.length > 0) {
+        taskItems.push({ id: 'surveys', severity: pendingSurveys.length > 2 ? 'high' : 'medium', module: 'encuestas', title: `${pendingSurveys.length} encuesta${pendingSurveys.length === 1 ? '' : 's'} pendientes`, detail: 'Tu participación ayuda a mejorar servicios.', when: _dashToDate(pendingSurveys[0]?.createdAt) || now, actionLabel: 'Responder' });
+      }
+      if (upcomingTasks.length > 0) {
+        taskItems.push({ id: 'aula-pending', severity: upcomingTasks.length > 2 ? 'high' : 'medium', module: 'aula', title: `${upcomingTasks.length} tarea${upcomingTasks.length === 1 ? '' : 's'} por entregar`, detail: `${upcomingTasks[0].titulo || 'Entrega'} en ${classTitleMap[upcomingTasks[0].claseId] || 'Aula'}`, when: upcomingTasks[0].dueAt, actionLabel: 'Ir a Aula' });
+      }
+      if (activeTickets.length > 0) {
+        taskItems.push({ id: 'tickets-active', severity: 'medium', module: 'quejas', title: `${activeTickets.length} caso${activeTickets.length === 1 ? '' : 's'} abierto${activeTickets.length === 1 ? '' : 's'}`, detail: `Último estado: ${activeTickets[0].status || 'pendiente'}`, when: _dashToDate(activeTickets[0]?.updatedAt || activeTickets[0]?.createdAt) || now, actionLabel: 'Revisar caso' });
+      }
+      if (relevantEvents.length > 0) {
+        const highlightedEvent = relevantEvents.find((event) => interestedEventIds.has(event.id)) || relevantEvents[0];
+        taskItems.push({ id: 'next-event', severity: interestedEventIds.has(highlightedEvent.id) ? 'medium' : 'low', module: 'foro', title: interestedEventIds.has(highlightedEvent.id) ? 'Evento que sigues' : 'Evento próximo', detail: highlightedEvent.title || highlightedEvent.titulo || 'Evento', when: _dashToDate(highlightedEvent.date || highlightedEvent.fecha), actionLabel: interestedEventIds.has(highlightedEvent.id) ? 'Ver evento' : 'Explorar Foro' });
+      }
+      if (savedStoryIds.size > 0) {
+        taskItems.push({ id: 'saved-stories', severity: 'low', module: 'avisos', title: `${savedStoryIds.size} novedad${savedStoryIds.size === 1 ? '' : 'es'} guardada${savedStoryIds.size === 1 ? '' : 's'}`, detail: 'Recupera avisos y eventos apartados para después.', when: now, actionLabel: 'Ver novedades' });
+      }
+      const nextGoalReminder = _getDashboardSemesterGoals()
+        .filter((goal) => !goal.done && (goal.type === 'reminder' || goal.reminderAt))
+        .map((goal) => ({ ...goal, reminderDate: _dashToDate(goal.reminderAt) }))
+        .sort((a, b) => {
+          const aTime = a.reminderDate?.getTime?.() || Number.MAX_SAFE_INTEGER;
+          const bTime = b.reminderDate?.getTime?.() || Number.MAX_SAFE_INTEGER;
+          return aTime - bTime;
+        })[0];
+      if (nextGoalReminder) {
+        const reminderDate = nextGoalReminder.reminderDate || now;
+        const targetDay = new Date(reminderDate);
+        targetDay.setHours(0, 0, 0, 0);
+        const baseDay = new Date();
+        baseDay.setHours(0, 0, 0, 0);
+        const dayDiff = Math.round((targetDay.getTime() - baseDay.getTime()) / 86400000);
+        taskItems.push({
+          id: `goal-reminder-${nextGoalReminder.id}`,
+          severity: dayDiff < 0 ? 'urgent' : (dayDiff <= 1 ? 'high' : 'medium'),
+          module: 'dashboard',
+          title: nextGoalReminder.type === 'reminder' ? 'Recordatorio pendiente' : 'Meta con fecha cercana',
+          detail: nextGoalReminder.reminderDate
+            ? `${nextGoalReminder.title} • ${_dashRelativeDateLabel(nextGoalReminder.reminderDate)}`
+            : nextGoalReminder.title,
+          when: nextGoalReminder.reminderDate || now,
+          actionLabel: 'Gestionar',
+          actionType: 'open-goals-modal'
+        });
+      }
+
+      _dashStats.taskCenter = taskItems.sort((a, b) => {
+        const sevDiff = (DASH_SEVERITY_ORDER[a.severity] || 99) - (DASH_SEVERITY_ORDER[b.severity] || 99);
+        if (sevDiff !== 0) return sevDiff;
+        return (_dashToDate(a.when)?.getTime?.() || 0) - (_dashToDate(b.when)?.getTime?.() || 0);
+      });
+      _dashStats.events = relevantEvents;
+
+      const recentActivity = [];
+      citasDocs.slice(0, 2).forEach((item) => {
+        recentActivity.push({ id: `medi_${item.id}`, module: 'medi', title: item.tipoServicio || 'Cita médica', detail: _dashFormatShortDate(item.fechaHoraSlot, true), at: _dashToDate(item.fechaHoraSlot) });
+      });
+      prestamosDocs.slice(0, 2).forEach((item) => {
+        recentActivity.push({ id: `biblio_${item.id}`, module: 'biblio', title: item.titulo || item.libroTitulo || 'Prestamo activo', detail: _dashFormatShortDate(item.fechaVencimiento || item.fechaExpiracionRecoleccion), at: _dashToDate(item.fechaVencimiento || item.fechaExpiracionRecoleccion) });
+      });
+      (portfolio?.entregas || []).slice(0, 2).forEach((item) => {
+        recentActivity.push({ id: `aula_${item.id}`, module: 'aula', title: item.publicacionTitulo || 'Entrega Aula', detail: item.estado || 'registrada', at: _dashToDate(item.entregadoAt || item.updatedAt || item.createdAt) });
+      });
+      (comunidadReciente || []).slice(0, 2).forEach((item) => {
+        recentActivity.push({ id: `community_${item.id}`, module: 'comunidad', title: item.titulo || item.claseTitulo || 'Actividad reciente', detail: item.claseTitulo || 'Comunidad Aula', at: _dashToDate(item.createdAt) });
+      });
+      activeTickets.slice(0, 1).forEach((item) => {
+        recentActivity.push({ id: `quejas_${item.id}`, module: 'quejas', title: item.subject || item.titulo || 'Caso abierto', detail: item.status || 'pendiente', at: _dashToDate(item.updatedAt || item.createdAt) });
+      });
+      pendingSurveys.slice(0, 1).forEach((item) => {
+        recentActivity.push({ id: `survey_${item.id}`, module: 'encuestas', title: item.title || 'Encuesta pendiente', detail: 'Disponible para responder', at: _dashToDate(item.createdAt) });
+      });
+      relevantEvents.slice(0, 1).forEach((item) => {
+        recentActivity.push({ id: `event_${item.id}`, module: 'foro', title: item.title || item.titulo || 'Evento', detail: _dashFormatShortDate(item.date || item.fecha, true), at: _dashToDate(item.date || item.fecha) });
+      });
+      _dashStats.recentActivity = recentActivity
+        .filter((item) => item.at)
+        .sort((a, b) => (_dashToDate(b.at)?.getTime?.() || 0) - (_dashToDate(a.at)?.getTime?.() || 0))
+        .slice(0, 6);
+
+      _dashState.visibleEvents = relevantEvents;
+      _dashState.taskCenter = _dashStats.taskCenter;
+      _dashState.recentActivity = _dashStats.recentActivity;
+      if (!_canCommitDashboardDataRender(renderVersion, uid)) return [];
+
+      _updateSummaryBanner();
+
+      // ── Update scorecard ──
+      _updateScorecard();
+      _renderTaskCenter();
+      _renderRecentActivity();
+      _renderHeaderDashboardMeta();
+
+      // ── Update activity strip (C3-01) ──
+      _updateActivityStrip(uid, { renderVersion, aulaTasks: weekAulaTasks });
+
+      // ── Update tip of the day (C3-05) ──
+      _updateTipOfDay();
+
+      // ── Mark timestamp ──
+      window._dashLastRefresh = Date.now();
+      const freshEl = document.getElementById('dash-data-freshness');
+      if (freshEl) freshEl.textContent = 'recien actualizado';
+      const syncChip = document.getElementById('dash-header-sync');
+      if (syncChip) syncChip.textContent = 'recien actualizado';
+      _cacheStudentDashboardState(uid);
+      _maybeEmitDashboardReminder();
+
+    } catch (err) {
+      if (_canCommitDashboardDataRender(renderVersion, uid) && !window._dashLastRefresh) {
+        _renderDashboardCardPlaceholders();
+        _renderEmptyActivityStrip();
+        _renderDashboardFromState();
+      }
+      console.error('[SmartCards] Error updating:', err);
+    }
+  };
+
+  // ── C1-08: Summary Banner ──
+  function _getScopedDashboardTasks() {
+    const scope = _normalizeDashboardScope(_dashState.scope || _getDashboardPrefs()?.defaultScope || 'week');
+    const end = _getDashboardScopeEnd(scope);
+    return (_dashStats.taskCenter || []).filter((item) => {
+      const when = _dashToDate(item.when);
+      if (!when) return true;
+      if (scope === 'all') return true;
+      return when <= end;
+    });
+  }
+
+  function _getScopedRecentActivity() {
+    const scope = _normalizeDashboardScope(_dashState.scope || _getDashboardPrefs()?.defaultScope || 'week');
+    const now = new Date();
+    const start = new Date(now);
+    if (scope === 'today') {
+      start.setHours(0, 0, 0, 0);
+    } else if (scope === 'week') {
+      start.setDate(start.getDate() - 7);
+    } else {
+      start.setDate(start.getDate() - 30);
+    }
+    return (_dashStats.recentActivity || []).filter((item) => {
+      const at = _dashToDate(item.at);
+      return at && at >= start;
+    });
+  }
+
+  function _renderHeaderDashboardMeta() {
+    const syncChip = document.getElementById('dash-header-sync');
+    const freshnessText = document.getElementById('dash-data-freshness')?.textContent;
+    if (syncChip && freshnessText) syncChip.textContent = freshnessText;
+    document.querySelectorAll('[data-dash-scope]').forEach((btn) => {
+      const isActive = btn.dataset.dashScope === _dashState.scope;
+      btn.classList.toggle('active', isActive);
+      btn.classList.toggle('btn-primary', isActive);
+      btn.classList.toggle('text-white', isActive);
+      btn.classList.toggle('btn-light', !isActive);
+    });
+
+    const subtitle = document.getElementById('dash-events-subtitle');
+    if (subtitle) {
+      const count = (_dashState.visibleEvents || []).length;
+      subtitle.textContent = count > 0
+        ? `${count} evento${count === 1 ? '' : 's'} en ${DASH_SCOPE_LABELS[_dashState.scope] || 'tu agenda'}`
+        : 'Calendario del campus';
+    }
+
+    const exportBtn = document.getElementById('dash-events-export-btn');
+    if (exportBtn) {
+      const hasEvents = Array.isArray(_dashState.visibleEvents) && _dashState.visibleEvents.length > 0;
+      exportBtn.classList.toggle('d-none', !hasEvents);
+      exportBtn.onclick = () => window.SIA.exportDashboardEvents();
+    }
+  }
+
+  function _renderTaskCenter() {
+    const listEl = document.getElementById('dash-task-center-list');
+    const summaryEl = document.getElementById('dash-task-center-summary');
+    if (!listEl) return;
+
+    const items = _getScopedDashboardTasks().slice(0, 5);
+    _dashState.taskCenter = items;
+    if (summaryEl) {
+      summaryEl.textContent = items.length > 0
+        ? `${items.length} prioridad${items.length === 1 ? '' : 'es'} en ${DASH_SCOPE_LABELS[_dashState.scope] || 'tu tablero'}`
+        : `Sin pendientes para ${DASH_SCOPE_LABELS[_dashState.scope] || 'este periodo'}`;
+    }
+
+    if (items.length === 0) {
+      const favoriteModules = _getDashboardFavoriteModules().slice(0, 3)
+        .map((moduleId) => DASH_MODULE_META[moduleId])
+        .filter(Boolean);
+      listEl.innerHTML = `
+        <div class="rounded-4 border p-3 dash-task-empty" style="background: var(--bg-card); border-color: var(--border-color);">
+          <div class="fw-bold small mb-1">Todo bajo control</div>
+          <div class="extra-small text-muted mb-3">No se encontraron tareas prioritarias en este horizonte.</div>
+          <div class="d-flex flex-wrap gap-2">
+            ${(favoriteModules.length ? favoriteModules : [DASH_MODULE_META.medi, DASH_MODULE_META.aula, DASH_MODULE_META.biblio]).map((module) => `
+              <button class="btn btn-outline-secondary btn-sm rounded-pill" type="button" onclick="window.SIA?.navigate('${module.viewId}')">
+                <i class="bi ${module.icon} me-1"></i>${module.label}
+              </button>`).join('')}
+          </div>
+        </div>`;
+      return;
+    }
+
+    listEl.innerHTML = items.map((item) => {
+      const moduleMeta = DASH_MODULE_META[item.module] || DASH_MODULE_META.aula;
+      const whenLabel = _dashRelativeDateLabel(item.when);
+      const actionCode = item.actionType === 'open-goals-modal'
+        ? 'window.SIA?.openDashboardGoalsModal?.()'
+        : `window.SIA?.navigate('${moduleMeta.viewId}')`;
+      return `
+        <div class="rounded-4 border p-3 dash-task-card dash-task-card--${item.severity}" style="background: var(--bg-card); border-color: var(--border-color);">
+          <div class="d-flex justify-content-between align-items-start gap-3">
+            <div class="d-flex gap-3 align-items-start">
+              <div class="dash-task-icon">
+                <i class="bi ${moduleMeta.icon}"></i>
+              </div>
+              <div>
+                <div class="fw-bold small" style="color: var(--text-heading);">${_escapeDashHtml(item.title)}</div>
+                <div class="extra-small text-muted mt-1">${_escapeDashHtml(item.detail)}</div>
+                <div class="extra-small mt-2" style="color: var(--accent);">${_escapeDashHtml(whenLabel)}</div>
+              </div>
+            </div>
+            <button class="btn btn-outline-secondary btn-sm rounded-pill flex-shrink-0" type="button" onclick="${actionCode}">
+              ${_escapeDashHtml(item.actionLabel || 'Abrir')}
+            </button>
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  function _renderRecentActivity() {
+    const listEl = document.getElementById('dash-history-list');
+    const metaEl = document.getElementById('dash-history-meta');
+    if (!listEl) return;
+    const items = _getScopedRecentActivity().slice(0, 5);
+    if (metaEl) metaEl.textContent = items.length > 0
+      ? `${items.length} movimiento${items.length === 1 ? '' : 's'} recientes`
+      : 'Sin actividad reciente en este horizonte';
+
+    if (items.length === 0) {
+      listEl.innerHTML = `
+        <div class="rounded-4 border p-3" style="background: var(--bg-card); border-color: var(--border-color);">
+          <div class="fw-bold small mb-1">Sin actividad reciente</div>
+          <div class="extra-small text-muted">A medida que uses SIA, aqui apareceran tus ultimos movimientos relevantes.</div>
+        </div>`;
+      return;
+    }
+
+    listEl.innerHTML = items.map((item) => {
+      const moduleMeta = DASH_MODULE_META[item.module] || DASH_MODULE_META.aula;
+      return `
+        <button type="button" class="btn text-start w-100 rounded-4 border p-3 dash-history-card" onclick="window.SIA?.navigate('${moduleMeta.viewId}')" style="background: var(--bg-card); border-color: var(--border-color);">
+          <div class="d-flex justify-content-between align-items-start gap-3">
+            <div class="d-flex gap-3 align-items-start">
+              <div class="dash-task-icon dash-task-icon--muted">
+                <i class="bi ${moduleMeta.icon}"></i>
+              </div>
+              <div>
+                <div class="fw-bold small" style="color: var(--text-heading);">${_escapeDashHtml(item.title)}</div>
+                <div class="extra-small text-muted mt-1">${_escapeDashHtml(item.detail || '')}</div>
+              </div>
+            </div>
+            <span class="extra-small text-muted flex-shrink-0">${_escapeDashHtml(_dashRelativeDateLabel(item.at))}</span>
+          </div>
+        </button>`;
+    }).join('');
+  }
+
+  function _maybeEmitDashboardReminder() {
+    const dashboardPrefs = _getDashboardPrefs();
+    if (dashboardPrefs?.smartReminders === false) return;
+    if ((_getScopedDashboardTasks()[0]?.severity || '') === 'low') return;
+    if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+    const task = _getScopedDashboardTasks()[0];
+    if (!task) return;
+    const todayKey = new Date().toISOString().slice(0, 10);
+    const reminderKey = `sia_dashboard_reminder_${getEffectiveSessionUid(currentUserProfile)}_${todayKey}`;
+    const reminderFingerprint = `${task.id}:${task.severity}`;
+    if (localStorage.getItem(reminderKey) === reminderFingerprint) return;
+    try {
+      new Notification(task.title, { body: task.detail || 'Tienes una accion pendiente en SIA.' });
+      localStorage.setItem(reminderKey, reminderFingerprint);
+    } catch (_) { }
+  }
+
+  function _updateSummaryBanner() {
+    const s = _dashStats;
+    const setCt = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+    setCt('dash-sum-citas', s.citas);
+    setCt('dash-sum-libros', s.libros);
+    setCt('dash-sum-encuestas', s.encuestas);
+    setCt('dash-sum-quejas', s.quejas);
+
+    const ctaBtn = document.getElementById('dash-summary-cta-btn');
+    const ctaLabel = document.getElementById('dash-summary-cta-label');
+    const okMsg = document.getElementById('dash-summary-ok');
+    const priorityEl = document.getElementById('dash-summary-priority');
+    const contextEl = document.getElementById('dash-summary-context');
+    const scopedTasks = _getScopedDashboardTasks();
+    const hasPending = s.citas > 0 || s.libros > 0 || s.encuestas > 0 || s.quejas > 0 || scopedTasks.length > 0;
+    const topTask = scopedTasks[0] || null;
+    if (ctaBtn) ctaBtn.onclick = null;
+    if (ctaLabel && !topTask) ctaLabel.textContent = 'Sin pendientes';
+
+    if (priorityEl) {
+      if (topTask?.severity === 'urgent') {
+        priorityEl.textContent = 'Urgente';
+        priorityEl.className = 'badge rounded-pill bg-danger-subtle text-danger';
+      } else if (topTask?.severity === 'high') {
+        priorityEl.textContent = 'Atencion hoy';
+        priorityEl.className = 'badge rounded-pill bg-warning-subtle text-warning-emphasis';
+      } else if (topTask) {
+        priorityEl.textContent = 'Pendientes activos';
+        priorityEl.className = 'badge rounded-pill bg-info-subtle text-info';
+      } else if (hasPending) {
+        priorityEl.textContent = 'Pendientes activos';
+        priorityEl.className = 'badge rounded-pill bg-info-subtle text-info';
+      } else {
+        priorityEl.textContent = 'Operando normal';
+        priorityEl.className = 'badge rounded-pill text-bg-light text-dark';
+      }
+    }
+    if (contextEl) {
+      contextEl.textContent = topTask
+        ? `${topTask.title} • ${_dashRelativeDateLabel(topTask.when)}`
+        : (hasPending ? 'Tienes actividad pendiente por revisar' : 'Sin acciones urgentes');
+    }
+
+    if (hasPending && ctaBtn && ctaLabel) {
+      ctaBtn.classList.remove('d-none');
+      if (okMsg) okMsg.classList.add('d-none');
+
+      if (topTask) {
+        const moduleMeta = DASH_MODULE_META[topTask.module] || DASH_MODULE_META.aula;
+        ctaLabel.textContent = topTask.actionLabel || `Abrir ${moduleMeta.label}`;
+        ctaBtn.onclick = topTask.actionType === 'open-goals-modal'
+          ? () => window.SIA?.openDashboardGoalsModal?.()
+          : () => window.SIA.navigate(moduleMeta.viewId);
+      } else if (s.libroUrgente !== null && s.libroUrgente <= 0) {
+        ctaLabel.textContent = 'Devolver libro vencido';
+        ctaBtn.onclick = () => window.SIA.navigate('view-biblio');
+      } else if (s.citaHoy) {
+        ctaLabel.textContent = 'Ver tu cita de hoy';
+        ctaBtn.onclick = () => window.SIA.navigate('view-medi');
+      } else if (s.libros > 0) {
+        ctaLabel.textContent = 'Ver prestamos activos';
+        ctaBtn.onclick = () => window.SIA.navigate('view-biblio');
+      } else if (s.citas > 0) {
+        ctaLabel.textContent = 'Ver tus citas';
+        ctaBtn.onclick = () => window.SIA.navigate('view-medi');
+      } else if (s.encuestas > 0) {
+        ctaLabel.textContent = 'Responder encuestas';
+        ctaBtn.onclick = () => window.SIA.navigate('view-encuestas');
+      } else if (s.quejas > 0) {
+        ctaLabel.textContent = 'Revisar casos abiertos';
+        ctaBtn.onclick = () => window.SIA.navigate('view-quejas');
+      } else {
+        ctaBtn.classList.add('d-none');
+        if (okMsg) okMsg.classList.remove('d-none');
+      }
+    } else {
+      if (ctaBtn) ctaBtn.classList.add('d-none');
+      if (ctaBtn) ctaBtn.onclick = null;
+      if (okMsg) okMsg.classList.remove('d-none');
+    }
+  }
+
+  // ── C3-04: Scorecard ──
+  function _updateScorecard() {
+    const s = _dashStats;
+    const setCt = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+    setCt('dash-sc-enrolled', s.aulaCount);
+    setCt('dash-sc-completed', s.aulaCompleted);
+    setCt('dash-sc-certs', s.aulaCerts);
+    setCt('dash-sc-pending-tasks', s.aulaPendingTasks || 0);
+    const completionPct = s.aulaCount > 0 ? Math.round(((s.aulaCompleted || 0) / s.aulaCount) * 100) : 0;
+    setCt('dash-sc-percent', `${completionPct}%`);
+    setCt('dash-sc-risk', s.aulaRisk || 'Estable');
+    const trendEl = document.getElementById('dash-sc-trend');
+    if (trendEl) {
+      if (typeof s.aulaTrend === 'number' && s.aulaTrend !== 0) {
+        trendEl.textContent = `${s.aulaTrend > 0 ? '+' : ''}${s.aulaTrend}%`;
+        trendEl.style.color = s.aulaTrend > 0 ? '#10b981' : '#ef4444';
+      } else {
+        trendEl.textContent = 'Sin cambio';
+        trendEl.style.color = '';
+      }
+    }
+    const nextDeadlineEl = document.getElementById('dash-sc-next-deadline');
+    if (nextDeadlineEl) {
+      nextDeadlineEl.textContent = s.aulaNextDeadline?.dueAt
+        ? `${_dashFormatShortDate(s.aulaNextDeadline.dueAt)} • ${s.aulaNextDeadline.claseTitle || 'Aula'}`
+        : 'Sin pendientes';
+    }
+    const courseList = document.getElementById('dash-sc-courses-list');
+    if (courseList) {
+      const pills = [];
+      if (s.aulaProgress?.title) pills.push(`<div class="extra-small text-muted mb-2">Curso destacado: <span class="fw-bold" style="color: var(--text-heading);">${_escapeDashHtml(s.aulaProgress.title)}</span></div>`);
+      if (s.aulaNextDeadline?.title) pills.push(`<div class="rounded-3 p-2 mb-2" style="background: rgba(245,158,11,0.08);"><div class="small fw-bold">${_escapeDashHtml(s.aulaNextDeadline.title)}</div><div class="extra-small text-muted">${_escapeDashHtml(s.aulaNextDeadline.claseTitle || 'Aula')} • ${_escapeDashHtml(_dashRelativeDateLabel(s.aulaNextDeadline.dueAt))}</div></div>`);
+      if ((s.aulaPendingTasks || 0) === 0 && (s.aulaCount || 0) > 0) pills.push(`<div class="rounded-3 p-2" style="background: rgba(16,185,129,0.08);"><div class="small fw-bold text-success">No tienes entregas pendientes inmediatas</div></div>`);
+      courseList.innerHTML = pills.join('');
+    }
+
+    // Mini donut chart
+    const canvas = document.getElementById('dash-scorecard-chart');
+    if (canvas && typeof Chart !== 'undefined') {
+      const ctx2d = canvas.getContext('2d');
+      if (canvas._chartInstance) canvas._chartInstance.destroy();
+      const completed = s.aulaCompleted || 0;
+      const inProgress = Math.max(0, (s.aulaCount || 0) - completed);
+      canvas._chartInstance = new Chart(ctx2d, {
+        type: 'doughnut',
+        data: {
+          labels: ['Completados', 'En progreso'],
+          datasets: [{ data: [completed || 0, inProgress || 1], backgroundColor: ['#10b981', 'rgba(255,255,255,0.1)'], borderWidth: 0 }]
+        },
+        options: {
+          cutout: '70%',
+          responsive: false,
+          plugins: { legend: { display: false }, tooltip: { enabled: false } }
+        }
+      });
+    }
+  }
+
+  // ── C3-01: Activity Strip ──
+  async function _updateActivityStrip(uid, options = {}) {
+    const strip = document.getElementById('dash-activity-strip');
+    if (!strip) return;
+    const renderVersion = Number.isInteger(options?.renderVersion) ? options.renderVersion : _dashboardDataRenderVersion;
+
+    const days = [];
+    const dayLabels = ['D', 'L', 'M', 'X', 'J', 'V', 'S'];
+    const now = new Date();
+
+    for (let i = 0; i <= 6; i++) {
+      const d = new Date(now);
+      d.setDate(d.getDate() + i);
+      d.setHours(0, 0, 0, 0);
+      days.push({ date: d, label: dayLabels[d.getDay()], isToday: i === 0, activities: [] });
+    }
+
+    try {
+      const today = days[0].date;
+      const endOfWeek = new Date(days[6].date);
+      endOfWeek.setHours(23, 59, 59, 999);
+
+      // 1. Citas medicas (Filter in memory to avoid missing composite indices)
+      const citasSnap = await _fetchWithTimeout(SIA.db.collection('citas-medi')
+        .where('studentId', '==', uid)
+        .get()).catch(e => { console.warn('Citas Tu Semana:', e); return { docs: [] }; });
+      if (!_canCommitDashboardActivityRender(renderVersion, uid, strip)) return;
+
+      citasSnap.docs.forEach(doc => {
+        const data = doc.data();
+        const slot = data.fechaHoraSlot?.toDate?.();
+        if (!slot || slot < today || slot > endOfWeek || data.estado === 'cancelada' || data.estado === 'completada') return;
+
+        const dayIdx = days.findIndex(d => slot >= d.date && slot < new Date(d.date.getTime() + 86400000));
+        if (dayIdx !== -1 && !days[dayIdx].activities.includes('medi')) days[dayIdx].activities.push('medi');
+      });
+
+      // 2. Libros (Prestamos con devolucion esta semana)
+      const biblioSnap = await _fetchWithTimeout(SIA.db.collection('prestamos-biblio')
+        .where('studentId', '==', uid)
+        .get()).catch(e => { console.warn('Biblio Tu Semana:', e); return { docs: [] }; });
+      if (!_canCommitDashboardActivityRender(renderVersion, uid, strip)) return;
+
+      biblioSnap.docs.forEach(doc => {
+        const data = doc.data();
+        const slot = data.fechaVencimiento?.toDate?.() || data.fechaExpiracionRecoleccion?.toDate?.();
+        if (!['pendiente', 'pendiente_entrega', 'entregado'].includes(data.estado)) return;
+        if (!slot || slot < today || slot > endOfWeek) return;
+
+        const dayIdx = days.findIndex(d => slot >= d.date && slot < new Date(d.date.getTime() + 86400000));
+        if (dayIdx !== -1 && !days[dayIdx].activities.includes('biblio')) days[dayIdx].activities.push('biblio');
+      });
+
+      // 3. Aula: publicaciones de tareas con fechaEntrega en la semana (nueva colección aula-publicaciones)
+      const aulaTasks = Array.isArray(options?.aulaTasks) ? options.aulaTasks : [];
+      aulaTasks.forEach((task) => {
+        const slot = _dashToDate(task.dueAt);
+        if (!slot) return;
+        const dayIdx = days.findIndex(d => slot >= d.date && slot < new Date(d.date.getTime() + 86400000));
+        if (dayIdx !== -1 && !days[dayIdx].activities.includes('aula')) days[dayIdx].activities.push('aula');
+      });
+      if (!_canCommitDashboardActivityRender(renderVersion, uid, strip)) return;
+
+    } catch (e) {
+      console.warn("Error cargando actividades semanales:", e);
+    }
+
+    const colorMap = {
+      medi: '#00d0ff',
+      biblio: '#ffd24d',
+      aula: '#4e1bda'
+    };
+
+    const titleMap = { medi: 'Cita', biblio: 'Libro', aula: 'Curso' };
+
+    // Mapeo de iconos dinamicos
+    const iconMap = {
+      medi: '<i class="bi bi-heart-pulse-fill"></i>',
+      biblio: '<i class="bi bi-book-half"></i>',
+      aula: '<i class="bi bi-mortarboard-fill"></i>'
+    };
+
+    if (!_canCommitDashboardActivityRender(renderVersion, uid, strip)) return;
+    strip.innerHTML = days.map(d => {
+      const hasActivity = d.activities.length > 0;
+      const mainAct = hasActivity ? d.activities[0] : null;
+      const mainColor = hasActivity ? (colorMap[mainAct] || '#0ea5e9') : '';
+
+      // Diseño del nuevo cuadro: borde solido, texto negro.
+      const borderStyle = d.isToday
+        ? 'border: 2px solid var(--accent, #0ea5e9); background: linear-gradient(135deg, rgba(14,165,233,0.1), rgba(14,165,233,0.05));' // Hoy
+        : hasActivity
+          ? `border: 2px solid #111827; background: linear-gradient(135deg, ${mainColor}, ${mainColor}dd);` // Con actividad (negro)
+          : 'border: 2px solid rgba(0,0,0,0.15); background: linear-gradient(135deg, rgba(240,240,240,0.8), rgba(220,220,220,0.5));'; // Default (gris)
+
+      const textColor = hasActivity ? 'color:#fff;' : 'color: #111827; font-weight: 700;'; // Fuerte negro o blanco
+      const dayNum = (d) => d.date.getDate();
+      const dateKey = d.date.toLocaleDateString('es-MX');
+
+      const todayLabel = d.isToday ? '<div class="activity-today-dot" style="background:var(--accent); width:6px; height:6px; border-radius:50%; margin: 6px auto 0;"></div>' : '';
+
+      // Construir el min-badge flotante si hay actividades (Círculo con el ícono)
+      let dynamicIconsHtml = '';
+      if (hasActivity) {
+        // Tomamos la primera actividad o mostramos un contador si son multiples
+        const mainAct = d.activities[0];
+        const mainIcon = iconMap[mainAct] || '<i class="bi bi-calendar-event"></i>';
+        const extraCount = d.activities.length > 1 ? `+${d.activities.length - 1}` : '';
+
+        dynamicIconsHtml = `
+           <div class="position-absolute d-flex align-items-center justify-content-center shadow-sm" 
+                style="top:-6px; right:-6px; background:#111827; color:#fff; width:22px; height:22px; border-radius:50%; font-size:0.6rem; border:2px solid #fff;">
+             ${d.activities.length > 1 ? extraCount : mainIcon}
+           </div>
+         `;
+      }
+
+      const activityLabel = hasActivity
+        ? `<div class="extra-small mt-2 fw-bold text-center" style="font-size:0.6rem;color:#111827;line-height:1.1;">${d.activities.map(a => titleMap[a] || a).join(', ')}${d.activities.length > 1 ? '<br><span class="text-muted">Carga alta</span>' : ''}</div>`
+        : '';
+
+      return `
+        <div class="text-center flex-fill position-relative" style="transition: all 0.2s ease; width: 65px; flex-shrink: 0;">
+          <div class="extra-small mb-2 fw-bold text-uppercase" style="font-size:0.75rem; letter-spacing: 0.5px; color: #111827;">${d.label}</div>
+          <div class="activity-day-card mx-auto d-flex align-items-center justify-content-center shadow-sm position-relative" 
+               style="${borderStyle} width:100%; height:60px; border-radius:12px; transition: all 0.3s ease; cursor:pointer;" 
+               onclick="window.SIA.openDashboardDay('${dateKey}', '${mainAct || ''}')"
+               title="${d.date.toLocaleDateString('es-MX')}${hasActivity ? ' — Actividad: ' + d.activities.map(a => titleMap[a] || a).join(', ') : ' — Sin actividad'}">
+            <span style="font-size:1.1rem;${textColor}">${dayNum(d)}</span>
+            ${dynamicIconsHtml}
+          </div>
+          ${todayLabel}
+          ${activityLabel}
+        </div>`;
+    }).join('');
+  }
+
+  // ── C3-02: Events Strip ──
+  function _renderEventsStrip(eventDocs) {
+    const section = document.getElementById('dash-events-section');
+    const strip = document.getElementById('dash-events-strip');
+    if (!section || !strip) return;
+
+    const scopeEnd = _getDashboardScopeEnd(_dashState.scope || 'week');
+    const interestedEventIds = new Set(_getInterestedEventIds());
+    const scopedEvents = (Array.isArray(eventDocs) ? eventDocs : []).filter((item) => {
+      const ev = typeof item?.data === 'function' ? item.data() : item;
+      const eventDate = _dashToDate(ev?.date || ev?.fecha);
+      if (!eventDate) return false;
+      if ((_dashState.scope || 'week') === 'all') return true;
+      return eventDate <= scopeEnd;
+    });
+    _dashState.visibleEvents = scopedEvents;
+
+    if (scopedEvents.length === 0) {
+      strip.innerHTML = '';
+      section.classList.add('d-none');
+      _renderHeaderDashboardMeta();
+      return;
+    }
+
+    section.classList.remove('d-none');
+    const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+    const escHtml = (value) => String(value || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+
+    strip.innerHTML = scopedEvents.map(item => {
+      const ev = typeof item?.data === 'function' ? item.data() : item;
+      const rawDate = ev?.date || ev?.fecha;
+      const fecha = rawDate?.toDate ? rawDate.toDate() : (rawDate ? new Date(rawDate) : null);
+      if (!fecha) return '';
+      const daysLeft = Math.max(0, Math.ceil((fecha.getTime() - Date.now()) / 86400000));
+      const dayNum = fecha.getDate();
+      const monthStr = months[fecha.getMonth()];
+      const title = String(ev.titulo || ev.title || 'Evento').substring(0, 30);
+      const safeTitle = escHtml(title);
+      const relativeLabel = daysLeft === 0 ? 'hoy' : `en ${daysLeft} día${daysLeft !== 1 ? 's' : ''}`;
+      const location = escHtml(ev.location || ev.ubicacion || '');
+      const modality = escHtml(ev.modalidad || ev.mode || '');
+      const capacity = Number(ev.capacity || ev.cupo || 0);
+      const registered = Number(ev.registeredCount || ev.inscritos || 0);
+      const isInterested = interestedEventIds.has(ev.id || item.id);
+
+      // Generate .ics content
+      const dtStart = fecha.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+      const icsTitle = title.replace(/[\r\n,;]/g, ' ');
+      const icsData = `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VEVENT\r\nDTSTART:${dtStart}\r\nSUMMARY:${icsTitle}\r\nEND:VEVENT\r\nEND:VCALENDAR`;
+
+      return `
+        <div class="event-countdown-card p-3 rounded-4 shadow-sm position-relative" onclick="window.SIA.navigate('view-foro')">
+          <div class="d-flex align-items-center gap-3">
+            <div class="event-date-circle text-center flex-shrink-0">
+              <div class="fw-bold" style="font-size:1.1rem;line-height:1;">${dayNum}</div>
+              <div class="extra-small text-uppercase" style="opacity:0.7;">${monthStr}</div>
+            </div>
+            <div class="flex-grow-1" style="min-width:0;">
+              <div class="fw-bold small text-truncate" style="color: var(--text-heading);">${safeTitle}</div>
+              <div class="extra-small" style="color: var(--accent);">${relativeLabel}</div>
+              ${(location || modality || capacity > 0) ? `
+                <div class="extra-small text-muted mt-1">
+                  ${location ? `<span class="me-2"><i class="bi bi-geo-alt me-1"></i>${location}</span>` : ''}
+                  ${modality ? `<span class="me-2"><i class="bi bi-broadcast me-1"></i>${modality}</span>` : ''}
+                  ${capacity > 0 ? `<span><i class="bi bi-people me-1"></i>${registered}/${capacity}</span>` : ''}
+                </div>` : ''}
+            </div>
+            <button class="btn btn-link btn-sm p-0 flex-shrink-0 event-interest-btn ${isInterested ? 'is-active' : ''}" title="${isInterested ? 'Quitar interés' : 'Marcar interés'}"
+              onclick="event.stopPropagation(); window.SIA.toggleDashboardEventInterest('${ev.id || item.id}');">
+              <i class="bi ${isInterested ? 'bi-star-fill' : 'bi-star'}" style="color: ${isInterested ? '#f59e0b' : 'var(--accent)'};"></i>
+            </button>
+            <button class="btn btn-link btn-sm p-0 flex-shrink-0 event-cal-btn" title="Agregar a calendario"
+              onclick="event.stopPropagation(); const b=new Blob(['${icsData.replace(/'/g, "\\'")}'],{type:'text/calendar'}); const u=URL.createObjectURL(b); const a=document.createElement('a'); a.href=u; a.download='evento.ics'; a.click(); URL.revokeObjectURL(u);">
+              <i class="bi bi-calendar-plus" style="color: var(--accent);"></i>
+            </button>
+          </div>
+        </div>`;
+    }).join('');
+    _renderHeaderDashboardMeta();
+  }
+
+  // ── C3-05: Tip of the Day ──
+  function _updateTipOfDay() {
+    const tipText = document.getElementById('dash-tip-text');
+    const tipIcon = document.getElementById('dash-tip-icon');
+    const tipAction = document.getElementById('dash-tip-action');
+    if (!tipText) return;
+
+    const s = _dashStats;
+    const profile = currentUserProfile;
+
+    // Priority chain
+    const tips = [];
+    if (s.libroUrgente !== null && s.libroUrgente <= 0) {
+      tips.push({ text: 'Tienes un libro con fecha de devolución vencida. Regrésalo cuanto antes para evitar sanciones.', icon: 'bi-exclamation-triangle-fill', color: '#ef4444', actionLabel: 'Ir a Biblioteca', action: () => window.SIA.navigate('view-biblio') });
+    }
+    if (profile && !(profile.tipoSangre || profile.healthData?.tipoSangre)) {
+      tips.push({ text: 'Completa tu expediente médico (tipo de sangre, contacto de emergencia) para una atención más rápida en caso de urgencia.', icon: 'bi-heart-pulse', color: '#ef4444', actionLabel: 'Completar perfil', action: () => window.SIA.navigate('view-profile') });
+    }
+    if (s.aulaCount === 0) {
+      tips.push({ text: 'Aún no te has inscrito a ningún curso en Aula Virtual. Explora el catálogo y obtén certificaciones que fortalecen tu CV.', icon: 'bi-mortarboard', color: 'var(--aula)', actionLabel: 'Explorar Aula', action: () => window.SIA.navigate('view-aula') });
+    }
+    if (s.encuestas > 0) {
+      tips.push({ text: `Tienes ${s.encuestas} encuesta${s.encuestas > 1 ? 's' : ''} sin responder. Tu participación ayuda a mejorar los servicios del campus.`, icon: 'bi-clipboard-check', color: '#f59e0b', actionLabel: 'Responder', action: () => window.SIA.navigate('view-encuestas') });
+    }
+
+    // General tips pool (Expanded set)
+    const generalTips = [
+      { text: 'Puedes acceder a tu credencial digital desde el boton "Mi QR" en la esquina superior. Funciona como identificacion oficial dentro del campus.', icon: 'bi-qr-code-scan', color: 'var(--accent)' },
+      { text: 'La Biblioteca tiene un amplio catálogo de libros de tu carrera. Pide un préstamo y llévalo a casa por hasta 7 días.', icon: 'bi-book-half', color: 'var(--biblio)' },
+      { text: 'Mantente al dia con los Eventos del campus. Conferencias, exposiciones y talleres enriquecen tu formacion profesional y personal.', icon: 'bi-calendar-event', color: '#14532d' },
+      { text: 'Si tienes alguna queja o sugerencia, el Buzon de Calidad es 100% confidencial y tu retroalimentacion genera cambios reales y tangibles.', icon: 'bi-chat-heart', color: '#10b981' },
+      { text: 'Personaliza tu dashboard reordenando las tarjetas de módulos. Mantén pulsada tu opción favorita y arrástrala al inicio.', icon: 'bi-grid', color: 'var(--accent)' },
+      { text: '¿Sabías que puedes ocultar el saldo o datos sensibles de tu cuenta usando el ojo de visibilidad en configuraciones rápidas?', icon: 'bi-eye-slash-fill', color: '#64748b' },
+      { text: 'Responder frecuentemente las encuestas de módulo te cataloga como un estudiante destacado, lo que te puede otorgar recompensas especiales al finalizar el semestre.', icon: 'bi-star-fill', color: '#f59e0b' },
+      { text: 'Los Servicios Médicos del campus ofrecen atención gratuita general. Puedes agendar citas directamente desde la app en horarios flexibles para ti.', icon: 'bi-heart-pulse', color: 'var(--med)' },
+      { text: 'El Scorecard de Aula Virtual evalúa tu progreso. Terminar tus cursos dentro del plazo te dota de insignias especiales visibles para todos.', icon: 'bi-trophy-fill', color: 'var(--aula)' },
+      { text: 'Puedes entrar de forma automática usando la app móvil o el escaneo PWA, de forma que el inicio de Microsoft será recordado sin tiempos de espera.', icon: 'bi-phone', color: '#a855f7' },
+      { text: 'La herramienta de "Reportar Problema" llega de inmediato al área de IT del campus para resolver problemas técnicos en el menor tiempo.', icon: 'bi-bug-fill', color: '#ef4444' },
+      { text: 'Un libro vencido tiene un recargo por día, pero si no se devuelve a tiempo puede causar el bloqueo del resto de los procesos administrativos.', icon: 'bi-exclamation-triangle', color: '#f97316' },
+      { text: 'La Credencial SIA te permite entrar como visitante rápido a los otros campus del TecNM si acreditas por código de barras ser un vigente local.', icon: 'bi-building', color: '#3b82f6' },
+      { text: 'Si ves la tarjeta de Lactancia significa que cumples con los perfiles del campus. Estas salas proveen recursos higiénicos sin cargo alguno.', icon: 'bi-hospital', color: '#ec4899' },
+      { text: '¿Aburrido? El módulo de Novedades se actualiza con artículos diarios recomendados por la dirección sobre innovación en distintas carreras.', icon: 'bi-newspaper', color: '#14b8a6' }
+    ];
+
+    // Pick tip: priority first, then daily rotation from general pool
+    let tip;
+    if (tips.length > 0) {
+      tip = tips[0];
+    } else {
+      const dayIdx = Math.floor(Date.now() / 86400000) % generalTips.length;
+      tip = generalTips[dayIdx];
+    }
+
+    tipText.textContent = tip.text;
+    if (tipIcon) {
+      tipIcon.className = `bi ${tip.icon}`;
+      tipIcon.style.color = tip.color || 'var(--accent)';
+    }
+    const iconWrap = document.getElementById('dash-tip-icon-wrap');
+    if (iconWrap && tip.color) {
+      iconWrap.style.background = tip.color.startsWith('#') ? `${tip.color}18` : `rgba(0,208,255,0.12)`;
+    }
+    if (tipAction) {
+      if (typeof tip.action === 'function') {
+        tipAction.classList.remove('d-none');
+        tipAction.textContent = tip.actionLabel || 'Resolver ahora';
+        tipAction.onclick = tip.action;
+      } else {
+        tipAction.classList.add('d-none');
+        tipAction.onclick = null;
+      }
+    }
+  }
+
+  // Compat legacy: algunos puntos externos todavia invocan window.loadDashboard
+  window.loadDashboard = loadDashboard;
+  window.SIA.loadDashboard = loadDashboard;
+
+  window.SIA.refreshStudentDashboard = async function () {
+    if (!shouldUseStandardDashboard(currentUserProfile)) return [];
+    const tasks = [];
+    if (typeof window.SIA?.updateSmartCards === 'function') tasks.push(window.SIA.updateSmartCards());
+    if (typeof renderDashboardStories === 'function') tasks.push(renderDashboardStories());
+    if (typeof checkAndShowAvisos === 'function') tasks.push(checkAndShowAvisos());
+    return Promise.allSettled(tasks);
+  };
+
+  // Loop para mantener el dashboard "vivo", pero con menos solicitudes a Firestore
   setInterval(() => {
+    // Si el tutorial está activo, no refrescamos para evitar que la UI se mueva
+    if (window.SIA_TOUR_ACTIVE) return;
+
     const dash = document.getElementById('view-dashboard');
     if (dash && !dash.classList.contains('d-none') && currentUserProfile) {
-      if (window.SIA.updateSmartCards) window.SIA.updateSmartCards();
-      // Actualizar stories cada 30s (evitar queries excesivas a Firestore)
-      renderDashboardStories();
+      if (typeof window.SIA?.refreshStudentDashboard === 'function') {
+        window.SIA.refreshStudentDashboard();
+      }
     }
-  }, 30000);
-
-  // Init once to show stories immediately
-  // Init once to show stories immediately
-  setTimeout(renderDashboardStories, 1000);
-
-  // Also check for avisos after a short delay (para estudiantes)
-  setTimeout(() => {
-    if (currentUserProfile && currentUserProfile.role !== 'department_admin') {
-      checkAndShowAvisos();
-    }
-  }, 2000);
+  }, 300000); // 5 minutos (300,000 ms) en lugar de 30 segundos
 
   // ==============================================
   // 5. SISTEMA DE AVISOS INSTITUCIONALES
@@ -3697,11 +6149,11 @@ document.addEventListener('DOMContentLoaded', () => {
   let _editingAvisoId = null;
 
   window.openAvisosAdminPanel = async function () {
-    const modal = new bootstrap.Modal(document.getElementById('modalAvisosAdmin'));
-    modal.show();
-    _resetAvisoForm();
-    await _loadAvisosAdminList();
-    _setupAvisosAdminForm();
+    if (window.SIA?._router) {
+      await window.SIA._router.navigate('view-avisos');
+    } else if (window.SIA?.navigate) {
+      await window.SIA.navigate('view-avisos');
+    }
   };
 
   function _resetAvisoForm() {
@@ -3906,11 +6358,11 @@ document.addEventListener('DOMContentLoaded', () => {
           'expired': '<span class="badge bg-secondary rounded-pill">Expirado</span>'
         }[a.status] || '<span class="badge bg-secondary rounded-pill">-</span>';
 
-        const typeBadge = { 'image': 'ðŸ–¼ï¸ Imagen', 'text': 'ðŸ“ Texto', 'mixed': 'ðŸ”€ Mixto' }[a.type] || a.type;
+        const typeBadge = { 'image': '🖼️ Imagen', 'text': '📝 Texto', 'mixed': '🔀 Mixto' }[a.type] || a.type;
         const createdDate = a.createdAt?.toDate ? a.createdAt.toDate().toLocaleDateString('es-MX') : 'N/A';
-        const thumbnailHtml = a.imageUrl ? `<img src="${a.imageUrl}" class="rounded-3" style="width:80px; height:80px; object-fit:cover;">` : `<div class="rounded-3 bg-light d-flex align-items-center justify-content-center" style="width:80px; height:80px;"><i class="bi bi-file-text fs-3 text-muted"></i></div>`;
+        const thumbnailHtml = a.imageUrl ? `<img src="${a.imageUrl}" class="rounded-3" style="width:80px; height:80px; object-fit:cover;">` : `<div class="rounded-3  d-flex align-items-center justify-content-center" style="width:80px; height:80px;"><i class="bi bi-file-text fs-3 text-muted"></i></div>`;
 
-        return `<div class="col-12"><div class="card border-0 shadow-sm rounded-3 overflow-hidden"><div class="card-body p-3 d-flex gap-3 align-items-center">${thumbnailHtml}<div class="flex-grow-1"><div class="d-flex align-items-center gap-2 mb-1"><h6 class="fw-bold mb-0 text-truncate">${a.title}</h6>${statusBadge}</div><div class="d-flex gap-3 extra-small text-muted"><span>${typeBadge}</span><span><i class="bi bi-calendar3 me-1"></i>${createdDate}</span><span><i class="bi bi-eye me-1"></i>${a.viewCount || 0} vistas</span>${a.priority === 'urgent' ? '<span class="text-danger fw-bold">ðŸ”´ Urgente</span>' : ''}</div></div><div class="d-flex gap-1"><button class="btn btn-sm btn-outline-${a.status === 'active' ? 'warning' : 'success'} rounded-pill" onclick="window._toggleAviso('${a.id}')"><i class="bi bi-${a.status === 'active' ? 'pause-fill' : 'play-fill'}"></i></button><button class="btn btn-sm btn-outline-primary rounded-pill" onclick="window._editAviso('${a.id}')"><i class="bi bi-pencil-fill"></i></button><button class="btn btn-sm btn-outline-danger rounded-pill" onclick="window._deleteAviso('${a.id}')"><i class="bi bi-trash3"></i></button></div></div></div></div>`;
+        return `<div class="col-12"><div class="card border-0 shadow-sm rounded-3 overflow-hidden"><div class="card-body p-3 d-flex gap-3 align-items-center">${thumbnailHtml}<div class="flex-grow-1"><div class="d-flex align-items-center gap-2 mb-1"><h6 class="fw-bold mb-0 text-truncate">${a.title}</h6>${statusBadge}</div><div class="d-flex gap-3 extra-small text-muted"><span>${typeBadge}</span><span><i class="bi bi-calendar3 me-1"></i>${createdDate}</span><span><i class="bi bi-eye me-1"></i>${a.viewCount || 0} vistas</span>${a.priority === 'urgent' ? '<span class="text-danger fw-bold">🔴 Urgente</span>' : ''}</div></div><div class="d-flex gap-1"><button class="btn btn-sm btn-outline-${a.status === 'active' ? 'warning' : 'success'} rounded-pill" onclick="window._toggleAviso('${a.id}')"><i class="bi bi-${a.status === 'active' ? 'pause-fill' : 'play-fill'}"></i></button><button class="btn btn-sm btn-outline-primary rounded-pill" onclick="window._editAviso('${a.id}')"><i class="bi bi-pencil-fill"></i></button><button class="btn btn-sm btn-outline-danger rounded-pill" onclick="window._deleteAviso('${a.id}')"><i class="bi bi-trash3"></i></button></div></div></div></div>`;
       }).join('');
     } catch (err) {
       container.innerHTML = '<div class="text-center text-danger py-5"><p>Error al cargar los avisos.</p></div>';
@@ -3966,31 +6418,57 @@ document.addEventListener('DOMContentLoaded', () => {
   let _currentAvisos = [];
   let _currentAvisoIndex = 0;
   let _avisoAnimation = null;
+  let _avisoTrackTimer = null;
+  let _avisoViewerOptions = {};
+  let _trackedAvisosInSession = {};
 
   async function checkAndShowAvisos() {
-    if (!window.AvisosService) return;
+    if (!window.AvisosService || window.SIA_TOUR_ACTIVE) return;
     try {
       const ctx = getCtx();
       if (!ctx.auth?.currentUser) return;
-      const seenKey = 'sia_avisos_seen';
-      const seen = JSON.parse(localStorage.getItem(seenKey) || '{}');
-      const now = Date.now();
-      Object.keys(seen).forEach(k => { if (now - seen[k] > 7 * 24 * 60 * 60 * 1000) delete seen[k]; });
-      localStorage.setItem(seenKey, JSON.stringify(seen));
-
       const avisos = await AvisosService.getActiveAvisos(ctx);
-      const unseen = avisos.filter(a => !seen[a.id]);
+      const unseen = avisos.filter(a => !AvisosService.hasSeenLocal(ctx, a.id));
 
       if (unseen.length === 0) return;
-      _showAvisoFullscreen(unseen, 0);
-      unseen.forEach(a => { seen[a.id] = Date.now(); AvisosService.incrementViewCount(ctx, a.id); });
-      localStorage.setItem(seenKey, JSON.stringify(seen));
+      _showAvisoFullscreen(unseen, 0, { source: 'auto', track: true, ctx });
     } catch (e) { console.warn('[Avisos] Error checking avisos:', e); }
   }
 
-  function _showAvisoFullscreen(avisos, startIndex) {
+  function _clearAvisoTrackingTimer() {
+    if (_avisoTrackTimer) {
+      clearTimeout(_avisoTrackTimer);
+      _avisoTrackTimer = null;
+    }
+  }
+
+  function _scheduleAvisoTracking(aviso) {
+    _clearAvisoTrackingTimer();
+    if (!_avisoViewerOptions.track || !aviso?.id || _trackedAvisosInSession[aviso.id]) return;
+
+    _avisoTrackTimer = setTimeout(async () => {
+      try {
+        const ctx = _avisoViewerOptions.ctx || getCtx();
+        if (document.hidden) return;
+        _trackedAvisosInSession[aviso.id] = true;
+        await window.AvisosService?.recordView?.(ctx, aviso.id, {
+          source: _avisoViewerOptions.source || 'center',
+          completed: true
+        });
+        if (window.Avisos?.refresh && (window.location.pathname === '/avisos' || Store.currentView === 'view-avisos')) {
+          window.Avisos.refresh();
+        }
+      } catch (error) {
+        console.warn('[Avisos] Error registrando visualizacion:', error);
+      }
+    }, 1200);
+  }
+
+  function _showAvisoFullscreen(avisos, startIndex, options) {
     _currentAvisos = avisos;
     _currentAvisoIndex = startIndex || 0;
+    _avisoViewerOptions = options || {};
+    _trackedAvisosInSession = {};
     const modalEl = document.getElementById('modalAvisoFullscreen');
     if (!modalEl) return;
     const progressContainer = document.getElementById('aviso-progress-bars');
@@ -4004,13 +6482,16 @@ document.addEventListener('DOMContentLoaded', () => {
     modal.show();
 
     document.getElementById('aviso-fullscreen-close').onclick = () => {
+      _clearAvisoTrackingTimer();
       if (_avisoAnimation) { _avisoAnimation.cancel(); _avisoAnimation = null; }
       document.querySelectorAll('.aviso-progress-fill').forEach(el => el.style.width = '0%');
       modal.hide();
     };
 
-    document.getElementById('aviso-nav-prev')?.addEventListener('click', (e) => { e.stopPropagation(); _navigateAviso(-1); });
-    document.getElementById('aviso-nav-next')?.addEventListener('click', (e) => { e.stopPropagation(); _navigateAviso(1); });
+    const prevBtn = document.getElementById('aviso-nav-prev');
+    const nextBtn = document.getElementById('aviso-nav-next');
+    if (prevBtn) prevBtn.onclick = (e) => { e.stopPropagation(); _navigateAviso(-1); };
+    if (nextBtn) nextBtn.onclick = (e) => { e.stopPropagation(); _navigateAviso(1); };
 
     const contentArea = document.querySelector('.modal-aviso-glass .modal-content');
     const pauseAnim = () => { if (_avisoAnimation && _avisoAnimation.playState === 'running') _avisoAnimation.pause(); };
@@ -4030,14 +6511,17 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!container || !_currentAvisos.length) return;
     const aviso = _currentAvisos[_currentAvisoIndex];
     if (!aviso) return;
+    const safeTitle = typeof escapeHtml === 'function' ? escapeHtml(aviso.title || '') : (aviso.title || '');
+    const safeBody = typeof escapeHtml === 'function' ? escapeHtml(aviso.body || '') : (aviso.body || '');
+    const safeImageUrl = typeof escapeHtml === 'function' ? escapeHtml(aviso.imageUrl || '') : (aviso.imageUrl || '');
 
     let contentHtml = '';
     if (aviso.type === 'image' && aviso.imageUrl) {
-      contentHtml = `<img src="${aviso.imageUrl}" class="aviso-fullscreen-img" style="max-width:100%; max-height:85vh; object-fit:contain; cursor:pointer;" onclick="window._navigateAviso(1)">`;
+      contentHtml = `<img src="${safeImageUrl}" class="aviso-fullscreen-img" style="max-width:100%; max-height:85vh; object-fit:contain; cursor:pointer;" onclick="window._navigateAviso(1)">`;
     } else if (aviso.type === 'text') {
-      contentHtml = `<div class="aviso-text-card text-center text-white p-4 p-md-5" style="max-width:600px;">${aviso.priority === 'urgent' ? '<div class="badge bg-danger mb-3 rounded-pill px-3 py-2">ðŸ”´ URGENTE</div>' : ''}<h1 class="fw-bold display-5 mb-4">${aviso.title}</h1><p class="lead opacity-90 mb-4" style="white-space:pre-line;">${aviso.body || ''}</p><div class="d-flex justify-content-center gap-2 mt-4"><img src="/images/logo-sia.png" width="30" class="filter-white opacity-50"><span class="text-white-50 small align-self-center">SIA - TecNM Los Cabos</span></div></div>`;
+      contentHtml = `<div class="aviso-text-card text-center text-white p-4 p-md-5" style="max-width:600px;">${aviso.priority === 'urgent' ? '<div class="badge bg-danger mb-3 rounded-pill px-3 py-2">🔴 URGENTE</div>' : ''}<h1 class="fw-bold display-5 mb-4">${aviso.title}</h1><p class="lead opacity-90 mb-4" style="white-space:pre-line;">${aviso.body || ''}</p><div class="d-flex justify-content-center gap-2 mt-4"><img src="/images/logo-sia.png" width="30" class="filter-white opacity-50"><span class="text-white-50 small align-self-center">SIA - TecNM Los Cabos</span></div></div>`;
     } else {
-      contentHtml = `<div class="aviso-mixed-card position-relative h-100 w-100 d-flex flex-column rounded-4 overflow-hidden">${aviso.imageUrl ? `<div class="flex-grow-1 d-flex align-items-center justify-content-center overflow-hidden" style="min-height:0;"><img src="${aviso.imageUrl}" style="max-width:100%; max-height:60vh; object-fit:contain;"></div>` : ''}<div class="aviso-mixed-text text-white p-4 text-center" style="background: linear-gradient(transparent, rgba(0,0,0,0.9));">${aviso.priority === 'urgent' ? '<div class="badge bg-danger mb-2 rounded-pill">ðŸ”´ URGENTE</div>' : ''}<h3 class="fw-bold mb-2">${aviso.title}</h3><p class="small opacity-90 mb-0" style="white-space:pre-line;">${aviso.body || ''}</p></div></div>`;
+      contentHtml = `<div class="aviso-mixed-card position-relative h-100 w-100 d-flex flex-column rounded-4 overflow-hidden">${aviso.imageUrl ? `<div class="flex-grow-1 d-flex align-items-center justify-content-center overflow-hidden" style="min-height:0;"><img src="${aviso.imageUrl}" style="max-width:100%; max-height:60vh; object-fit:contain;"></div>` : ''}<div class="aviso-mixed-text text-white p-4 text-center" style="background: linear-gradient(transparent, rgba(0,0,0,0.9));">${aviso.priority === 'urgent' ? '<div class="badge bg-danger mb-2 rounded-pill">🔴 URGENTE</div>' : ''}<h3 class="fw-bold mb-2">${aviso.title}</h3><p class="small opacity-90 mb-0" style="white-space:pre-line;">${aviso.body || ''}</p></div></div>`;
     }
     container.innerHTML = contentHtml;
 
@@ -4047,6 +6531,7 @@ document.addEventListener('DOMContentLoaded', () => {
       fill.style.width = (idx < _currentAvisoIndex) ? '100%' : '0%';
     });
     _updateAvisoNav();
+    _scheduleAvisoTracking(aviso);
   }
 
   function _startAvisoAutoTimer() {
@@ -4086,17 +6571,24 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   document.getElementById('modalAvisoFullscreen')?.addEventListener('hidden.bs.modal', () => {
+    _clearAvisoTrackingTimer();
     if (_avisoAnimation) { _avisoAnimation.cancel(); _avisoAnimation = null; }
     _currentAvisos = [];
     _currentAvisoIndex = 0;
+    _avisoViewerOptions = {};
+    _trackedAvisosInSession = {};
   });
 
 
   // --- 5c. STORY CLICK: Open aviso from stories ---
 
-  function _openAvisoStoryPreviewModal(aviso) {
-    _showAvisoFullscreen([aviso], 0);
+  function _openAvisoStoryPreviewModal(aviso, ctx) {
+    _showAvisoFullscreen([aviso], 0, { source: 'story', track: true, ctx: ctx || getCtx() });
   }
+
+  window.showAvisoFullscreen = function (avisos, startIndex, options) {
+    _showAvisoFullscreen(avisos, startIndex, options);
+  };
 
 
   function renderDepartmentDashboard(profile) {
@@ -4161,22 +6653,17 @@ document.addEventListener('DOMContentLoaded', () => {
       'view-medi': { title: "Servicios Médicos", desc: "Consultas y Expedientes", img: "images/medi.png", color: "danger" },
       'view-lactario': { title: "Sala de Lactancia", desc: "Gestiona espacios, estadisticas y horarios.", img: "images/lactario.png", color: "maternal" },
       'view-aula': { title: "Aula Virtual", desc: "Cursos y Certificaciones", img: "images/aula.png", color: "primary" },
-      'view-foro': { title: "Foro y Eventos", desc: "Control de Asistencia", img: "images/foro.png", color: "info" },
+      'view-comunidad': { title: "Comunidad", desc: "Publicaciones, preguntas y campus social", img: "images/comunidad.png", color: "success" },
+      'view-foro': { title: "Eventos", desc: "Agenda, asistencia y recursos", img: "images/foro.png", color: "info" },
       'view-quejas': { title: "Quejas y Sugerencias", desc: "Gestión de Tickets y Calidad", img: null, icon: "bi-chat-heart-fill", color: "primary" },
       'view-encuestas': { title: "Centro de Encuestas", desc: "Crear y analizar encuestas", img: null, icon: "bi-clipboard2-check-fill", color: "info" },
-      'view-avisos-admin': { title: "Avisos Institucionales", desc: "Publicar anuncios para toda la comunidad", img: null, icon: "bi-megaphone-fill", color: "success" },
+      'view-avisos': { title: "Avisos Institucionales", desc: "Publicar anuncios para toda la comunidad", img: null, icon: "bi-megaphone-fill", color: "success" },
       'view-vocacional-admin': { title: "Test Vocacional", desc: "CRM de Aspirantes y Métricas", img: null, icon: "bi-compass", color: "primary" }
     };
 
     gridEl.innerHTML = '';
 
-    // Safety check just in case allowedViews is undefined or empty
-    const views = profile.allowedViews && profile.allowedViews.length ? [...profile.allowedViews] : [];
-
-    // Inyectar tarjeta de Avisos si tiene permiso avisos:admin
-    if (profile.permissions?.avisos === 'admin' && !views.includes('view-avisos-admin')) {
-      views.push('view-avisos-admin');
-    }
+    const views = getEffectiveAllowedViews(profile);
 
     views.forEach(viewId => {
       // FILTER: Omitir 'view-dashboard' para que no salga una tarjeta recursiva inútil
@@ -4203,10 +6690,10 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       col.innerHTML = `
-        <div class="card h-100 border-0 shadow-sm rounded-4 overflow-hidden hover-scale cursor-pointer" onclick="${viewId === 'view-avisos-admin' ? 'window.openAvisosAdminPanel()' : `SIA.navigate('${viewId}')`}">
+        <div class="card h-100 border-0 shadow-sm rounded-4 overflow-hidden hover-scale cursor-pointer" onclick="SIA.navigate('${viewId}')">
           <div class="card-body p-4 d-flex flex-column">
             <div class="d-flex justify-content-between align-items-start mb-4">
-              <div class="p-2 rounded-4 bg-light d-inline-flex align-items-center justify-content-center" style="width: 80px; height: 80px;">
+              <div class="p-2 rounded-4  d-inline-flex align-items-center justify-content-center" style="width: 80px; height: 80px;">
                  ${iconOrImgHtml}
               </div>
             </div>
@@ -4230,3 +6717,4 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
 });
+

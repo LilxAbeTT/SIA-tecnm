@@ -25,6 +25,7 @@ export class UiManager {
     }
 
     showLanding() {
+        document.querySelectorAll('.sia-public-view').forEach(el => el.classList.add('d-none'));
         if (this.landingView) this.landingView.classList.remove('d-none');
 
         // Force Hide AppShell
@@ -49,6 +50,7 @@ export class UiManager {
     }
 
     showApp() {
+        document.querySelectorAll('.sia-public-view').forEach(el => el.classList.add('d-none'));
         if (this.landingView) this.landingView.classList.add('d-none');
         if (this.registerWizard) this.registerWizard.classList.add('d-none');
 
@@ -61,6 +63,7 @@ export class UiManager {
     }
 
     showRegisterWizard() {
+        document.querySelectorAll('.sia-public-view').forEach(el => el.classList.add('d-none'));
         if (this.landingView) this.landingView.classList.add('d-none');
         if (this.appShell) {
             this.appShell.classList.add('d-none');

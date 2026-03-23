@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBox="0 0 160 160" fill="none" aria-labelledby="title desc" role="img">
+  <title id="title">Logo del modulo Comunidad con celular</title>
+  <desc id="desc">Marca abstracta de tres personas juntas usando celular, en color rojo vino con detalles negros.</desc>
+  <g fill="#7A1F3D">
+    <circle cx="44" cy="40" r="16"/>
+    <circle cx="80" cy="28" r="16"/>
+    <circle cx="116" cy="40" r="16"/>
+    <ellipse cx="40" cy="106" rx="24" ry="34" transform="rotate(-18 40 106)"/>
+    <rect x="66" y="62" width="28" height="72" rx="14"/>
+    <ellipse cx="120" cy="106" rx="24" ry="34" transform="rotate(18 120 106)"/>
+  </g>
+  <g stroke="#111111" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="34" y="84" width="10" height="19" rx="3" transform="rotate(-18 34 84)"/>
+    <line x1="37" y1="88" x2="42" y2="86"/>
+    <rect x="75" y="80" width="10" height="19" rx="3"/>
+    <line x1="78" y1="84" x2="82" y2="84"/>
+    <rect x="116" y="84" width="10" height="19" rx="3" transform="rotate(18 116 84)"/>
+    <line x1="119" y1="86" x2="124" y2="88"/>
+  </g>
+</svg>

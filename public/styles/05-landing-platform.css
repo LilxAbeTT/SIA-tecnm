@@ -1,0 +1,648 @@
+/* ============================================================
+   MODO OSCURO TOTAL (DARK LANDING V3.0)
+   Unifica el fondo con el Hero (#051525) y adapta componentes.
+   ============================================================ */
+
+/* ============================================================
+   LANDING V4.0 - COLORES OFICIALES TecNM
+   Pantone 294: #1B396A | Cool Gray 10C: #807E82 | Negro: #000
+   Tipografía: Noto Sans (body) + Source Serif 4 / Patria (headings)
+   ============================================================ */
+
+/* --- Variables del Landing --- */
+#landing-view {
+    --landing-bg: #0f1114;
+    --landing-bg-alt: #161a1e;
+    --landing-primary: #1B396A;
+    --landing-primary-light: #2a5298;
+    --landing-gray: #807E82;
+    --landing-text: #ffffff;
+    --landing-text-muted: rgba(255, 255, 255, 0.55);
+    --landing-text-soft: rgba(255, 255, 255, 0.75);
+    --landing-border: rgba(255, 255, 255, 0.08);
+    --landing-card-bg: rgba(255, 255, 255, 0.04);
+    --landing-font-body: 'Noto Sans', sans-serif;
+    --landing-font-heading: 'Source Serif 4', 'Patria', Georgia, serif;
+}
+
+/* =============================================
+   OVERRIDE BOOTSTRAP LIGHT/DARK THEME INSIDE LANDING
+   El landing SIEMPRE es oscuro, sin importar el tema del navegador.
+   ============================================= */
+
+/* Force dark context on the landing root */
+#landing-view,
+#landing-view *:not(i):not(span.bi) {
+    color-scheme: dark;
+}
+
+/* 1. Tipografía global del landing */
+#landing-view {
+    font-family: var(--landing-font-body);
+    color: var(--landing-text) !important;
+    background-color: var(--landing-bg) !important;
+}
+
+#landing-view h1,
+#landing-view h2,
+#landing-view h3 {
+    font-family: var(--landing-font-heading);
+    color: var(--landing-text) !important;
+    font-weight: 800;
+}
+
+#landing-view h4,
+#landing-view h5,
+#landing-view h6,
+#landing-view p,
+#landing-view span,
+#landing-view li,
+#landing-view small,
+#landing-view div {
+    color: inherit;
+}
+
+#landing-view h4,
+#landing-view h5,
+#landing-view h6 {
+    font-family: var(--landing-font-body);
+    color: var(--landing-text) !important;
+    font-weight: 700;
+}
+
+#landing-view .text-muted {
+    color: var(--landing-text-muted) !important;
+}
+
+#landing-view .lead {
+    color: var(--landing-text-soft) !important;
+}
+
+#landing-view .text-dark,
+#landing-view .text-body {
+    color: var(--landing-text) !important;
+}
+
+/* 2. Forzar fondos oscuros en TODAS las secciones */
+#landing-view,
+#landing-view main,
+#landing-view section,
+#landing-view footer {
+    background-color: var(--landing-bg) !important;
+    background-image: none !important;
+    color: var(--landing-text) !important;
+}
+
+#landing-view .landing-section-alt {
+    background-color: var(--landing-bg-alt) !important;
+}
+
+/* 3. Cards de Bootstrap: forzar fondo oscuro (override --bs-card-bg) */
+#landing-view .card {
+    --bs-card-bg: rgba(15, 17, 20, 0.7);
+    --bs-card-color: #fff;
+    --bs-card-border-color: rgba(255, 255, 255, 0.08);
+    --bs-card-cap-bg: transparent;
+    background-color: rgba(15, 17, 20, 0.7) !important;
+    background: rgba(15, 17, 20, 0.7) !important;
+    border-color: rgba(255, 255, 255, 0.08) !important;
+    color: var(--landing-text) !important;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3) !important;
+}
+
+#landing-view .card-body,
+#landing-view .card-header,
+#landing-view .card-footer {
+    background-color: transparent !important;
+    background: transparent !important;
+    color: var(--landing-text) !important;
+    border-color: rgba(255, 255, 255, 0.06) !important;
+}
+
+/* Mockup card extra specificity */
+#landing-view main .card {
+    background: rgba(15, 17, 20, 0.7) !important;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+}
+
+#landing-view .landing-mockup-card {
+    --bs-card-bg: rgba(15, 17, 20, 0.8) !important;
+    background: rgba(15, 17, 20, 0.8) !important;
+    backdrop-filter: blur(20px) !important;
+    -webkit-backdrop-filter: blur(20px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5) !important;
+    color: #fff !important;
+}
+
+#landing-view .landing-mockup-card * {
+    color: inherit;
+}
+
+/* 4. Bootstrap bg-* overrides */
+#landing-view .bg-white,
+#landing-view .bg-surface-muted {
+    background-color: var(--landing-bg) !important;
+}
+
+/* 5. Borders Bootstrap override */
+#landing-view .border,
+#landing-view .border-top,
+#landing-view .border-bottom {
+    border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+/* 6. Dropdown/List overrides */
+#landing-view .dropdown-menu {
+    background-color: rgba(15, 17, 20, 0.95) !important;
+    border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+#landing-view .dropdown-item {
+    color: rgba(255, 255, 255, 0.7) !important;
+}
+
+#landing-view .dropdown-item:hover {
+    background-color: rgba(255, 255, 255, 0.08) !important;
+    color: #fff !important;
+}
+
+/* 7. btn-outline-light forced contrast */
+#landing-view .btn-outline-light {
+    color: rgba(255, 255, 255, 0.8) !important;
+    border-color: rgba(255, 255, 255, 0.15) !important;
+}
+
+#landing-view .btn-outline-light:hover {
+    background-color: rgba(255, 255, 255, 0.1) !important;
+    color: #fff !important;
+    border-color: rgba(255, 255, 255, 0.3) !important;
+}
+
+/* 8. hr separator */
+#landing-view hr {
+    border-color: rgba(255, 255, 255, 0.06) !important;
+    opacity: 1;
+}
+
+/* 9. Rounded containers inside mockup card */
+#landing-view .card .rounded-3,
+#landing-view .card .rounded-4 {
+    background-color: transparent;
+}
+
+/* 10. Bootstrap text-white-50 override */
+#landing-view .text-white-50 {
+    color: rgba(255, 255, 255, 0.5) !important;
+}
+
+#landing-view .text-white {
+    color: #fff !important;
+}
+
+/* 11. Navbar pill: ensure always dark */
+.landing-nav-pill {
+    --bs-navbar-color: rgba(255, 255, 255, 0.7);
+    --bs-navbar-hover-color: #fff;
+    --bs-navbar-brand-color: #fff;
+    --bs-navbar-toggler-border-color: transparent;
+}
+
+/* 12. Override .bg-primary-subtle and similar Bootstrap contextual inside landing */
+#landing-view [class*="bg-"][class*="-subtle"] {
+    background-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+/* 13. List-unstyled links in footer */
+#landing-view .list-unstyled a {
+    color: rgba(255, 255, 255, 0.4) !important;
+    text-decoration: none;
+    transition: color 0.2s;
+}
+
+#landing-view .list-unstyled a:hover {
+    color: #fff !important;
+}
+
+/* 14. Ensure bootstrap .fw-bold doesn't change color */
+#landing-view .fw-bold {
+    color: inherit;
+}
+
+/* 15. Badge override */
+#landing-view .badge {
+    color: inherit !important;
+}
+
+/* 16. Navbar collapse mobile - force dark */
+.landing-nav-collapse.show,
+.landing-nav-collapse.collapsing {
+    background: rgba(15, 17, 20, 0.95) !important;
+}
+
+/* 3. Tarjetas landing con glass effect */
+#landing-view .landing-card {
+    background: var(--landing-card-bg) !important;
+    border: 1px solid var(--landing-border) !important;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+#landing-view .landing-card:hover {
+    background: rgba(255, 255, 255, 0.07) !important;
+    border-color: rgba(27, 57, 106, 0.4) !important;
+    transform: translateY(-4px);
+    box-shadow: 0 12px 40px rgba(27, 57, 106, 0.2);
+}
+
+/* 4. Navbar flotante del landing */
+.landing-nav-pill {
+    background: rgba(15, 17, 20, 0.8);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    transition: all 0.3s ease;
+}
+
+.landing-nav-pill .nav-link {
+    color: rgba(255, 255, 255, 0.6);
+    font-weight: 600;
+    font-size: 0.85rem;
+    padding: 0.4rem 1rem;
+    border-radius: 50rem;
+    transition: all 0.25s ease;
+    font-family: 'Noto Sans', sans-serif;
+}
+
+.landing-nav-pill .nav-link:hover {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.08);
+}
+
+/* Botón CTA del navbar */
+.btn-landing-cta {
+    background: #ffffff !important;
+    color: var(--landing-primary) !important;
+    font-weight: 700 !important;
+    font-size: 0.85rem;
+    padding: 0.5rem 1.25rem;
+    border-radius: 50rem;
+    border: none;
+    transition: all 0.25s ease;
+    font-family: 'Noto Sans', sans-serif;
+    box-shadow: 0 2px 12px rgba(255, 255, 255, 0.15);
+}
+
+.btn-landing-cta:hover {
+    background: #f0f0f0 !important;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 20px rgba(255, 255, 255, 0.25);
+}
+
+/* 5. Botón Hero principal (Acceso Institucional) */
+.btn-acceso-institucional {
+    background: linear-gradient(135deg, #ffffff 0%, #e8edf5 100%);
+    color: #1B396A;
+    font-weight: 800;
+    font-size: 1.05rem;
+    padding: 1rem 2.5rem;
+    border-radius: 50rem;
+    border: none;
+    box-shadow: 0 4px 24px rgba(255, 255, 255, 0.2), 0 0 0 1px rgba(255, 255, 255, 0.1);
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    font-family: 'Noto Sans', sans-serif;
+    letter-spacing: -0.01em;
+    position: relative;
+    overflow: hidden;
+}
+
+.btn-acceso-institucional::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(27, 57, 106, 0.05) 0%, rgba(27, 57, 106, 0.1) 100%);
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+
+.btn-acceso-institucional:hover {
+    transform: translateY(-2px) scale(1.02);
+    box-shadow: 0 8px 40px rgba(255, 255, 255, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.2);
+    color: #1B396A;
+}
+
+.btn-acceso-institucional:hover::before {
+    opacity: 1;
+}
+
+.landing-gradient-text {
+    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+#landing-view .landing-hero-subtitle {
+    max-width: 58ch;
+    color: rgba(255, 255, 255, 0.72) !important;
+    font-size: 1.05rem;
+    line-height: 1.78;
+}
+
+#landing-view .landing-hero-subtitle strong {
+    color: rgba(255, 255, 255, 0.95) !important;
+}
+
+#landing-view .landing-hero-actions,
+#landing-view .landing-vocational-actions,
+#landing-view .landing-process-footer {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+#landing-view .landing-hero-actions {
+    margin-bottom: 1.35rem;
+}
+
+#landing-view .landing-secondary-cta {
+    border-color: rgba(255, 255, 255, 0.15) !important;
+    font-size: 0.95rem;
+}
+
+#landing-view .landing-trust-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+#landing-view .landing-trust-chip,
+#landing-view .landing-process-badge,
+#landing-view .landing-process-tag,
+#landing-view .landing-route-pill,
+#landing-view .landing-preview-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.06);
+    color: rgba(255, 255, 255, 0.82);
+    font-size: 0.76rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+}
+
+#landing-view .landing-trust-chip,
+#landing-view .landing-process-tag {
+    padding: 0.5rem 0.8rem;
+}
+
+#landing-view .landing-trust-chip i {
+    color: #7dd3fc;
+}
+
+#landing-view .landing-hero-note {
+    max-width: 48ch;
+    color: rgba(255, 255, 255, 0.58);
+    font-size: 0.88rem;
+    line-height: 1.7;
+    margin-bottom: 2rem;
+}
+
+#landing-view .landing-dashboard-preview {
+    max-width: 430px;
+    transform: rotate(-1deg);
+}
+
+#landing-view .landing-preview-mark {
+    width: 52px;
+    height: 52px;
+    background: linear-gradient(135deg, #1B396A, #2a5298);
+    color: #fff;
+    font-size: 0.95rem;
+}
+
+#landing-view .landing-preview-list {
+    display: grid;
+    gap: 0.85rem;
+}
+
+#landing-view .landing-preview-item {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.9rem;
+    padding: 0.95rem 1rem;
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+#landing-view .landing-preview-item.is-priority {
+    background: rgba(27, 57, 106, 0.18);
+    border-color: rgba(79, 172, 254, 0.22);
+}
+
+#landing-view .landing-preview-label {
+    font-size: 0.88rem;
+    font-weight: 800;
+    color: #fff;
+    margin-bottom: 0.2rem;
+}
+
+#landing-view .landing-preview-text {
+    color: rgba(255, 255, 255, 0.58);
+    font-size: 0.78rem;
+    line-height: 1.6;
+}
+
+#landing-view .landing-preview-badge {
+    flex-shrink: 0;
+    padding: 0.42rem 0.7rem;
+}
+
+#landing-view .landing-vocational-spotlight {
+    display: grid;
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+    gap: 1.25rem;
+    align-items: stretch;
+}
+
+#landing-view .landing-vocational-copy,
+#landing-view .landing-vocational-card,
+#landing-view .landing-process-card,
+#landing-view .landing-value-card {
+    padding: 1.5rem;
+}
+
+#landing-view .landing-vocational-copy {
+    border-radius: 28px;
+    background:
+        radial-gradient(circle at top left, rgba(79, 172, 254, 0.18), transparent 28%),
+        linear-gradient(145deg, rgba(12, 25, 46, 0.96) 0%, rgba(16, 47, 92, 0.88) 100%);
+    border: 1px solid rgba(79, 172, 254, 0.2);
+    box-shadow: 0 24px 60px rgba(4, 12, 28, 0.35);
+}
+
+#landing-view .landing-vocational-copy h2,
+#landing-view .landing-process-card h3,
+#landing-view .landing-value-card h3,
+#landing-view .landing-vocational-card h3 {
+    font-size: 1.45rem;
+    line-height: 1.15;
+}
+
+#landing-view .landing-vocational-lead,
+#landing-view .landing-vocational-card p,
+#landing-view .landing-process-desc,
+#landing-view .landing-value-card p {
+    color: rgba(255, 255, 255, 0.68) !important;
+    font-size: 0.95rem;
+    line-height: 1.75;
+}
+
+#landing-view .landing-vocational-grid {
+    display: grid;
+    grid-template-columns: repeat(1, minmax(0, 1fr));
+    gap: 1rem;
+}
+
+#landing-view .landing-route-pill {
+    width: fit-content;
+    padding: 0.5rem 0.8rem;
+    margin-bottom: 1rem;
+    color: #9bdcff;
+}
+
+#landing-view .landing-process-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1rem;
+}
+
+#landing-view .landing-process-card {
+    min-height: 100%;
+}
+
+#landing-view .landing-process-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+#landing-view .landing-process-badge {
+    padding: 0.42rem 0.75rem;
+}
+
+#landing-view .landing-process-title {
+    margin-bottom: 0.75rem;
+    font-size: 1.2rem !important;
+}
+
+#landing-view .landing-process-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.65rem;
+    margin-top: auto;
+}
+
+#landing-view .landing-process-footer {
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 1.5rem;
+    padding: 1rem 1.2rem;
+    border-radius: 22px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+#landing-view .landing-process-footer p {
+    color: rgba(255, 255, 255, 0.62) !important;
+    line-height: 1.7;
+}
+
+#landing-view .landing-value-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 1rem;
+}
+
+#landing-view .landing-value-card {
+    min-height: 100%;
+}
+
+#landing-view .landing-value-icon,
+#landing-view .landing-module-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#landing-view .landing-value-icon {
+    width: 3.25rem;
+    height: 3.25rem;
+    border-radius: 18px;
+    margin-bottom: 1rem;
+    font-size: 1.2rem;
+}
+
+#landing-view .landing-module-icon.is-blue,
+#landing-view .landing-value-icon.is-blue {
+    background: rgba(27, 57, 106, 0.24);
+    color: #6ecbff;
+}
+
+#landing-view .landing-module-icon.is-amber {
+    background: rgba(217, 119, 6, 0.22);
+    color: #fbbf24;
+}
+
+#landing-view .landing-module-icon.is-red,
+#landing-view .landing-value-icon.is-red {
+    background: rgba(220, 38, 38, 0.2);
+    color: #f87171;
+}
+
+#landing-view .landing-module-icon.is-cyan,
+#landing-view .landing-value-icon.is-cyan {
+    background: rgba(8, 145, 178, 0.22);
+    color: #67e8f9;
+}
+
+#landing-view .landing-module-icon.is-orange {
+    background: rgba(249, 115, 22, 0.18);
+    color: #fb923c;
+}
+
+#landing-view .landing-module-icon.is-emerald,
+#landing-view .landing-value-icon.is-emerald {
+    background: rgba(16, 185, 129, 0.2);
+    color: #6ee7b7;
+}
+
+#landing-view .landing-social-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.6rem;
+    height: 2.6rem;
+    border-radius: 50%;
+    color: rgba(255, 255, 255, 0.45);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.03);
+    transition: color 0.2s ease, border-color 0.2s ease, transform 0.2s ease, background 0.2s ease;
+}
+
+#landing-view .landing-social-link:hover {
+    color: #fff;
+    border-color: rgba(255, 255, 255, 0.22);
+    background: rgba(255, 255, 255, 0.07);
+    transform: translateY(-1px);
+}

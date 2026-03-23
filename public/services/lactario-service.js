@@ -6,6 +6,7 @@ const LactarioService = (function () {
     const C_RESERVAS = 'lactario-bookings';
     const C_ESPACIOS = 'lactario-spaces'; // Colección de cubiculos
     const CONFIG_DOC = 'lactario-config/main';
+    const MEDI_TYPE = 'Médico';
 
     // Default config
     let config = {
@@ -25,6 +26,110 @@ const LactarioService = (function () {
 
     // Genera ID de slot: YYYY-MM-DD_HH:MM
     const getSlotId = (date) => `${toISO(date)}_${pad(date.getHours())}:${pad(date.getMinutes())}`;
+
+    function parseLegacyLactationMonths(rawValue) {
+        if (rawValue === null || rawValue === undefined || rawValue === '') return null;
+        const match = String(rawValue).trim().match(/\d+/);
+        if (!match) return null;
+
+        const months = Number(match[0]);
+        return Number.isFinite(months) ? months : null;
+    }
+
+    function resolveDateLike(value) {
+        if (!value) return null;
+        const parsed = value.toDate ? value.toDate() : new Date(value);
+        return Number.isNaN(parsed.getTime()) ? null : parsed;
+    }
+
+    function normalizeFlag(value) {
+        return String(value || '').trim().toLowerCase().replace('í', 'i');
+    }
+
+    function buildBookingDate(dateStr, timeStr) {
+        const [h, m] = timeStr.split(':').map(Number);
+        const bookingDate = new Date(`${dateStr}T00:00:00`);
+        bookingDate.setHours(h, m, 0, 0);
+
+        if (isNaN(bookingDate.getTime())) {
+            throw new Error("Fecha inválida.");
+        }
+
+        return bookingDate;
+    }
+
+    function getDateRange(dateStr) {
+        return {
+            start: new Date(`${dateStr}T00:00:00`),
+            end: new Date(`${dateStr}T23:59:59.999`)
+        };
+    }
+
+    function normalizeBookingDoc(doc) {
+        const data = doc.data ? doc.data() : doc;
+        return {
+            id: doc.id || data.id,
+            ...data,
+            date: resolveDateLike(data.dateQuery) || resolveDateLike(data.date)
+        };
+    }
+
+    async function createMedicalSupportAppointment(ctx, { user, bookingId, bookingDate, lactarioType }) {
+        if (!window.MediService || typeof MediService.reservarCita !== 'function') {
+            throw new Error('El servicio médico no está disponible en este momento.');
+        }
+
+        const activeAppointment = await MediService.checkActiveAppointment(ctx, user.uid);
+        if (activeAppointment) {
+            throw new Error('Ya tienes una cita médica activa. Cancélala o reprográmala antes de solicitar asistencia desde lactario.');
+        }
+
+        let professional = await MediService.resolveProfessionalForBooking(ctx, MEDI_TYPE, bookingDate);
+        if (!professional) {
+            professional = {
+                id: null,
+                displayName: 'Atención Médica',
+                profileId: null
+            };
+        }
+
+        const bookingResult = await MediService.reservarCita(ctx, {
+            user,
+            date: bookingDate,
+            slotId: `${getSlotId(bookingDate)}_${MEDI_TYPE}`,
+            tipo: MEDI_TYPE,
+            motivo: `[Lactario] Asistencia médica vinculada a sesión de ${lactarioType || 'Lactancia'}`,
+            profesionalId: professional.id,
+            profesionalName: professional.displayName,
+            profesionalProfileId: professional.profileId,
+            extraData: {
+                linkedLactarioId: bookingId,
+                sourceModule: 'lactario',
+                lactarioBookingType: lactarioType || 'Lactancia',
+                lactarioSupport: true
+            }
+        });
+
+        const citaSnap = await ctx.db.collection('citas-medi').doc(bookingResult.citaId).get();
+        const citaData = citaSnap.exists ? citaSnap.data() : {};
+
+        return {
+            citaId: bookingResult.citaId,
+            status: citaData.estado || (bookingResult.isQueued ? 'pendiente' : 'confirmada'),
+            queuePosition: bookingResult.queuePosition || 0,
+            professionalName: citaData.profesionalName || professional.displayName || 'Atención Médica'
+        };
+    }
+
+    async function cancelLinkedMedicalAppointment(ctx, citaId, reason) {
+        if (!citaId) return;
+
+        if (!window.MediService || typeof MediService.cancelarCitaEstudiante !== 'function') {
+            throw new Error('No fue posible sincronizar la cancelación con Servicio Médico.');
+        }
+
+        await MediService.cancelarCitaEstudiante(ctx, citaId, reason || 'Cancelada desde lactario');
+    }
 
     // --- CORE ---
 
@@ -58,7 +163,7 @@ const LactarioService = (function () {
     }
 
     // --- LAZY CLEANUP (Auto-Cancel/No-Show) ---
-    async function checkExpiredBookings(ctx) {
+    async function checkExpiredBookings(ctx, uid = null) {
         try {
             const now = new Date();
             // Look for confirmed bookings that might have expired.
@@ -73,10 +178,12 @@ const LactarioService = (function () {
             const batch = ctx.db.batch();
             let updates = 0;
             const tolerance = config.tolerance || 20;
+            const linkedAppointmentsToCancel = [];
 
             q.docs.forEach(doc => {
                 const data = doc.data();
                 if (!data.dateQuery) return;
+                if (uid && data.userId !== uid) return;
 
                 const bookTime = data.dateQuery.toDate();
                 // Expire if: Now > (BookTime + Tolerance)
@@ -85,14 +192,21 @@ const LactarioService = (function () {
                 if (now > expireTime) {
                     batch.update(doc.ref, {
                         status: 'no-show',
-                        autoCancelledAt: firebase.firestore.FieldValue.serverTimestamp()
+                        autoCancelledAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        medicalSupportStatus: data.linkedMediCitaId ? 'cancelled' : (data.medicalSupportStatus || null)
                     });
+                    if (uid && data.linkedMediCitaId) {
+                        linkedAppointmentsToCancel.push(data.linkedMediCitaId);
+                    }
                     updates++;
                 }
             });
 
             if (updates > 0) {
                 await batch.commit();
+                for (const citaId of linkedAppointmentsToCancel) {
+                    await cancelLinkedMedicalAppointment(ctx, citaId, 'No-show en reserva de lactario');
+                }
                 console.log(`[Lactario] Marked ${updates} bookings as no-show.`);
             }
         } catch (e) {
@@ -101,22 +215,27 @@ const LactarioService = (function () {
     }
 
     // --- CHECK ACCESS ---
-    // Regla: Solo mujeres lactantes con tiempo < 10 meses
+    // Regla: Solo mujeres lactantes con periodo de hasta 7 meses
     async function checkAccess(userProfile) {
         if (!userProfile) return { allowed: false, reason: 'No profile' };
 
+        const role = String(userProfile.role || '').toLowerCase();
+        const lactarioPermission = String(userProfile.permissions?.lactario || '').toLowerCase();
+        const email = String(userProfile.email || '').trim().toLowerCase();
+
         // Admin access override
-        if (userProfile.permissions?.lactario === 'admin' || userProfile.email === 'calidad@loscabos.tecnm.mx') {
+        if (
+            role === 'superadmin' ||
+            lactarioPermission === 'admin' ||
+            lactarioPermission === 'superadmin' ||
+            email === 'calidad@loscabos.tecnm.mx'
+        ) {
             return { allowed: true, isAdmin: true };
         }
 
-        // Psych Access for Accompaniment
-        if (userProfile.role === 'Psicologo' || userProfile.role === 'psicologo') {
-            return { allowed: true, isAdmin: false, isPsych: true };
-        }
-
-        const isFemale = userProfile.personalData?.genero === 'Femenino' || userProfile.genero === 'Femenino';
-        const isLactating = userProfile.healthData?.lactancia === 'Sí' || userProfile.lactancia === 'Sí';
+        const gender = String(userProfile.personalData?.genero || userProfile.genero || '').trim().toLowerCase();
+        const isFemale = ['femenino', 'mujer'].includes(gender);
+        const isLactating = normalizeFlag(userProfile.healthData?.lactancia || userProfile.lactancia) === 'si';
         const rawTime = userProfile.healthData?.lactanciaTiempo || userProfile.lactanciaTiempo || '';
 
         if (!isFemale) return { allowed: false, reason: 'Módulo exclusivo para mujeres.' };
@@ -126,16 +245,27 @@ const LactarioService = (function () {
         const fechaInicio = userProfile.healthData?.lactanciaInicio || userProfile.lactanciaInicio; // Timestamp or Date
 
         if (fechaInicio) {
-            // Convert to Date if Firestore Timestamp
-            const startDate = fechaInicio.toDate ? fechaInicio.toDate() : new Date(fechaInicio);
+            const startDate = resolveDateLike(fechaInicio);
             const now = new Date();
+
+            if (!startDate) {
+                return { allowed: false, reason: 'La fecha de inicio de lactancia en tu perfil es inválida. Actualízala para continuar.' };
+            }
+
+            if (startDate > now) {
+                return { allowed: false, reason: 'La fecha de inicio de lactancia no puede ser futura. Actualiza tu perfil para continuar.' };
+            }
 
             // Calculate months difference
             let months = (now.getFullYear() - startDate.getFullYear()) * 12;
             months -= startDate.getMonth();
             months += now.getMonth();
 
-            // Ajuste por días si es necesario, pero mes a mes es suficiente aprox.
+            if (now.getDate() < startDate.getDate()) {
+                months -= 1;
+            }
+            months = Math.max(0, months);
+
             if (months > 7) {
                 return {
                     allowed: false,
@@ -143,17 +273,20 @@ const LactarioService = (function () {
                 };
             }
         }
-        // Fallback for legacy data (though we want strictly new logic)
-        else if (rawTime && !['1', '2', '3', '4', '5', '6', '7'].includes(rawTime)) {
-            // Si el string no es 1-7, probablemente es legacy (e.g. "Más de 10")
-            // Pero mejor asumimos que si no hay fecha, exigimos actualizar.
-            // O permitimos si es legacy valid?
-            // El usuario pidió: "el usuario debe validarse para saber si no pasaron sus 7 meses"
-            // Si no tiene fecha, no podemos calcular.
-            return { allowed: false, reason: 'Por favor actualiza tu perfil para indicar fecha de inicio de lactancia.' };
-        }
+        else {
+            const legacyMonths = parseLegacyLactationMonths(rawTime);
 
-        return { allowed: true, isAdmin: false };
+            if (legacyMonths === null) {
+                return { allowed: false, reason: 'Por favor actualiza tu perfil para indicar fecha de inicio de lactancia.' };
+            }
+
+            if (legacyMonths > 7) {
+                return {
+                    allowed: false,
+                    reason: `Tu periodo de lactancia (${legacyMonths} meses) excede el límite de 7 meses para este servicio.`
+                };
+            }
+        }
 
         return { allowed: true, isAdmin: false };
     }
@@ -217,18 +350,38 @@ const LactarioService = (function () {
         return slots;
     }
 
-    async function createReservation(ctx, { user, date, timeStr, type, fridge, accompaniment }) {
-        return ctx.db.runTransaction(async tx => {
+    async function createReservation(ctx, { user, date, timeStr, type, fridge, medicalSupport }) {
+        await loadConfig(ctx);
+        const bookingDate = buildBookingDate(date, timeStr);
+        const now = new Date();
+
+        if (bookingDate < now) {
+            throw new Error('Este horario ya no está disponible. Selecciona otro.');
+        }
+
+        if (medicalSupport) {
+            if (!window.MediService || typeof MediService.checkActiveAppointment !== 'function' || typeof MediService.reservarCita !== 'function') {
+                throw new Error('El servicio médico no está disponible en este momento.');
+            }
+
+            const activeAppointment = await MediService.checkActiveAppointment(ctx, user.uid);
+            if (activeAppointment) {
+                throw new Error('Ya tienes una cita médica activa. Cancélala o reprográmala antes de solicitar asistencia desde lactario.');
+            }
+        }
+
+        const reservationResult = await ctx.db.runTransaction(async tx => {
             // Fix: 'date' is already a YYYY-MM-DD string, so we don't need toISO() which expects a Date object
             const slotId = `${date}_${timeStr}`;
+            const activeWindowStart = new Date();
+            activeWindowStart.setHours(0, 0, 0, 0);
 
             // 1. Check user existing active reservation (prevent double booking same time or pending status)
             // Simpler check: Allow only 1 active reservation per user? Let's say yes for now to avoid abuse.
-            const userActiveQ = await ctx.db.collection(C_RESERVAS)
+            const userActiveQ = await tx.get(ctx.db.collection(C_RESERVAS)
                 .where('userId', '==', user.uid)
                 .where('status', 'in', ['confirmed', 'checked-in'])
-                .where('dateQuery', '>', new Date()) // Future bookings
-                .get();
+                .where('dateQuery', '>=', activeWindowStart));
 
             if (!userActiveQ.empty) {
                 // Check if it's the same day? For now blocking multiple future reservations.
@@ -239,11 +392,15 @@ const LactarioService = (function () {
             const activeSpaces = spaces.filter(s => s.active !== false);
             const totalSpaces = activeSpaces.length;
 
+            if (totalSpaces <= 0) {
+                throw new Error("No hay espacios activos disponibles en este momento.");
+            }
+
             // We need to count existing bookings for this specific slotId inside transaction
-            const slotQ = await ctx.db.collection(C_RESERVAS)
+            const slotQ = await tx.get(ctx.db.collection(C_RESERVAS)
                 .where('slotId', '==', slotId)
                 .where('status', 'in', ['confirmed', 'checked-in'])
-                .get();
+            );
 
             const takenCount = slotQ.size; // This matches ANY space (active or not)
 
@@ -259,18 +416,6 @@ const LactarioService = (function () {
 
             if (!availableSpace) {
                 throw new Error("Error interno: No se pudo asignar espacio.");
-            }
-
-            // 4. Create Booking
-            const [h, m] = timeStr.split(':').map(Number);
-
-            // Fix: Create date safely handling string input
-            // Append T00:00:00 to ensure local time is parsed, not UTC
-            const bookingDate = new Date(`${date}T00:00:00`);
-            bookingDate.setHours(h, m, 0, 0);
-
-            if (isNaN(bookingDate.getTime())) {
-                throw new Error("Fecha inválida.");
             }
 
             // Verify firebase global availability
@@ -296,28 +441,10 @@ const LactarioService = (function () {
                 status: 'confirmed',
                 checkIn: null,
                 checkOut: null,
-                accompaniment: accompaniment || false
+                medicalSupportRequested: !!medicalSupport,
+                medicalSupportStatus: medicalSupport ? 'creating' : null,
+                linkedMediCitaId: null
             });
-
-            // 5. Accompaniment Request (Linked to Medi)
-            if (accompaniment) {
-                const mediRef = ctx.db.collection('citas-medi').doc();
-                tx.set(mediRef, {
-                    id: mediRef.id,
-                    studentId: user.uid,
-                    studentEmail: user.email,
-                    studentName: user.displayName || user.email,
-                    matricula: user.matricula || '',
-                    fechaSolicitud: firebase.firestore.FieldValue.serverTimestamp(),
-                    fechaHoraSlot: firebase.firestore.Timestamp.fromDate(bookingDate),
-                    slotId: slotId,
-                    tipoServicio: 'Psicologo', // Route to Psych
-                    motivo: 'Acompañamiento Lactancia',
-                    estado: 'pendiente',
-                    linkedLactarioId: docRef.id,
-                    color: 'pink' // UI Hint
-                });
-            }
 
             return {
                 success: true,
@@ -326,6 +453,45 @@ const LactarioService = (function () {
                 time: timeStr
             };
         });
+
+        if (!medicalSupport) {
+            return reservationResult;
+        }
+
+        try {
+            const medicalResult = await createMedicalSupportAppointment(ctx, {
+                user,
+                bookingId: reservationResult.id,
+                bookingDate,
+                lactarioType: type
+            });
+
+            await ctx.db.collection(C_RESERVAS).doc(reservationResult.id).update({
+                linkedMediCitaId: medicalResult.citaId,
+                medicalSupportRequested: true,
+                medicalSupportStatus: medicalResult.status,
+                medicalSupportQueuePosition: medicalResult.queuePosition || 0,
+                medicalSupportProfessionalName: medicalResult.professionalName || null,
+                medicalSupportLinkedAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+
+            return {
+                ...reservationResult,
+                medicalSupportStatus: medicalResult.status,
+                medicalSupportQueuePosition: medicalResult.queuePosition || 0,
+                medicalSupportProfessionalName: medicalResult.professionalName || null
+            };
+        } catch (error) {
+            await ctx.db.collection(C_RESERVAS).doc(reservationResult.id).update({
+                status: 'cancelled',
+                cancelReason: 'No se pudo generar la asistencia médica vinculada',
+                cancelledAt: firebase.firestore.FieldValue.serverTimestamp(),
+                medicalSupportRequested: true,
+                medicalSupportStatus: 'error',
+                medicalSupportError: error.message || 'Error desconocido'
+            });
+            throw error;
+        }
     }
 
     async function getUserActiveReservation(ctx, uid) {
@@ -408,10 +574,21 @@ const LactarioService = (function () {
     }
 
     async function cancelReservation(ctx, id, reason) {
-        return ctx.db.collection(C_RESERVAS).doc(id).update({
+        const ref = ctx.db.collection(C_RESERVAS).doc(id);
+        const snap = await ref.get();
+        if (!snap.exists) return;
+
+        const data = snap.data();
+
+        if (data.linkedMediCitaId) {
+            await cancelLinkedMedicalAppointment(ctx, data.linkedMediCitaId, reason || 'Cancelada desde lactario');
+        }
+
+        return ref.update({
             status: 'cancelled',
             cancelReason: reason,
-            cancelledAt: firebase.firestore.FieldValue.serverTimestamp()
+            cancelledAt: firebase.firestore.FieldValue.serverTimestamp(),
+            medicalSupportStatus: data.linkedMediCitaId ? 'cancelled' : (data.medicalSupportStatus || null)
         });
     }
 
@@ -437,6 +614,11 @@ const LactarioService = (function () {
         await loadConfig(ctx);
     }
 
+    async function updateSpace(ctx, spaceId, data) {
+        await ctx.db.collection(C_ESPACIOS).doc(spaceId).update(data);
+        await loadConfig(ctx);
+    }
+
     async function deleteSpace(ctx, spaceId) {
         await ctx.db.collection(C_ESPACIOS).doc(spaceId).delete();
         await loadConfig(ctx);
@@ -458,10 +640,14 @@ const LactarioService = (function () {
         if (range === '7days') past.setDate(now.getDate() - 7);
         if (range === '30days') past.setDate(now.getDate() - 30);
 
-        const q = await ctx.db.collection(C_RESERVAS)
-            .where('dateQuery', '>=', past)
-            .where('status', 'in', ['confirmed', 'checked-in', 'completed']) // Include future confirmed
-            .get();
+        let query = ctx.db.collection(C_RESERVAS)
+            .where('status', 'in', ['confirmed', 'checked-in', 'completed', 'cancelled', 'no-show']);
+
+        if (range !== 'all') {
+            query = query.where('dateQuery', '>=', past);
+        }
+
+        const q = await query.get();
 
         const docs = q.docs.map(d => d.data());
 
@@ -480,18 +666,15 @@ const LactarioService = (function () {
         // Process Data
         docs.forEach(d => {
             // Status
-            const st = d.status === 'checked-in' ? 'completed' : d.status; // Treat check-in as completed for general stats or separate? 
-            // Better keep raw status keys but map safely
             if (stats.statusCounts[d.status] !== undefined) {
                 stats.statusCounts[d.status]++;
             } else {
-                // If distinct like 'checked-in', group into completed or new?
                 stats.statusCounts[d.status] = 1;
             }
 
             if (d.status === 'completed' || d.status === 'checked-in') {
                 // By Date
-                const dateKey = d.dateQuery.toDate().toISOString().split('T')[0];
+                const dateKey = toISO(d.dateQuery.toDate());
                 stats.visitsByDate[dateKey] = (stats.visitsByDate[dateKey] || 0) + 1;
 
                 // By Hour
@@ -534,6 +717,324 @@ const LactarioService = (function () {
         return stats;
     }
 
+    async function getUserHistorySummary(ctx, uid) {
+        const q = await ctx.db.collection(C_RESERVAS)
+            .where('userId', '==', uid)
+            .where('status', 'in', ['checked-in', 'completed'])
+            .orderBy('dateQuery', 'asc')
+            .get();
+
+        const docs = q.docs.map(d => d.data());
+        let totalMinutes = 0;
+
+        docs.forEach((booking) => {
+            if (booking.checkInTime && booking.checkOutTime) {
+                const start = resolveDateLike(booking.checkInTime);
+                const end = resolveDateLike(booking.checkOutTime);
+                if (start && end && end > start) {
+                    totalMinutes += Math.round((end - start) / 60000);
+                    return;
+                }
+            }
+
+            if (booking.status === 'checked-in' && booking.checkInTime) {
+                const start = resolveDateLike(booking.checkInTime);
+                if (start) {
+                    const elapsed = Math.max(0, Math.round((Date.now() - start.getTime()) / 60000));
+                    totalMinutes += Math.min(elapsed, config.usageTime || 30);
+                    return;
+                }
+            }
+
+            totalMinutes += config.usageTime || 30;
+        });
+
+        return {
+            visits: docs.length,
+            totalMinutes
+        };
+    }
+
+    async function getUserBookingHistory(ctx, uid, limit = 12) {
+        const q = await ctx.db.collection(C_RESERVAS)
+            .where('userId', '==', uid)
+            .get();
+
+        return q.docs
+            .map((doc) => normalizeBookingDoc(doc))
+            .sort((a, b) => (b.date?.getTime() || 0) - (a.date?.getTime() || 0))
+            .slice(0, limit);
+    }
+
+    async function rescheduleReservation(ctx, bookingId, { user, date, timeStr, type, medicalSupport }) {
+        await loadConfig(ctx);
+        const bookingRef = ctx.db.collection(C_RESERVAS).doc(bookingId);
+        const bookingSnap = await bookingRef.get();
+        if (!bookingSnap.exists) throw new Error('Reserva no encontrada.');
+
+        const currentBooking = bookingSnap.data();
+        if (currentBooking.status !== 'confirmed') {
+            throw new Error('Solo puedes reagendar una reserva pendiente de entrada.');
+        }
+
+        const bookingDate = buildBookingDate(date, timeStr);
+        if (bookingDate < new Date()) {
+            throw new Error('No puedes reagendar a un horario pasado.');
+        }
+
+        const reservationResult = await ctx.db.runTransaction(async (tx) => {
+            const liveSnap = await tx.get(bookingRef);
+            if (!liveSnap.exists) throw new Error('Reserva no encontrada.');
+
+            const liveBooking = liveSnap.data();
+            if (liveBooking.status !== 'confirmed') {
+                throw new Error('La reserva ya cambió de estado. Recarga e intenta de nuevo.');
+            }
+
+            const slotId = `${date}_${timeStr}`;
+            const activeWindowStart = new Date();
+            activeWindowStart.setHours(0, 0, 0, 0);
+
+            const activeBookingsQ = await tx.get(ctx.db.collection(C_RESERVAS)
+                .where('userId', '==', user.uid)
+                .where('status', 'in', ['confirmed', 'checked-in'])
+                .where('dateQuery', '>=', activeWindowStart));
+
+            const otherActiveBookings = activeBookingsQ.docs.filter((doc) => doc.id !== bookingId);
+            if (otherActiveBookings.length > 0) {
+                throw new Error('Tienes otra reserva activa. Cancélala antes de reagendar esta visita.');
+            }
+
+            const activeSpaces = spaces.filter((space) => space.active !== false);
+            if (activeSpaces.length <= 0) {
+                throw new Error('No hay espacios activos disponibles en este momento.');
+            }
+
+            const slotQ = await tx.get(ctx.db.collection(C_RESERVAS)
+                .where('slotId', '==', slotId)
+                .where('status', 'in', ['confirmed', 'checked-in']));
+
+            const competingBookings = slotQ.docs.filter((doc) => doc.id !== bookingId);
+            if (competingBookings.length >= activeSpaces.length) {
+                throw new Error('Lo sentimos, este horario ya está lleno.');
+            }
+
+            const takenSpaceIds = competingBookings.map((doc) => doc.data().spaceId);
+            const preferredSpace = activeSpaces.find((space) => space.id === liveBooking.spaceId && !takenSpaceIds.includes(space.id));
+            const availableSpace = preferredSpace || activeSpaces.find((space) => !takenSpaceIds.includes(space.id));
+
+            if (!availableSpace) {
+                throw new Error('No fue posible asignar un espacio disponible para el nuevo horario.');
+            }
+
+            tx.update(bookingRef, {
+                date,
+                time: timeStr,
+                type: type || liveBooking.type || 'Lactancia',
+                slotId,
+                spaceId: availableSpace.id,
+                spaceName: availableSpace.name,
+                dateQuery: firebase.firestore.Timestamp.fromDate(bookingDate),
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                medicalSupportRequested: !!medicalSupport,
+                medicalSupportQueuePosition: 0,
+                medicalSupportProfessionalName: null,
+                medicalSupportLinkedAt: null,
+                medicalSupportError: null
+            });
+
+            return {
+                id: bookingId,
+                spaceName: availableSpace.name,
+                time: timeStr
+            };
+        });
+
+        let medicalWarning = null;
+        if (currentBooking.linkedMediCitaId) {
+            try {
+                await cancelLinkedMedicalAppointment(ctx, currentBooking.linkedMediCitaId, 'Reagendada desde lactario');
+            } catch (error) {
+                medicalWarning = error?.message || 'No fue posible cancelar la cita médica previa.';
+            }
+        }
+
+        if (!medicalSupport) {
+            await bookingRef.update({
+                linkedMediCitaId: null,
+                medicalSupportRequested: false,
+                medicalSupportStatus: medicalWarning ? 'warning' : null,
+                medicalSupportQueuePosition: 0,
+                medicalSupportProfessionalName: null,
+                medicalSupportLinkedAt: null,
+                medicalSupportError: medicalWarning
+            });
+            return {
+                ...reservationResult,
+                medicalSupportStatus: medicalWarning ? 'warning' : null,
+                medicalSupportWarning: medicalWarning
+            };
+        }
+
+        try {
+            const medicalResult = await createMedicalSupportAppointment(ctx, {
+                user,
+                bookingId,
+                bookingDate,
+                lactarioType: type
+            });
+
+            await bookingRef.update({
+                linkedMediCitaId: medicalResult.citaId,
+                medicalSupportRequested: true,
+                medicalSupportStatus: medicalResult.status,
+                medicalSupportQueuePosition: medicalResult.queuePosition || 0,
+                medicalSupportProfessionalName: medicalResult.professionalName || null,
+                medicalSupportLinkedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                medicalSupportError: medicalWarning
+            });
+
+            return {
+                ...reservationResult,
+                medicalSupportStatus: medicalResult.status,
+                medicalSupportQueuePosition: medicalResult.queuePosition || 0,
+                medicalSupportProfessionalName: medicalResult.professionalName || null,
+                medicalSupportWarning: medicalWarning
+            };
+        } catch (error) {
+            await bookingRef.update({
+                linkedMediCitaId: null,
+                medicalSupportRequested: true,
+                medicalSupportStatus: 'error',
+                medicalSupportQueuePosition: 0,
+                medicalSupportProfessionalName: null,
+                medicalSupportLinkedAt: null,
+                medicalSupportError: error?.message || 'No fue posible reprogramar la asistencia médica.'
+            });
+
+            return {
+                ...reservationResult,
+                medicalSupportStatus: 'error',
+                medicalSupportError: error?.message || 'No fue posible reprogramar la asistencia médica.',
+                medicalSupportWarning: medicalWarning
+            };
+        }
+    }
+
+    async function getAdminBookings(ctx, { dateStr, status = 'all', type = 'all' } = {}) {
+        const targetDate = dateStr || toISO(new Date());
+        const { start, end } = getDateRange(targetDate);
+        const q = await ctx.db.collection(C_RESERVAS)
+            .where('dateQuery', '>=', start)
+            .where('dateQuery', '<=', end)
+            .orderBy('dateQuery', 'asc')
+            .get();
+
+        return q.docs
+            .map((doc) => normalizeBookingDoc(doc))
+            .filter((booking) => status === 'all' ? true : booking.status === status)
+            .filter((booking) => type === 'all' ? true : booking.type === type);
+    }
+
+    async function getActiveFridgeItems(ctx) {
+        const q = await ctx.db.collection(C_RESERVAS)
+            .where('fridgeStatus', '==', 'stored')
+            .get();
+
+        return q.docs
+            .map((doc) => ({
+                ...normalizeBookingDoc(doc),
+                fridgeTime: resolveDateLike(doc.data().fridgeTime)
+            }))
+            .sort((a, b) => (b.fridgeTime?.getTime() || 0) - (a.fridgeTime?.getTime() || 0));
+    }
+
+    async function getAdminDashboardSnapshot(ctx, dateStr = toISO(new Date())) {
+        const [bookings, activeFridgeItems] = await Promise.all([
+            getAdminBookings(ctx, { dateStr }),
+            getActiveFridgeItems(ctx)
+        ]);
+
+        const now = new Date();
+        const target = new Date(`${dateStr}T00:00:00`);
+        const isToday = target.toDateString() === now.toDateString();
+
+        const summary = {
+            total: bookings.length,
+            confirmed: bookings.filter((item) => item.status === 'confirmed').length,
+            checkedIn: bookings.filter((item) => item.status === 'checked-in').length,
+            completed: bookings.filter((item) => item.status === 'completed').length,
+            cancelled: bookings.filter((item) => item.status === 'cancelled').length,
+            noShow: bookings.filter((item) => item.status === 'no-show').length,
+            upcoming: bookings.filter((item) => item.status === 'confirmed' && (!isToday || (item.date && item.date >= now))).length,
+            delayedCheckins: bookings.filter((item) => item.status === 'confirmed' && isToday && item.date && item.date < now).length,
+            medicalSupport: bookings.filter((item) => item.medicalSupportRequested).length,
+            fridgesInUse: activeFridgeItems.length
+        };
+
+        return {
+            dateStr,
+            summary,
+            bookings,
+            activeFridgeItems
+        };
+    }
+
+    async function adminUpdateBookingStatus(ctx, bookingId, { status, reason = '' } = {}) {
+        const allowedStatuses = ['confirmed', 'checked-in', 'completed', 'cancelled', 'no-show'];
+        if (!allowedStatuses.includes(status)) {
+            throw new Error('Estado de reserva no válido.');
+        }
+
+        const bookingRef = ctx.db.collection(C_RESERVAS).doc(bookingId);
+        const snap = await bookingRef.get();
+        if (!snap.exists) throw new Error('Reserva no encontrada.');
+
+        const booking = snap.data();
+        const updates = {
+            status,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        };
+
+        if (status === 'checked-in' && !booking.checkInTime) {
+            updates.checkInTime = firebase.firestore.FieldValue.serverTimestamp();
+        }
+
+        if (status === 'completed') {
+            if (!booking.checkInTime) {
+                updates.checkInTime = firebase.firestore.FieldValue.serverTimestamp();
+            }
+            updates.checkOutTime = firebase.firestore.FieldValue.serverTimestamp();
+        }
+
+        if (status === 'cancelled') {
+            updates.cancelReason = reason || 'Cancelada por administración';
+            updates.cancelledAt = firebase.firestore.FieldValue.serverTimestamp();
+        }
+
+        if (status === 'no-show') {
+            updates.autoCancelledAt = firebase.firestore.FieldValue.serverTimestamp();
+            updates.cancelReason = reason || 'Marcada como no-show por administración';
+        }
+
+        if ((status === 'cancelled' || status === 'no-show') && booking.linkedMediCitaId) {
+            try {
+                await cancelLinkedMedicalAppointment(ctx, booking.linkedMediCitaId, updates.cancelReason);
+                updates.medicalSupportStatus = 'cancelled';
+            } catch (error) {
+                updates.medicalSupportStatus = 'warning';
+                updates.medicalSupportError = error?.message || 'No fue posible cancelar la cita médica vinculada.';
+            }
+        }
+
+        await bookingRef.update(updates);
+        return {
+            id: bookingId,
+            status,
+            reason: updates.cancelReason || null
+        };
+    }
+
 
     // --- FRIDGE MANAGEMENT ---
     async function getFridges(ctx) {
@@ -541,9 +1042,10 @@ const LactarioService = (function () {
         return snaps.docs.map(d => ({ id: d.id, ...d.data() }));
     }
 
-    async function addFridge(ctx, name) {
+    async function addFridge(ctx, name, limit = 10) {
         return ctx.db.collection('lactario_fridges').add({
             name,
+            limit: Number.isFinite(limit) && limit > 0 ? limit : 10,
             active: true,
             createdAt: firebase.firestore.FieldValue.serverTimestamp()
         });
@@ -562,8 +1064,30 @@ const LactarioService = (function () {
     }
 
     async function useFridge(ctx, bookingId, fridgeQR) {
-        // Simple update to booking
-        return ctx.db.collection(C_RESERVAS).doc(bookingId).update({
+        const fridgeRef = ctx.db.collection('lactario_fridges').doc(fridgeQR);
+        const fridgeSnap = await fridgeRef.get();
+        if (!fridgeSnap.exists) {
+            throw new Error('El QR del refrigerador no es válido.');
+        }
+        if (fridgeSnap.data()?.active === false) {
+            throw new Error('Este refrigerador está inactivo en este momento.');
+        }
+
+        const bookingRef = ctx.db.collection(C_RESERVAS).doc(bookingId);
+        const bookingSnap = await bookingRef.get();
+        if (!bookingSnap.exists) {
+            throw new Error('No se encontró la reserva activa para el frigobar.');
+        }
+
+        const booking = bookingSnap.data();
+        if (booking.status !== 'checked-in') {
+            throw new Error('Solo puedes registrar frigobar durante una visita en curso.');
+        }
+        if (booking.fridgeStatus === 'stored') {
+            throw new Error('Tu contenedor ya está registrado en frigobar.');
+        }
+
+        return bookingRef.update({
             fridgeUsed: true,
             fridgeStatus: 'stored', // NEW: track status
             fridgeId: fridgeQR,
@@ -571,7 +1095,21 @@ const LactarioService = (function () {
         });
     }
 
-    async function pickupFridge(ctx, bookingId) {
+    async function pickupFridge(ctx, bookingId, fridgeQR = null) {
+        const bookingRef = ctx.db.collection(C_RESERVAS).doc(bookingId);
+        const bookingSnap = await bookingRef.get();
+        if (!bookingSnap.exists) {
+            throw new Error('No se encontró el registro del frigobar.');
+        }
+
+        const booking = bookingSnap.data();
+        if (booking.fridgeStatus !== 'stored') {
+            throw new Error('Este registro ya no está pendiente de retiro.');
+        }
+        if (fridgeQR && booking.fridgeId && booking.fridgeId !== fridgeQR) {
+            throw new Error('El QR escaneado no coincide con tu resguardo.');
+        }
+
         return ctx.db.collection(C_RESERVAS).doc(bookingId).update({
             fridgeStatus: 'picked_up',
             fridgePickupTime: firebase.firestore.FieldValue.serverTimestamp()
@@ -586,7 +1124,6 @@ const LactarioService = (function () {
             .orderBy('fridgeTime', 'desc')
             .get();
 
-        return q.docs.map(d => ({ id: d.id, ...d.data(), fridgeTime: d.data().fridgeTime?.toDate() }));
         return q.docs.map(d => ({ id: d.id, ...d.data(), fridgeTime: d.data().fridgeTime?.toDate() }));
     }
 
@@ -626,9 +1163,17 @@ const LactarioService = (function () {
         // Admin
         addSpace,
         toggleSpace,
+        updateSpace,
         deleteSpace,
         updateConfig,
         getStats,
+        getUserHistorySummary,
+        getUserBookingHistory,
+        rescheduleReservation,
+        getAdminBookings,
+        getActiveFridgeItems,
+        getAdminDashboardSnapshot,
+        adminUpdateBookingStatus,
         // Fridges
         getFridges,
         addFridge,
@@ -636,7 +1181,6 @@ const LactarioService = (function () {
         toggleFridge,
         deleteFridge,
         useFridge,
-        pickupFridge,
         pickupFridge,
         getFridgeStatus,
         // Psych

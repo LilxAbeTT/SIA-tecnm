@@ -327,36 +327,74 @@ const VocacionalService = (function () {
     }
 
     async function getCRMStats() {
-        const snapshot = await getDb().collection(COLLECTION_NAME).get();
-        const total = snapshot.docs.length;
-        let completed = 0;
-        let careersCount = {};
-        let prepasCount = {};
+        const CACHE_DOC = 'vocacional_stats';
+        const cacheRef = getDb().collection('reportes_cache').doc(CACHE_DOC);
 
-        snapshot.docs.forEach(doc => {
-            const data = doc.data();
-            if (data.testStatus === 'completed') {
-                completed++;
-                if (data.recommendedCareers && data.recommendedCareers.length > 0) {
-                    const top1 = data.recommendedCareers[0].name;
-                    careersCount[top1] = (careersCount[top1] || 0) + 1;
+        try {
+            // 1. Intentar leer desde caché
+            const docSnap = await cacheRef.get();
+            const now = Date.now();
+            let needsRefresh = true;
+
+            if (docSnap.exists) {
+                const data = docSnap.data();
+                const lastUpdated = data.lastUpdated ? data.lastUpdated.toMillis() : 0;
+                // Si la caché tiene menos de 1 hora de antigüedad, la usamos
+                if (now - lastUpdated < 3600000) {
+                    needsRefresh = false;
+                    return data.stats;
                 }
             }
-            if (data.personalInfo && data.personalInfo.highSchool) {
-                const prepa = data.personalInfo.highSchool;
-                prepasCount[prepa] = (prepasCount[prepa] || 0) + 1;
+
+            // 2. Si necesita refresh (no existe o expiró), calculamos desde la base de datos
+            console.log("Generando nueva caché de Estadísticas del CRM Vocacional...");
+            const snapshot = await getDb().collection(COLLECTION_NAME).get();
+            const total = snapshot.docs.length;
+            let completed = 0;
+            let careersCount = {};
+            let prepasCount = {};
+
+            snapshot.docs.forEach(doc => {
+                const data = doc.data();
+                if (data.testStatus === 'completed') {
+                    completed++;
+                    if (data.recommendedCareers && data.recommendedCareers.length > 0) {
+                        const top1 = data.recommendedCareers[0].name;
+                        careersCount[top1] = (careersCount[top1] || 0) + 1;
+                    }
+                }
+                if (data.personalInfo && data.personalInfo.highSchool) {
+                    const prepa = data.personalInfo.highSchool;
+                    prepasCount[prepa] = (prepasCount[prepa] || 0) + 1;
+                }
+            });
+
+            const ofertaObj = Object.values(VOCACIONAL_CATALOGS.careersITES).map(c => ({ id: c.name, name: c.name }));
+
+            const stats = {
+                totalAspirantes: total,
+                totalCompleted: completed,
+                demandaCareers: careersCount,
+                procedenciaPrepas: prepasCount,
+                ofertaEducativa: ofertaObj
+            };
+
+            // 3. Guardar en caché
+            try {
+                await cacheRef.set({
+                    stats: stats,
+                    lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+                });
+            } catch (err) {
+                console.warn("No se pudo guardar la caché de vocacional (quizás reglas de seguridad), devolviendo datos en vivo:", err);
             }
-        });
 
-        const ofertaObj = Object.values(VOCACIONAL_CATALOGS.careersITES).map(c => ({ id: c.name, name: c.name }));
+            return stats;
 
-        return {
-            totalAspirantes: total,
-            totalCompleted: completed,
-            demandaCareers: careersCount,
-            procedenciaPrepas: prepasCount,
-            ofertaEducativa: ofertaObj
-        };
+        } catch (error) {
+            console.error("Error al obtener estadísticas del CRM:", error);
+            throw error;
+        }
     }
 
     function getCatalog() {

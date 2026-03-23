@@ -1,0 +1,61 @@
+[1m[37mCompound Indexes[39m[22m
+[32m[READY] [39m[36m(aula-comentarios)[39m -- (publicacionId,ASCENDING) (createdAt,ASCENDING)  -- [36mDensity:SPARSE_ALL [39m
+[32m[READY] [39m[36m(aula-cursos)[39m -- (creadoPor,ASCENDING) (createdAt,DESCENDING)  -- [36mDensity:SPARSE_ALL [39m
+[32m[READY] [39m[36m(aula-cursos)[39m -- (publico,ASCENDING) (createdAt,DESCENDING)  -- [36mDensity:SPARSE_ALL [39m
+[32m[READY] [39m[36m(aula-entregas)[39m -- (claseId,ASCENDING) (estudianteId,ASCENDING) (entregadoAt,DESCENDING)  -- [36mDensity:SPARSE_ALL [39m
+[32m[READY] [39m[36m(aula-inscripciones)[39m -- (cursoId,ASCENDING) (fechaInscripcion,DESCENDING)  -- [36mDensity:SPARSE_ALL [39m
+[32m[READY] [39m[36m(aula-inscripciones)[39m -- (studentId,ASCENDING) (fechaInscripcion,DESCENDING)  -- [36mDensity:SPARSE_ALL [39m
+[32m[READY] [39m[36m(aula-intentos)[39m -- (cursoId,ASCENDING) (at,DESCENDING)  -- [36mDensity:SPARSE_ALL [39m
+[32m[READY] [39m[36m(aula-publicaciones)[39m -- (carrera,ASCENDING) (tipo,ASCENDING) (visibleCarrera,ASCENDING) (createdAt,DESCENDING)  -- [36mDensity:SPARSE_ALL [39m
+[32m[READY] [39m[36m(aula-publicaciones)[39m -- (claseId,ASCENDING) (createdAt,DESCENDING)  -- [36mDensity:SPARSE_ALL [39m
+[32m[READY] [39m[36m(aula-publicaciones)[39m -- (claseId,ASCENDING) (tipo,ASCENDING) (createdAt,ASCENDING)  -- [36mDensity:SPARSE_ALL [39m
+[32m[READY] [39m[36m(aula-publicaciones)[39m -- (claseId,ASCENDING) (tipo,ASCENDING) (createdAt,DESCENDING)  -- [36mDensity:SPARSE_ALL [39m
+[32m[READY] [39m[36m(aula-publicaciones)[39m -- (tipo,ASCENDING) (fechaEntrega,ASCENDING)  -- [36mDensity:SPARSE_ALL [39m
+[32m[READY] [39m[36m(avisos)[39m -- (modulo,ASCENDING) (createdAt,DESCENDING)  -- [36mDensity:SPARSE_ALL [39m
+[32m[READY] [39m[36m(avisos)[39m -- (status,ASCENDING) (createdAt,DESCENDING)  -- [36mDensity:SPARSE_ALL [39m
+[32m[READY] [39m[36m(biblio-activos)[39m -- (occupiedBy,ASCENDING) (status,ASCENDING)  -- [36mDensity:SPARSE_ALL [39m
+[32m[READY] [39m[36m(biblio-activos)[39m -- (occupiedBy,ASCENDING) (tipo,ASCENDING) (status,ASCENDING)  -- [36mDensity:SPARSE_ALL [39m
+[32m[READY] [39m[36m(biblio-activos)[39m -- (tipo,ASCENDING) (status,ASCENDING)  -- [36mDensity:SPARSE_ALL [39m
+[32m[READY] [39m[36m(biblio-catalogo)[39m -- (active,ASCENDING) (tituloSearch,ASCENDING)  -- [36mDensity:SPARSE_ALL [39m
+[32m[READY] [39m[36m(biblio-reservas)[39m -- (date,ASCENDING) (tipo,ASCENDING) (status,ASCENDING)  -- [36mDensity:SPARSE_ALL [39m
+[32m[READY] [39m[36m(biblio-reservas)[39m -- (status,ASCENDING) (studentId,ASCENDING) (date,ASCENDING)  -- [36mDensity:SPARSE_ALL [39m
+[32m[READY] [39m[36m(biblio-reservas)[39m -- (studentId,ASCENDING) (createdAt,DESCENDING)  -- [36mDensity:SPARSE_ALL [39m
+[32m[READY] [39m[36m(biblio-reservas)[39m -- (studentId,ASCENDING) (date,ASCENDING)  -- [36mDensity:SPARSE_ALL [39m
+[32m[READY] [39m[36m(biblio-reservas)[39m -- (studentId,ASCENDING) (date,ASCENDING) (status,ASCENDING)  -- [36mDensity:SPARSE_ALL [39m
+[32m[READY] [39m[36m(biblio-solicitudes)[39m -- (status,ASCENDING) (createdAt,DESCENDING)  -- [36mDensity:SPARSE_ALL [39m
+[32m[READY] [39m[36m(biblio-visitas)[39m -- (matricula,ASCENDING) (fecha,DESCENDING)  -- [36mDensity:SPARSE_ALL [39m
+[32m[READY] [39m[36m(cafeteria-pedidos)[39m -- (estado,ASCENDING) (createdAt,DESCENDING)  -- [36mDensity:SPARSE_ALL [39m
+[32m[READY] [39m[36m(cafeteria-pedidos)[39m -- (userId,ASCENDING) (createdAt,DESCENDING)  -- [36mDensity:SPARSE_ALL [39m
+[32m[READY] [39m[36m(cafeteria-productos)[39m -- (disponible,ASCENDING) (orden,ASCENDING)  -- [36mDensity:SPARSE_ALL [39m
+[32m[READY] [39m[36m(cafeteria-resenas)[39m -- (productoId,ASCENDING) (visible,ASCENDING) (createdAt,DESCENDING)  -- [36mDensity:SPARSE_ALL [39m
+[32m[READY] [39m[36m(cafeteria-resenas)[39m -- (tipo,ASCENDING) (visible,ASCENDING) (createdAt,DESCENDING)  -- [36mDensity:SPARSE_ALL [39m
+[32m[READY] [39m[36m(citas-medi)[39m -- (estado,ASCENDING) (fechaHoraSlot,ASCENDING)  -- [36mDensity:SPARSE_ALL [39m
+[32m[READY] [39m[36m(citas-medi)[39m -- (estado,ASCENDING) (fechaSolicitud,ASCENDING)  -- [36mDensity:SPARSE_ALL [39m
+[32m[READY] [39m[36m(citas-medi)[39m -- (estado,ASCENDING) (profesionalId,ASCENDING) (fechaHoraSlot,ASCENDING)  -- [36mDensity:SPARSE_ALL [39m
+[32m[READY] [39m[36m(citas-medi)[39m -- (estado,ASCENDING) (studentId,ASCENDING) (fechaHoraSlot,ASCENDING)  -- [36mDensity:SPARSE_ALL [39m
+[32m[READY] [39m[36m(citas-medi)[39m -- (estado,ASCENDING) (studentId,ASCENDING) (fechaHoraSlot,DESCENDING)  -- [36mDensity:SPARSE_ALL [39m
+[32m[READY] [39m[36m(citas-medi)[39m -- (estado,ASCENDING) (tipoServicio,ASCENDING) (fechaHoraSlot,ASCENDING)  -- [36mDensity:SPARSE_ALL [39m
+[32m[READY] [39m[36m(citas-medi)[39m -- (studentId,ASCENDING) (fechaHoraSlot,DESCENDING)  -- [36mDensity:SPARSE_ALL [39m
+[32m[READY] [39m[36m(citas-medi)[39m -- (studentId,ASCENDING) (fechaSolicitud,DESCENDING)  -- [36mDensity:SPARSE_ALL [39m
+[32m[READY] [39m[36m(consultas)[39m -- (autorId,ASCENDING) (createdAt,DESCENDING)  -- [36mDensity:SPARSE_ALL [39m
+[32m[READY] [39m[36m(consultas)[39m -- (autorId,ASCENDING) (estado,ASCENDING) (createdAt,ASCENDING)  -- [36mDensity:SPARSE_ALL [39m
+[32m[READY] [39m[36m(consultas)[39m -- (autorId,ASCENDING) (estado,ASCENDING) (createdAt,DESCENDING)  -- [36mDensity:SPARSE_ALL [39m
+[32m[READY] [39m[36m(consultas)[39m -- (autorId,ASCENDING) (estado,ASCENDING) (followUp.required,ASCENDING) (createdAt,DESCENDING)  -- [36mDensity:SPARSE_ALL [39m
+[32m[READY] [39m[36m(consultas)[39m -- (estado,ASCENDING) (createdAt,ASCENDING)  -- [36mDensity:SPARSE_ALL [39m
+[32m[READY] [39m[36m(consultas)[39m -- (estado,ASCENDING) (followUp.required,ASCENDING) (profesionalProfileId,ASCENDING) (createdAt,DESCENDING)  -- [36mDensity:SPARSE_ALL [39m
+[32m[READY] [39m[36m(consultas)[39m -- (estado,ASCENDING) (profesionalProfileId,ASCENDING) (createdAt,ASCENDING)  -- [36mDensity:SPARSE_ALL [39m
+[32m[READY] [39m[36m(consultas)[39m -- (estado,ASCENDING) (profesionalProfileId,ASCENDING) (createdAt,DESCENDING)  -- [36mDensity:SPARSE_ALL [39m
+[32m[READY] [39m[36m(consultas)[39m -- (profesionalProfileId,ASCENDING) (createdAt,DESCENDING)  -- [36mDensity:SPARSE_ALL [39m
+[32m[READY] [39m[36m(encuestas)[39m -- (status,ASCENDING) (createdAt,DESCENDING)  -- [36mDensity:SPARSE_ALL [39m
+[32m[READY] [39m[36m(encuestas)[39m -- (status,ASCENDING) (isPublic,ASCENDING) (createdAt,DESCENDING)  -- [36mDensity:SPARSE_ALL [39m
+[32m[READY] [39m[36m(encuestas-respuestas)[39m -- (surveyId,ASCENDING) (submittedAt,DESCENDING)  -- [36mDensity:SPARSE_ALL [39m
+[32m[READY] [39m[36m(encuestas-respuestas)[39m -- (userId,ASCENDING) (submittedAt,DESCENDING)  -- [36mDensity:SPARSE_ALL [39m
+[32m[READY] [39m[36m(encuestas-servicio-respuestas)[39m -- (serviceType,ASCENDING) (submittedAt,DESCENDING)  -- [36mDensity:SPARSE_ALL [39m
+[32m[READY] [39m[36m(expedientes-clinicos)[39m -- (studentId,ASCENDING) (visiblePaciente,ASCENDING) (createdAt,DESCENDING)  -- [36mDensity:SPARSE_ALL [39m
+[32m[READY] [39m[36m(foro_events)[39m -- (active,ASCENDING) (date,ASCENDING)  -- [36mDensity:SPARSE_ALL [39m
+[32m[READY] [39m[36m(foro_events)[39m -- (createdBy,ASCENDING) (date,DESCENDING)  -- [36mDensity:SPARSE_ALL [39m
+[32m[READY] [39m[36m(foro_events)[39m -- (status,ASCENDING) (date,ASCENDING)  -- [36mDensity:SPARSE_ALL [39m
+[32m[READY] [39m[36m(foro_events)[39m -- (status,ASCENDING) (date,DESCENDING)  -- [36mDensity:SPARSE_ALL [39m
+[32m[READY] [39m[36m(foro_tickets)[39m -- (status,ASCENDING) (userId,ASCENDING) (attendedAt,DESCENDING)  -- [36mDensity:SPARSE_ALL [39m
+[32m[READY] [39m[36m(foro_tickets)[39m -- (status,ASCENDING) (userId,ASCENDING) (eventDate,DESCENDING)  -- [36mDensity:SPARSE_ALL [39m
+[32m[READY] [39m[36m(lactario-bookings)[39m -- (fridgeStatus,ASCENDING) (userId,ASCENDING) (fridgeTime,DESCENDING)  -- [36mDensity:SPARSE_A

@@ -10,10 +10,11 @@ window.AdminVocacional = (function () {
     let aspirantesData = [];
     let lastVisibleDoc = null;
     let hasMoreAspirantes = true;
+    let isInsideReportes = false;
 
-    async function init(ctx) {
+    async function init(ctx, container = null) {
         _ctx = ctx;
-        _ctx.container = document.getElementById('view-vocacional-admin');
+        _ctx.container = container || document.getElementById('view-vocacional-admin');
 
         // Restore tab from state if available
         const savedTab = localStorage.getItem('sia_vocacional_admin_tab');
@@ -36,9 +37,15 @@ window.AdminVocacional = (function () {
             return;
         }
 
-        renderBase();
+        if (!isInsideReportes) {
+            renderBase();
+        } else {
+            _ctx.container.innerHTML = '<div id="vocacional-content"><div class="text-center py-5"><div class="spinner-border text-primary"></div></div></div>';
+        }
         await loadData();
-        setupEventListeners();
+        if (!isInsideReportes) {
+            setupEventListeners();
+        }
     }
 
     function renderBase() {
@@ -116,17 +123,18 @@ window.AdminVocacional = (function () {
                 btnExport.disabled = false;
             }
 
-            renderCurrentTab(stats);
+            await renderCurrentTab(stats);
         } catch (e) {
             console.error(e);
-            document.getElementById('vocacional-content').innerHTML = `
+            let contentEl = document.getElementById('vocacional-content') || _ctx.container;
+            if (contentEl) contentEl.innerHTML = `
             <div class="alert alert-danger shadow-sm"><i class="bi bi-exclamation-triangle me-2"></i>Error al cargar los datos del CRM.</div>
         `;
         }
     }
 
     async function renderCurrentTab(stats) {
-        const content = document.getElementById('vocacional-content');
+        const content = document.getElementById('vocacional-content') || _ctx.container;
         if (currentTab === 'dashboard') {
             renderDashboard(content, stats);
         } else if (currentTab === 'prospectos') {
@@ -264,7 +272,7 @@ window.AdminVocacional = (function () {
             <div class="card-body p-0">
                 <div class="table-responsive">
                     <table class="table table-hover align-middle mb-0">
-                        <thead class="bg-light">
+                        <thead class="">
                             <tr>
                                 <th class="text-uppercase small text-muted fw-bold py-3 px-4">Aspirante</th>
                                 <th class="text-uppercase small text-muted fw-bold py-3">Contacto</th>
@@ -430,7 +438,7 @@ window.AdminVocacional = (function () {
             <div class="modal fade" id="helpEditorModal" tabindex="-1" aria-labelledby="helpEditorModalLabel" aria-hidden="true">
               <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
                 <div class="modal-content border-0 shadow">
-                  <div class="modal-header bg-light border-bottom-0">
+                  <div class="modal-header  border-bottom-0">
                     <h5 class="modal-title fw-bold text-primary" id="helpEditorModalLabel"><i class="bi bi-info-circle-fill me-2"></i>Guía del Editor Vocacional</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                   </div>
@@ -457,7 +465,7 @@ window.AdminVocacional = (function () {
                         <p class="small text-muted mb-0">Si deseas que la elección de una pregunta dispare una alarma automática para los psicólogos (por ejemplo, si manifiestan no querer estudiar), escribe en la caja de 'ID Alerta' un texto breve en formato JSON, ej: <code>{"msg":"Desinterés crítico","type":"red"}</code></p>
                     </div>
                   </div>
-                  <div class="modal-footer bg-light border-top-0">
+                  <div class="modal-footer  border-top-0">
                     <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">Entendido</button>
                   </div>
                 </div>
@@ -502,14 +510,14 @@ window.AdminVocacional = (function () {
                 const blockHTML = `
                 <div class="accordion-item border-0 mb-3 shadow-sm rounded-4 overflow-hidden" data-bindex="${bIndex}">
                     <h2 class="accordion-header">
-                        <button class="accordion-button collapsed bg-light text-dark fw-bold" type="button" data-bs-toggle="collapse" data-bs-target="#${blockId}">
+                        <button class="accordion-button collapsed  text-dark fw-bold" type="button" data-bs-toggle="collapse" data-bs-target="#${blockId}">
                             <i class="bi bi-collection me-2 text-primary"></i> ${escapeHtml(block.title || `Bloque ${bIndex + 1}`)}
                         </button>
                     </h2>
                     <div id="${blockId}" class="accordion-collapse collapse" data-bs-parent="#accordionBlocks">
                         <div class="accordion-body bg-white pt-4">
                             <!-- Metadatos del Bloque -->
-                            <div class="row g-3 mb-4 p-3 bg-light rounded-3 border">
+                            <div class="row g-3 mb-4 p-3  rounded-3 border">
                                 <div class="col-md-5">
                                     <label class="form-label small fw-bold text-muted">Título del Bloque</label>
                                     <input type="text" class="form-control form-control-sm block-title-input" value="${escapeHtml(block.title || '')}" placeholder="Ej. Bloque I: Intereses">
@@ -571,7 +579,7 @@ window.AdminVocacional = (function () {
 
                 return `
                 <div class="card mb-3 border question-card shadow-sm" data-qindex="${qIndex}">
-                    <div class="card-header bg-light border-bottom d-flex justify-content-between align-items-center py-2">
+                    <div class="card-header  border-bottom d-flex justify-content-between align-items-center py-2">
                         <span class="badge bg-secondary">P${qIndex + 1}</span>
                         <button class="btn btn-sm text-danger btn-delete-question p-0" title="Eliminar Pregunta" data-bindex="${bIndex}" data-qindex="${qIndex}"><i class="bi bi-trash"></i></button>
                     </div>
@@ -872,8 +880,25 @@ window.AdminVocacional = (function () {
     }
 
     // Public API
-    return {
-        init
+    const API = {
+        init,
+        render: async function (container) {
+            isInsideReportes = true;
+            const state = window.Reportes.getState();
+            currentTab = state.currentTab || 'dashboard';
+
+            if (!_ctx) {
+                await init(state.ctx, container);
+            } else {
+                _ctx.container = container;
+                container.innerHTML = '<div id="vocacional-content"><div class="text-center py-5"><div class="spinner-border text-primary"></div></div></div>';
+                const stats = await VocacionalService.getCRMStats();
+                await renderCurrentTab(stats);
+            }
+        }
     };
+
+    if (window.Reportes) window.Reportes.Vocacional = API;
+    return API;
 
 })();

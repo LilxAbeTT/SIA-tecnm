@@ -1,388 +1,401 @@
 // public/services/foro-service.js
-// Servicio de datos para el Módulo FORO v6.0 — Eventos Académicos
+// Servicio de Eventos del campus
 
 if (!window.ForoService) {
     window.ForoService = (function () {
-
         const C_EVENTS = 'foro_events';
         const C_TICKETS = 'foro_tickets';
 
-        const VALID_TYPES = ['conferencia', 'exposicion', 'otro'];
+        function getCtxUid(ctx, fallbackProfile) {
+            return (
+                ctx?.user?.uid ||
+                ctx?.auth?.currentUser?.uid ||
+                fallbackProfile?.uid ||
+                ctx?.profile?.uid ||
+                null
+            );
+        }
 
-        // ===============================================
-        // 1. GESTIÓN DE EVENTOS
-        // ===============================================
+        function getFunctions(ctx) {
+            return ctx?.functions || window.SIA?.functions || firebase.functions();
+        }
 
-        // ===============================================
-        // 1. GESTIÓN DE EVENTOS
-        // ===============================================
+        function getStorage(ctx) {
+            return ctx?.storage || window.SIA?.storage || firebase.storage();
+        }
 
-        // Para Difusión: Ver TODO (especialmente pendientes)
-        async function getPendingEvents(ctx) {
+        async function callAction(ctx, name, payload = {}) {
+            const functions = getFunctions(ctx);
+            if (!functions?.httpsCallable) {
+                throw new Error('Firebase Functions no esta disponible.');
+            }
+            const callable = functions.httpsCallable(name);
+            const result = await callable(payload);
+            return result?.data || {};
+        }
+
+        function toDate(value) {
+            if (!value) return null;
+            if (value.toDate) return value.toDate();
+            const date = value instanceof Date ? value : new Date(value);
+            return Number.isNaN(date.getTime()) ? null : date;
+        }
+
+        function getUserCareer(profile) {
+            return profile?.career || profile?.carrera || 'GENERIC';
+        }
+
+        function normalizeFeedbackInput(ctx, userIdOrPayload, rating, comment) {
+            if (userIdOrPayload && typeof userIdOrPayload === 'object' && !Array.isArray(userIdOrPayload)) {
+                return {
+                    rating: parseInt(userIdOrPayload.rating, 10),
+                    comment: userIdOrPayload.comments || userIdOrPayload.comment || ''
+                };
+            }
+
+            return {
+                rating: parseInt(rating, 10),
+                comment: comment || ''
+            };
+        }
+
+        function safeLimit(limit, fallback) {
+            const resolved = parseInt(limit, 10);
+            return Number.isFinite(resolved) && resolved > 0 ? resolved : fallback;
+        }
+
+        function sanitizeFileName(name) {
+            return String(name || 'archivo')
+                .replace(/[^a-z0-9._-]/gi, '_')
+                .replace(/_+/g, '_')
+                .slice(-90);
+        }
+
+        function mapDocs(snapshot) {
+            return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+        }
+
+        function filterEventsByAudience(events, profile) {
+            const career = getUserCareer(profile);
+            return events.filter((event) => {
+                if (!Array.isArray(event.targetAudience) || event.targetAudience.length === 0) return true;
+                if (event.targetAudience.includes('ALL')) return true;
+                return event.targetAudience.includes(career);
+            });
+        }
+
+        async function uploadToStorage(ctx, path, file) {
+            const storage = getStorage(ctx);
+            if (!storage?.ref) {
+                throw new Error('Firebase Storage no esta disponible.');
+            }
+            const ref = storage.ref(path);
+            await ref.put(file, {
+                contentType: file?.type || 'application/octet-stream'
+            });
+            return ref.getDownloadURL();
+        }
+
+        function serializeEventPayload(data) {
+            const resources = Array.isArray(data?.resources)
+                ? data.resources.map((item, index) => ({
+                    id: item?.id || `res_${Date.now()}_${index}`,
+                    title: item?.title || item?.name || '',
+                    type: item?.type || 'link',
+                    description: item?.description || '',
+                    url: item?.url || '',
+                    fileName: item?.fileName || '',
+                    mimeType: item?.mimeType || ''
+                }))
+                : [];
+
+            return {
+                eventId: data?.eventId || '',
+                title: data?.title || '',
+                speaker: data?.speaker || '',
+                location: data?.location || '',
+                description: data?.description || '',
+                type: data?.type || 'otro',
+                capacity: Number(data?.capacity) || 100,
+                targetAudience: Array.isArray(data?.targetAudience) ? data.targetAudience : [],
+                date: toDate(data?.date)?.toISOString() || '',
+                endDate: toDate(data?.endDate)?.toISOString() || '',
+                coverImage: data?.coverImage || '',
+                room: data?.room || '',
+                mapUrl: data?.mapUrl || '',
+                dayInstructions: data?.dayInstructions || '',
+                attendanceOpensMinutesBefore: Number(data?.attendanceOpensMinutesBefore) || 30,
+                attendanceClosesMinutesAfter: Number(data?.attendanceClosesMinutesAfter) || 120,
+                allowSelfCheckIn: data?.allowSelfCheckIn !== false,
+                contactEnabled: data?.contactEnabled !== false,
+                resources,
+                resourcesQrEnabled: data?.resourcesQrEnabled !== false,
+                status: data?.status || ''
+            };
+        }
+
+        async function getPendingEvents(ctx, options = {}) {
+            const limit = safeLimit(options.limit, 40);
             const snap = await ctx.db.collection(C_EVENTS)
                 .where('status', '==', 'pending')
                 .orderBy('date', 'asc')
+                .limit(limit)
                 .get();
-            return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            return mapDocs(snap);
         }
 
-        // Para Difusión: Historial (Aprobados/Rechazados)
-        async function getHistoryEvents(ctx) {
+        async function getHistoryEvents(ctx, options = {}) {
+            const limit = safeLimit(options.limit, 60);
             const snap = await ctx.db.collection(C_EVENTS)
                 .where('status', 'in', ['active', 'rejected', 'cancelled'])
                 .orderBy('date', 'desc')
-                .limit(50)
+                .limit(limit)
                 .get();
-            return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            return mapDocs(snap);
         }
 
-        // Para Jefes de División: Sus propios eventos (cualquier estado)
-        async function getMyEvents(ctx) {
-            const uid = ctx.auth.currentUser.uid;
+        async function getMyEvents(ctx, options = {}) {
+            const uid = getCtxUid(ctx);
+            const limit = safeLimit(options.limit, 60);
             const snap = await ctx.db.collection(C_EVENTS)
                 .where('createdBy', '==', uid)
                 .orderBy('date', 'desc')
+                .limit(limit)
                 .get();
-            return snap.docs.map(d => ({ id: d.id, ...d.data() }));
-
-            // Fallback si índice falla temporalmente (filtrado cliente)
-            /*
-            const allSnap = await ctx.db.collection(C_EVENTS).orderBy('date', 'desc').limit(100).get();
-            return allSnap.docs
-                .map(d => ({ id: d.id, ...d.data() }))
-                .filter(e => e.createdBy === uid);
-            */
+            return mapDocs(snap);
         }
 
-        // Legacy (mantener por compatibilidad si es necesario, OJO: usa getActiveEvents para alumnos)
-        async function getAllEventsAdmin(ctx) {
-            // Este método podría ser ambiguo ahora, lo redirigimos a getMyEvents si no es difusion
-            // Pero mantendremos la lógica original si es Difusion para ver todo.
-            const user = ctx.profile || {};
-            if (user.email === 'difusion@loscabos.tecnm.mx') {
-                const snap = await ctx.db.collection(C_EVENTS).orderBy('date', 'desc').get();
-                return snap.docs.map(d => ({ id: d.id, ...d.data() }));
-            } else {
-                return getMyEvents(ctx);
-            }
+        async function getAllEventsAdmin(ctx, options = {}) {
+            return getMyEvents(ctx, options);
         }
 
-        async function getActiveEvents(ctx) {
-            const today = new Date();
-            const yesterday = new Date(today);
-            yesterday.setDate(today.getDate() - 1);
+        async function getActiveEvents(ctx, options = {}) {
+            const limit = safeLimit(options.limit, 48);
+            const baseline = new Date();
+            baseline.setDate(baseline.getDate() - 1);
 
             const snap = await ctx.db.collection(C_EVENTS)
-                .where('status', '==', 'active') // IMPORTANTE: Solo activos
-                .where('date', '>=', yesterday)
+                .where('status', '==', 'active')
+                .where('date', '>=', baseline)
                 .orderBy('date', 'asc')
+                .limit(limit)
                 .get();
 
-            const user = ctx.profile || {};
-            const userCareer = user.career || 'GENERIC';
+            return filterEventsByAudience(mapDocs(snap), ctx.profile || {});
+        }
 
-            return snap.docs.map(d => ({ id: d.id, ...d.data() }))
-                .filter(evt => {
-                    if (!evt.targetAudience || evt.targetAudience.includes('ALL')) return true;
-                    return evt.targetAudience.includes(userCareer);
-                });
+        async function getEventById(ctx, eventId) {
+            const snap = await ctx.db.collection(C_EVENTS).doc(eventId).get();
+            if (!snap.exists) throw new Error('El evento no existe.');
+            return { id: snap.id, ...snap.data() };
+        }
+
+        function streamActiveEvents(ctx, options = {}, onData, onError) {
+            const limit = safeLimit(options.limit, 48);
+            const baseline = new Date();
+            baseline.setDate(baseline.getDate() - 1);
+
+            return ctx.db.collection(C_EVENTS)
+                .where('status', '==', 'active')
+                .where('date', '>=', baseline)
+                .orderBy('date', 'asc')
+                .limit(limit)
+                .onSnapshot((snapshot) => {
+                    onData(filterEventsByAudience(mapDocs(snapshot), ctx.profile || {}));
+                }, onError);
         }
 
         async function createEvent(ctx, data) {
-            if (data.type && !VALID_TYPES.includes(data.type)) {
-                throw new Error('Tipo de evento inválido. Usa: conferencia, exposicion, otro');
-            }
-
-            const user = ctx.profile || {};
-            const isDifusion = user.email === 'difusion@loscabos.tecnm.mx';
-
-            // ESTADO INICIAL: Active si es Difusion, Pending si es Jefe
-            const initialStatus = isDifusion ? 'active' : 'pending';
-
-            await ctx.db.collection(C_EVENTS).add({
-                ...data,
-                type: data.type || 'otro',
-                coverImage: data.coverImage || '',
-                registeredCount: 0,
-                status: initialStatus,
-                createdBy: ctx.auth.currentUser.uid,
-                createdByName: user.displayName || 'Admin',
-                createdByEmail: user.email || '',
-                createdAt: new Date(),
-                division: user.departmentConfig ? Object.keys(user.departmentConfig)[0] : 'general'
-            });
+            return callAction(ctx, 'foroUpsertEvent', serializeEventPayload(data));
         }
 
         async function updateEvent(ctx, id, data) {
-            await ctx.db.collection(C_EVENTS).doc(id).update(data);
+            return callAction(ctx, 'foroUpsertEvent', serializeEventPayload({ ...data, eventId: id }));
         }
 
         async function deleteEvent(ctx, id) {
-            // Soft delete: Change status to 'cancelled'
-            await ctx.db.collection(C_EVENTS).doc(id).update({
-                status: 'cancelled',
-                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-            });
+            return callAction(ctx, 'foroCancelEvent', { eventId: id });
         }
 
-        // --- VALIDACIÓN ---
-
         async function approveEvent(ctx, eventId) {
-            await ctx.db.collection(C_EVENTS).doc(eventId).update({
-                status: 'active',
-                validatedBy: ctx.profile.email,
-                validatedAt: new Date(),
-                rejectionReason: null // Limpiar si hubo rechazo previo
-            });
+            return callAction(ctx, 'foroReviewEvent', { eventId, action: 'approve' });
         }
 
         async function rejectEvent(ctx, eventId, reason) {
-            await ctx.db.collection(C_EVENTS).doc(eventId).update({
-                status: 'rejected',
-                rejectedBy: ctx.profile.email,
-                rejectedAt: new Date(),
-                rejectionReason: reason || 'Sin motivo especificado'
-            });
+            return callAction(ctx, 'foroReviewEvent', { eventId, action: 'reject', reason: reason || '' });
         }
 
-        // ===============================================
-        // 2. INSCRIPCIÓN Y TICKETS
-        // ===============================================
-
-        async function registerUser(ctx, event, userProfile) {
-            const evtRef = ctx.db.collection(C_EVENTS).doc(event.id);
-
-            return ctx.db.runTransaction(async (t) => {
-                const doc = await t.get(evtRef);
-                const evtData = doc.data();
-
-                if (evtData.registeredCount >= evtData.capacity) {
-                    throw new Error("El evento está lleno.");
-                }
-
-                // Verificar duplicado
-                const existing = await ctx.db.collection(C_TICKETS)
-                    .where('eventId', '==', event.id)
-                    .where('userId', '==', userProfile.uid)
-                    .limit(1)
-                    .get();
-
-                if (!existing.empty) {
-                    throw new Error("Ya estás inscrito a este evento.");
-                }
-
-                const ticketRef = ctx.db.collection(C_TICKETS).doc();
-
-                t.set(ticketRef, {
-                    eventId: event.id,
-                    eventTitle: evtData.title,
-                    eventLocation: evtData.location,
-                    eventDate: evtData.date,
-                    eventType: evtData.type || 'otro',
-                    userId: userProfile.uid,
-                    userName: userProfile.displayName,
-                    userMatricula: userProfile.matricula,
-                    userCareer: userProfile.career || 'N/A',
-                    qrCodeData: `SIA:FORO:${event.id}:${userProfile.uid}`,
-                    status: 'registered',
-                    registeredAt: new Date()
-                });
-
-                t.update(evtRef, { registeredCount: evtData.registeredCount + 1 });
-            });
+        async function registerUser(ctx, event) {
+            return callAction(ctx, 'foroRegister', { eventId: event.id || event });
         }
 
-        async function getUserTickets(ctx, uid) {
+        async function cancelRegistration(ctx, ticketId) {
+            return callAction(ctx, 'foroCancelRegistration', { ticketId });
+        }
+
+        async function getUserTickets(ctx, uid, options = {}) {
+            const limit = safeLimit(options.limit, 60);
             const snap = await ctx.db.collection(C_TICKETS)
                 .where('userId', '==', uid)
                 .where('status', 'in', ['registered', 'attended'])
                 .orderBy('eventDate', 'desc')
+                .limit(limit)
                 .get();
-            return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            return mapDocs(snap);
         }
 
-        // ===============================================
-        // 3. ASISTENCIA (QR)
-        // ===============================================
-
-        async function markAttendance(ctx, qrData) {
-            const parts = qrData.split(':');
-            if (parts.length !== 4 || parts[0] !== 'SIA' || parts[1] !== 'FORO') {
-                throw new Error("Código QR inválido o de otro sistema.");
-            }
-
-            const [, , eventId, userId] = parts;
-
-            const ticketQuery = await ctx.db.collection(C_TICKETS)
-                .where('eventId', '==', eventId)
-                .where('userId', '==', userId)
-                .limit(1)
-                .get();
-
-            if (ticketQuery.empty) {
-                throw new Error("El alumno no está inscrito a este evento.");
-            }
-
-            const ticketDoc = ticketQuery.docs[0];
-            const ticket = ticketDoc.data();
-
-            if (ticket.status === 'attended') {
-                throw new Error(`${ticket.userName} YA registró asistencia.`);
-            }
-
-            await ctx.db.collection(C_TICKETS).doc(ticketDoc.id).update({
-                status: 'attended',
-                attendedAt: new Date()
-            });
-
-            return { userName: ticket.userName, eventTitle: ticket.eventTitle };
-        }
-
-        async function markBulkAttendance(ctx, eventId) {
-            const snap = await ctx.db.collection(C_TICKETS)
-                .where('eventId', '==', eventId)
-                .where('status', '==', 'registered')
-                .get();
-
-            if (snap.empty) return { count: 0 };
-
-            const batch = ctx.db.batch();
-            snap.docs.forEach(doc => {
-                batch.update(doc.ref, {
-                    status: 'attended',
-                    attendedAt: new Date()
-                });
-            });
-
-            await batch.commit();
-            return { count: snap.size };
-        }
-
-        async function getEventAttendees(ctx, eventId) {
-            const snap = await ctx.db.collection(C_TICKETS)
-                .where('eventId', '==', eventId)
-                .get();
-            return snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        }
-
-        // ===============================================
-        // 4. DASHBOARD STORIES
-        // ===============================================
-
-        async function getEventsForStories(ctx) {
-            if (!ctx.user) return [];
-
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-
-            const snap = await ctx.db.collection(C_EVENTS)
-                .where('date', '>=', today)
-                .where('status', '==', 'active')
-                .orderBy('date', 'asc')
-                .limit(10)
-                .get();
-
-            const events = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-
-            const results = [];
-            for (const event of events) {
-                const ticketSnap = await ctx.db.collection(C_TICKETS)
-                    .where('eventId', '==', event.id)
-                    .where('userId', '==', ctx.user.uid)
-                    .limit(1)
-                    .get();
-
-                results.push({
-                    ...event,
-                    registered: !ticketSnap.empty,
-                    source: 'foro'
-                });
-            }
-
-            return results;
-        }
-
-        // ===============================================
-        // 5. CANCELACIÓN DE INSCRIPCIÓN
-        // ===============================================
-
-        async function cancelRegistration(ctx, ticketId, eventId) {
-            const ticketRef = ctx.db.collection(C_TICKETS).doc(ticketId);
-            const eventRef = ctx.db.collection(C_EVENTS).doc(eventId);
-
-            return ctx.db.runTransaction(async (t) => {
-                const ticket = await t.get(ticketRef);
-                const event = await t.get(eventRef);
-
-                if (!ticket.exists) throw new Error("Ticket no encontrado.");
-                if (!event.exists) throw new Error("Evento no encontrado.");
-
-                const ticketData = ticket.data();
-                const eventData = event.data();
-
-                const eventDate = ticketData.eventDate?.toDate
-                    ? ticketData.eventDate.toDate()
-                    : new Date(ticketData.eventDate);
-                if (eventDate < new Date()) {
-                    throw new Error("No puedes cancelar despues de que inicio el evento.");
-                }
-                if (ticketData.status === 'attended') {
-                    throw new Error("No puedes cancelar un evento al que ya asististe.");
-                }
-
-                t.delete(ticketRef);
-                t.update(eventRef, {
-                    registeredCount: Math.max(0, (eventData.registeredCount || 1) - 1)
-                });
-            });
-        }
-
-        // ===============================================
-        // 6. HISTORIAL DE PARTICIPACIÓN
-        // ===============================================
-
-        async function getUserEventHistory(ctx, uid) {
+        async function getUserEventHistory(ctx, uid, options = {}) {
+            const limit = safeLimit(options.limit, 80);
             const snap = await ctx.db.collection(C_TICKETS)
                 .where('userId', '==', uid)
                 .where('status', '==', 'attended')
                 .orderBy('attendedAt', 'desc')
+                .limit(limit)
                 .get();
-            return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            return mapDocs(snap);
         }
 
-        // ===============================================
-        // 7. FEEDBACK POST-EVENTO
-        // ===============================================
+        async function markAttendance(ctx, qrData) {
+            return callAction(ctx, 'foroMarkAttendance', { qrData });
+        }
 
-        async function submitEventFeedback(ctx, ticketId, eventId, userId, rating, comment) {
-            await ctx.db.collection(C_EVENTS).doc(eventId)
-                .collection('feedback').add({
-                    ticketId,
-                    eventId,
-                    userId,
-                    rating: parseInt(rating),
-                    comment: comment || '',
-                    submittedAt: new Date()
-                });
+        async function markAttendanceByEventQR(ctx, qrData) {
+            return callAction(ctx, 'foroMarkAttendanceByEventQr', { qrData });
+        }
 
-            await ctx.db.collection(C_TICKETS).doc(ticketId).update({
-                feedbackSubmitted: true
+        async function processStudentQr(ctx, qrData) {
+            if (String(qrData || '').startsWith('SIA:FORO_EVENT:')) {
+                const result = await markAttendanceByEventQR(ctx, qrData);
+                return { type: 'attendance', ...result };
+            }
+
+            if (String(qrData || '').startsWith('SIA:FORO_RES:')) {
+                const parts = String(qrData).split(':');
+                const eventId = parts[2];
+                const resources = await getEventResources(ctx, { eventId, qrData });
+                return { type: 'resources', ...resources };
+            }
+
+            throw new Error('El QR no corresponde a asistencia ni a recursos del evento.');
+        }
+
+        async function markBulkAttendance() {
+            throw new Error('La asistencia masiva ya no esta habilitada en cliente.');
+        }
+
+        async function getEventAttendees(ctx, eventId, options = {}) {
+            const limit = safeLimit(options.limit, 5000);
+            let query = ctx.db.collection(C_TICKETS)
+                .where('eventId', '==', eventId);
+
+            if (limit) {
+                query = query.limit(limit);
+            }
+
+            const snap = await query.get();
+
+            return mapDocs(snap).sort((left, right) => {
+                const a = toDate(right.registeredAt) || new Date(0);
+                const b = toDate(left.registeredAt) || new Date(0);
+                return a.getTime() - b.getTime();
+            });
+        }
+
+        async function getEventsForStories(ctx) {
+            if (!ctx?.user?.uid) return [];
+            const now = new Date();
+            now.setHours(0, 0, 0, 0);
+
+            const [eventsSnap, ticketsSnap] = await Promise.all([
+                ctx.db.collection(C_EVENTS)
+                    .where('status', '==', 'active')
+                    .where('date', '>=', now)
+                    .orderBy('date', 'asc')
+                    .limit(10)
+                    .get(),
+                ctx.db.collection(C_TICKETS)
+                    .where('userId', '==', ctx.user.uid)
+                    .where('status', 'in', ['registered', 'attended'])
+                    .orderBy('eventDate', 'desc')
+                    .limit(40)
+                    .get()
+            ]);
+
+            const registeredIds = new Set(mapDocs(ticketsSnap).map((ticket) => ticket.eventId));
+            return filterEventsByAudience(mapDocs(eventsSnap), ctx.profile || {}).map((event) => ({
+                ...event,
+                registered: registeredIds.has(event.id),
+                source: 'foro'
+            }));
+        }
+
+        async function submitEventFeedback(ctx, ticketId, eventId, userIdOrPayload, rating, comment) {
+            const normalized = normalizeFeedbackInput(ctx, userIdOrPayload, rating, comment);
+            return callAction(ctx, 'foroSubmitFeedback', {
+                ticketId,
+                eventId,
+                rating: normalized.rating,
+                comment: normalized.comment
             });
         }
 
         function canSubmitFeedback(ticket) {
             if (!ticket || ticket.status !== 'attended') return false;
             if (ticket.feedbackSubmitted) return false;
-            const attendedAt = ticket.attendedAt?.toDate
-                ? ticket.attendedAt.toDate()
-                : new Date(ticket.attendedAt);
-            const hoursSince = (new Date() - attendedAt) / 3600000;
-            return hoursSince <= 48;
+            const attendedAt = toDate(ticket.attendedAt);
+            if (!attendedAt) return false;
+            return (Date.now() - attendedAt.getTime()) <= 48 * 60 * 60 * 1000;
         }
 
-        // ===============================================
-        // 8. CONSTANCIA PDF
-        // ===============================================
+        async function getEventQrPayload(ctx, eventId, kind = 'attendance') {
+            return callAction(ctx, 'foroGetEventQrPayload', { eventId, kind });
+        }
+
+        async function getEventResources(ctx, { eventId, qrData } = {}) {
+            return callAction(ctx, 'foroGetEventResources', { eventId, qrData: qrData || '' });
+        }
+
+        async function uploadCoverImage(ctx, file, uid) {
+            if (!file) return '';
+            const safeName = sanitizeFileName(file.name);
+            const path = `foro/covers/${uid || 'user'}_${Date.now()}_${safeName}`;
+            return uploadToStorage(ctx, path, file);
+        }
+
+        async function uploadEventMaterial(ctx, file, uid) {
+            if (!file) throw new Error('No hay archivo para subir.');
+            const safeName = sanitizeFileName(file.name);
+            const path = `foro/materials/${uid || 'user'}/${Date.now()}_${safeName}`;
+            const url = await uploadToStorage(ctx, path, file);
+            return {
+                url,
+                fileName: file.name || safeName,
+                mimeType: file.type || ''
+            };
+        }
+
+        function buildEventCalendarIcs(event) {
+            const start = toDate(event?.date || event?.eventDate);
+            if (!start) return null;
+            const end = toDate(event?.endDate || event?.eventEndDate) || new Date(start.getTime() + 90 * 60 * 1000);
+            const toIcsDate = (date) => date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+            const title = String(event?.title || event?.eventTitle || 'Evento').replace(/[\r\n]/g, ' ');
+            const location = String(event?.location || event?.eventLocation || '').replace(/[\r\n]/g, ' ');
+            const description = String(event?.description || '').replace(/[\r\n]/g, ' ');
+            return `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VEVENT\r\nDTSTART:${toIcsDate(start)}\r\nDTEND:${toIcsDate(end)}\r\nSUMMARY:${title}\r\n${location ? `LOCATION:${location}\r\n` : ''}${description ? `DESCRIPTION:${description}\r\n` : ''}END:VEVENT\r\nEND:VCALENDAR`;
+        }
+
+        function downloadEventCalendar(event) {
+            const ics = buildEventCalendarIcs(event);
+            if (!ics) throw new Error('No fue posible generar el calendario para este evento.');
+            const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const anchor = document.createElement('a');
+            anchor.href = url;
+            anchor.download = 'evento-sia.ics';
+            anchor.click();
+            URL.revokeObjectURL(url);
+        }
 
         async function generateAttendanceCertificate(ctx, uid, userProfile) {
             if (!window.jspdf) throw new Error('jsPDF no disponible');
@@ -392,140 +405,99 @@ if (!window.ForoService) {
 
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF('p', 'mm', 'letter');
-            const pw = doc.internal.pageSize.getWidth();
-            const m = 20;
+            const pageWidth = doc.internal.pageSize.getWidth();
+            const margin = 20;
 
-            // Header
-            doc.setFillColor(27, 57, 106);
-            doc.rect(0, 0, pw, 50, 'F');
+            doc.setFillColor(16, 49, 82);
+            doc.rect(0, 0, pageWidth, 52, 'F');
             doc.setTextColor(255, 255, 255);
             doc.setFontSize(20);
             doc.setFont('helvetica', 'bold');
-            doc.text('CONSTANCIA DE PARTICIPACION', pw / 2, 22, { align: 'center' });
+            doc.text('CONSTANCIA DE PARTICIPACION', pageWidth / 2, 22, { align: 'center' });
             doc.setFontSize(11);
             doc.setFont('helvetica', 'normal');
-            doc.text('Eventos Academicos — TecNM Campus Los Cabos', pw / 2, 32, { align: 'center' });
-            doc.text('Sistema Integral de Asistencia (SIA)', pw / 2, 40, { align: 'center' });
+            doc.text('Eventos Academicos - TecNM Campus Los Cabos', pageWidth / 2, 32, { align: 'center' });
+            doc.text('Sistema Integral de Asistencia (SIA)', pageWidth / 2, 40, { align: 'center' });
 
-            // Body
-            let y = 65;
+            let cursor = 65;
             doc.setTextColor(60, 60, 60);
             doc.setFontSize(11);
-            doc.text('Se hace constar que:', m, y);
-            y += 12;
+            doc.text('Se hace constar que:', margin, cursor);
+            cursor += 12;
             doc.setFontSize(16);
             doc.setFont('helvetica', 'bold');
-            doc.text(userProfile.displayName || userProfile.email || 'Alumno', pw / 2, y, { align: 'center' });
-            y += 7;
+            doc.text(userProfile.displayName || userProfile.email || 'Alumno', pageWidth / 2, cursor, { align: 'center' });
+            cursor += 7;
             doc.setFontSize(11);
             doc.setFont('helvetica', 'normal');
-            doc.text(`Matricula: ${userProfile.matricula || 'N/A'}  |  Carrera: ${userProfile.career || 'N/A'}`, pw / 2, y, { align: 'center' });
-            y += 12;
-            doc.text(`Ha participado en ${history.length} evento${history.length > 1 ? 's' : ''} academico${history.length > 1 ? 's' : ''}:`, m, y);
-            y += 10;
+            doc.text(`Matricula: ${userProfile.matricula || 'N/A'}  |  Carrera: ${getUserCareer(userProfile) || 'N/A'}`, pageWidth / 2, cursor, { align: 'center' });
+            cursor += 12;
+            doc.text(`Ha participado en ${history.length} evento${history.length > 1 ? 's' : ''} academico${history.length > 1 ? 's' : ''}:`, margin, cursor);
+            cursor += 10;
 
-            history.forEach((evt, i) => {
-                if (y > 240) { doc.addPage(); y = m; }
+            history.forEach((event, index) => {
+                if (cursor > 240) {
+                    doc.addPage();
+                    cursor = margin;
+                }
                 doc.setFont('helvetica', 'bold');
                 doc.setFontSize(10);
-                doc.text(`${i + 1}. ${evt.eventTitle || 'Evento'}`, m + 5, y);
-                y += 5;
+                doc.text(`${index + 1}. ${event.eventTitle || 'Evento'}`, margin + 5, cursor);
+                cursor += 5;
                 doc.setFont('helvetica', 'normal');
                 doc.setFontSize(9);
-                const dateStr = evt.eventDate
-                    ? (evt.eventDate.toDate ? evt.eventDate.toDate() : new Date(evt.eventDate)).toLocaleDateString('es-MX', { dateStyle: 'long' })
-                    : '';
-                doc.text(`   ${dateStr} — ${evt.eventLocation || 'Campus'}`, m + 5, y);
-                y += 8;
+                const dateStr = toDate(event.eventDate)?.toLocaleDateString('es-MX', { dateStyle: 'long' }) || '';
+                doc.text(`   ${dateStr} - ${event.eventLocation || 'Campus'}`, margin + 5, cursor);
+                cursor += 8;
             });
 
-            // Footer
-            y = 250;
+            cursor = 250;
             doc.setDrawColor(100);
-            doc.line(pw / 2 - 40, y, pw / 2 + 40, y);
-            y += 5;
+            doc.line(pageWidth / 2 - 40, cursor, pageWidth / 2 + 40, cursor);
+            cursor += 5;
             doc.setFontSize(10);
             doc.setTextColor(80, 80, 80);
-            doc.text('Desarrollo Academico', pw / 2, y, { align: 'center' });
-            y += 8;
+            doc.text('Desarrollo Academico', pageWidth / 2, cursor, { align: 'center' });
+            cursor += 8;
             doc.setFontSize(8);
             doc.setTextColor(150, 150, 150);
-            doc.text(`Emitido: ${new Date().toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric' })}`, pw / 2, y, { align: 'center' });
+            doc.text(`Emitido: ${new Date().toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric' })}`, pageWidth / 2, cursor, { align: 'center' });
 
             doc.save(`Constancia_Eventos_${userProfile.matricula || 'SIA'}_${Date.now()}.pdf`);
         }
 
-        // ===============================================
-        // 9. UTILIDADES
-        // ===============================================
-
-        function getEventQRData(eventId) {
-            return `SIA:FORO_EVENT:${eventId}`;
-        }
-
-        /**
-         * Marca asistencia cuando el ESTUDIANTE escanea el QR del evento proyectado.
-         * El QR del evento tiene formato: SIA:FORO_EVENT:{eventId}
-         */
-        async function markAttendanceByEventQR(ctx, qrData, userId) {
-            const parts = qrData.split(':');
-            if (parts.length !== 3 || parts[0] !== 'SIA' || parts[1] !== 'FORO_EVENT') {
-                throw new Error("Código QR inválido. Escanea el QR del evento proyectado.");
-            }
-
-            const eventId = parts[2];
-
-            const ticketQuery = await ctx.db.collection(C_TICKETS)
-                .where('eventId', '==', eventId)
-                .where('userId', '==', userId)
-                .limit(1)
-                .get();
-
-            if (ticketQuery.empty) {
-                throw new Error("No estás inscrito a este evento.");
-            }
-
-            const ticketDoc = ticketQuery.docs[0];
-            const ticket = ticketDoc.data();
-
-            if (ticket.status === 'attended') {
-                throw new Error("Ya registraste tu asistencia a este evento.");
-            }
-
-            await ctx.db.collection(C_TICKETS).doc(ticketDoc.id).update({
-                status: 'attended',
-                attendedAt: new Date()
-            });
-
-            return { eventTitle: ticket.eventTitle };
-        }
-
-        // --- PUBLIC API ---
         return {
             getAllEventsAdmin,
             getPendingEvents,
             getHistoryEvents,
             getMyEvents,
-            approveEvent,
-            rejectEvent,
             getActiveEvents,
+            getEventById,
+            streamActiveEvents,
             createEvent,
             updateEvent,
             deleteEvent,
+            approveEvent,
+            rejectEvent,
             registerUser,
+            cancelRegistration,
             getUserTickets,
+            getUserEventHistory,
             markAttendance,
+            markAttendanceByEventQR,
+            processStudentQr,
             markBulkAttendance,
             getEventAttendees,
             getEventsForStories,
-            getEventQRData,
-            markAttendanceByEventQR,
-            cancelRegistration,
-            getUserEventHistory,
             submitEventFeedback,
             canSubmitFeedback,
+            getEventQrPayload,
+            getEventResources,
+            uploadCoverImage,
+            uploadEventMaterial,
+            buildEventCalendarIcs,
+            downloadEventCalendar,
             generateAttendanceCertificate
         };
-
     })();
 }
