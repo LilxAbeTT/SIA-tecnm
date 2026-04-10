@@ -114,6 +114,11 @@ const VIEW_META = Object.freeze({
         pillLabel: 'Avisos',
         color: 'var(--primary, #1B396A)'
     },
+    'view-campus-map': {
+        label: 'Mapa del Campus',
+        pillLabel: 'Mapa del Campus',
+        color: '#0f766e'
+    },
     'view-notificaciones': {
         label: 'Notificaciones',
         pillLabel: 'Notificaciones',

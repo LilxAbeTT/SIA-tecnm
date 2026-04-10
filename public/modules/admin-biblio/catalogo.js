@@ -1,18 +1,36 @@
-if (!window.AdminBiblio) window.AdminBiblio = {};
+﻿if (!window.AdminBiblio) window.AdminBiblio = {};
 window.AdminBiblio.State = window.AdminBiblio.State || {};
 window.AdminBiblio.Catalogo = (function () {
     const state = window.AdminBiblio.State;
     let _ctx = null;
     let _configAssetsUnsub = null;
+    let _holidayCalendarCursor = null;
+    let _holidaySelectedDates = [];
+    let _holidayBlockedDates = [];
+    let _holidaySelectionAnchor = null;
+    let _holidayCalendarMeta = null;
+    let _holidayPointerActive = false;
+    let _holidayPointerMode = 'add';
+    let _holidayLastPointerDate = '';
 
     function syncFromState() {
         _ctx = state.ctx;
         _configAssetsUnsub = state.configAssetsUnsub;
+        _holidayCalendarCursor = state.holidayCalendarCursor;
+        _holidaySelectedDates = Array.isArray(state.holidaySelectedDates) ? state.holidaySelectedDates.slice() : [];
+        _holidayBlockedDates = Array.isArray(state.holidayBlockedDates) ? state.holidayBlockedDates.slice() : [];
+        _holidaySelectionAnchor = state.holidaySelectionAnchor;
+        _holidayCalendarMeta = state.holidayCalendarMeta;
     }
 
     function syncToState() {
         state.ctx = _ctx;
         state.configAssetsUnsub = _configAssetsUnsub;
+        state.holidayCalendarCursor = _holidayCalendarCursor;
+        state.holidaySelectedDates = Array.isArray(_holidaySelectedDates) ? _holidaySelectedDates.slice() : [];
+        state.holidayBlockedDates = Array.isArray(_holidayBlockedDates) ? _holidayBlockedDates.slice() : [];
+        state.holidaySelectionAnchor = _holidaySelectionAnchor;
+        state.holidayCalendarMeta = _holidayCalendarMeta;
     }
 
     function withState(fn) {
@@ -46,6 +64,110 @@ window.AdminBiblio.Catalogo = (function () {
     function runNonCriticalTask(...args) { return shared.runNonCriticalTask(...args); }
     function isActiveLoanState(...args) { return shared.isActiveLoanState(...args); }
     function resetServiceSelection(...args) { return shared.resetServiceSelection(...args); }
+
+    function formatDateKeyLocal(date) {
+        if (!(date instanceof Date) || Number.isNaN(date.getTime())) return '';
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    }
+
+    function parseDateKeyLocal(value) {
+        const raw = String(value || '').trim();
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return null;
+        const [year, month, day] = raw.split('-').map(Number);
+        return new Date(year, month - 1, day, 12, 0, 0, 0);
+    }
+
+    function startOfMonth(date = new Date()) {
+        return new Date(date.getFullYear(), date.getMonth(), 1, 12, 0, 0, 0);
+    }
+
+    function getHolidaySelectedSet() {
+        return new Set(Array.isArray(_holidaySelectedDates) ? _holidaySelectedDates : []);
+    }
+
+    function getHolidayBlockedSet() {
+        return new Set(Array.isArray(_holidayBlockedDates) ? _holidayBlockedDates : []);
+    }
+
+    function isWeekendDateKey(dateKey) {
+        const date = parseDateKeyLocal(dateKey);
+        if (!date) return false;
+        const day = date.getDay();
+        return day === 0 || day === 6;
+    }
+
+    function normalizeHolidaySelection() {
+        const blocked = getHolidayBlockedSet();
+        _holidaySelectedDates = [...new Set((_holidaySelectedDates || []).filter((dateKey) => dateKey && !isWeekendDateKey(dateKey) && !blocked.has(dateKey)))].sort();
+    }
+
+    function normalizeHolidayBlockedDates() {
+        _holidayBlockedDates = [...new Set((_holidayBlockedDates || []).filter((dateKey) => dateKey && !isWeekendDateKey(dateKey)))].sort();
+    }
+
+    function getDateRangeKeys(fromKey, toKey) {
+        const start = parseDateKeyLocal(fromKey);
+        const end = parseDateKeyLocal(toKey);
+        if (!start || !end) return [];
+        const rangeStart = start <= end ? start : end;
+        const rangeEnd = start <= end ? end : start;
+        const keys = [];
+        const cursor = new Date(rangeStart);
+        while (cursor <= rangeEnd) {
+            keys.push(formatDateKeyLocal(cursor));
+            cursor.setDate(cursor.getDate() + 1);
+        }
+        return keys;
+    }
+
+    function groupHolidayRanges(dateKeys = []) {
+        const sorted = [...new Set((dateKeys || []).filter(Boolean))].sort();
+        if (!sorted.length) return [];
+        const ranges = [];
+        let current = { start: sorted[0], end: sorted[0], count: 1 };
+
+        for (let index = 1; index < sorted.length; index += 1) {
+            const previousDate = parseDateKeyLocal(current.end);
+            const nextDate = parseDateKeyLocal(sorted[index]);
+            const expectedKey = previousDate
+                ? formatDateKeyLocal(new Date(previousDate.getFullYear(), previousDate.getMonth(), previousDate.getDate() + 1, 12, 0, 0, 0))
+                : '';
+
+            if (expectedKey && expectedKey === sorted[index]) {
+                current.end = sorted[index];
+                current.count += 1;
+            } else {
+                ranges.push(current);
+                current = { start: sorted[index], end: sorted[index], count: 1 };
+            }
+        }
+
+        ranges.push(current);
+        return ranges;
+    }
+
+    function formatHolidayDateLabel(dateKey, withWeekday = false) {
+        const date = parseDateKeyLocal(dateKey);
+        if (!date) return '--';
+        return date.toLocaleDateString('es-MX', withWeekday
+            ? { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' }
+            : { day: '2-digit', month: 'short', year: 'numeric' });
+    }
+
+    function formatHolidayDateTimeLabel(dateValue) {
+        const date = parseDate(dateValue);
+        if (!date) return '--';
+        return date.toLocaleString('es-MX', {
+            day: '2-digit',
+            month: 'short',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+    }
     function clearLiveAssetStreams() {
         if (state.pcGridUnsub) {
             try { state.pcGridUnsub(); } catch (error) { console.warn('[BiblioAdmin] Error clearing PC stream:', error); }
@@ -118,7 +240,7 @@ window.AdminBiblio.Catalogo = (function () {
 
         body.innerHTML = `
             <div class="modal-header border-0 bg-primary text-white p-4">
-                <h3 class="fw-bold mb-0"><i class="bi bi-book-half me-3"></i>Gestión de Libros</h3>
+                <h3 class="fw-bold mb-0"><i class="bi bi-book-half me-3"></i>Gestion de Libros</h3>
                 <button class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body p-5  text-center">
@@ -129,7 +251,7 @@ window.AdminBiblio.Catalogo = (function () {
                                 <i class="bi bi-plus-lg fs-1 text-success"></i>
                             </div>
                             <h5 class="fw-bold text-dark">Agregar Nuevo</h5>
-                            <p class="text-muted small mb-0">Registrar un nuevo libro en el catálogo.</p>
+                        <p class="text-muted small mb-0">Registrar un nuevo libro en el catalogo.</p>
                         </button>
                     </div>
                     <div class="col-md-5">
@@ -182,11 +304,11 @@ window.AdminBiblio.Catalogo = (function () {
                 <form id="book-form" onsubmit="event.preventDefault(); AdminBiblio.saveBook('${bookToEdit?.id || ''}')">
                     <div class="row g-3">
                         <div class="col-md-4">
-                            <label class="form-label small fw-bold text-muted">No. Adquisición *</label>
+                            <label class="form-label small fw-bold text-muted">No. Adquisicion *</label>
                             <input type="text" class="form-control rounded-3" id="bf-adq" required value="${escapeHtml(bookToEdit?.adquisicion || '')}" ${isEdit ? 'readonly' : ''}>
                         </div>
                         <div class="col-md-8">
-                            <label class="form-label small fw-bold text-muted">Título del Libro *</label>
+                            <label class="form-label small fw-bold text-muted">Titulo del Libro *</label>
                             <input type="text" class="form-control rounded-3" id="bf-titulo" required value="${escapeHtml(bookToEdit?.titulo || '')}">
                         </div>
                         <div class="col-md-6">
@@ -194,27 +316,27 @@ window.AdminBiblio.Catalogo = (function () {
                             <input type="text" class="form-control rounded-3" id="bf-autor" required value="${escapeHtml(bookToEdit?.autor || '')}">
                         </div>
                         <div class="col-md-3">
-                            <label class="form-label small fw-bold text-muted">Año</label>
-                            <input type="text" class="form-control rounded-3" id="bf-anio" value="${escapeHtml(bookToEdit?.año || '')}">
+                            <label class="form-label small fw-bold text-muted">Anio</label>
+                            <input type="text" class="form-control rounded-3" id="bf-anio" value="${escapeHtml(bookToEdit?.anio ?? bookToEdit?.['año'] ?? '')}">
                         </div>
                         <div class="col-md-3">
                             <label class="form-label small fw-bold text-muted">Copias Totales *</label>
                             <input type="number" class="form-control rounded-3" id="bf-copias" required min="1" value="${bookToEdit?.copiasTotales ?? bookToEdit?.copiasDisponibles ?? 1}">
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label small fw-bold text-muted">Categoría *</label>
+                            <label class="form-label small fw-bold text-muted">Categoria *</label>
                             <select class="form-select rounded-3" id="bf-cat" required>
                                 <option value="">Selecciona...</option>
-                                <option value="Administración">Administración</option>
+                                <option value="Administracion">Administracion</option>
                                 <option value="Arquitectura">Arquitectura</option>
-                                <option value="Ciencias Básicas">Ciencias Básicas</option>
-                                <option value="Gastronomía">Gastronomía</option>
+                                <option value="Ciencias Basicas">Ciencias Basicas</option>
+                                <option value="Gastronomia">Gastronomia</option>
                                 <option value="Literatura">Literatura</option>
                                 <option value="General">General</option>
                             </select>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label small fw-bold text-muted">Clasificación / Ubicación</label>
+                            <label class="form-label small fw-bold text-muted">Clasificacion / Ubicacion</label>
                             <input type="text" class="form-control rounded-3" id="bf-clasif" placeholder="Ej: HM251 W46" value="${escapeHtml(bookToEdit?.clasificacion || '')}">
                         </div>
                     </div>
@@ -240,11 +362,11 @@ window.AdminBiblio.Catalogo = (function () {
             adquisicion: document.getElementById('bf-adq').value.trim().toUpperCase(),
             titulo: document.getElementById('bf-titulo').value.trim(),
             autor: document.getElementById('bf-autor').value.trim(),
-            año: document.getElementById('bf-anio').value.trim(),
+            anio: document.getElementById('bf-anio').value.trim(),
             copiasTotales: parseInt(document.getElementById('bf-copias').value, 10),
             categoria: document.getElementById('bf-cat').value,
             clasificacion: document.getElementById('bf-clasif').value.trim(),
-            ubicacion: 'Estantería' // Default
+            ubicacion: 'Estanteria' // Default
         };
 
         if (!data.adquisicion || !data.titulo || !data.autor || !data.categoria) {
@@ -276,15 +398,15 @@ window.AdminBiblio.Catalogo = (function () {
             </div>
             <div class="modal-body p-4 ">
                 <div class="input-group mb-4 shadow-sm">
-                    <input type="text" class="form-control border-0 p-3" id="edit-search-input" placeholder="Ingresa No. Adquisición (Ej: 00001)">
+                    <input type="text" class="form-control border-0 p-3" id="edit-search-input" placeholder="Ingresa No. Adquisicion (Ej: 00001)">
                     <button class="btn btn-warning px-4 fw-bold" onclick="AdminBiblio.handleEditSearch()">
                         <i class="bi bi-search"></i>
                     </button>
                 </div>
                 
-                <h6 class="fw-bold text-muted small mb-3 text-uppercase ls-1">Último Agregado / Resultado</h6>
+                    <h6 class="fw-bold text-muted small mb-3 text-uppercase ls-1">Ultimo Agregado / Resultado</h6>
                 <div id="edit-search-result" class="card border-0 shadow-sm">
-                    <div class="text-center py-4 text-muted"><span class="spinner-border spinner-border-sm"></span> Cargando último registro...</div>
+                    <div class="text-center py-4 text-muted"><span class="spinner-border spinner-border-sm"></span> Cargando ultimo registro...</div>
                 </div>
             </div>
         `;
@@ -299,7 +421,7 @@ window.AdminBiblio.Catalogo = (function () {
 
     async function handleEditSearch() {
         const q = document.getElementById('edit-search-input').value.trim();
-        if (!q) return showToast("Ingresa un número de adquisición", "warning");
+        if (!q) return showToast("Ingresa un numero de adquisicion", "warning");
 
         const container = document.getElementById('edit-search-result');
         container.innerHTML = '<div class="text-center py-4 text-muted"><span class="spinner-border spinner-border-sm"></span> Buscando...</div>';
@@ -316,13 +438,13 @@ window.AdminBiblio.Catalogo = (function () {
     function renderEditBookCard(book, isSearch = false) {
         const container = document.getElementById('edit-search-result');
         if (!book) {
-            container.innerHTML = `<div class="p-4 text-center text-muted opacity-75">${isSearch ? 'No se encontró el libro.' : 'No hay libros registrados manualmente aún.'}</div>`;
+            container.innerHTML = `<div class="p-4 text-center text-muted opacity-75">${isSearch ? 'No se encontro el libro.' : 'No hay libros registrados manualmente aun.'}</div>`;
             return;
         }
 
         const bookPayload = encodeItemPayload(book);
         const adquisicion = escapeHtml(book.adquisicion || 'S/N');
-        const titulo = escapeHtml(book.titulo || 'Sin título');
+            const titulo = escapeHtml(book.titulo || 'Sin titulo');
         const autor = escapeHtml(book.autor || 'Desconocido');
 
         container.innerHTML = `
@@ -354,7 +476,7 @@ window.AdminBiblio.Catalogo = (function () {
                          <i class="bi bi-gear-fill fs-3 text-white"></i>
                     </div>
                     <div>
-                        <h3 class="fw-bold mb-0">Configuración de Espacios</h3>
+                <h3 class="fw-bold mb-0">Configuracion de Espacios</h3>
                         <p class="small text-white-50 mb-0">Gestiona mesas y computadoras activas</p>
                     </div>
                 </div>
@@ -382,6 +504,316 @@ window.AdminBiblio.Catalogo = (function () {
         new bootstrap.Modal(document.getElementById('modal-admin-action')).show();
 
         loadConfigAssets();
+    }
+
+    async function abrirModalDiasInhabiles() {
+        clearLiveAssetStreams();
+        _holidayCalendarCursor = startOfMonth(new Date());
+        _holidaySelectedDates = [];
+        _holidayBlockedDates = [];
+        _holidaySelectionAnchor = null;
+        _holidayCalendarMeta = null;
+
+        const body = document.getElementById('modal-admin-body');
+        body.innerHTML = `
+            <div class="modal-header border-0 bg-danger text-white p-4">
+                <div>
+                <h3 class="fw-bold mb-0"><i class="bi bi-calendar-x-fill me-2"></i>Dias inhabiles</h3>
+                <p class="small text-white-50 mb-0">Los prestamos, renovaciones y retrasos ignoraran fines de semana y las fechas marcadas aqui.</p>
+                </div>
+                <button class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div class="text-center py-5 text-muted">
+                    <span class="spinner-border spinner-border-sm me-2"></span>Cargando calendario...
+                </div>
+            </div>
+        `;
+
+        new bootstrap.Modal(document.getElementById('modal-admin-action')).show();
+
+        try {
+            const config = await BiblioService.getHolidayCalendarConfig(_ctx, { force: true });
+            _holidaySelectedDates = Array.isArray(config.holidayDates) ? config.holidayDates.slice() : [];
+            _holidayBlockedDates = Array.isArray(config.blockedDates) ? config.blockedDates.slice() : [];
+            normalizeHolidayBlockedDates();
+            normalizeHolidaySelection();
+            _holidayCalendarMeta = {
+                updatedAt: config.updatedAt || null,
+                updatedBy: config.updatedBy || ''
+            };
+            renderHolidayCalendarModal();
+        } catch (error) {
+            console.error('[BiblioAdmin] Error cargando dias inhabiles:', error);
+            showToast(error.message || 'No se pudo cargar la configuracion de dias inhabiles.', 'danger');
+        }
+    }
+
+    function renderHolidayCalendarModal() {
+        const body = document.getElementById('modal-admin-body');
+        if (!body) return;
+
+        normalizeHolidayBlockedDates();
+        normalizeHolidaySelection();
+        const cursor = _holidayCalendarCursor || startOfMonth(new Date());
+        const nextMonth = startOfMonth(new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1, 12, 0, 0, 0));
+
+        body.innerHTML = `
+            <div class="modal-header border-0 bg-danger text-white p-4">
+                <div>
+                    <h3 class="fw-bold mb-0"><i class="bi bi-calendar-x-fill me-2"></i>Días inhábiles</h3>
+                </div>
+                <button class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4" onmouseup="AdminBiblio.finalizarArrastreDiasInhabiles()" onmouseleave="AdminBiblio.finalizarArrastreDiasInhabiles()" style="user-select:none;">
+                <div class="card border-0 shadow-sm rounded-4 mb-4">
+                    <div class="card-body p-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
+                        <div class="btn-group" role="group">
+                            <button class="btn btn-outline-secondary rounded-pill" onclick="AdminBiblio.cambiarMesDiasInhabiles(-1)">
+                                <i class="bi bi-chevron-left"></i>
+                            </button>
+                            <button class="btn btn-outline-secondary rounded-pill" onclick="AdminBiblio.irMesActualDiasInhabiles()">
+                                Hoy
+                            </button>
+                            <button class="btn btn-outline-secondary rounded-pill" onclick="AdminBiblio.cambiarMesDiasInhabiles(1)">
+                                <i class="bi bi-chevron-right"></i>
+                            </button>
+                        </div>
+                        <div class="small text-muted fw-semibold">${escapeHtml(cursor.toLocaleDateString('es-MX', { month: 'long', year: 'numeric' }))} / ${escapeHtml(nextMonth.toLocaleDateString('es-MX', { month: 'long', year: 'numeric' }))}</div>
+                    </div>
+                </div>
+
+                <div id="holiday-calendar-grid" class="row g-3 mb-4">
+                    ${renderHolidayMonth(cursor)}
+                    ${renderHolidayMonth(nextMonth)}
+                </div>
+
+                <div class="card border-0 shadow-sm rounded-4">
+                    <div class="card-body p-3">
+                        <div class="row g-3 align-items-end">
+                            <div class="col-md-5">
+                                <label class="form-label small fw-bold text-muted">Desde</label>
+                                <input type="date" id="holiday-range-start" class="form-control rounded-3 shadow-sm" onchange="AdminBiblio.handleHolidayRangeInput()">
+                            </div>
+                            <div class="col-md-5">
+                                <label class="form-label small fw-bold text-muted">Hasta</label>
+                                <input type="date" id="holiday-range-end" class="form-control rounded-3 shadow-sm" onchange="AdminBiblio.handleHolidayRangeInput()">
+                            </div>
+                            <div class="col-md-2 d-grid">
+                                <button class="btn btn-light border rounded-pill fw-bold" onclick="AdminBiblio.limpiarDiasInhabiles()">
+                                    Limpiar
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer border-0 px-4 pb-4 pt-0 d-flex justify-content-between gap-2">
+                <button class="btn btn-light rounded-pill px-4 fw-bold" data-bs-dismiss="modal">Cerrar</button>
+                <button class="btn btn-danger rounded-pill px-4 fw-bold" id="btn-save-holidays" onclick="AdminBiblio.guardarDiasInhabiles()">
+                    Guardar días inhábiles
+                </button>
+            </div>
+        `;
+    }
+
+    function renderHolidayMonth(monthDate) {
+        const firstDay = startOfMonth(monthDate);
+        const firstWeekday = (firstDay.getDay() + 6) % 7;
+        const totalDays = new Date(firstDay.getFullYear(), firstDay.getMonth() + 1, 0).getDate();
+        const selected = getHolidaySelectedSet();
+        const blocked = getHolidayBlockedSet();
+        const todayKey = formatDateKeyLocal(new Date());
+        const weekHeaders = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
+        const cells = [];
+
+        for (let blank = 0; blank < firstWeekday; blank += 1) {
+            cells.push('<div></div>');
+        }
+
+        for (let day = 1; day <= totalDays; day += 1) {
+            const currentDate = new Date(firstDay.getFullYear(), firstDay.getMonth(), day, 12, 0, 0, 0);
+            const dateKey = formatDateKeyLocal(currentDate);
+            const isSelected = selected.has(dateKey);
+            const isBlocked = blocked.has(dateKey);
+            const isToday = dateKey === todayKey;
+            const isWeekend = isWeekendDateKey(dateKey);
+            const isDisabled = isWeekend || isBlocked;
+            const buttonClass = isDisabled
+                ? 'btn-light border text-muted opacity-50'
+                : (isSelected
+                    ? 'btn-danger text-white border-danger'
+                    : (isToday ? 'btn-outline-primary border-primary text-primary' : 'btn-light border'));
+            const pointerAttrs = isDisabled
+                ? 'disabled'
+                : `onmousedown="AdminBiblio.iniciarArrastreDiasInhabiles('${dateKey}')" onmouseenter="AdminBiblio.arrastrarDiaInhabil('${dateKey}')"`;
+            const title = isWeekend
+                ? `${formatHolidayDateLabel(dateKey, true)} · Fin de semana`
+                : (isBlocked
+                    ? `${formatHolidayDateLabel(dateKey, true)} · Periodo largo`
+                    : formatHolidayDateLabel(dateKey, true));
+
+            cells.push(`
+                <button class="btn ${buttonClass} rounded-3 d-flex align-items-center justify-content-center fw-semibold"
+                        style="height:42px;"
+                        ${pointerAttrs}
+                        onclick="return false"
+                        title="${escapeHtml(title)}">
+                    ${day}
+                </button>
+            `);
+        }
+
+        return `
+            <div class="col-md-6">
+                <div class="card border-0 shadow-sm rounded-4 h-100">
+                    <div class="card-body p-3">
+                        <div class="fw-bold text-capitalize mb-3">${escapeHtml(firstDay.toLocaleDateString('es-MX', { month: 'long', year: 'numeric' }))}</div>
+                        <div class="d-grid gap-2" style="grid-template-columns: repeat(7, minmax(0, 1fr));">
+                            ${weekHeaders.map((label) => `<div class="small text-muted text-center fw-bold">${label}</div>`).join('')}
+                            ${cells.join('')}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    function cambiarMesDiasInhabiles(offset) {
+        const cursor = _holidayCalendarCursor || startOfMonth(new Date());
+        _holidayCalendarCursor = startOfMonth(new Date(cursor.getFullYear(), cursor.getMonth() + Number(offset || 0), 1, 12, 0, 0, 0));
+        finalizarArrastreDiasInhabiles();
+        renderHolidayCalendarModal();
+    }
+
+    function irMesActualDiasInhabiles() {
+        _holidayCalendarCursor = startOfMonth(new Date());
+        finalizarArrastreDiasInhabiles();
+        renderHolidayCalendarModal();
+    }
+
+    function iniciarArrastreDiasInhabiles(dateKey) {
+        if (!dateKey || isWeekendDateKey(dateKey) || getHolidayBlockedSet().has(dateKey)) return false;
+        const selected = getHolidaySelectedSet();
+        _holidayPointerActive = true;
+        _holidayPointerMode = selected.has(dateKey) ? 'remove' : 'add';
+        _holidayLastPointerDate = '';
+        window.addEventListener('mouseup', window.AdminBiblio.finalizarArrastreDiasInhabiles, { once: true });
+        toggleDiaInhabil(dateKey, _holidayPointerMode);
+        return false;
+    }
+
+    function arrastrarDiaInhabil(dateKey) {
+        if (!_holidayPointerActive || !dateKey || isWeekendDateKey(dateKey) || getHolidayBlockedSet().has(dateKey) || _holidayLastPointerDate === dateKey) return false;
+        toggleDiaInhabil(dateKey, _holidayPointerMode);
+        return false;
+    }
+
+    function finalizarArrastreDiasInhabiles() {
+        _holidayPointerActive = false;
+        _holidayPointerMode = 'add';
+        _holidayLastPointerDate = '';
+    }
+
+    function toggleDiaInhabil(dateKey, mode = null) {
+        if (!dateKey || isWeekendDateKey(dateKey) || getHolidayBlockedSet().has(dateKey)) return;
+        const nextSelection = getHolidaySelectedSet();
+        const nextMode = mode || (nextSelection.has(dateKey) ? 'remove' : 'add');
+
+        if (nextMode === 'remove') nextSelection.delete(dateKey);
+        else nextSelection.add(dateKey);
+
+        _holidaySelectionAnchor = dateKey;
+        _holidayLastPointerDate = dateKey;
+        _holidaySelectedDates = [...nextSelection].sort();
+        renderHolidayCalendarModal();
+    }
+
+    function handleHolidayRangeInput() {
+        const start = document.getElementById('holiday-range-start')?.value;
+        const end = document.getElementById('holiday-range-end')?.value;
+        if (!start || !end) return;
+
+        const rangeKeys = getDateRangeKeys(start, end).filter((dateKey) => !isWeekendDateKey(dateKey));
+        if (!rangeKeys.length) {
+            showToast('Ese periodo solo contiene fines de semana.', 'warning');
+            return;
+        }
+
+        const selected = getHolidaySelectedSet();
+        const blocked = getHolidayBlockedSet();
+        const shouldRemove = rangeKeys.every((key) => blocked.has(key));
+        rangeKeys.forEach((key) => {
+            if (shouldRemove) blocked.delete(key);
+            else blocked.add(key);
+            selected.delete(key);
+        });
+        _holidayBlockedDates = [...blocked].sort();
+        _holidaySelectedDates = [...selected].sort();
+        _holidaySelectionAnchor = end;
+        renderHolidayCalendarModal();
+
+        const startInput = document.getElementById('holiday-range-start');
+        const endInput = document.getElementById('holiday-range-end');
+        if (startInput) startInput.value = '';
+        if (endInput) endInput.value = '';
+    }
+
+    function limpiarDiasInhabiles() {
+        _holidaySelectedDates = [];
+        _holidayBlockedDates = [];
+        _holidaySelectionAnchor = null;
+        finalizarArrastreDiasInhabiles();
+        renderHolidayCalendarModal();
+    }
+
+    function cerrarModalesAdminBiblioteca() {
+        document.querySelectorAll('.modal.show').forEach((modalEl) => {
+            if (!modalEl || modalEl.id === 'mini-confirm-modal') return;
+            const modal = bootstrap.Modal.getInstance(modalEl);
+            if (modal) modal.hide();
+        });
+    }
+
+    async function guardarDiasInhabiles() {
+        const saveBtn = document.getElementById('btn-save-holidays');
+        if (saveBtn) {
+            saveBtn.disabled = true;
+            saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Guardando...';
+        }
+
+        try {
+            const result = await BiblioService.saveHolidayCalendarConfig(_ctx, {
+                holidayDates: _holidaySelectedDates,
+                blockedDates: _holidayBlockedDates
+            });
+            _holidayCalendarMeta = {
+                updatedAt: new Date(),
+                updatedBy: _ctx?.auth?.currentUser?.uid || ''
+            };
+            await loadAdminStats();
+            showConfirmModal({
+                icon: 'check-circle-fill',
+                iconColor: '#dc3545',
+                title: 'Dias inhabiles guardados',
+                message: `Se guardo el calendario y se recalcularon ${result.adjustedLoans || 0} prestamo(s) activo(s).`,
+                confirmText: 'Aceptar',
+                confirmClass: 'btn-danger',
+                sizeClass: 'modal-sm',
+                onConfirm: async () => {
+                    cerrarModalesAdminBiblioteca();
+                }
+            });
+        } catch (error) {
+            console.error('[BiblioAdmin] Error guardando dias inhabiles:', error);
+            showToast(error.message || 'No se pudo guardar la configuracion.', 'danger');
+        } finally {
+            const refreshedSaveBtn = document.getElementById('btn-save-holidays');
+            if (refreshedSaveBtn) {
+                refreshedSaveBtn.disabled = false;
+            refreshedSaveBtn.innerHTML = 'Guardar dias inhabiles';
+            }
+        }
     }
 
 
@@ -454,7 +886,7 @@ window.AdminBiblio.Catalogo = (function () {
                             <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                         </div>
                         <div class="modal-body p-4 text-center">
-                            <p class="text-muted small mb-4">Selecciona el tipo de espacio a crear. El sistema asignará un nombre automáticamente (ej. MESA-09).</p>
+                <p class="text-muted small mb-4">Selecciona el tipo de espacio a crear. El sistema asignara un nombre automaticamente (ej. MESA-09).</p>
                             <div class="row g-3 justify-content-center">
                                 <div class="col-4">
                                     <button class="btn btn-outline-primary w-100 py-3 rounded-4 hover-scale" onclick="AdminBiblio.createAsset('mesa')">
@@ -534,11 +966,11 @@ window.AdminBiblio.Catalogo = (function () {
                 iconColor: '#0dcaf0',
                 title: 'Crear Espacio',
                 message: `¿Crear <strong>${newName}</strong>?`,
-                confirmText: 'Sí, Crear',
+                confirmText: 'Si, Crear',
                 confirmClass: 'btn-success',
                 onConfirm: async () => {
                     await BiblioAssetsService.saveAsset(_ctx, null, { nombre: newName, tipo: type });
-                    showToast("✅ Espacio creado: " + newName, "success");
+                    showToast("Espacio creado: " + newName, "success");
                 }
             });
 
@@ -553,7 +985,7 @@ window.AdminBiblio.Catalogo = (function () {
             icon: 'trash-fill',
             iconColor: '#dc3545',
             title: 'Eliminar Espacio',
-            message: `¿Estás seguro de eliminar <strong>${escapeHtml(nombre)}</strong>?<br>Esta acción es irreversible.`,
+                message: `¿Estas seguro de eliminar <strong>${escapeHtml(nombre)}</strong>?<br>Esta accion es irreversible.`,
             confirmText: 'Eliminar',
             confirmClass: 'btn-danger',
             onConfirm: async () => {
@@ -588,6 +1020,16 @@ window.AdminBiblio.Catalogo = (function () {
         handleEditSearch: withState(handleEditSearch),
         renderEditBookCard: withState(renderEditBookCard),
         abrirModalConfig: withState(abrirModalConfig),
+        abrirModalDiasInhabiles: withState(abrirModalDiasInhabiles),
+        cambiarMesDiasInhabiles: withState(cambiarMesDiasInhabiles),
+        irMesActualDiasInhabiles: withState(irMesActualDiasInhabiles),
+        iniciarArrastreDiasInhabiles: withState(iniciarArrastreDiasInhabiles),
+        arrastrarDiaInhabil: withState(arrastrarDiaInhabil),
+        finalizarArrastreDiasInhabiles: withState(finalizarArrastreDiasInhabiles),
+        toggleDiaInhabil: withState(toggleDiaInhabil),
+        handleHolidayRangeInput: withState(handleHolidayRangeInput),
+        limpiarDiasInhabiles: withState(limpiarDiasInhabiles),
+        guardarDiasInhabiles: withState(guardarDiasInhabiles),
         loadConfigAssets: withState(loadConfigAssets),
         openAddAssetModal: withState(openAddAssetModal),
         createAsset: withState(createAsset),
@@ -595,3 +1037,4 @@ window.AdminBiblio.Catalogo = (function () {
         toggleAssetStatus: withState(toggleAssetStatus)
     };
 })();
+

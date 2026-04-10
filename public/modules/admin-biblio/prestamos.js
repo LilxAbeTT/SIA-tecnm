@@ -126,6 +126,7 @@ window.AdminBiblio.Prestamos = (function () {
                         </div>
                    </div>
                 </div>
+                <div id="prestamo-scan-status" class="small text-center mt-2 d-none"></div>
                 
                 <div class="d-grid mb-4">
                     <button class="btn btn-warning rounded-pill border-0 fw-bold shadow-sm py-2" onclick="AdminBiblio.consultarPrestamo()">
@@ -181,7 +182,9 @@ window.AdminBiblio.Prestamos = (function () {
 
             document.getElementById('prev-p-user').innerText = `${info.user.nombre} (${info.user.matricula})`;
             document.getElementById('prev-p-book').innerText = info.book.titulo;
-            document.getElementById('prev-p-date').innerText = info.returnDate.toLocaleDateString();
+            document.getElementById('prev-p-date').innerText = info.borrowerPolicy?.requiresConfirmation
+                ? 'Se define al confirmar'
+                : info.returnDate.toLocaleDateString();
 
             const alertBox = document.getElementById('prev-p-alert-box');
             const confirmBtn = document.getElementById('btn-conf-prestamo');
@@ -196,6 +199,28 @@ window.AdminBiblio.Prestamos = (function () {
                         <div>
                             <strong>¡Atención!</strong>
                             <div class="mb-0">El usuario tiene <strong>${info.user.recogidos.length}</strong> préstamos pendientes sin devolver.</div>
+                        </div>
+                    </div>`;
+            }
+
+            if (info.loanPolicy?.isWeekly) {
+                htmlContent += `
+                    <div class="alert alert-info d-flex align-items-center gap-2 small p-2 mb-2">
+                        <i class="bi bi-journal-richtext fs-4"></i>
+                        <div>
+                            <strong>Prestamo especial</strong>
+                            <div class="mb-0">Este libro de ${escapeHtml(info.book.categoria || 'literatura')} dura <strong>1 semana</strong>.</div>
+                        </div>
+                    </div>`;
+            }
+
+            if (info.borrowerPolicy?.requiresConfirmation) {
+                htmlContent += `
+                    <div class="alert alert-primary d-flex align-items-center gap-2 small p-2 mb-2">
+                        <i class="bi bi-person-badge fs-4"></i>
+                        <div>
+                            <strong>Confirmacion requerida</strong>
+                            <div class="mb-0">Este usuario no parece alumno regular. Al confirmar se te preguntara si el prestamo es para docente/personal. Si lo es, dura <strong>1 semana</strong> y el retraso solo se registra <strong>sin cobro</strong>.</div>
                         </div>
                     </div>`;
             }
@@ -225,7 +250,14 @@ window.AdminBiblio.Prestamos = (function () {
         btn.innerText = "Procesando...";
 
         try {
-            await BiblioService.prestarLibroManual(_ctx, _currentPrestamoData.user.uid, _currentPrestamoData.book.id);
+            let staffLoan = false;
+            if (_currentPrestamoData.borrowerPolicy?.requiresConfirmation) {
+                staffLoan = window.confirm(
+                    'Este usuario no parece alumno regular.\n\nAceptar = prestamo para docente/personal administrativo: dura 1 semana y el retraso se registra sin cobro.\n\nCancelar = prestamo normal.'
+                );
+            }
+
+            await BiblioService.prestarLibroManual(_ctx, _currentPrestamoData.user.uid, _currentPrestamoData.book.id, { staffLoan });
 
             const warnings = [];
             await runNonCriticalTask('registro de visita', async () => {
@@ -252,7 +284,10 @@ window.AdminBiblio.Prestamos = (function () {
                     ), warnings);
             }
 
-            showToast("Prestamo realizado exitosamente.", "success");
+            const durationMsg = staffLoan
+                ? " Prestamo confirmado para personal: dura 1 semana y el retraso se registra sin cobro."
+                : (_currentPrestamoData.loanPolicy?.isWeekly ? " Prestamo configurado por 1 semana." : "");
+            showToast(`Prestamo realizado exitosamente.${durationMsg}`, "success");
             if (warnings.length > 0) {
                 showToast(`Prestamo guardado, pero fallaron procesos secundarios: ${warnings.join(', ')}.`, "warning");
             }

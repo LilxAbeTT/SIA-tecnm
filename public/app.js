@@ -663,6 +663,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     updateMenuVisibility(effectiveProfile);
 
+    if (window.PanicService?.bindSession) {
+      try {
+        window.PanicService.bindSession(window.SIA, effectiveProfile);
+      } catch (error) {
+        console.warn('[PanicService] No se pudo enlazar la sesion actual:', error);
+      }
+    }
+
     if ((Store.currentView || '') === 'view-dashboard' || options.syncDashboard === true) {
       renderDashboardSurface(effectiveProfile);
     }
@@ -971,6 +979,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       const isVerifyRoute = path.startsWith('/verify/');
       const isVocacionalRoute = path === '/test-vocacional' || path === '/vocacional/test';
+      const isCampusMapPublicRoute = path === '/mapa-campus';
       const isQaSecretRoutePath = isQaSecretRoute(path);
 
       if (!user) {
@@ -991,6 +1000,13 @@ document.addEventListener('DOMContentLoaded', () => {
         ModuleManager.clearAll();
         // FIX NOTIFICATIONS
         if (window.Notify) Notify.cleanup();
+        if (window.PanicService?.cleanup) {
+          try {
+            window.PanicService.cleanup();
+          } catch (error) {
+            console.warn('[PanicService] Error limpiando sesion:', error);
+          }
+        }
 
         if (globalAvisosUnsub) { globalAvisosUnsub(); globalAvisosUnsub = null; }
 
@@ -998,7 +1014,7 @@ document.addEventListener('DOMContentLoaded', () => {
           startVerifyFlowFromCurrentPath();
         } else if (isQaSecretRoutePath) {
           showQaSecretLogin({ resetPassword: false });
-        } else if (isVocacionalRoute) {
+        } else if (isVocacionalRoute || isCampusMapPublicRoute) {
           await restoreCurrentRoute();
         } else if (_loginPopupInProgress) {
           // NO regresar al landing mientras el popup de Microsoft esta abierto

@@ -216,6 +216,18 @@ window.AdminMedi.Chat = (function () {
     if (AdminMedi.State.adminMsgsUnsub) AdminMedi.State.adminMsgsUnsub();
     AdminMedi.State.adminMsgsUnsub = null;
     AdminMedi.State.activeAdminConvId = null;
+    cleanupChatRuntime();
+  }
+
+  function cleanupChatRuntime() {
+    if (_convDocUnsub) {
+      _convDocUnsub();
+      _convDocUnsub = null;
+    }
+    if (_profTypingTimer) {
+      clearTimeout(_profTypingTimer);
+      _profTypingTimer = null;
+    }
   }
 
   async function sendAdminMessage() {
@@ -568,6 +580,7 @@ window.AdminMedi.Chat = (function () {
     openMessagesModal,
     searchAndChat,
     startChatWithStudent,
+    cleanupChatRuntime,
     _onProfTyping,
   };
 })();

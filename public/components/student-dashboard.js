@@ -13,6 +13,8 @@ class SiaStudentDashboard extends HTMLElement {
     this._skeletonTimeout = null;
     this._profile = null;
     this._reportBtnObserver = null;
+    this._panicStateHandler = null;
+    this._panicDraft = null;
     this._tutorialCheckedUid = null;
     this._tutorialLaunchTimeout = null;
     this._viewHandler = null;
@@ -43,12 +45,15 @@ class SiaStudentDashboard extends HTMLElement {
       }
     };
     window.addEventListener('sia-view-changed', this._viewHandler);
+    this._panicStateHandler = (event) => this._handlePanicStateChanged(event?.detail || {});
+    window.addEventListener('sia-panic-state-changed', this._panicStateHandler);
     this._setupOfflineDetection();
   }
 
   disconnectedCallback() {
     if (this._profileHandler) window.removeEventListener('sia-profile-ready', this._profileHandler);
     if (this._viewHandler) window.removeEventListener('sia-view-changed', this._viewHandler);
+    if (this._panicStateHandler) window.removeEventListener('sia-panic-state-changed', this._panicStateHandler);
     if (this._onlineHandler) window.removeEventListener('online', this._onlineHandler);
     if (this._offlineHandler) window.removeEventListener('offline', this._offlineHandler);
     if (this._freshnessInterval) clearInterval(this._freshnessInterval);
@@ -102,6 +107,12 @@ class SiaStudentDashboard extends HTMLElement {
           <!-- Boton Modo Oscuro -->
           <button class="btn btn-light rounded-circle shadow-sm d-flex align-items-center justify-content-center p-0" id="dash-dark-mode-btn" title="Alternar Modo Oscuro" style="width: 36px; height: 36px;" onclick="if(typeof toggleDarkMode === 'function') toggleDarkMode(); else document.getElementById('theme-toggle-btn')?.click();">
             <i class="bi bi-moon-stars-fill text-dark" style="font-size: 1.1rem;"></i>
+          </button>
+
+          <!-- Boton Mapa del Campus -->
+          <button class="btn btn-sm d-flex align-items-center px-3 shadow-sm rounded-pill fw-bold" id="dash-campus-map-btn" title="Abrir mapa del campus">
+            <i class="bi bi-geo-alt-fill me-1" style="font-size: 1rem;"></i>
+            <span class="d-none d-sm-inline ms-1">Mapa</span>
           </button>
 
           <!-- Boton QR rapido -->
@@ -592,50 +603,18 @@ class SiaStudentDashboard extends HTMLElement {
 
       <!-- C3-03: PANEL SOS FLOTANTE -->
       <div class="dash-sos-fab d-none" id="dash-sos-fab">
-        <button class="btn dash-sos-btn shadow-lg" id="dash-sos-toggle" title="Emergencia / Salud">
-          <i class="bi bi-heart-pulse-fill"></i>
+        <button class="btn dash-sos-btn shadow-lg" id="dash-sos-toggle" title="Boton de panico">
+          <i class="bi bi-shield-fill-exclamation"></i>
         </button>
         <div class="dash-sos-panel d-none shadow-lg rounded-4 p-3" id="dash-sos-panel">
           <div class="d-flex justify-content-between align-items-center mb-2">
-            <span class="fw-bold small" style="color: var(--text-heading);">Emergencia</span>
+            <span class="fw-bold small" id="dash-sos-title" style="color: var(--text-heading);">Boton de panico</span>
             <button class="btn btn-link btn-sm p-0 text-muted" id="dash-sos-close"><i class="bi bi-x-lg"></i></button>
           </div>
           <div class="rounded-pill px-3 py-2 mb-2 extra-small fw-bold" id="dash-sos-status" style="background: rgba(14,165,233,0.12); color: var(--accent);">
-            Expediente de emergencia en revision
+            Solo disponible para perfiles habilitados
           </div>
-          <div class="d-flex gap-2 mb-2">
-            <div class="p-2 rounded-3 text-center flex-fill" style="background: rgba(239,68,68,0.1);">
-              <div class="extra-small text-muted">Tipo de sangre</div>
-              <div class="fw-bold small" id="dash-sos-blood" style="color: #ef4444;">--</div>
-            </div>
-            <div class="p-2 rounded-3 text-center flex-fill" style="background: rgba(245,158,11,0.1);">
-              <div class="extra-small text-muted">Alergias</div>
-              <div class="fw-bold small" id="dash-sos-allergy" style="color: #f59e0b;">Ninguna</div>
-            </div>
-          </div>
-          <div class="mb-2 p-2 rounded-3" style="background: var(--surface, rgba(255,255,255,0.05));">
-            <div class="extra-small text-muted">Contacto de emergencia</div>
-            <div class="fw-bold small" id="dash-sos-contact-name" style="color: var(--text-heading);">No registrado</div>
-            <div class="extra-small" id="dash-sos-contact-phone" style="color: var(--text-body);"></div>
-          </div>
-          <div class="d-flex gap-2 mb-2">
-            <div class="p-2 rounded-3 flex-fill" style="background: rgba(34,197,94,0.08);">
-              <div class="extra-small text-muted">Seguro</div>
-              <div class="fw-bold small" id="dash-sos-insurance" style="color: var(--text-heading);">No indicado</div>
-            </div>
-            <div class="p-2 rounded-3 flex-fill" style="background: rgba(59,130,246,0.08);">
-              <div class="extra-small text-muted">Carrera</div>
-              <div class="fw-bold small" id="dash-sos-career" style="color: var(--text-heading);">Sin asignar</div>
-            </div>
-          </div>
-          <div class="d-flex gap-2">
-            <button class="btn btn-danger btn-sm rounded-pill flex-fill fw-bold" id="dash-sos-medi-btn">
-              <i class="bi bi-heart-pulse me-1"></i>SOS Medi
-            </button>
-            <a href="tel:911" class="btn btn-outline-danger btn-sm rounded-pill flex-fill fw-bold">
-              <i class="bi bi-telephone-fill me-1"></i>911
-            </a>
-          </div>
+          <div class="d-flex flex-column gap-3" id="dash-sos-content"></div>
         </div>
       </div>
 
@@ -702,6 +681,7 @@ class SiaStudentDashboard extends HTMLElement {
   // ── Hidratacion post-render ──────────────────────────────────────
 
   _hydrate() {
+    this._setupCampusMapButton();
     this._setupQRButton();
     this._setupTutorialButton();
     this._setupAvatarDropdown();
@@ -1633,7 +1613,6 @@ class SiaStudentDashboard extends HTMLElement {
     const fab = this.querySelector('#dash-sos-toggle');
     const panel = this.querySelector('#dash-sos-panel');
     const close = this.querySelector('#dash-sos-close');
-    const mediBtn = this.querySelector('#dash-sos-medi-btn');
 
     if (fab && panel) {
       fab.addEventListener('click', () => panel.classList.toggle('d-none'));
@@ -1641,112 +1620,507 @@ class SiaStudentDashboard extends HTMLElement {
     if (close && panel) {
       close.addEventListener('click', () => panel.classList.add('d-none'));
     }
-    if (mediBtn) {
-      mediBtn.addEventListener('click', () => {
-        const profile = this._profile || window.SIA?.currentUserProfile || null;
-        const hd = profile?.healthData || {};
-        const hasCriticalData = Boolean((profile?.tipoSangre || hd?.tipoSangre) && (profile?.contactoEmergenciaTel || hd?.contactoEmergenciaTel || hd?.contactos?.[0]?.telefono));
-        if (!hasCriticalData) {
-          const shouldContinue = window.confirm('Tu expediente de emergencia esta incompleto. Quieres abrir Medi de todos modos para completarlo?');
-          if (!shouldContinue) return;
-        }
-        window.SIA?.navigate('view-medi');
-        setTimeout(() => { if (window.Medi?.toggleSOS) window.Medi.toggleSOS(); }, 500);
-      });
-    }
+    this._renderPanicPanel();
   }
 
   _populateSOS(profile) {
     const sosFab = this.querySelector('#dash-sos-fab');
     if (!sosFab) return;
-
-    // Siempre mostrar para acceso a 911
-    sosFab.classList.remove('d-none');
-    this._syncSOSFabPosition();
-
-    const hd = profile.healthData || {};
-    const statusEl = this.querySelector('#dash-sos-status');
-    const insuranceEl = this.querySelector('#dash-sos-insurance');
-    const careerEl = this.querySelector('#dash-sos-career');
-
-    // tipoSangre esta en el root del perfil, no en healthData
-    const blood = this.querySelector('#dash-sos-blood');
-    const bloodVal = profile.tipoSangre || hd.tipoSangre;
-    if (blood) {
-      blood.textContent = bloodVal || 'No indicado';
+    if (window.PanicService?.canUsePanicFab?.(profile)) {
+      sosFab.classList.remove('d-none');
+      this._syncSOSFabPosition();
+      if (!this._panicDraft) this._panicDraft = this._getDefaultPanicDraft();
+      window.PanicService.loadConfig?.().catch(() => null);
+      this._renderPanicPanel();
+      return;
     }
 
-    // Alergias en healthData.alergia
-    const allergy = this.querySelector('#dash-sos-allergy');
-    if (allergy) {
-      const allergyVal = hd.alergia;
-      if (allergyVal && allergyVal.trim()) {
-        allergy.textContent = allergyVal.length > 25 ? allergyVal.substring(0, 23) + '...' : allergyVal;
-      } else {
-        allergy.textContent = 'Sin alergias registradas';
-      }
-    }
+    sosFab.classList.add('d-none');
+  }
 
-    // Contacto de emergencia: puede estar en healthData.contactos[0] o campos legacy
-    const contactName = this.querySelector('#dash-sos-contact-name');
-    const contactPhone = this.querySelector('#dash-sos-contact-phone');
+  _handlePanicStateChanged() {
+    this._renderPanicPanel();
+  }
 
-    const contacts = hd.contactos || profile.contactos || [];
-    const cont1 = contacts[0] || {};
-    const emergName = cont1.nombre || profile.contactoEmergenciaName || hd.contactoEmergencia;
-    const emergPhone = cont1.telefono || profile.contactoEmergenciaTel || hd.contactoEmergenciaTel;
-    const insuranceVal = hd.seguroTipo || hd.seguro || profile.seguro || '';
-    const careerVal = this._getProfileCareer(profile);
-
-    if (contactName) contactName.textContent = emergName || 'Sin contacto registrado';
-    if (contactPhone) {
-      contactPhone.textContent = '';
-      if (emergPhone) {
-        const normalizedPhone = String(emergPhone).replace(/[^\d+]/g, '');
-        const phoneLink = document.createElement('a');
-        phoneLink.className = 'text-decoration-none';
-        phoneLink.style.color = 'var(--accent)';
-        phoneLink.textContent = String(emergPhone);
-        phoneLink.href = normalizedPhone ? `tel:${normalizedPhone}` : '#';
-        contactPhone.appendChild(phoneLink);
-      } else {
-        contactPhone.textContent = 'Sin telefono registrado';
-      }
-    }
-
-    if (insuranceEl) insuranceEl.textContent = insuranceVal || 'No indicado';
-    if (careerEl) careerEl.textContent = careerVal || 'Sin asignar';
-
-    if (statusEl) {
-      const completeness = [
-        Boolean(bloodVal),
-        Boolean(emergName),
-        Boolean(emergPhone),
-        Boolean(insuranceVal)
-      ].filter(Boolean).length;
-      const missing = 4 - completeness;
-      if (missing <= 0) {
-        statusEl.textContent = 'Expediente de emergencia completo';
-        statusEl.style.background = 'rgba(16,185,129,0.12)';
-        statusEl.style.color = '#10b981';
-      } else {
-        statusEl.textContent = `Faltan ${missing} dato${missing === 1 ? '' : 's'} critico${missing === 1 ? '' : 's'}`;
-        statusEl.style.background = 'rgba(245,158,11,0.14)';
-        statusEl.style.color = '#b45309';
-      }
-    }
+  _getDefaultPanicDraft() {
+    return {
+      recipientMode: 'custom',
+      selectedGroups: ['docentes'],
+      campusZone: '',
+      manualReference: '',
+      reason: '',
+      reviewMode: false,
+      sending: false,
+      locating: false,
+      holdReady: false
+    };
   }
 
   _syncSOSFabPosition() {
     const sosFab = this.querySelector('#dash-sos-fab');
     if (!sosFab) return;
-    const reportBtn = document.getElementById('btn-report-problem');
-    const isAlone = !reportBtn || reportBtn.classList.contains('d-none');
-    sosFab.classList.toggle('dash-sos-alone', isAlone);
+    sosFab.classList.add('dash-sos-alone');
+  }
 
-    if (reportBtn && !this._reportBtnObserver) {
-      this._reportBtnObserver = new MutationObserver(() => this._syncSOSFabPosition());
-      this._reportBtnObserver.observe(reportBtn, { attributes: true, attributeFilter: ['class', 'style'] });
+  _getPanicUiState() {
+    return window.PanicService?.getState?.() || {
+      phase: 'idle',
+      alert: null,
+      config: window.PanicService?.getConfig?.() || null,
+      tracking: { active: false, error: '', lastCapture: null, lastSentPoint: null }
+    };
+  }
+
+  _getPanicConfig() {
+    const panicState = this._getPanicUiState();
+    return panicState.config || {
+      main: {
+        allowedRecipientModes: ['custom', 'staff', 'school'],
+        campusZones: [],
+        ui: { requireReasonFor: ['staff', 'school'] }
+      },
+      groups: {}
+    };
+  }
+
+  _getPanicModeLabel(mode) {
+    if (mode === 'staff') return 'Todo el personal';
+    if (mode === 'school') return 'Toda la escuela';
+    return 'Personalizado';
+  }
+
+  _formatPanicDate(value) {
+    if (!value) return 'Ahora mismo';
+    const date = value?.toDate ? value.toDate() : new Date(value);
+    if (Number.isNaN(date.getTime())) return 'Ahora mismo';
+    return date.toLocaleString('es-MX', {
+      day: '2-digit',
+      month: 'short',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  }
+
+  _renderPanicGroupButtons(config) {
+    const draft = this._panicDraft || this._getDefaultPanicDraft();
+    const groupKeys = Array.isArray(config?.main?.curatedGroups) && config.main.curatedGroups.length
+      ? config.main.curatedGroups
+      : ['docentes'];
+
+    return groupKeys.map((groupKey) => {
+      const normalizedKey = String(groupKey || '').trim();
+      const selected = draft.selectedGroups.includes(normalizedKey);
+      const label = config?.groups?.[normalizedKey]?.label || normalizedKey.replace(/_/g, ' ');
+      return `
+        <button type="button" class="btn btn-sm rounded-pill ${selected ? 'btn-danger' : 'btn-outline-secondary'}"
+          data-panic-group="${normalizedKey}">
+          ${label}
+        </button>
+      `;
+    }).join('');
+  }
+
+  _renderPanicZoneOptions(config) {
+    const draft = this._panicDraft || this._getDefaultPanicDraft();
+    const zones = Array.isArray(config?.main?.campusZones) ? config.main.campusZones : [];
+    return zones.map((zone) => `
+      <option value="${zone.key}" ${draft.campusZone === zone.key ? 'selected' : ''}>${zone.label}</option>
+    `).join('');
+  }
+
+  _renderPanicLocationSummary(panicState) {
+    const point = panicState?.tracking?.lastCapture || panicState?.alert?.exactLocation || null;
+    if (!point || point.lat == null || point.lng == null) {
+      return `
+        <div class="small fw-bold" style="color: var(--text-heading);">Sin GPS capturado todavia</div>
+        <div class="extra-small text-muted">Si no hay permiso de ubicacion, describe una referencia manual clara.</div>
+      `;
+    }
+    return `
+      <div class="small fw-bold" style="color: var(--text-heading);">${Number(point.lat).toFixed(5)}, ${Number(point.lng).toFixed(5)}</div>
+      <div class="extra-small text-muted">
+        Precision ${point.accuracy ? `${Math.round(point.accuracy)} m` : 'sin dato'} · ${this._formatPanicDate(point.capturedAt)}
+      </div>
+    `;
+  }
+
+  _renderPanicIdle(config, panicState) {
+    const draft = this._panicDraft || this._getDefaultPanicDraft();
+    const requiresReason = (config?.main?.ui?.requireReasonFor || []).includes(draft.recipientMode);
+    return `
+      <div class="dash-panic-card p-2 rounded-3">
+        <div class="extra-small text-muted mb-2">Destino</div>
+        <div class="d-flex flex-wrap gap-2">
+          <button type="button" class="btn btn-sm rounded-pill ${draft.recipientMode === 'custom' ? 'btn-danger' : 'btn-outline-secondary'}" data-panic-mode="custom">Personalizado</button>
+          <button type="button" class="btn btn-sm rounded-pill ${draft.recipientMode === 'staff' ? 'btn-danger' : 'btn-outline-secondary'}" data-panic-mode="staff">Todo el personal</button>
+          <button type="button" class="btn btn-sm rounded-pill ${draft.recipientMode === 'school' ? 'btn-danger' : 'btn-outline-secondary'}" data-panic-mode="school">Toda la escuela</button>
+        </div>
+      </div>
+      ${draft.recipientMode === 'custom' ? `
+        <div class="dash-panic-card p-2 rounded-3">
+          <div class="extra-small text-muted mb-2">Grupos autorizados</div>
+          <div class="d-flex flex-wrap gap-2">${this._renderPanicGroupButtons(config)}</div>
+        </div>
+      ` : ''}
+      <div class="dash-panic-card p-2 rounded-3">
+        <label class="extra-small text-muted mb-1 d-block">Zona o edificio</label>
+        <select class="form-select form-select-sm" id="dash-panic-zone">
+          <option value="">Selecciona una zona</option>
+          ${this._renderPanicZoneOptions(config)}
+        </select>
+      </div>
+      <div class="dash-panic-card p-2 rounded-3">
+        <label class="extra-small text-muted mb-1 d-block">Referencia manual</label>
+        <input type="text" class="form-control form-control-sm" id="dash-panic-reference"
+          maxlength="180" placeholder="Ej. Piso 2, pasillo de laboratorios"
+          value="${draft.manualReference || ''}">
+      </div>
+      <div class="dash-panic-card p-2 rounded-3">
+        <label class="extra-small text-muted mb-1 d-block">Motivo ${requiresReason ? '(obligatorio)' : '(opcional)'}</label>
+        <textarea class="form-control form-control-sm" id="dash-panic-reason" rows="2" maxlength="400"
+          placeholder="Describe brevemente que esta ocurriendo">${draft.reason || ''}</textarea>
+      </div>
+      <div class="dash-panic-card p-2 rounded-3">
+        <div class="d-flex justify-content-between align-items-start gap-2">
+          <div>${this._renderPanicLocationSummary(panicState)}</div>
+          <button type="button" class="btn btn-sm btn-outline-primary rounded-pill" data-panic-refresh-location ${draft.locating ? 'disabled' : ''}>
+            ${draft.locating ? 'Buscando...' : 'Ubicacion'}
+          </button>
+        </div>
+        ${panicState?.tracking?.error ? `<div class="extra-small text-warning mt-2">${panicState.tracking.error}</div>` : ''}
+      </div>
+      <div class="d-flex gap-2">
+        <button type="button" class="btn btn-danger btn-sm rounded-pill flex-fill fw-bold" data-panic-review ${draft.sending ? 'disabled' : ''}>
+          ${draft.sending ? 'Enviando...' : 'Revisar alerta'}
+        </button>
+        <a href="tel:911" class="btn btn-outline-danger btn-sm rounded-pill fw-bold">911</a>
+      </div>
+    `;
+  }
+
+  _renderPanicReview(config, panicState) {
+    const draft = this._panicDraft || this._getDefaultPanicDraft();
+    const requiresHold = draft.recipientMode === 'staff' || draft.recipientMode === 'school';
+    const zone = (config?.main?.campusZones || []).find((item) => item.key === draft.campusZone);
+    return `
+      <div class="dash-panic-card p-2 rounded-3">
+        <div class="extra-small text-muted mb-2">Confirma la alerta</div>
+        <div class="small"><strong>Destino:</strong> ${this._getPanicModeLabel(draft.recipientMode)}</div>
+        ${draft.recipientMode === 'custom' ? `<div class="small"><strong>Grupos:</strong> ${(draft.selectedGroups || []).join(', ')}</div>` : ''}
+        <div class="small"><strong>Zona:</strong> ${zone?.label || 'No indicada'}</div>
+        <div class="small"><strong>Referencia:</strong> ${draft.manualReference || 'Sin referencia'}</div>
+        <div class="small"><strong>Motivo:</strong> ${draft.reason || 'Sin motivo'}</div>
+      </div>
+      <div class="dash-panic-card p-2 rounded-3">
+        ${this._renderPanicLocationSummary(panicState)}
+      </div>
+      <div class="d-flex gap-2">
+        <button type="button" class="btn btn-light btn-sm rounded-pill flex-fill" data-panic-cancel-review>Editar</button>
+        <button type="button" class="btn btn-danger btn-sm rounded-pill flex-fill fw-bold" data-panic-send ${draft.sending ? 'disabled' : ''}>
+          ${requiresHold ? 'Mantener para confirmar' : (draft.sending ? 'Enviando...' : 'Enviar ahora')}
+        </button>
+      </div>
+      ${requiresHold ? '<div class="extra-small text-muted text-center">Para los niveles mas altos se requiere mantener presionado el boton de envio.</div>' : ''}
+    `;
+  }
+
+  _renderPanicActive(alert, panicState) {
+    const zone = alert?.campusZone?.label || alert?.campusZone?.key || 'Sin zona';
+    const summary = alert?.dispatchSummary || {};
+    const mapUrl = window.PanicService?.getMapsUrl?.(alert) || '';
+    return `
+      <div class="dash-panic-card p-2 rounded-3">
+        <div class="extra-small text-muted">Alerta activa</div>
+        <div class="small fw-bold" style="color: var(--text-heading);">${this._getPanicModeLabel(alert?.recipientMode)}</div>
+        <div class="extra-small text-muted">ID ${alert?.id || '---'} · ${this._formatPanicDate(alert?.createdAt)}</div>
+      </div>
+      <div class="dash-panic-card p-2 rounded-3">
+        <div class="small"><strong>Zona:</strong> ${zone}</div>
+        <div class="small"><strong>Referencia:</strong> ${alert?.manualReference || 'Sin referencia'}</div>
+        <div class="small"><strong>Motivo:</strong> ${alert?.reason || 'Sin motivo capturado'}</div>
+      </div>
+      <div class="dash-panic-card p-2 rounded-3">
+        <div class="small"><strong>Canales:</strong> ${summary.notificationCount || 0} in-app · ${summary.pushCount || 0} push · ${summary.emailCount || 0} email · ${summary.smsCount || 0} SMS</div>
+        <div class="small"><strong>Acks:</strong> ${summary.ackCount || 0}</div>
+        <div class="extra-small ${panicState?.tracking?.active ? 'text-success' : 'text-muted'}">
+          ${panicState?.tracking?.active ? 'Seguimiento foreground activo.' : 'Seguimiento en espera o sin permiso.'}
+        </div>
+      </div>
+      <div class="dash-panic-card p-2 rounded-3">
+        ${this._renderPanicLocationSummary(panicState)}
+      </div>
+      <div class="d-flex gap-2 flex-wrap">
+        <button type="button" class="btn btn-outline-primary btn-sm rounded-pill flex-fill" data-panic-refresh-location>Actualizar ubicacion</button>
+        ${mapUrl ? `<a href="${mapUrl}" target="_blank" rel="noopener" class="btn btn-outline-secondary btn-sm rounded-pill flex-fill">Abrir en Maps</a>` : ''}
+      </div>
+      <button type="button" class="btn btn-outline-danger btn-sm rounded-pill w-100 fw-bold" data-panic-resolve-own>
+        Marcar como falsa alarma / a salvo
+      </button>
+    `;
+  }
+
+  _renderPanicTerminal(alert) {
+    const status = String(alert?.status || '').toLowerCase();
+    const isError = ['error', 'rejected'].includes(status);
+    const details = alert?.dispatchSummary?.lastError || alert?.rejectionReason || alert?.resolution?.notes || '';
+    return `
+      <div class="dash-panic-card p-2 rounded-3">
+        <div class="small fw-bold ${isError ? 'text-warning' : 'text-success'}">${isError ? 'Ultimo intento con incidencia' : 'Ultima alerta cerrada'}</div>
+        <div class="extra-small text-muted">${this._formatPanicDate(alert?.resolvedAt || alert?.updatedAt || alert?.createdAt)}</div>
+      </div>
+      <div class="dash-panic-card p-2 rounded-3">
+        <div class="small"><strong>Estado:</strong> ${status || 'cerrada'}</div>
+        <div class="small"><strong>Destino:</strong> ${this._getPanicModeLabel(alert?.recipientMode)}</div>
+        <div class="small"><strong>Zona:</strong> ${alert?.campusZone?.label || alert?.campusZone?.key || 'Sin zona'}</div>
+        ${details ? `<div class="extra-small text-muted mt-2">${details}</div>` : ''}
+      </div>
+      <button type="button" class="btn btn-danger btn-sm rounded-pill w-100 fw-bold" data-panic-reset-draft>
+        Preparar nueva alerta
+      </button>
+    `;
+  }
+
+  _renderPanicPanel() {
+    const sosFab = this.querySelector('#dash-sos-fab');
+    const toggle = this.querySelector('#dash-sos-toggle');
+    const titleEl = this.querySelector('#dash-sos-title');
+    const statusEl = this.querySelector('#dash-sos-status');
+    const contentEl = this.querySelector('#dash-sos-content');
+    if (!sosFab || !toggle || !statusEl || !contentEl) return;
+
+    const profile = this._profile || window.SIA?.currentUserProfile || window.currentUserProfile || null;
+    if (!window.PanicService?.canUsePanicFab?.(profile)) {
+      sosFab.classList.add('d-none');
+      return;
+    }
+
+    if (!this._panicDraft) this._panicDraft = this._getDefaultPanicDraft();
+    sosFab.classList.remove('d-none');
+    this._syncSOSFabPosition();
+
+    const panicState = this._getPanicUiState();
+    const alert = panicState.alert || null;
+    const phase = panicState.phase || 'idle';
+    const isError = ['error', 'rejected'].includes(String(alert?.status || '').toLowerCase());
+
+    toggle.classList.toggle('dash-sos-btn-active', phase === 'active');
+    toggle.classList.toggle('dash-sos-btn-error', phase === 'terminal' && isError);
+    if (titleEl) titleEl.textContent = phase === 'active' ? 'Monitoreo activo' : 'Boton de panico';
+
+    if (phase === 'active') {
+      statusEl.textContent = 'Alerta activa y compartiendo seguimiento';
+      statusEl.style.background = 'rgba(239,68,68,0.16)';
+      statusEl.style.color = '#b91c1c';
+      contentEl.innerHTML = this._renderPanicActive(alert, panicState);
+    } else if (phase === 'terminal') {
+      statusEl.textContent = isError ? 'Ultima alerta con incidencia o rechazo' : 'Ultima alerta cerrada';
+      statusEl.style.background = isError ? 'rgba(245,158,11,0.16)' : 'rgba(16,185,129,0.16)';
+      statusEl.style.color = isError ? '#b45309' : '#047857';
+      contentEl.innerHTML = this._renderPanicTerminal(alert);
+    } else if (this._panicDraft.reviewMode) {
+      statusEl.textContent = 'Revision final antes del envio';
+      statusEl.style.background = 'rgba(245,158,11,0.16)';
+      statusEl.style.color = '#b45309';
+      contentEl.innerHTML = this._renderPanicReview(this._getPanicConfig(), panicState);
+    } else {
+      statusEl.textContent = 'Selecciona alcance, zona y referencia';
+      statusEl.style.background = 'rgba(14,165,233,0.12)';
+      statusEl.style.color = 'var(--accent)';
+      contentEl.innerHTML = this._renderPanicIdle(this._getPanicConfig(), panicState);
+    }
+
+    this._bindPanicPanelEvents();
+  }
+
+  _bindPanicPanelEvents() {
+    this.querySelectorAll('[data-panic-mode]').forEach((button) => {
+      button.addEventListener('click', () => {
+        this._panicDraft.recipientMode = button.dataset.panicMode || 'custom';
+        if (this._panicDraft.recipientMode !== 'custom') this._panicDraft.selectedGroups = ['docentes'];
+        this._renderPanicPanel();
+      });
+    });
+
+    this.querySelectorAll('[data-panic-group]').forEach((button) => {
+      button.addEventListener('click', () => {
+        const groupKey = button.dataset.panicGroup;
+        const selected = new Set(this._panicDraft.selectedGroups || []);
+        if (selected.has(groupKey)) selected.delete(groupKey);
+        else selected.add(groupKey);
+        this._panicDraft.selectedGroups = [...selected];
+        if (this._panicDraft.selectedGroups.length === 0) this._panicDraft.selectedGroups = ['docentes'];
+        this._renderPanicPanel();
+      });
+    });
+
+    const zone = this.querySelector('#dash-panic-zone');
+    if (zone) {
+      zone.addEventListener('change', () => {
+        this._panicDraft.campusZone = zone.value || '';
+      });
+    }
+
+    const reference = this.querySelector('#dash-panic-reference');
+    if (reference) {
+      reference.addEventListener('input', () => {
+        this._panicDraft.manualReference = reference.value || '';
+      });
+    }
+
+    const reason = this.querySelector('#dash-panic-reason');
+    if (reason) {
+      reason.addEventListener('input', () => {
+        this._panicDraft.reason = reason.value || '';
+      });
+    }
+
+    const refreshLocation = this.querySelector('[data-panic-refresh-location]');
+    if (refreshLocation) {
+      refreshLocation.addEventListener('click', () => this._refreshPanicLocation());
+    }
+
+    const reviewButton = this.querySelector('[data-panic-review]');
+    if (reviewButton) {
+      reviewButton.addEventListener('click', () => this._startPanicReview());
+    }
+
+    const cancelReview = this.querySelector('[data-panic-cancel-review]');
+    if (cancelReview) {
+      cancelReview.addEventListener('click', () => {
+        this._panicDraft.reviewMode = false;
+        this._renderPanicPanel();
+      });
+    }
+
+    const sendButton = this.querySelector('[data-panic-send]');
+    if (sendButton) {
+      const needsHold = this._panicDraft.recipientMode === 'staff' || this._panicDraft.recipientMode === 'school';
+      if (needsHold) {
+        const holdMs = this._getPanicConfig()?.main?.ui?.holdToConfirmMs || 1800;
+        let holdTimer = null;
+        const start = () => {
+          sendButton.textContent = 'Confirmando...';
+          holdTimer = window.setTimeout(() => {
+            holdTimer = null;
+            this._submitPanicAlert();
+          }, holdMs);
+        };
+        const cancel = () => {
+          if (holdTimer) clearTimeout(holdTimer);
+          holdTimer = null;
+          if (!this._panicDraft.sending) sendButton.textContent = 'Mantener para confirmar';
+        };
+        sendButton.addEventListener('pointerdown', start);
+        sendButton.addEventListener('pointerup', cancel);
+        sendButton.addEventListener('pointerleave', cancel);
+      } else {
+        sendButton.addEventListener('click', () => this._submitPanicAlert());
+      }
+    }
+
+    const resolveOwn = this.querySelector('[data-panic-resolve-own]');
+    if (resolveOwn) {
+      resolveOwn.addEventListener('click', () => this._resolveOwnPanicAlert());
+    }
+
+    const resetDraft = this.querySelector('[data-panic-reset-draft]');
+    if (resetDraft) {
+      resetDraft.addEventListener('click', () => {
+        this._panicDraft = this._getDefaultPanicDraft();
+        this._renderPanicPanel();
+      });
+    }
+  }
+
+  async _refreshPanicLocation() {
+    if (!window.PanicService?.captureCurrentLocation) return;
+    this._panicDraft.locating = true;
+    this._renderPanicPanel();
+    try {
+      const point = await window.PanicService.captureCurrentLocation();
+      const panicState = this._getPanicUiState();
+      if (panicState?.phase === 'active' && panicState?.alert?.id) {
+        await window.PanicService.updateLocation?.(panicState.alert.id, point);
+      }
+      window.showToast?.('Ubicacion capturada', 'success');
+    } catch (error) {
+      window.showToast?.(error?.message || 'No se pudo leer la ubicacion', 'warning');
+    } finally {
+      this._panicDraft.locating = false;
+      this._renderPanicPanel();
+    }
+  }
+
+  _validatePanicDraft() {
+    const config = this._getPanicConfig();
+    const requiresReason = (config?.main?.ui?.requireReasonFor || []).includes(this._panicDraft.recipientMode);
+    if (!this._panicDraft.campusZone) {
+      throw new Error('Selecciona una zona o edificio del campus.');
+    }
+    if (requiresReason && !String(this._panicDraft.reason || '').trim()) {
+      throw new Error('Debes capturar un motivo breve para este alcance.');
+    }
+    if (this._panicDraft.recipientMode === 'custom' && (!Array.isArray(this._panicDraft.selectedGroups) || !this._panicDraft.selectedGroups.length)) {
+      throw new Error('Selecciona al menos un grupo autorizado.');
+    }
+  }
+
+  _startPanicReview() {
+    try {
+      this._validatePanicDraft();
+      this._panicDraft.reviewMode = true;
+      this._renderPanicPanel();
+    } catch (error) {
+      window.showToast?.(error?.message || 'Faltan datos para continuar', 'warning');
+    }
+  }
+
+  _buildPanicPayload() {
+    const panicState = this._getPanicUiState();
+    return {
+      recipientMode: this._panicDraft.recipientMode,
+      selectedGroups: this._panicDraft.recipientMode === 'custom' ? this._panicDraft.selectedGroups : [],
+      campusZone: this._panicDraft.campusZone,
+      manualReference: (this._panicDraft.manualReference || '').trim(),
+      reason: (this._panicDraft.reason || '').trim(),
+      exactLocation: panicState?.tracking?.lastCapture || null,
+      clientRequestId: `panic_${Date.now()}`
+    };
+  }
+
+  async _submitPanicAlert() {
+    if (!window.PanicService?.createAlert) return;
+    try {
+      this._validatePanicDraft();
+      this._panicDraft.sending = true;
+      this._renderPanicPanel();
+      const result = await window.PanicService.createAlert(this._buildPanicPayload());
+      this._panicDraft = this._getDefaultPanicDraft();
+      window.showToast?.(
+        result?.reusedExisting ? 'Ya existe una alerta activa para tu perfil.' : 'Alerta enviada. Se inicio el seguimiento.',
+        result?.reusedExisting ? 'warning' : 'danger'
+      );
+    } catch (error) {
+      console.error('[Dashboard] Error creando alerta de panico:', error);
+      window.showToast?.(error?.message || 'No se pudo enviar la alerta', 'danger');
+      this._panicDraft.sending = false;
+      return;
+    }
+    this._renderPanicPanel();
+  }
+
+  async _resolveOwnPanicAlert() {
+    const panicState = this._getPanicUiState();
+    const alertId = panicState?.alert?.id;
+    if (!alertId || !window.PanicService?.resolveAlert) return;
+    const confirmed = window.confirm('Esto cerrara tu alerta activa como falsa alarma o a salvo. Continuar?');
+    if (!confirmed) return;
+    try {
+      await window.PanicService.resolveAlert(alertId, { type: 'false_alarm', notes: 'Cierre desde dashboard de estudiante.' });
+      window.showToast?.('La alerta fue cerrada', 'success');
+    } catch (error) {
+      console.error('[Dashboard] Error resolviendo alerta:', error);
+      window.showToast?.(error?.message || 'No se pudo cerrar la alerta', 'danger');
     }
   }
 
@@ -1953,6 +2327,14 @@ class SiaStudentDashboard extends HTMLElement {
   }
 
   // ── Tutorial ─────────────────────────────────────────────────────
+
+  _setupCampusMapButton() {
+    const btn = this.querySelector('#dash-campus-map-btn');
+    if (!btn) return;
+    btn.addEventListener('click', () => {
+      window.SIA?.navigate?.('view-campus-map');
+    });
+  }
 
   _setupTutorialButton() {
     const btn = this.querySelector('#btn-replay-tutorial');

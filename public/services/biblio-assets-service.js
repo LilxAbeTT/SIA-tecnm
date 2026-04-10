@@ -29,6 +29,16 @@ const BiblioAssetsService = (function () {
         return end > now;
     }
 
+    function getAssetExpiryMillis(data = {}) {
+        if (data.expiresAt?.toMillis) return data.expiresAt.toMillis();
+        if (typeof data.expiresAt === 'number') return data.expiresAt;
+
+        const occupiedAt = data.occupiedAt?.toMillis
+            ? data.occupiedAt.toMillis()
+            : (typeof data.occupiedAt === 'number' ? data.occupiedAt : null);
+        return occupiedAt ? occupiedAt + (60 * 60 * 1000) : null;
+    }
+
     async function getAssetDoc(ctx, assetId) {
         const assetRef = ctx.db.collection(ASSETS_COLL).doc(assetId);
         const assetSnap = await assetRef.get();
@@ -426,7 +436,7 @@ const BiblioAssetsService = (function () {
 
     // [FIX] Liberar automáticamente activos cuyo tiempo de 1 hora ya expiró
     async function liberarActivosExpirados(ctx) {
-        const now = firebase.firestore.Timestamp.now();
+        const nowMs = Date.now();
         const snap = await ctx.db.collection(ASSETS_COLL)
             .where('status', '==', 'ocupado')
             .get();
@@ -438,8 +448,8 @@ const BiblioAssetsService = (function () {
 
         snap.docs.forEach(doc => {
             const data = doc.data();
-            // Si tiene expiresAt y ya pasó, liberar
-            if (data.expiresAt && data.expiresAt.toMillis() <= now.toMillis()) {
+            const expiryMs = getAssetExpiryMillis(data);
+            if (expiryMs && expiryMs <= nowMs) {
                 batch.update(doc.ref, {
                     status: 'disponible',
                     ...CLEAR_OCCUPANCY

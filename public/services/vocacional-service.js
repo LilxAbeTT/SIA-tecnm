@@ -335,14 +335,16 @@ const VocacionalService = (function () {
             const docSnap = await cacheRef.get();
             const now = Date.now();
             let needsRefresh = true;
+            let cachedStats = null;
 
             if (docSnap.exists) {
                 const data = docSnap.data();
+                cachedStats = data.stats || null;
                 const lastUpdated = data.lastUpdated ? data.lastUpdated.toMillis() : 0;
                 // Si la caché tiene menos de 1 hora de antigüedad, la usamos
-                if (now - lastUpdated < 3600000) {
+                if (cachedStats && (now - lastUpdated < 3600000)) {
                     needsRefresh = false;
-                    return data.stats;
+                    return cachedStats;
                 }
             }
 
@@ -392,6 +394,16 @@ const VocacionalService = (function () {
             return stats;
 
         } catch (error) {
+            try {
+                const staleSnap = await cacheRef.get();
+                const staleStats = staleSnap.exists ? staleSnap.data()?.stats : null;
+                if (staleStats) {
+                    console.warn("Usando cache vocacional previa por error al refrescar estadisticas:", error);
+                    return staleStats;
+                }
+            } catch (cacheError) {
+                console.warn("No se pudo recuperar la cache vocacional tras error de refresco:", cacheError);
+            }
             console.error("Error al obtener estadísticas del CRM:", error);
             throw error;
         }

@@ -188,9 +188,6 @@ window.AdminMedi.Agenda = (function () {
       const kpiPend = document.getElementById('kpi-pendientes-hoy');
       const badgeAgendaCard = document.getElementById('badge-agenda-card');
 
-      if (kpiPend) kpiPend.textContent = todayDocs.length;
-      if (badgeAgendaCard) badgeAgendaCard.textContent = `${todayDocs.length} citas`;
-
       const modalUpdateSync = () => {
         const modalTarget = document.getElementById('modal-agenda-list');
         const modalEl = document.getElementById('modalMiAgenda');

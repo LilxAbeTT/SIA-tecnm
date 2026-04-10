@@ -1098,6 +1098,7 @@ const Biblio = (function () {
         const safeClasificacion = escapeHtml(clasificacion || '');
         const safeAnio = escapeHtml(anio || '');
         const safeAdquisicion = escapeHtml(adquisicion || id || '--');
+        const loanPolicy = window.BiblioService?.getLoanPolicy?.({ categoria }) || null;
         const hasActiveRequest = userHasActiveBookRequest(id);
         const inWishlist = _studentWishlist.some(item => item.id === id);
         const inWaitlist = _studentWaitlist.some(item => item.id === id);
@@ -1130,6 +1131,12 @@ const Biblio = (function () {
                     </div>
                     <p class="small text-muted mb-0">${stock > 0 ? 'Si lo apartas, tendras 24 horas para recogerlo en mostrador.' : 'Si no hay stock, puedes seguir este titulo desde la lista de espera.'}</p>
                 </div>
+                ${loanPolicy?.isWeekly ? `
+                    <div class="alert alert-info rounded-4 border-0 d-flex align-items-center gap-2">
+                        <i class="bi bi-journal-richtext"></i>
+                        <div class="small mb-0">Este titulo tiene prestamo especial de <strong>1 semana</strong> cuando te lo entregan.</div>
+                    </div>
+                ` : ''}
             </div>
             <div class="modal-footer border-0 px-4 pb-4 d-flex flex-column gap-2">
                 ${hasActiveRequest
@@ -1159,6 +1166,7 @@ const Biblio = (function () {
     async function solicitarLibro(id, titulo) {
         const bookId = id || _currentBookDetail?.id;
         const bookTitle = titulo || _currentBookDetail?.titulo || 'Libro';
+        const loanPolicy = window.BiblioService?.getLoanPolicy?.(_currentBookDetail || null) || null;
         if (!bookId || !_ctx?.auth?.currentUser) {
             showToast("No se pudo identificar el libro a solicitar.", "warning");
             return;
@@ -1187,7 +1195,7 @@ const Biblio = (function () {
             if (_studentWaitlist.some(item => item.id === bookId) && window.BiblioService?.leaveWaitlist) {
                 await BiblioService.leaveWaitlist(_ctx, _ctx.auth.currentUser.uid, bookId).catch(() => {});
             }
-            showToast("Solicitud registrada. Tienes 24 horas para recoger tu libro en mostrador.", "success");
+            showToast(`Solicitud registrada. Tienes 24 horas para recoger tu libro en mostrador.${loanPolicy?.isWeekly ? ' Cuando te lo entreguen, durara 1 semana.' : ''}`, "success");
             bootstrap.Modal.getInstance(document.getElementById('modal-libro-detalle'))?.hide();
             await loadStudentFullData();
 
@@ -1205,7 +1213,7 @@ const Biblio = (function () {
                 window.Notify.send(_ctx.auth.currentUser.uid, {
                     tipo: 'biblio',
                     titulo: 'Solicitud registrada',
-                    mensaje: `"${bookTitle}" quedo apartado. Tienes 24 horas para recogerlo en mostrador.`,
+                    mensaje: `"${bookTitle}" quedo apartado. Tienes 24 horas para recogerlo en mostrador.${loanPolicy?.isWeekly ? ' Al entregarse, este titulo dura 1 semana.' : ''}`,
                     link: '#/biblio'
                 });
             }
@@ -1374,6 +1382,7 @@ const Biblio = (function () {
         const returnDate = loan.fechaDevolucionReal?.toDate ? loan.fechaDevolucionReal.toDate() : null;
         const cancellationDate = loan.fechaCancelacion?.toDate ? loan.fechaCancelacion.toDate() : null;
         const extensionCount = Number(loan.extensiones) || 0;
+        const loanPolicy = window.BiblioService?.getLoanPolicy?.(loan) || null;
         const isDelivered = loan.estado === 'entregado';
         const isPendingPickup = ['pendiente', 'pendiente_entrega'].includes(loan.estado);
         const overdueAmount = Number(loan.multaActual || loan.montoDeuda || 0);
@@ -1426,6 +1435,7 @@ const Biblio = (function () {
                     ${returnDate ? `Movimiento final registrado: ${escapeHtml(formatDateTime(returnDate))}.` : ''}
                     ${cancellationDate ? ` Cancelado: ${escapeHtml(formatDateTime(cancellationDate))}.` : ''}
                     ${isPendingPickup ? ' Recuerda pasar a mostrador dentro de la ventana de recoleccion.' : ' Devuelvelo a tiempo para evitar multas y conservar tu racha.'}
+                    ${!isPendingPickup && loanPolicy?.isWeekly ? ' Este titulo tiene un prestamo especial de 1 semana.' : ''}
                 </div>
             </div>
             <div class="modal-footer border-0 px-4 pb-4 d-flex gap-2 flex-wrap">

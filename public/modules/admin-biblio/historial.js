@@ -167,6 +167,13 @@ window.AdminBiblio.Historial = (function () {
         const searchVal = document.getElementById('historial-search').value.trim();
         const type = _tipoHistorialActivo;
 
+        if (type === 'visitas' || type === 'pcs') {
+            await Promise.allSettled([
+                BiblioService.cleanupExpiredActiveVisits?.(_ctx, { force: true }),
+                window.BiblioAssetsService?.liberarActivosExpirados?.(_ctx)
+            ]);
+        }
+
         if (nuevaBusqueda) {
             container.innerHTML = '<div class="text-center text-muted py-4"><span class="spinner-border text-primary"></span></div>';
             pagination.style.display = 'none';
@@ -391,6 +398,9 @@ window.AdminBiblio.Historial = (function () {
             const fecha = dDev ? dDev.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' }) : '--';
             const hora = dDev ? dDev.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
             const multa = item.montoDeuda || 0;
+            const retrasoSinCobro = item.sinCobroRetraso
+                ? `<span class="badge bg-primary rounded-pill fw-bold" style="font-size: 0.75rem;">Retraso sin cobro${item.diasRetraso ? `: ${item.diasRetraso}d` : ''}</span>`
+                : '';
             const studentDis = escapeHtml(item._resolvedStudentName ? `${item._resolvedStudentName} (${item._resolvedStudentMatricula})` : item.studentId);
             const titulo = escapeHtml(item.tituloLibro || 'Libro');
             return `
@@ -405,7 +415,9 @@ window.AdminBiblio.Historial = (function () {
                         </div>
                     </div>
                     <div class="text-end" style="min-width: 100px;">
-                        ${multa > 0
+                        ${item.sinCobroRetraso
+                    ? retrasoSinCobro
+                    : multa > 0
                     ? `<span class="badge bg-danger rounded-pill fw-bold" style="font-size: 0.75rem;">Deuda: $${multa}</span>`
                     : `<span class="badge bg-success rounded-pill fw-bold" style="font-size: 0.75rem;">Liquido</span>`}
                         ${item.perdonado ? `<span class="badge bg-info text-dark ms-1" style="font-size: 0.75rem;" title="Multa Perdonada"><i class="bi bi-shield-check"></i> Perdón</span>` : ''}

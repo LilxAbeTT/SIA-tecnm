@@ -7,6 +7,9 @@ window.ReportesService = (function () {
         'MEDICO': { name: 'Servicio Médico / Psicología', color: '#6366f1', icon: 'bi-heart-pulse-fill', gradient: 'linear-gradient(135deg, #6366f1, #4f46e5)' }
     };
 
+    const MODULE_VOCACIONAL = { name: 'Test Vocacional', color: '#0bacbe', icon: 'bi-journal-check', gradient: 'linear-gradient(135deg, #0dcaf0, #0bacbe)' };
+    MODULES.VOCACIONAL = MODULE_VOCACIONAL;
+
     // Cache de usuarios para evitar re-fetches
     let _userCache = {};
     let _consultasCache = {}; // Cache para _enrichWithConsultaDetails
@@ -20,9 +23,10 @@ window.ReportesService = (function () {
     const CACHE_TTL_BIBLIO = 5 * 60 * 1000; // 5 minutos
     const CACHE_TTL_MEDICO = 5 * 60 * 1000; // 5 minutos
     const CACHE_TTL_USERS = 20 * 60 * 1000; // 20 minutos
+    const CACHE_TTL_REPORT_DATA = 5 * 60 * 1000; // 5 minutos
     const CACHE_TTL_CONSULTAS = 15 * 60 * 1000; // 15 minutos
-    const CACHE_TTL_POBLACION = 30 * 60 * 1000; // 30 minutos
-    const CACHE_TTL_EXPEDIENTES = 10 * 60 * 1000; // 10 minutos
+    const CACHE_TTL_POBLACION = 6 * 60 * 60 * 1000; // 6 horas
+    const CACHE_TTL_EXPEDIENTES = 60 * 60 * 1000; // 1 hora
 
     function isFresh(ts, ttl) {
         return Number.isFinite(ts) && (Date.now() - ts) < ttl;
@@ -385,6 +389,18 @@ window.ReportesService = (function () {
         };
     }
 
+    function cacheUserLookupEntry(cacheKey, lookup, ts = Date.now()) {
+        if (!cacheKey || !lookup || typeof lookup !== 'object') return;
+        _userCache[cacheKey] = lookup;
+        _userCacheTimes[cacheKey] = ts;
+
+        if (lookup.matricula) {
+            const matriculaKey = `mat_${lookup.matricula}`;
+            _userCache[matriculaKey] = lookup;
+            _userCacheTimes[matriculaKey] = ts;
+        }
+    }
+
     /**
      * Extrae la generación a partir de la matrícula.
      * Ej: "22380123" → 2022, "19380456" → 2019
@@ -446,9 +462,10 @@ window.ReportesService = (function () {
             const batch = uidArray.slice(i, i + 30);
             try {
                 const snap = await ctx.db.collection('usuarios').where('__name__', 'in', batch).get();
+                const fetchedAt = Date.now();
                 snap.docs.forEach(doc => {
-                    _userCache[doc.id] = buildNormalizedUserLookup(doc.data(), doc.id);
-                    _userCacheTimes[doc.id] = Date.now();
+                    const lookup = buildNormalizedUserLookup(doc.data(), doc.id);
+                    cacheUserLookupEntry(doc.id, lookup, fetchedAt);
                 });
             } catch (e) {
                 console.warn('[ReportesService] Error fetching users batch:', e);
@@ -463,20 +480,29 @@ window.ReportesService = (function () {
                 !r._uid &&
                 r.matricula &&
                 r.matricula !== 'N/A' &&
-                !Object.values(_userCache).some((u) => u.matricula === r.matricula)
+                !isFresh(_userCacheTimes[`mat_${r.matricula}`], CACHE_TTL_USERS)
             ) {
                 matsToFetch.add(r.matricula);
             }
         });
 
-        for (const mat of matsToFetch) {
+        const matriculaArray = [...matsToFetch];
+        for (let i = 0; i < matriculaArray.length; i += 30) {
+            const batch = matriculaArray.slice(i, i + 30);
             try {
-                const snap = await ctx.db.collection('usuarios').where('matricula', '==', mat).limit(1).get();
-                if (!snap.empty) {
-                    const doc = snap.docs[0];
-                    _userCache[`mat_${mat}`] = buildNormalizedUserLookup(doc.data(), doc.id);
-                    _userCacheTimes[`mat_${mat}`] = Date.now();
-                }
+                const snap = await ctx.db.collection('usuarios').where('matricula', 'in', batch).get();
+                const fetchedAt = Date.now();
+                snap.docs.forEach(doc => {
+                    const lookup = buildNormalizedUserLookup(doc.data(), doc.id);
+                    cacheUserLookupEntry(doc.id, lookup, fetchedAt);
+                });
+                batch.forEach((mat) => {
+                    const matriculaKey = `mat_${mat}`;
+                    if (!isFresh(_userCacheTimes[matriculaKey], CACHE_TTL_USERS)) {
+                        _userCache[matriculaKey] = _userCache[matriculaKey] || {};
+                        _userCacheTimes[matriculaKey] = fetchedAt;
+                    }
+                });
             } catch (e) { /* silently skip */ }
         }
 
@@ -517,9 +543,13 @@ window.ReportesService = (function () {
         const end = new Date(filters.end || new Date());
         end.setHours(23, 59, 59, 999);
 
-        let allData = [];
+        const requestedAreas = Array.isArray(filters.areas) ? [...new Set(filters.areas)].sort() : [];
+        const cacheKey = buildCacheKey('report-data', requestedAreas, start, end);
 
-        if (filters.areas.includes('BIBLIO')) {
+        return getFromMemoryCache(cacheKey, CACHE_TTL_REPORT_DATA, async () => {
+            let allData = [];
+
+        if (requestedAreas.includes('BIBLIO')) {
             const [visitas, prestamos] = await Promise.all([
                 fetchBiblioVisitas(ctx, start, end),
                 fetchBiblioPrestamos(ctx, start, end)
@@ -527,12 +557,12 @@ window.ReportesService = (function () {
             allData = [...allData, ...visitas, ...prestamos];
         }
 
-        if (filters.areas.includes('MEDICO')) {
+        if (requestedAreas.includes('MEDICO')) {
             const citas = await fetchCitasMedi(ctx, start, end);
             allData = [...allData, ...citas];
         }
 
-        if (filters.areas.includes('POBLACION')) {
+        if (requestedAreas.includes('POBLACION')) {
             const poblacion = await fetchPoblacionData(ctx, start, end);
             allData = [...allData, ...poblacion];
         }
@@ -540,7 +570,53 @@ window.ReportesService = (function () {
         // Enriquecimiento demográfico
         allData = await enrichWithUserData(ctx, allData);
 
-        return allData.sort((a, b) => b.fecha - a.fecha);
+            return allData.sort((a, b) => b.fecha - a.fecha);
+        });
+    }
+
+    async function fetchVocacionalStats(ctx) {
+        return getFromMemoryCache(buildCacheKey('vocacional-stats'), CACHE_TTL_LANDING, async () => {
+            let cachedStats = null;
+
+            try {
+                const cacheSnap = await ctx.db.collection('reportes_cache').doc('vocacional_stats').get();
+                if (cacheSnap.exists) {
+                    cachedStats = cacheSnap.data()?.stats || null;
+                }
+            } catch (e) {
+                console.warn('[ReportesService] No se pudo leer cache vocacional:', e);
+            }
+
+            if (cachedStats) {
+                return cachedStats;
+            }
+
+            const getCountSafe = async (customQuery) => {
+                try { return (await customQuery.count().get()).data().count; }
+                catch (e) { return (await customQuery.get()).size; }
+            };
+
+            try {
+                const [totalAspirantes, totalCompleted] = await Promise.all([
+                    getCountSafe(ctx.db.collection('aspirantes-registros')),
+                    getCountSafe(
+                        ctx.db.collection('aspirantes-registros')
+                            .where('testStatus', '==', 'completed')
+                    )
+                ]);
+
+                return {
+                    totalAspirantes,
+                    totalCompleted,
+                    demandaCareers: {},
+                    procedenciaPrepas: {},
+                    ofertaEducativa: []
+                };
+            } catch (e) {
+                console.warn('[ReportesService] No se pudieron calcular estadisticas vocacionales en vivo:', e);
+                return null;
+            }
+        });
     }
 
     async function fetchLandingKPIs(ctx) {
@@ -579,17 +655,18 @@ window.ReportesService = (function () {
                 }
             };
 
-            const [usuarios, visitasHoy, consultasHoy] = await Promise.all([
+            const [usuarios, visitasHoy, consultasHoy, vocacional] = await Promise.all([
                 safeMetric('usuarios', () => getCountSafe(ctx.db.collection('usuarios'))),
                 safeMetric('visitas', () => getCountSafe(
                     ctx.db.collection('biblio-visitas')
                         .where('fecha', '>=', today)
                         .where('fecha', '<=', todayEnd)
                 )),
-                safeMetric('consultas', getConsultasHoy)
+                safeMetric('consultas', getConsultasHoy),
+                safeMetric('vocacional', () => fetchVocacionalStats(ctx))
             ]);
 
-            return { usuarios, visitasHoy, consultasHoy };
+            return { usuarios, visitasHoy, consultasHoy, vocacional };
         });
     }
 
@@ -1168,6 +1245,7 @@ window.ReportesService = (function () {
         extractGeneracion,
         MODULES,
         fetchLandingKPIs,
+        fetchVocacionalStats,
         fetchPoblacionData,
         fetchBiblioCatalogo,
         fetchBiblioActivos,

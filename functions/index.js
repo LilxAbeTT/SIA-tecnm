@@ -84,6 +84,11 @@ exports.sendPushOnNewNotification = onDocumentCreated(
       return null;
     }
 
+    if (notifData?.meta?.skipPushTrigger) {
+      console.log(`[Push] Notificacion ${notifId} marcada para omitir trigger push.`);
+      return null;
+    }
+
     const { titulo, mensaje, tipo = 'info', link } = notifData;
     console.log(`[Push] Nueva notificacion para ${uid}: "${titulo}"`);
 
@@ -278,3 +283,5 @@ exports.aggregateServiceSurveyExemptions = onDocumentWritten(
 );
 
 Object.assign(exports, require('./foro'));
+Object.assign(exports, require('./panic'));
+Object.assign(exports, require('./scanner'));

@@ -31,6 +31,7 @@ var Medi = (function () {
   let _currentShift = null; // Mantiene el turno 'legacy' para filtrado
   let _currentProfile = null; // [NEW] Objeto del perfil autenticado
   let _profesionalCedula = null;
+  let _cleanupRegisteredCtx = null;
   const C_CITAS = 'citas-medi';
 
   // --- B3: Inline Consultation State ---
@@ -2346,6 +2347,13 @@ var Medi = (function () {
 
   async function initStudent(ctx) {
     _ctx = ctx;
+    if (ctx?.ModuleManager?.addSubscription && _cleanupRegisteredCtx !== ctx) {
+      _cleanupRegisteredCtx = ctx;
+      ctx.ModuleManager.addSubscription(() => {
+        destroy();
+        if (_cleanupRegisteredCtx === ctx) _cleanupRegisteredCtx = null;
+      });
+    }
     const user = _ctx.user; // Usar el usuario del Store/Context
     const profile = _ctx.profile;
 
@@ -3002,7 +3010,7 @@ var Medi = (function () {
           setTimeout(() => _focusBookingSection('time'), 120);
         });
       });
-    } if (window.Medi && typeof window.Medi.renderFollowUpBanner === 'function') window.Medi.renderFollowUpBanner(_ctx.user.uid);
+    }
 
     if (!form.dataset.listenerAttached) {
       form.addEventListener('submit', async (e) => {
@@ -3398,11 +3406,13 @@ var Medi = (function () {
 
     const profId = _currentProfile ? _currentProfile.id : null;
     const uid = _myUid;
+    list.innerHTML = '<div class="text-center py-4"><div class="spinner-border text-success" role="status"></div></div>';
+    if (_recentUnsub) {
+      _recentUnsub();
+      _recentUnsub = null;
+    }
 
-    // Unsubscribe previous if exists? (Not tracking strict unsubs for this one yet, assuming refresh)
-    // Ideally add to _unsubs
-
-    MediService.streamRecentActivity(_ctx, _myRole, uid, profId, 10, (docs) => {
+    _recentUnsub = MediService.streamRecentActivity(_ctx, _myRole, uid, profId, 10, (docs) => {
       if (docs.length === 0) {
         list.innerHTML = '<div class="text-center py-4 text-muted small opacity-50">Sin actividad reciente</div>';
         return;
@@ -3707,6 +3717,7 @@ onclick = "Medi.showConsultationQuickDetail('${encoded}')" >
    * El router llama a Medi.destroy?.() antes de cambiar de vista.
    */
   function destroy() {
+    _cleanupRegisteredCtx = null;
     _cleanupListeners();
     _cleanupGlobalElements();
     if (_stuMsgsUnsub) { _stuMsgsUnsub(); _stuMsgsUnsub = null; }

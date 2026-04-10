@@ -8,34 +8,309 @@ window.AdminVocacional = (function () {
     let _ctx = null;
     let currentTab = 'dashboard';
     let aspirantesData = [];
+    let crmStats = null;
     let lastVisibleDoc = null;
     let hasMoreAspirantes = true;
     let isInsideReportes = false;
+    let dashboardCharts = [];
+
+    function normalizePermission(value) {
+        return String(value || '').trim().toLowerCase();
+    }
+
+    function getProfileEmail(ctx = _ctx) {
+        return String(
+            ctx?.profile?.emailInstitucional
+            || ctx?.profile?.email
+            || ctx?.auth?.currentUser?.email
+            || ctx?.user?.email
+            || ''
+        ).trim().toLowerCase();
+    }
+
+    function hasVocacionalAdminAccess(ctx = _ctx) {
+        const profile = ctx?.profile || {};
+        const canAccessView = typeof window.SIA?.canAccessView === 'function'
+            ? window.SIA.canAccessView(profile, 'view-vocacional-admin')
+            : false;
+
+        return !!ctx?.user && (
+            profile.role === 'superadmin'
+            || canAccessView
+            || normalizePermission(profile?.permissions?.vocacional) === 'admin'
+            || getProfileEmail(ctx) === 'difusion@loscabos.tecnm.mx'
+        );
+    }
+
+    function hasReportesAccess(ctx = _ctx) {
+        const profile = ctx?.profile || {};
+        const canAccessView = typeof window.SIA?.canAccessView === 'function'
+            ? window.SIA.canAccessView(profile, 'view-reportes')
+            : false;
+        const email = getProfileEmail(ctx);
+
+        return !!ctx?.user && (
+            profile.role === 'superadmin'
+            || canAccessView
+            || normalizePermission(profile?.permissions?.reportes) === 'admin'
+            || email === 'desarrolloacademico@loscabos.tecnm.mx'
+            || email === 'biblioteca@loscabos.tecnm.mx'
+        );
+    }
+
+    function _resolveAccess(ctx = _ctx) {
+        if (!ctx?.user) {
+            return {
+                allowed: false,
+                admin: false,
+                message: 'La sesion no esta lista todavia. Intenta nuevamente en unos segundos.'
+            };
+        }
+
+        const admin = hasVocacionalAdminAccess(ctx);
+        if (isInsideReportes) {
+            if (admin || hasReportesAccess(ctx)) {
+                return { allowed: true, admin, message: '' };
+            }
+            return {
+                allowed: false,
+                admin: false,
+                message: 'No tienes permisos para ver el modulo vocacional desde Reportes.'
+            };
+        }
+
+        if (admin) {
+            return { allowed: true, admin, message: '' };
+        }
+
+        return {
+            allowed: false,
+            admin: false,
+            message: 'No tienes permisos para ver el CRM de Difusion.'
+        };
+    }
+
+    function updateExportButtonState() {
+        if (isInsideReportes) return;
+        const btnExport = document.getElementById('btn-export-csv');
+        if (!btnExport) return;
+        btnExport.disabled = currentTab !== 'prospectos' || aspirantesData.length === 0;
+    }
+
+    function renderRestrictedTab(tabId) {
+        destroyDashboardCharts();
+        const content = document.getElementById('vocacional-content') || _ctx?.container;
+        if (!content) return;
+
+        const tabLabels = {
+            prospectos: 'Base de Prospectos',
+            configuracion: 'Configurar Test'
+        };
+
+        content.innerHTML = `
+        <div class="alert alert-info border-0 shadow-sm rounded-4 px-4 py-4">
+            <div class="d-flex align-items-start gap-3">
+                <div class="rounded-circle bg-primary bg-opacity-10 text-primary d-flex align-items-center justify-content-center flex-shrink-0" style="width: 48px; height: 48px;">
+                    <i class="bi bi-info-circle fs-4"></i>
+                </div>
+                <div>
+                    <h5 class="fw-bold mb-1">${tabLabels[tabId] || 'Esta seccion'} requiere permisos vocacionales</h5>
+                    <p class="text-muted mb-0">Desde Reportes solo esta disponible la vista agregada de Estadisticas para perfiles sin acceso administrativo al CRM vocacional.</p>
+                </div>
+            </div>
+        </div>`;
+    }
+
+    function destroyDashboardCharts() {
+        dashboardCharts.forEach((chart) => {
+            try {
+                chart.destroy();
+            } catch (e) {
+                console.warn('[AdminVocacional] No se pudo destruir grafica previa:', e);
+            }
+        });
+        dashboardCharts = [];
+    }
+
+    function getDashboardChartColors(count = 4) {
+        const palette = [
+            'rgba(13, 110, 253, 0.82)',
+            'rgba(32, 201, 151, 0.82)',
+            'rgba(245, 158, 11, 0.82)',
+            'rgba(14, 165, 233, 0.82)',
+            'rgba(239, 68, 68, 0.82)',
+            'rgba(107, 114, 128, 0.82)'
+        ];
+
+        return Array.from({ length: Math.max(count, 1) }, (_, index) => palette[index % palette.length]);
+    }
+
+    function truncateDashboardLabel(value, maxLength = 26) {
+        const label = String(value || '').replace(/\s+/g, ' ').trim();
+        if (!label) return '--';
+        return label.length > maxLength ? `${label.slice(0, maxLength - 1)}…` : label;
+    }
+
+    function createDashboardChart(canvasId, config) {
+        if (typeof window.Chart !== 'function') return null;
+        const canvas = document.getElementById(canvasId);
+        if (!canvas) return null;
+        const chart = new window.Chart(canvas.getContext('2d'), config);
+        dashboardCharts.push(chart);
+        return chart;
+    }
+
+    function renderDashboardCharts(stats) {
+        destroyDashboardCharts();
+        if (typeof window.Chart !== 'function') return;
+
+        const totalAspirantes = Number(stats?.totalAspirantes || 0);
+        const totalCompleted = Number(stats?.totalCompleted || 0);
+        const pendingAspirantes = Math.max(totalAspirantes - totalCompleted, 0);
+        const ofertaTotal = Array.isArray(stats?.ofertaEducativa) ? stats.ofertaEducativa.length : 0;
+        const careersWithDemand = Object.keys(stats?.demandaCareers || {}).length;
+        const careersWithoutDemand = Math.max(ofertaTotal - careersWithDemand, 0);
+        const careerEntries = Object.entries(stats?.demandaCareers || {}).sort((a, b) => b[1] - a[1]).slice(0, 8);
+        const prepaEntries = Object.entries(stats?.procedenciaPrepas || {}).sort((a, b) => b[1] - a[1]).slice(0, 8);
+        const chartColors = getDashboardChartColors(8);
+
+        createDashboardChart('vocacional-funnel-chart', {
+            type: 'doughnut',
+            data: {
+                labels: ['Completados', 'Pendientes'],
+                datasets: [{
+                    data: [totalCompleted, pendingAspirantes],
+                    backgroundColor: ['rgba(25, 135, 84, 0.85)', 'rgba(245, 158, 11, 0.78)'],
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                cutout: '64%',
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: { usePointStyle: true, boxWidth: 10 }
+                    }
+                }
+            }
+        });
+
+        createDashboardChart('vocacional-coverage-chart', {
+            type: 'doughnut',
+            data: {
+                labels: ['Con demanda', 'Sin demanda'],
+                datasets: [{
+                    data: [careersWithDemand, careersWithoutDemand],
+                    backgroundColor: ['rgba(14, 116, 144, 0.85)', 'rgba(99, 102, 241, 0.75)'],
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                cutout: '64%',
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: { usePointStyle: true, boxWidth: 10 }
+                    }
+                }
+            }
+        });
+
+        createDashboardChart('vocacional-careers-chart', {
+            type: 'bar',
+            data: {
+                labels: (careerEntries.length ? careerEntries : [['Sin datos', 0]]).map(([label]) => truncateDashboardLabel(label, 28)),
+                datasets: [{
+                    data: (careerEntries.length ? careerEntries : [['Sin datos', 0]]).map(([, value]) => Number(value) || 0),
+                    backgroundColor: chartColors,
+                    borderRadius: 8,
+                    maxBarThickness: 22
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                indexAxis: 'y',
+                plugins: {
+                    legend: { display: false }
+                },
+                scales: {
+                    x: {
+                        beginAtZero: true,
+                        ticks: { precision: 0 }
+                    },
+                    y: {
+                        ticks: { font: { size: 11 } }
+                    }
+                }
+            }
+        });
+
+        createDashboardChart('vocacional-prepas-chart', {
+            type: 'bar',
+            data: {
+                labels: (prepaEntries.length ? prepaEntries : [['Sin datos', 0]]).map(([label]) => truncateDashboardLabel(label, 28)),
+                datasets: [{
+                    data: (prepaEntries.length ? prepaEntries : [['Sin datos', 0]]).map(([, value]) => Number(value) || 0),
+                    backgroundColor: chartColors.slice().reverse(),
+                    borderRadius: 8,
+                    maxBarThickness: 22
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                indexAxis: 'y',
+                plugins: {
+                    legend: { display: false }
+                },
+                scales: {
+                    x: {
+                        beginAtZero: true,
+                        ticks: { precision: 0 }
+                    },
+                    y: {
+                        ticks: { font: { size: 11 } }
+                    }
+                }
+            }
+        });
+    }
 
     async function init(ctx, container = null) {
-        _ctx = ctx;
-        _ctx.container = container || document.getElementById('view-vocacional-admin');
+        const nextCtx = { ...(ctx || {}) };
+        nextCtx.container = container || document.getElementById('view-vocacional-admin');
+        isInsideReportes = nextCtx.container?.id !== 'view-vocacional-admin';
 
-        // Restore tab from state if available
-        const savedTab = localStorage.getItem('sia_vocacional_admin_tab');
-        if (savedTab) {
-            currentTab = savedTab;
+        if (!isInsideReportes) {
+            const savedTab = localStorage.getItem('sia_vocacional_admin_tab');
+            if (savedTab) {
+                currentTab = savedTab;
+            }
         }
 
         // Verificar permisos
-        const profile = _ctx.profile || {};
-        const isAdminProfile = profile.role === 'superadmin' ||
-            (profile.role === 'department_admin' && profile.permissions && profile.permissions.vocacional === 'admin');
+        const access = _resolveAccess(nextCtx);
 
-        if (!_ctx.user || !isAdminProfile) {
-            _ctx.container.innerHTML = `
+        if (!access.allowed) {
+            destroyDashboardCharts();
+            _ctx = null;
+            nextCtx.container.innerHTML = `
             <div class="container py-5 text-center">
                 <i class="bi bi-shield-lock text-danger display-1 mb-3"></i>
                 <h2>Acceso Denegado</h2>
                 <p class="text-muted">No tienes permisos para ver el CRM de Difusión.</p>
             </div>`;
+            const deniedMessage = nextCtx.container.querySelector('.text-muted');
+            if (deniedMessage) deniedMessage.textContent = access.message;
             return;
         }
+
+        _ctx = nextCtx;
 
         if (!isInsideReportes) {
             renderBase();
@@ -108,6 +383,59 @@ window.AdminVocacional = (function () {
 
     async function loadData() {
         try {
+            const access = _resolveAccess();
+            if (!access.allowed) {
+                throw new Error(access.message || 'Acceso no autorizado.');
+            }
+
+            if (currentTab === 'dashboard') {
+                crmStats = await VocacionalService.getCRMStats();
+                updateExportButtonState();
+                await renderCurrentTab(crmStats);
+                return;
+            }
+
+            if (currentTab === 'prospectos') {
+                if (isInsideReportes && !access.admin) {
+                    renderRestrictedTab(currentTab);
+                    updateExportButtonState();
+                    return;
+                }
+                if (!crmStats) {
+                    crmStats = await VocacionalService.getCRMStats();
+                }
+                lastVisibleDoc = null;
+                hasMoreAspirantes = true;
+                const res = await VocacionalService.getAspirantes(50, null);
+                aspirantesData = res.docs;
+                lastVisibleDoc = res.lastVisible;
+                if (res.docs.length < 50) hasMoreAspirantes = false;
+                updateExportButtonState();
+                await renderCurrentTab(crmStats);
+                return;
+            }
+
+            if (currentTab === 'configuracion') {
+                if (isInsideReportes && !access.admin) {
+                    renderRestrictedTab(currentTab);
+                    updateExportButtonState();
+                    return;
+                }
+                if (!VocacionalService.VOCACIONAL_TEST_DATA || VocacionalService.VOCACIONAL_TEST_DATA.length === 0) {
+                    await VocacionalService.initTestData();
+                }
+                if (!crmStats) {
+                    try {
+                        crmStats = await VocacionalService.getCRMStats();
+                    } catch (statsError) {
+                        console.warn('[AdminVocacional] No se pudieron refrescar stats para configuracion:', statsError);
+                    }
+                }
+                updateExportButtonState();
+                await renderCurrentTab(crmStats);
+                return;
+            }
+
             const stats = await VocacionalService.getCRMStats();
             // Load first page of table
             lastVisibleDoc = null;
@@ -126,6 +454,7 @@ window.AdminVocacional = (function () {
             await renderCurrentTab(stats);
         } catch (e) {
             console.error(e);
+            destroyDashboardCharts();
             let contentEl = document.getElementById('vocacional-content') || _ctx.container;
             if (contentEl) contentEl.innerHTML = `
             <div class="alert alert-danger shadow-sm"><i class="bi bi-exclamation-triangle me-2"></i>Error al cargar los datos del CRM.</div>
@@ -135,8 +464,14 @@ window.AdminVocacional = (function () {
 
     async function renderCurrentTab(stats) {
         const content = document.getElementById('vocacional-content') || _ctx.container;
+        destroyDashboardCharts();
         if (currentTab === 'dashboard') {
-            renderDashboard(content, stats);
+            renderDashboard(content, stats || crmStats || {
+                totalAspirantes: 0,
+                totalCompleted: 0,
+                procedenciaPrepas: {},
+                demandaCareers: {}
+            });
         } else if (currentTab === 'prospectos') {
             renderTable(content);
         } else if (currentTab === 'configuracion') {
@@ -144,7 +479,7 @@ window.AdminVocacional = (function () {
         }
     }
 
-    function renderDashboard(container, stats) {
+    function _renderDashboardLegacy(container, stats) {
         // Ordenar prepas para el top
         const sortPrepas = Object.entries(stats.procedenciaPrepas).sort((a, b) => b[1] - a[1]).slice(0, 5);
         // Ordenar carreras para el top
@@ -257,6 +592,166 @@ window.AdminVocacional = (function () {
     }
 
     // Helper para escapar HTML en caso de inyección
+    function renderDashboard(container, stats) {
+        const totalAspirantes = Number(stats?.totalAspirantes || 0);
+        const totalCompleted = Number(stats?.totalCompleted || 0);
+        const pendingAspirantes = Math.max(totalAspirantes - totalCompleted, 0);
+        const conversion = totalAspirantes > 0 ? (100 * totalCompleted / totalAspirantes) : 0;
+        const sortPrepas = Object.entries(stats?.procedenciaPrepas || {}).sort((a, b) => b[1] - a[1]);
+        const sortCareers = Object.entries(stats?.demandaCareers || {}).sort((a, b) => b[1] - a[1]);
+        const ofertaTotal = Array.isArray(stats?.ofertaEducativa) ? stats.ofertaEducativa.length : 0;
+        const careersWithDemand = Object.keys(stats?.demandaCareers || {}).length;
+        const topCareer = sortCareers[0] || null;
+        const topPrepa = sortPrepas[0] || null;
+
+        container.innerHTML = `
+        <div class="row g-4 mb-4">
+            <div class="col-sm-6 col-xl-3">
+                <div class="card stat-card shadow-sm h-100 p-4 border-start border-4 border-primary">
+                    <div class="d-flex align-items-center justify-content-between mb-3">
+                        <span class="kpi-chip bg-primary bg-opacity-10 text-primary"><i class="bi bi-people-fill"></i></span>
+                        <span class="text-muted small fw-semibold text-uppercase">Prospectos</span>
+                    </div>
+                    <h2 class="display-6 fw-bold text-dark mb-1">${totalAspirantes}</h2>
+                    <p class="text-muted small mb-0">Registros acumulados en el CRM.</p>
+                </div>
+            </div>
+            <div class="col-sm-6 col-xl-3">
+                <div class="card stat-card shadow-sm h-100 p-4 border-start border-4 border-success">
+                    <div class="d-flex align-items-center justify-content-between mb-3">
+                        <span class="kpi-chip bg-success bg-opacity-10 text-success"><i class="bi bi-check2-circle"></i></span>
+                        <span class="text-muted small fw-semibold text-uppercase">Completados</span>
+                    </div>
+                    <h2 class="display-6 fw-bold text-dark mb-1">${totalCompleted}</h2>
+                    <p class="text-muted small mb-0">Aspirantes con test finalizado.</p>
+                </div>
+            </div>
+            <div class="col-sm-6 col-xl-3">
+                <div class="card stat-card shadow-sm h-100 p-4 border-start border-4 border-warning">
+                    <div class="d-flex align-items-center justify-content-between mb-3">
+                        <span class="kpi-chip bg-warning bg-opacity-10 text-warning"><i class="bi bi-hourglass-split"></i></span>
+                        <span class="text-muted small fw-semibold text-uppercase">Pendientes</span>
+                    </div>
+                    <h2 class="display-6 fw-bold text-dark mb-1">${pendingAspirantes}</h2>
+                    <p class="text-muted small mb-0">Sin resultado final registrado.</p>
+                </div>
+            </div>
+            <div class="col-sm-6 col-xl-3">
+                <div class="card stat-card shadow-sm h-100 p-4 border-start border-4 border-info">
+                    <div class="d-flex align-items-center justify-content-between mb-3">
+                        <span class="kpi-chip bg-info bg-opacity-10 text-info"><i class="bi bi-graph-up-arrow"></i></span>
+                        <span class="text-muted small fw-semibold text-uppercase">Conversion</span>
+                    </div>
+                    <h2 class="display-6 fw-bold text-dark mb-1">${conversion.toFixed(1)}%</h2>
+                    <p class="text-muted small mb-0">Relacion entre captacion y cierre.</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-4 mb-4">
+            <div class="col-xl-6">
+                <div class="card border-0 shadow-sm rounded-4 h-100">
+                    <div class="card-header bg-white border-bottom-0 pt-4 pb-0">
+                        <h5 class="fw-bold text-dark mb-1"><i class="bi bi-pie-chart-fill text-success me-2"></i>Estatus del test</h5>
+                        <p class="text-muted small mb-0">Balance entre tests cerrados y pendientes.</p>
+                    </div>
+                    <div class="card-body pt-3">
+                        <div class="voc-chart-wrap voc-chart-wrap-sm">
+                            <canvas id="vocacional-funnel-chart"></canvas>
+                        </div>
+                        <div class="d-flex justify-content-between gap-3 small text-muted mt-3">
+                            <span>Completados: <strong class="text-dark">${totalCompleted}</strong></span>
+                            <span>Pendientes: <strong class="text-dark">${pendingAspirantes}</strong></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-xl-6">
+                <div class="card border-0 shadow-sm rounded-4 h-100">
+                    <div class="card-header bg-white border-bottom-0 pt-4 pb-0">
+                        <h5 class="fw-bold text-dark mb-1"><i class="bi bi-bullseye text-info me-2"></i>Cobertura de oferta</h5>
+                        <p class="text-muted small mb-0">Carreras con al menos una recomendacion vs oferta total.</p>
+                    </div>
+                    <div class="card-body pt-3">
+                        <div class="voc-chart-wrap voc-chart-wrap-sm">
+                            <canvas id="vocacional-coverage-chart"></canvas>
+                        </div>
+                        <div class="d-flex justify-content-between gap-3 small text-muted mt-3">
+                            <span>Oferta total: <strong class="text-dark">${ofertaTotal}</strong></span>
+                            <span>Con demanda: <strong class="text-dark">${careersWithDemand}</strong></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-4">
+            <div class="col-xl-6">
+                <div class="card border-0 shadow-sm rounded-4 h-100">
+                    <div class="card-header bg-white border-bottom-0 pt-4 pb-0">
+                        <h5 class="fw-bold text-dark mb-1"><i class="bi bi-bar-chart-line-fill text-primary me-2"></i>Demanda proyectada</h5>
+                        <p class="text-muted small mb-0">Top 1 de carreras mas recomendadas.</p>
+                    </div>
+                    <div class="card-body pt-3">
+                        <div class="voc-chart-wrap voc-chart-wrap-lg">
+                            <canvas id="vocacional-careers-chart"></canvas>
+                        </div>
+                        <div class="small text-muted mt-3">
+                            Lider actual: <strong class="text-dark">${topCareer ? escapeHtml(topCareer[0]) : 'Sin datos'}</strong>
+                            ${topCareer ? `<span class="ms-2">(${topCareer[1]} aspirantes)</span>` : ''}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-xl-6">
+                <div class="card border-0 shadow-sm rounded-4 h-100">
+                    <div class="card-header bg-white border-bottom-0 pt-4 pb-0">
+                        <h5 class="fw-bold text-dark mb-1"><i class="bi bi-bank2 text-warning me-2"></i>Escuelas de procedencia</h5>
+                        <p class="text-muted small mb-0">Preparatorias con mayor participacion en el test.</p>
+                    </div>
+                    <div class="card-body pt-3">
+                        <div class="voc-chart-wrap voc-chart-wrap-lg">
+                            <canvas id="vocacional-prepas-chart"></canvas>
+                        </div>
+                        <div class="small text-muted mt-3">
+                            Lider actual: <strong class="text-dark">${topPrepa ? escapeHtml(topPrepa[0]) : 'Sin datos'}</strong>
+                            ${topPrepa ? `<span class="ms-2">(${topPrepa[1]} prospectos)</span>` : ''}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <style>
+            .kpi-chip {
+                width: 44px;
+                height: 44px;
+                border-radius: 14px;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 1.2rem;
+            }
+            .voc-chart-wrap {
+                position: relative;
+                width: 100%;
+            }
+            .voc-chart-wrap-sm {
+                min-height: 260px;
+            }
+            .voc-chart-wrap-lg {
+                min-height: 320px;
+            }
+            .voc-chart-wrap canvas {
+                width: 100% !important;
+                height: 100% !important;
+            }
+        </style>
+    `;
+
+        renderDashboardCharts(stats);
+    }
+
     function escapeHtml(unsafe) {
         return (unsafe || '').toString()
             .replace(/&/g, "&amp;")
@@ -803,9 +1298,7 @@ window.AdminVocacional = (function () {
                 const content = document.getElementById('vocacional-content');
                 content.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-primary"></div></div>';
 
-                // Quick local reload (or re-fetch if needed)
-                const stats = await VocacionalService.getCRMStats();
-                renderCurrentTab(stats);
+                await loadData();
             });
         });
 
@@ -813,6 +1306,7 @@ window.AdminVocacional = (function () {
         if (btnExport) {
             btnExport.addEventListener('click', exportToCSV);
         }
+        updateExportButtonState();
     }
 
     function exportToCSV() {
@@ -886,15 +1380,7 @@ window.AdminVocacional = (function () {
             isInsideReportes = true;
             const state = window.Reportes.getState();
             currentTab = state.currentTab || 'dashboard';
-
-            if (!_ctx) {
-                await init(state.ctx, container);
-            } else {
-                _ctx.container = container;
-                container.innerHTML = '<div id="vocacional-content"><div class="text-center py-5"><div class="spinner-border text-primary"></div></div></div>';
-                const stats = await VocacionalService.getCRMStats();
-                await renderCurrentTab(stats);
-            }
+            await init(state.ctx, container);
         }
     };
 

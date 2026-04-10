@@ -22,7 +22,8 @@ window.ExportUtils = (function () {
     const AREA_NAMES = {
         BIBLIO: 'Biblioteca',
         MEDICO: 'Servicios Médicos',
-        POBLACION: 'Población SIA'
+        POBLACION: 'Población SIA',
+        VOCACIONAL: 'Test Vocacional'
     };
 
     const PERIOD_LABELS = {
@@ -59,6 +60,15 @@ window.ExportUtils = (function () {
             danger: [225, 29, 72],
             light: [240, 253, 250],
             dark: [17, 94, 89]
+        },
+        VOCACIONAL: {
+            primary: [14, 116, 144],
+            accent: [6, 182, 212],
+            success: [22, 163, 74],
+            warning: [217, 119, 6],
+            danger: [220, 38, 38],
+            light: [236, 254, 255],
+            dark: [14, 73, 87]
         },
         DEFAULT: {
             primary: BLUE,
@@ -575,7 +585,7 @@ window.ExportUtils = (function () {
         doc.save(filename);
     }
 
-    function _generateGenericExcel(config, payload, area) {
+    function _generateGenericExcelLegacy(config, payload, area) {
         var wb = XLSX.utils.book_new();
         var areaName = AREA_NAMES[area] || area;
         var periodLabel = PERIOD_LABELS[config.period] || config.period || 'Actual';
@@ -633,9 +643,22 @@ window.ExportUtils = (function () {
             minute: '2-digit'
         });
         const filename = (payload.filenameBase || ('Reporte_' + area)) + '_' + new Date().toISOString().slice(0, 10) + '.pdf';
+        const totalRows = Number.isFinite(payload.recordCount)
+            ? payload.recordCount
+            : (Array.isArray(payload.rows) ? payload.rows.length : 0);
         const detailRows = Array.isArray(payload.pdfRows) && payload.pdfRows.length
             ? payload.pdfRows
             : (Array.isArray(payload.rows) ? payload.rows : []);
+        const showDetailTable = !(payload.pdfOptions && payload.pdfOptions.showDetailTable === false);
+        const chartSpecs = window.Chart && Array.isArray(payload.charts)
+            ? payload.charts.filter(function (spec) {
+                return spec
+                    && Array.isArray(spec.labels)
+                    && Array.isArray(spec.values)
+                    && spec.labels.length
+                    && spec.labels.length === spec.values.length;
+            })
+            : [];
         let y = 20;
 
         function drawHeader() {
@@ -672,6 +695,77 @@ window.ExportUtils = (function () {
             y += 5;
         }
 
+        async function drawChartRow(specs) {
+            var gap = 6;
+            var isHalfRow = specs.length > 1 || (specs[0] && specs[0].layout === 'half');
+            var cardWidth = isHalfRow ? ((cw - gap) / 2) : cw;
+            var legendLimit = isHalfRow ? 4 : 6;
+            var legendSets = specs.map(function (spec) {
+                return _buildChartLegendRows(spec, area, legendLimit);
+            });
+            var maxLegendRows = legendSets.reduce(function (max, rows) {
+                return Math.max(max, rows.length);
+            }, 0);
+            var legendHeight = maxLegendRows ? ((maxLegendRows * 4.2) + 6) : 0;
+            var cardHeight = (isHalfRow ? 76 : 88) + legendHeight;
+            var rowY;
+
+            ensureSpace(cardHeight + 6);
+            rowY = y;
+
+            for (var index = 0; index < specs.length; index++) {
+                var spec = specs[index];
+                if (!spec) continue;
+
+                var cardX = isHalfRow
+                    ? (specs.length === 1 ? (M + ((cw - cardWidth) / 2)) : (M + (index * (cardWidth + gap))))
+                    : M;
+                var titleLines = doc.splitTextToSize(spec.title || 'Grafica', cardWidth - 10);
+                var imageY = rowY + 7 + (titleLines.length * 3.5);
+                var imageHeight = cardHeight - (imageY - rowY) - legendHeight - 5;
+                var chartImage = await _renderChartImage(spec, area);
+                var legendRows = legendSets[index] || [];
+
+                doc.setFillColor(255, 255, 255);
+                doc.setDrawColor(...palette.accent);
+                doc.setLineWidth(0.2);
+                doc.roundedRect(cardX, rowY, cardWidth, cardHeight, 3, 3, 'FD');
+                doc.setFillColor(...palette.light);
+                doc.roundedRect(cardX, rowY, cardWidth, 7, 3, 3, 'F');
+                doc.setFontSize(8.1);
+                doc.setFont('helvetica', 'bold');
+                doc.setTextColor(...palette.dark);
+                doc.text(titleLines, cardX + 5, rowY + 5);
+
+                if (chartImage) {
+                    doc.addImage(chartImage, 'PNG', cardX + 4, imageY, cardWidth - 8, imageHeight);
+                } else {
+                    doc.setFontSize(7);
+                    doc.setFont('helvetica', 'italic');
+                    doc.setTextColor(107, 114, 128);
+                    doc.text('Grafica no disponible', cardX + (cardWidth / 2), imageY + (imageHeight / 2), { align: 'center' });
+                }
+
+                if (legendRows.length) {
+                    var legendY = imageY + imageHeight + 4;
+                    doc.setFontSize(6.6);
+                    doc.setFont('helvetica', 'normal');
+
+                    legendRows.forEach(function (row, rowIndex) {
+                        var legendLineY = legendY + (rowIndex * 4.2);
+                        doc.setFillColor(...row.color);
+                        doc.roundedRect(cardX + 5, legendLineY - 2.2, 2.8, 2.8, 0.6, 0.6, 'F');
+                        doc.setTextColor(...palette.dark);
+                        doc.text(row.label, cardX + 10, legendLineY);
+                        doc.setTextColor(75, 85, 99);
+                        doc.text([row.value, row.pct].filter(Boolean).join(' · '), cardX + cardWidth - 5, legendLineY, { align: 'right' });
+                    });
+                }
+            }
+
+            y += cardHeight + 7;
+        }
+
         drawHeader();
 
         doc.setFillColor(...palette.light);
@@ -687,7 +781,7 @@ window.ExportUtils = (function () {
         doc.setTextColor(95, 99, 104);
         doc.text(payload.subtitle || 'Centro de reportes SIA', M + 10, y + 14);
         doc.text(`Periodo: ${periodLabel}`, M + 10, y + 20);
-        doc.text(`Registros: ${(Array.isArray(payload.rows) ? payload.rows.length : 0).toLocaleString('es-MX')}`, M + 10, y + 25.5);
+        doc.text(`Registros: ${totalRows.toLocaleString('es-MX')}`, M + 10, y + 25.5);
         doc.text(`Generado: ${generatedAt}`, pw - M - 2, y + 20, { align: 'right' });
         doc.text(`Area: ${areaName}`, pw - M - 2, y + 25.5, { align: 'right' });
         y += 38;
@@ -743,6 +837,32 @@ window.ExportUtils = (function () {
             y += (Math.ceil(payload.highlights.length / 2) * (cardHeight + 4));
         }
 
+        if (chartSpecs.length) {
+            drawSectionTitle('Graficas clave');
+            var halfRow = [];
+
+            for (const spec of chartSpecs) {
+                if (spec.layout === 'half') {
+                    halfRow.push(spec);
+                    if (halfRow.length === 2) {
+                        await drawChartRow(halfRow);
+                        halfRow = [];
+                    }
+                    continue;
+                }
+
+                if (halfRow.length) {
+                    await drawChartRow(halfRow);
+                    halfRow = [];
+                }
+                await drawChartRow([spec]);
+            }
+
+            if (halfRow.length) {
+                await drawChartRow(halfRow);
+            }
+        }
+
         (payload.sections || []).forEach(function (section) {
             if (!section || !Array.isArray(section.rows) || !section.rows.length) return;
             ensureSpace(34);
@@ -768,7 +888,7 @@ window.ExportUtils = (function () {
             y = doc.lastAutoTable.finalY + 7;
         });
 
-        if (Array.isArray(payload.columns) && payload.columns.length && detailRows.length) {
+        if (showDetailTable && Array.isArray(payload.columns) && payload.columns.length && detailRows.length) {
             ensureSpace(48);
             drawSectionTitle(payload.dataTitle || 'Detalle');
             doc.autoTable({
@@ -815,7 +935,7 @@ window.ExportUtils = (function () {
         doc.save(filename);
     }
 
-    function _generateGenericExcel(config, payload, area) {
+    function _generateGenericExcelLegacyCurrent(config, payload, area) {
         if (!window.XLSX) throw new Error('XLSX no cargado.');
 
         var wb = XLSX.utils.book_new();
@@ -823,7 +943,9 @@ window.ExportUtils = (function () {
         var periodLabel = PERIOD_LABELS[config.period] || config.period || 'Actual';
         var generatedAt = new Date().toLocaleString('es-MX');
         var filename = (payload.filenameBase || ('Reporte_' + area)) + '_' + new Date().toISOString().slice(0, 10) + '.xlsx';
-        var totalRows = Array.isArray(payload.rows) ? payload.rows.length : 0;
+        var totalRows = Number.isFinite(payload.recordCount)
+            ? payload.recordCount
+            : (Array.isArray(payload.rows) ? payload.rows.length : 0);
 
         wb.Props = {
             Title: payload.title || 'Reporte SIA',
@@ -908,6 +1030,335 @@ window.ExportUtils = (function () {
         XLSX.writeFile(wb, filename);
     }
 
+    function _rgbToHex(rgb) {
+        return rgb.map(function (value) {
+            return Number(value).toString(16).padStart(2, '0');
+        }).join('').toUpperCase();
+    }
+
+    function _getExcelStyleKit(area) {
+        var palette = _getAreaPalette(area);
+        var border = {
+            top: { style: 'thin', color: { rgb: 'D9E2EC' } },
+            bottom: { style: 'thin', color: { rgb: 'D9E2EC' } },
+            left: { style: 'thin', color: { rgb: 'D9E2EC' } },
+            right: { style: 'thin', color: { rgb: 'D9E2EC' } }
+        };
+
+        return {
+            title: {
+                font: { bold: true, sz: 16, color: { rgb: 'FFFFFF' } },
+                fill: { patternType: 'solid', fgColor: { rgb: _rgbToHex(palette.primary) } },
+                alignment: { horizontal: 'center', vertical: 'center' }
+            },
+            subtitle: {
+                font: { bold: true, italic: true, sz: 11, color: { rgb: _rgbToHex(palette.dark) } },
+                fill: { patternType: 'solid', fgColor: { rgb: _rgbToHex(palette.light) } },
+                alignment: { horizontal: 'center', vertical: 'center' }
+            },
+            section: {
+                font: { bold: true, sz: 12, color: { rgb: _rgbToHex(palette.dark) } },
+                fill: { patternType: 'solid', fgColor: { rgb: 'E2E8F0' } },
+                alignment: { horizontal: 'left', vertical: 'center' },
+                border: border
+            },
+            header: {
+                font: { bold: true, color: { rgb: 'FFFFFF' } },
+                fill: { patternType: 'solid', fgColor: { rgb: _rgbToHex(palette.accent) } },
+                alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
+                border: border
+            },
+            label: {
+                font: { bold: true, color: { rgb: _rgbToHex(palette.dark) } },
+                fill: { patternType: 'solid', fgColor: { rgb: 'F8FAFC' } },
+                alignment: { vertical: 'top', wrapText: true },
+                border: border
+            },
+            body: {
+                font: { sz: 11, color: { rgb: '374151' } },
+                alignment: { vertical: 'top', wrapText: true },
+                border: border
+            },
+            bodyAlt: {
+                font: { sz: 11, color: { rgb: '374151' } },
+                alignment: { vertical: 'top', wrapText: true },
+                fill: { patternType: 'solid', fgColor: { rgb: 'F8FAFC' } },
+                border: border
+            },
+            note: {
+                font: { italic: true, color: { rgb: '64748B' } },
+                alignment: { vertical: 'top', wrapText: true },
+                border: border
+            }
+        };
+    }
+
+    function _applyCellStyle(ws, row, col, style) {
+        var address = XLSX.utils.encode_cell({ r: row, c: col });
+        if (!ws[address]) return;
+        ws[address].s = style;
+    }
+
+    function _applyRowStyle(ws, row, maxCol, style) {
+        for (var col = 0; col <= maxCol; col++) {
+            _applyCellStyle(ws, row, col, style);
+        }
+    }
+
+    function _decorateGenericSheet(ws, area, options) {
+        if (!ws || !ws['!ref']) return ws;
+
+        var opts = options || {};
+        var styles = _getExcelStyleKit(area);
+        var range = XLSX.utils.decode_range(ws['!ref']);
+        var sectionRows = new Set(opts.sectionRows || []);
+        var noteRows = new Set(opts.noteRows || []);
+
+        ws['!rows'] = ws['!rows'] || [];
+
+        if (Number.isFinite(opts.titleRow)) {
+            _applyRowStyle(ws, opts.titleRow, range.e.c, styles.title);
+            ws['!rows'][opts.titleRow] = { hpt: 24 };
+        }
+
+        if (Number.isFinite(opts.subtitleRow)) {
+            _applyRowStyle(ws, opts.subtitleRow, range.e.c, styles.subtitle);
+            ws['!rows'][opts.subtitleRow] = { hpt: 20 };
+        }
+
+        sectionRows.forEach(function (row) {
+            _applyRowStyle(ws, row, range.e.c, styles.section);
+            ws['!rows'][row] = { hpt: 19 };
+        });
+
+        if (Number.isFinite(opts.headerRow)) {
+            _applyRowStyle(ws, opts.headerRow, range.e.c, styles.header);
+            ws['!rows'][opts.headerRow] = { hpt: 22 };
+        }
+
+        if (Number.isFinite(opts.bodyStartRow)) {
+            for (var row = opts.bodyStartRow; row <= range.e.r; row++) {
+                if (sectionRows.has(row) || noteRows.has(row) || row === opts.headerRow) continue;
+
+                _applyRowStyle(ws, row, range.e.c, ((row - opts.bodyStartRow) % 2 === 0) ? styles.body : styles.bodyAlt);
+
+                if (Number.isFinite(opts.labelCol)) {
+                    _applyCellStyle(ws, row, opts.labelCol, styles.label);
+                }
+            }
+        }
+
+        noteRows.forEach(function (row) {
+            _applyRowStyle(ws, row, range.e.c, styles.note);
+        });
+
+        return ws;
+    }
+
+    function _generateGenericExcel(config, payload, area) {
+        if (!window.XLSX) throw new Error('XLSX no cargado.');
+
+        var wb = XLSX.utils.book_new();
+        var areaName = AREA_NAMES[area] || area;
+        var periodLabel = PERIOD_LABELS[config.period] || config.period || 'Actual';
+        var generatedAt = new Date().toLocaleString('es-MX');
+        var filename = (payload.filenameBase || ('Reporte_' + area)) + '_' + new Date().toISOString().slice(0, 10) + '.xlsx';
+        var totalRows = Number.isFinite(payload.recordCount)
+            ? payload.recordCount
+            : (Array.isArray(payload.rows) ? payload.rows.length : 0);
+
+        wb.Props = {
+            Title: payload.title || 'Reporte SIA',
+            Subject: payload.subtitle || areaName,
+            Author: 'SIA',
+            Company: 'TecNM Campus Los Cabos',
+            CreatedDate: new Date()
+        };
+
+        var summaryMatrix = [
+            [payload.title || 'Exportacion'],
+            [payload.subtitle || areaName],
+            [''],
+            ['Resumen ejecutivo', ''],
+            ['Area', areaName],
+            ['Periodo', periodLabel],
+            ['Generado', generatedAt],
+            ['Registros', totalRows]
+        ];
+
+        (payload.summary || []).forEach(function (row) {
+            summaryMatrix.push([_formatExportValue(row[0]), _formatExportValue(row[1])]);
+        });
+
+        var summarySectionRows = [3];
+        var noteRows = [];
+        if (Array.isArray(payload.notes) && payload.notes.length) {
+            summaryMatrix.push(['']);
+            summaryMatrix.push(['Notas', '']);
+            summarySectionRows.push(summaryMatrix.length - 1);
+            payload.notes.forEach(function (note) {
+                summaryMatrix.push([_formatExportValue(note), '']);
+                noteRows.push(summaryMatrix.length - 1);
+            });
+        }
+
+        var wsSummary = _appendGenericSheet(wb, 'Resumen', summaryMatrix, {
+            merges: [
+                { s: { r: 0, c: 0 }, e: { r: 0, c: 2 } },
+                { s: { r: 1, c: 0 }, e: { r: 1, c: 2 } },
+                { s: { r: 3, c: 0 }, e: { r: 3, c: 2 } }
+            ].concat(summarySectionRows.slice(1).map(function (row) {
+                return { s: { r: row, c: 0 }, e: { r: row, c: 2 } };
+            })),
+            cols: [{ wch: 28 }, { wch: 42 }, { wch: 18 }]
+        });
+        _decorateGenericSheet(wsSummary, area, {
+            titleRow: 0,
+            subtitleRow: 1,
+            sectionRows: summarySectionRows,
+            bodyStartRow: 4,
+            labelCol: 0,
+            noteRows: noteRows
+        });
+
+        if (Array.isArray(payload.highlights) && payload.highlights.length) {
+            var highlightsMatrix = [
+                [payload.title || 'Exportacion'],
+                ['Indicadores clave'],
+                [''],
+                ['Indicador', 'Valor', 'Lectura']
+            ];
+
+            payload.highlights.forEach(function (item) {
+                highlightsMatrix.push([
+                    _formatExportValue(item.label),
+                    _formatExportValue(item.value),
+                    _formatExportValue(item.hint)
+                ]);
+            });
+
+            var wsHighlights = _appendGenericSheet(wb, 'Indicadores', highlightsMatrix, {
+                merges: [
+                    { s: { r: 0, c: 0 }, e: { r: 0, c: 2 } },
+                    { s: { r: 1, c: 0 }, e: { r: 1, c: 2 } }
+                ],
+                cols: [{ wch: 26 }, { wch: 18 }, { wch: 46 }],
+                autofilterRow: 3
+            });
+            _decorateGenericSheet(wsHighlights, area, {
+                titleRow: 0,
+                subtitleRow: 1,
+                headerRow: 3,
+                bodyStartRow: 4
+            });
+        }
+
+        if (Array.isArray(payload.charts) && payload.charts.length) {
+            var chartsMatrix = [
+                [payload.title || 'Exportacion'],
+                ['Graficas clave'],
+                [''],
+                ['Grafica', 'Categoria', 'Valor', 'Participacion']
+            ];
+
+            payload.charts.forEach(function (chart) {
+                var total = (chart.values || []).reduce(function (sum, value) {
+                    return sum + (Number(value) || 0);
+                }, 0);
+
+                (chart.labels || []).forEach(function (label, index) {
+                    var value = Number(chart.values[index]) || 0;
+                    chartsMatrix.push([
+                        index === 0 ? _formatExportValue(chart.title) : '',
+                        _formatExportValue(label),
+                        value,
+                        total > 0 ? ((value / total) * 100).toFixed(1) + '%' : ''
+                    ]);
+                });
+
+                chartsMatrix.push(['', '', '', '']);
+            });
+
+            var wsCharts = _appendGenericSheet(wb, 'Graficas', chartsMatrix, {
+                merges: [
+                    { s: { r: 0, c: 0 }, e: { r: 0, c: 3 } },
+                    { s: { r: 1, c: 0 }, e: { r: 1, c: 3 } }
+                ],
+                cols: [{ wch: 32 }, { wch: 32 }, { wch: 12 }, { wch: 14 }],
+                autofilterRow: 3
+            });
+            _decorateGenericSheet(wsCharts, area, {
+                titleRow: 0,
+                subtitleRow: 1,
+                headerRow: 3,
+                bodyStartRow: 4,
+                labelCol: 0
+            });
+        }
+
+        (payload.sections || []).forEach(function (section, index) {
+            if (!section || !Array.isArray(section.rows) || !section.rows.length) return;
+
+            var headers = (section.headers || ['Valor', 'Cantidad']).map(_formatExportValue);
+            var matrix = [
+                [payload.title || 'Exportacion'],
+                [section.title || ('Seccion ' + (index + 1))],
+                [''],
+                headers
+            ];
+
+            section.rows.forEach(function (row) {
+                matrix.push(row.map(_formatExportValue));
+            });
+
+            var wsSection = _appendGenericSheet(wb, `${String(index + 1).padStart(2, '0')}_${section.title || 'Seccion'}`, matrix, {
+                merges: [
+                    { s: { r: 0, c: 0 }, e: { r: 0, c: Math.max(headers.length - 1, 2) } },
+                    { s: { r: 1, c: 0 }, e: { r: 1, c: Math.max(headers.length - 1, 2) } }
+                ],
+                cols: _buildColumnWidths(matrix, 14, 34),
+                autofilterRow: 3
+            });
+            _decorateGenericSheet(wsSection, area, {
+                titleRow: 0,
+                subtitleRow: 1,
+                headerRow: 3,
+                bodyStartRow: 4
+            });
+        });
+
+        if (Array.isArray(payload.columns) && payload.columns.length) {
+            var detailHeaders = payload.columns.map(_formatExportValue);
+            var detailMatrix = [
+                [payload.dataTitle || 'Detalle'],
+                [payload.subtitle || areaName],
+                [''],
+                detailHeaders
+            ];
+
+            (payload.rows || []).forEach(function (row) {
+                detailMatrix.push(row.map(_formatExportValue));
+            });
+
+            var wsDetail = _appendGenericSheet(wb, payload.detailSheetName || 'Detalle', detailMatrix, {
+                merges: [
+                    { s: { r: 0, c: 0 }, e: { r: 0, c: Math.max(detailHeaders.length - 1, 2) } },
+                    { s: { r: 1, c: 0 }, e: { r: 1, c: Math.max(detailHeaders.length - 1, 2) } }
+                ],
+                cols: _buildColumnWidths(detailMatrix, 12, detailHeaders.length > 10 ? 20 : 30),
+                autofilterRow: 3
+            });
+            _decorateGenericSheet(wsDetail, area, {
+                titleRow: 0,
+                subtitleRow: 1,
+                headerRow: 3,
+                bodyStartRow: 4
+            });
+        }
+
+        XLSX.writeFile(wb, filename);
+    }
+
     function _getAreaPalette(area) {
         return AREA_PALETTES[area] || AREA_PALETTES.DEFAULT;
     }
@@ -922,6 +1373,183 @@ window.ExportUtils = (function () {
             case 'secondary': return [107, 114, 128];
             case 'info': return palette.accent;
             default: return palette.primary;
+        }
+    }
+
+    function _toRgba(rgb, alpha) {
+        return `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${alpha})`;
+    }
+
+    function _buildChartColors(area, tone, count) {
+        var palette = _getAreaPalette(area);
+        var base = _getToneColor(area, tone);
+        var swatches = [
+            base,
+            palette.accent,
+            palette.success,
+            palette.warning,
+            palette.danger,
+            palette.dark,
+            palette.primary,
+            [107, 114, 128]
+        ];
+        var fills = [];
+        var borders = [];
+        var raws = [];
+
+        for (var i = 0; i < Math.max(count || 0, 1); i++) {
+            var color = swatches[i % swatches.length];
+            raws.push(color);
+            fills.push(_toRgba(color, 0.82));
+            borders.push(_toRgba(color, 1));
+        }
+
+        return { fills: fills, borders: borders, raws: raws };
+    }
+
+    function _truncateChartLabel(value, maxLength) {
+        var label = _formatExportValue(value).replace(/\s+/g, ' ').trim();
+        var limit = maxLength || 28;
+        if (!label) return '--';
+        return label.length > limit ? label.slice(0, limit - 1) + '…' : label;
+    }
+
+    function _buildChartLegendRows(spec, area, maxItems) {
+        if (!spec || !Array.isArray(spec.labels) || !Array.isArray(spec.values)) return [];
+
+        var colors = _buildChartColors(area, spec.tone, spec.labels.length);
+        var total = spec.values.reduce(function (sum, value) {
+            return sum + (Number(value) || 0);
+        }, 0);
+        var limit = Math.min(spec.labels.length, maxItems || spec.labels.length);
+        var rows = [];
+
+        for (var i = 0; i < limit; i++) {
+            var rawValue = Number(spec.values[i]) || 0;
+            rows.push({
+                color: colors.raws[i] || [148, 163, 184],
+                label: _truncateChartLabel(spec.labels[i], spec.layout === 'half' ? 22 : 34),
+                value: rawValue.toLocaleString('es-MX'),
+                pct: total > 0 ? ((rawValue / total) * 100).toFixed(1) + '%' : ''
+            });
+        }
+
+        if (spec.labels.length > limit) {
+            rows.push({
+                color: [148, 163, 184],
+                label: '+' + (spec.labels.length - limit) + ' categorias mas',
+                value: '',
+                pct: ''
+            });
+        }
+
+        return rows;
+    }
+
+    async function _renderChartImage(spec, area) {
+        if (!window.Chart || !document.body || !spec || !Array.isArray(spec.labels) || !Array.isArray(spec.values)) return null;
+        if (!spec.labels.length || spec.labels.length !== spec.values.length) return null;
+
+        var palette = _getAreaPalette(area);
+        var isCircular = spec.type === 'doughnut' || spec.type === 'pie';
+        var isHorizontal = spec.type === 'bar-horizontal';
+        var chartType = isHorizontal ? 'bar' : (spec.type || 'bar');
+        var width = spec.layout === 'half' ? 520 : 920;
+        var height = isCircular ? 320 : (isHorizontal ? 380 : 340);
+        var mount = document.createElement('div');
+        var canvas = document.createElement('canvas');
+        var chart = null;
+
+        mount.style.position = 'fixed';
+        mount.style.left = '-10000px';
+        mount.style.top = '0';
+        mount.style.width = width + 'px';
+        mount.style.height = height + 'px';
+        mount.style.opacity = '0';
+        mount.style.pointerEvents = 'none';
+
+        canvas.width = width * 2;
+        canvas.height = height * 2;
+        canvas.style.width = width + 'px';
+        canvas.style.height = height + 'px';
+        mount.appendChild(canvas);
+        document.body.appendChild(mount);
+
+        try {
+            var colors = _buildChartColors(area, spec.tone, spec.labels.length);
+            var labels = spec.labels.map(function (label) {
+                return _truncateChartLabel(label, isHorizontal ? 28 : 22);
+            });
+            var values = spec.values.map(function (value) {
+                return Number(value) || 0;
+            });
+
+            chart = new window.Chart(canvas.getContext('2d'), {
+                type: chartType,
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: spec.title || 'Serie',
+                        data: values,
+                        backgroundColor: colors.fills,
+                        borderColor: isCircular ? 'rgba(255,255,255,0.92)' : colors.borders,
+                        borderWidth: isCircular ? 2 : 1.2,
+                        borderRadius: isCircular ? 0 : 6,
+                        maxBarThickness: isHorizontal ? 22 : 28
+                    }]
+                },
+                options: {
+                    responsive: false,
+                    maintainAspectRatio: false,
+                    animation: false,
+                    indexAxis: isHorizontal ? 'y' : 'x',
+                    layout: {
+                        padding: { top: 6, right: 8, bottom: 2, left: 8 }
+                    },
+                    plugins: {
+                        legend: {
+                            display: spec.legend !== false && isCircular,
+                            position: 'bottom',
+                            labels: {
+                                boxWidth: 10,
+                                usePointStyle: true,
+                                pointStyle: 'circle',
+                                color: palette.dark,
+                                font: { size: 10 }
+                            }
+                        },
+                        tooltip: { enabled: false }
+                    },
+                    scales: isCircular ? {} : {
+                        x: {
+                            beginAtZero: true,
+                            grid: { color: 'rgba(148, 163, 184, 0.16)' },
+                            ticks: {
+                                color: palette.dark,
+                                precision: 0,
+                                font: { size: 10 }
+                            }
+                        },
+                        y: {
+                            grid: { display: false },
+                            ticks: {
+                                color: palette.dark,
+                                font: { size: 10 }
+                            }
+                        }
+                    }
+                }
+            });
+
+            await new Promise(function (resolve) { setTimeout(resolve, 40); });
+            return canvas.toDataURL('image/png', 1.0);
+        } catch (e) {
+            return null;
+        } finally {
+            if (chart) {
+                try { chart.destroy(); } catch (destroyError) { /* noop */ }
+            }
+            mount.remove();
         }
     }
 

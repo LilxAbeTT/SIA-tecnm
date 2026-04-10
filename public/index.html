@@ -125,6 +125,7 @@
 
 
   <sia-landing-view id="landing-view" class="d-none"></sia-landing-view>
+  <div id="view-campus-map-public" class="sia-public-view d-none"></div>
 
   <!-- ============================================== -->
   <!-- NUEVO WIZARD DE REGISTRO & SELECCIÓN DE ROL    -->
@@ -657,6 +658,7 @@
     <!-- ============================================== -->
 
     <sia-student-dashboard id="view-dashboard" class="app-view container py-4 mb-5"></sia-student-dashboard>
+    <div id="view-campus-map" class="app-view d-none px-2 px-lg-3 py-4 mb-5"></div>
     <div id="view-lactario" class="app-view d-none container py-4 mb-5"> <!-- Lactario Module populated by JS --> </div>
     <div id="view-quejas" class="app-view d-none container py-4 mb-5"> <!-- Quejas Module populated by JS --> </div>
     <div id="view-biblio" class="app-view d-none container py-4 mb-5"> <!-- Biblio Module populated by JS --> </div>
@@ -713,13 +715,6 @@
     <div id="view-superadmin-dashboard" class="app-view d-none p-0">
       <!-- Rendered dynamically by /modules/superadmin.js -->
     </div>
-
-    <!-- Botón flotante: Reportar problema -->
-    <button class="btn btn-danger rounded-circle shadow-lg d-none btn-bug-fab" id="btn-report-problem"
-      onclick="document.getElementById('modalReportProblem') && new bootstrap.Modal(document.getElementById('modalReportProblem')).show()"
-      title="Reportar un problema o revisar mis tickets">
-      <i class="bi bi-bug-fill"></i>
-    </button>
 
     <!-- Modal: Reportar Problema Técnico -->
     <div class="modal fade" id="modalReportProblem" tabindex="-1">
@@ -2129,6 +2124,7 @@
     const localScripts = [
       '/config/departments.js',       // Config Global (Critical: Before App)
       '/services/firebase.js',        // Base SDK
+      '/services/panic-service.js',   // Panic / SOS institutional flow
       '/utils/pdf-generator.js',      // Utils
       '/services/notify.js',          // Global Service
       '/utils/ui.js',                 // Utils

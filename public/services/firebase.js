@@ -148,6 +148,7 @@
       // Sistema
       role: 'student', // Por defecto
       status: 'active',
+      safetyProfile: buildPanicSafetyProfile(data),
       photoURL: googleUser.photoURL || '',
       createdAt: firebase.firestore.FieldValue.serverTimestamp(),
       lastLogin: firebase.firestore.FieldValue.serverTimestamp()
@@ -265,6 +266,30 @@
       .trim();
   }
 
+  function resolvePanicEligibility(profileLike) {
+    const explicit = profileLike?.safetyProfile?.canUsePanicFab;
+    if (typeof explicit === 'boolean') return explicit;
+    const gender = normalizeRoleText(
+      profileLike?.genero
+      || profileLike?.personalData?.genero
+      || profileLike?.sexo
+      || profileLike?.personalData?.sexo
+    );
+    return ['femenino', 'mujer', 'female'].includes(gender);
+  }
+
+  function buildPanicSafetyProfile(profileLike, existing = null) {
+    return {
+      ...(existing && typeof existing === 'object' ? existing : {}),
+      canUsePanicFab: resolvePanicEligibility(profileLike),
+      source: (existing && typeof existing === 'object' && existing.source) || 'profile_genero_v1'
+    };
+  }
+
+  function canUsePanicFab(profile) {
+    return resolvePanicEligibility(profile);
+  }
+
   function hasAcademicAulaDistinction(profile) {
     const tipoUsuario = normalizeRoleText(profile?.tipoUsuario);
     const role = normalizeRoleText(profile?.role);
@@ -329,6 +354,7 @@
     'view-vocacional-admin',
     'view-cafeteria',
     'view-avisos',
+    'view-campus-map',
     'view-notificaciones'
   ];
 
@@ -557,9 +583,9 @@
   };
 
   const DEFAULT_STANDARD_VIEWS = {
-    student: ['view-dashboard', 'view-aula', 'view-comunidad', 'view-medi', 'view-biblio', 'view-foro', 'view-quejas', 'view-encuestas', 'view-cafeteria'],
-    docente: ['view-dashboard', 'view-aula', 'view-comunidad', 'view-medi', 'view-biblio', 'view-foro', 'view-quejas', 'view-encuestas', 'view-cafeteria'],
-    personal: ['view-dashboard', 'view-comunidad', 'view-medi', 'view-biblio', 'view-foro', 'view-quejas', 'view-encuestas', 'view-cafeteria']
+    student: ['view-dashboard', 'view-campus-map', 'view-aula', 'view-comunidad', 'view-medi', 'view-biblio', 'view-foro', 'view-quejas', 'view-encuestas', 'view-cafeteria'],
+    docente: ['view-dashboard', 'view-campus-map', 'view-aula', 'view-comunidad', 'view-medi', 'view-biblio', 'view-foro', 'view-quejas', 'view-encuestas', 'view-cafeteria'],
+    personal: ['view-dashboard', 'view-campus-map', 'view-comunidad', 'view-medi', 'view-biblio', 'view-foro', 'view-quejas', 'view-encuestas', 'view-cafeteria']
   };
 
   function uniqueViews(views) {
@@ -872,6 +898,8 @@
       views.push('view-comunidad');
     }
 
+    views.push('view-campus-map');
+
     return uniqueViews(views);
   }
 
@@ -935,7 +963,7 @@
 
   function canAccessView(profile, viewId) {
     if (!profile || !viewId) return false;
-    if (viewId === 'view-profile' || viewId === 'view-notificaciones') return true;
+    if (viewId === 'view-profile' || viewId === 'view-notificaciones' || viewId === 'view-campus-map') return true;
     if (normalizeRoleText(profile?.role) === 'superadmin') return true;
 
     const allowedViews = getEffectiveAllowedViews(profile);
@@ -1112,6 +1140,7 @@
     const now = firebase.firestore.FieldValue.serverTimestamp();
     const dataToSave = {
       ...profileData,
+      safetyProfile: buildPanicSafetyProfile(profileData, profileData.safetyProfile),
       updatedAt: now
     };
 
@@ -1289,6 +1318,7 @@
     getAulaAccessLevel,
     canTeachInAula,
     canManageAulaClase,
+    canUsePanicFab,
     getProfileCategory,
     getEffectiveAllowedViews,
     getHomeView,

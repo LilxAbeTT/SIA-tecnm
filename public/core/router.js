@@ -26,6 +26,7 @@ export class Router {
             'view-vocacional-admin': '/vocacional-admin',
             'view-cafeteria': '/cafeteria',
             'view-avisos': '/avisos',
+            'view-campus-map': '/mapa-campus',
             'view-notificaciones': '/notificaciones',
             'view-qa-secret-login': this.qaSecretRoute
         };
@@ -88,6 +89,9 @@ export class Router {
 
         // Check explicit routes
         let viewId = this.urlMap[path];
+        if (viewId === 'view-campus-map' && !Store.user) {
+            viewId = 'view-campus-map-public';
+        }
 
         // Handle sub-routes via simple matching
         if (!viewId) {
@@ -114,6 +118,9 @@ export class Router {
             else if (path.startsWith('/vocacional-admin')) viewId = 'view-vocacional-admin';
             else if (path.startsWith('/cafeteria')) viewId = 'view-cafeteria';
             else if (path.startsWith('/avisos')) viewId = 'view-avisos';
+            else if (path.startsWith('/mapa-campus')) {
+                viewId = Store.user ? 'view-campus-map' : 'view-campus-map-public';
+            }
             else if (path.startsWith('/notificaciones')) viewId = 'view-notificaciones';
         }
 
@@ -121,7 +128,11 @@ export class Router {
         if (viewId === 'view-encuesta-publica'
             || viewId === 'view-test-vocacional'
             || viewId === 'view-vocacional-test-active'
+            || viewId === 'view-campus-map-public'
             || viewId === 'view-qa-secret-login') {
+            this.ui.showLoader();
+            await this._loadModuleDependencies(viewId);
+            this.ui.hideLoader();
             this._renderView(viewId);
             return;
         }
@@ -149,6 +160,7 @@ export class Router {
         if (viewId === 'view-test-vocacional'
             || viewId === 'view-vocacional-test-active'
             || viewId === 'view-encuesta-publica'
+            || viewId === 'view-campus-map-public'
             || viewId === 'view-qa-secret-login') {
             const landing = document.getElementById('landing-view');
             const appshell = document.getElementById('app-shell');
@@ -222,7 +234,7 @@ export class Router {
         }
 
         if (!role) return false;
-        if (viewId === 'view-profile') return true;
+        if (viewId === 'view-profile' || viewId === 'view-campus-map') return true;
 
         if (viewId === 'view-avisos') {
             if (role === 'department_admin') {
@@ -368,6 +380,7 @@ export class Router {
                 '/services/biblio-service.js',
                 '/services/biblio-assets-service.js',
                 ...(isBiblioAdmin ? [
+                    '/services/scanner-service.js',
                     '/modules/admin-biblio/shared.js',
                     '/modules/admin-biblio/catalogo.js',
                     '/modules/admin-biblio/prestamos.js',
@@ -464,6 +477,14 @@ export class Router {
             ],
             'view-avisos': [
                 '/modules/avisos.js'
+            ],
+            'view-campus-map': [
+                '/modules/campus-map/data.js',
+                '/modules/campus-map.js'
+            ],
+            'view-campus-map-public': [
+                '/modules/campus-map/data.js',
+                '/modules/campus-map.js'
             ],
             'view-notificaciones': [
                 '/services/push-service.js',
@@ -718,6 +739,10 @@ export class Router {
                 window.Avisos.init(ctx);
             }
         }
+
+        if ((viewId === 'view-campus-map' || viewId === 'view-campus-map-public') && window.CampusMap && window.CampusMap.init) {
+            window.CampusMap.init(ctx, { viewId });
+        }
     }
 
     _updateBreadcrumbs(viewId) {
@@ -745,6 +770,7 @@ export class Router {
                 'view-superadmin-dashboard': 'SuperAdmin',
                 'view-cafeteria': 'Cafetería',
                 'view-avisos': 'Avisos',
+                'view-campus-map': 'Mapa del Campus',
                 'view-notificaciones': 'Notificaciones'
             };
             breadcrumb.textContent = labels[viewId] || 'SIA';

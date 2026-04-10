@@ -7,6 +7,97 @@ service cloud.firestore {
     function isOwner(uid) { return isSignedIn() && request.auth.uid == uid; }
     function userDoc(uid) { return get(/databases/$(database)/documents/usuarios/$(uid)); }
     function roleOf(uid)  { return userDoc(uid).data.get('role', ''); }
+    function safeText(value) { return value == null ? '' : value; }
+    function isTrustedOwnerProfileBootstrap(uid) {
+      return isOwner(uid) && (
+        isDev() ||
+        request.auth.token.email == 'admin@super.com' ||
+        request.auth.token.email == 'atencionmedica@loscabos.tecnm.mx' ||
+        request.auth.token.email == 'atencionpsicopedagogica@loscabos.tecnm.mx' ||
+        request.auth.token.email == 'biblioteca@loscabos.tecnm.mx' ||
+        request.auth.token.email == 'calidad@loscabos.tecnm.mx' ||
+        request.auth.token.email == 'difusion@loscabos.tecnm.mx' ||
+        request.auth.token.email == 'desarrolloacademico@loscabos.tecnm.mx'
+      );
+    }
+    function isSafeOwnerUserUpdate(uid) {
+      let changed = request.resource.data.diff(resource.data).affectedKeys();
+      return isOwner(uid)
+        && changed.hasOnly([
+          'displayName',
+          'genero',
+          'fechaNacimiento',
+          'telefono',
+          'emailPersonal',
+          'photoURL',
+          'tipoSangre',
+          'domicilio',
+          'estadoCivil',
+          'turno',
+          'areaAdscripcion',
+          'contactoEmergenciaName',
+          'contactoEmergenciaTel',
+          'alergias',
+          'medicamentosActuales',
+          'condicionesCronicas',
+          'otraCondicionDetalle',
+          'cubiculo',
+          'extension',
+          'beca',
+          'trabaja',
+          'dependientes',
+          'dependientesQty',
+          'discapacidad',
+          'prefs',
+          'healthData',
+          'personalData',
+          'culturalData',
+          'institutionalContext',
+          'lastLogin',
+          'updatedAt'
+        ])
+        && request.resource.data.role == resource.data.role
+        && request.resource.data.tipoUsuario == resource.data.tipoUsuario
+        && request.resource.data.permissions == resource.data.permissions
+        && request.resource.data.allowedViews == resource.data.allowedViews
+        && request.resource.data.safetyProfile == resource.data.safetyProfile;
+    }
+    function isPanicStaffResponder() {
+      let data = userDoc(request.auth.uid).data;
+      let role = data.get('role', '');
+      let tipoUsuario = safeText(data.get('tipoUsuario', '')).lower();
+      let perm = data.get('permissions', {});
+      let panicPerm = safeText(perm.get('panic', '')).lower();
+      return isSignedIn() && (
+        isSuperAdmin() ||
+        role == 'admin' ||
+        role == 'department_admin' ||
+        role == 'medico' ||
+        role == 'psicologo' ||
+        role == 'docente' ||
+        role == 'aula' ||
+        role == 'aula_admin' ||
+        role == 'biblio' ||
+        role == 'bibliotecario' ||
+        role == 'biblio_admin' ||
+        role == 'foro' ||
+        role == 'foro_admin' ||
+        role == 'cafeteria' ||
+        panicPerm == 'admin' ||
+        panicPerm == 'responder' ||
+        tipoUsuario == 'docente' ||
+        tipoUsuario == 'administrativo' ||
+        tipoUsuario == 'operativo' ||
+        tipoUsuario == 'personal academico' ||
+        tipoUsuario == 'personal académico' ||
+        tipoUsuario == 'academico' ||
+        tipoUsuario == 'académico' ||
+        tipoUsuario == 'profesor' ||
+        tipoUsuario == 'maestro' ||
+        tipoUsuario == 'catedratico' ||
+        tipoUsuario == 'catedrático'
+      );
+    }
     function isValidAvisoViewCreate(uid, avisoId) {
       return isOwner(uid)
         && request.resource.data.userId == request.auth.uid
@@ -200,7 +291,7 @@ service cloud.firestore {
     match /usuarios/{uid} {
       allow read: if isSignedIn(); // Desarrollo necesita leer nombres para reportes
       allow create: if isOwner(uid);
-      allow update: if isOwner(uid) || isSuperAdmin() || isBiblio();
+      allow update: if isSuperAdmin() || isBiblio() || isTrustedOwnerProfileBootstrap(uid) || isSafeOwnerUserUpdate(uid);
       
       match /notificaciones/{notifId} {
         allow create: if isOwner(uid) || isSalud() || isSuperAdmin() || isBiblio() || isLactarioAdmin();
@@ -224,6 +315,47 @@ service cloud.firestore {
 
       match /pushTokens/{tokenId} {
         allow read, write: if isOwner(uid);
+      }
+    }
+
+    match /panic_alerts/{alertId} {
+      allow create, update, delete: if false;
+      allow read: if isSignedIn() && (
+        resource.data.initiatorUid == request.auth.uid ||
+        isPanicStaffResponder()
+      );
+
+      match /events/{eventId} {
+        allow read: if isSignedIn() && (
+          get(/databases/$(database)/documents/panic_alerts/$(alertId)).data.initiatorUid == request.auth.uid ||
+          isPanicStaffResponder()
+        );
+        allow write: if false;
+      }
+
+      match /trackPoints/{trackId} {
+        allow read: if isSignedIn() && (
+          get(/databases/$(database)/documents/panic_alerts/$(alertId)).data.initiatorUid == request.auth.uid ||
+          isPanicStaffResponder()
+        );
+        allow write: if false;
+      }
+
+      match /acks/{ackId} {
+        allow read: if isSignedIn() && (
+          get(/databases/$(database)/documents/panic_alerts/$(alertId)).data.initiatorUid == request.auth.uid ||
+          isPanicStaffResponder()
+        );
+        allow write: if false;
+      }
+
+      match /recipients/{recipientId} {
+        allow read: if isSignedIn() && (
+          recipientId == request.auth.uid ||
+          get(/databases/$(database)/documents/panic_alerts/$(alertId)).data.initiatorUid == request.auth.uid ||
+          isPanicStaffResponder()
+        );
+        allow write: if false;
       }
     }
 
@@ -270,6 +402,11 @@ service cloud.firestore {
 
     match /biblio-visitas-activos/{id} {
       allow read, write: if isBiblio() || isSuperAdmin() || isDesarrollo();
+    }
+
+    match /scanner-stations/{id} {
+      allow read: if isBiblio() || isSuperAdmin() || isDesarrollo();
+      allow write: if isSuperAdmin();
     }
 
     match /biblio-catalogo/{bookId} {
@@ -336,6 +473,16 @@ service cloud.firestore {
 
     match /biblio-activos/{id} {
       allow read: if true;
+      allow write: if isBiblio() || isSuperAdmin();
+    }
+
+    match /biblio-config/loan-calendar {
+      allow read: if isSignedIn();
+      allow write: if isBiblio() || isSuperAdmin();
+    }
+
+    match /biblio-config/{id} {
+      allow read: if isBiblio() || isSuperAdmin();
       allow write: if isBiblio() || isSuperAdmin();
     }
 
@@ -1136,7 +1283,7 @@ function isEncuestasAdmin() {
 
     // [NEW] Config global
     match /config/{docId} {
-      allow read: if isSignedIn();
+      allow read: if docId == 'campus_map' || isSignedIn();
       allow write: if isSuperAdmin();
     }
 

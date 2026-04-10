@@ -304,8 +304,15 @@ if (!window.SuperAdmin) {
         async function renderDashboard(main) {
             main.innerHTML = `
             <div class="sa-panel-header">
-                <h4 class="fw-bold mb-1"><i class="bi bi-speedometer2 me-2 text-primary"></i>Dashboard</h4>
-                <p class="text-muted mb-0 small">Resumen general del sistema SIA</p>
+                <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+                    <div>
+                        <h4 class="fw-bold mb-1"><i class="bi bi-speedometer2 me-2 text-primary"></i>Dashboard</h4>
+                        <p class="text-muted mb-0 small">Resumen general del sistema SIA</p>
+                    </div>
+                    <button class="btn btn-outline-primary btn-sm rounded-pill px-3 fw-semibold" onclick="SuperAdmin.openCampusMapEditor()">
+                        <i class="bi bi-geo-alt-fill me-2"></i>Editar mapa del campus
+                    </button>
+                </div>
             </div>
             <div class="row g-3 mb-4" id="sa-kpi-row">
                 <div class="col-6 col-lg-3"><div class="sa-kpi-card sa-kpi-blue"><div class="sa-kpi-icon"><i class="bi bi-people-fill"></i></div><div class="sa-kpi-value" id="kpi-users">—</div><div class="sa-kpi-label">Usuarios</div></div></div>
@@ -390,6 +397,10 @@ if (!window.SuperAdmin) {
             } catch (e) {
                 console.error('[SuperAdmin] Error loading dashboard:', e);
             }
+        }
+
+        function openCampusMapEditor() {
+            window.SIA?.navigate?.('view-campus-map');
         }
 
         // =============================================
@@ -1556,6 +1567,41 @@ if (!window.SuperAdmin) {
                         </div>
                     </div>
                 </div>
+            </div>
+            <div class="row g-4 mt-1">
+                <div class="col-12">
+                    <div class="card border-0 shadow-sm rounded-4">
+                        <div class="card-header bg-white border-0 py-3">
+                            <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
+                                <div>
+                                    <h6 class="fw-bold mb-1"><i class="bi bi-shield-exclamation text-danger me-2"></i>Botón de Pánico</h6>
+                                    <div class="small text-muted">Edición mínima de la configuración operativa. Se guarda en <code>config/panic_main</code> y <code>config/panic_groups</code>.</div>
+                                </div>
+                                <div class="d-flex gap-2">
+                                    <button class="btn btn-outline-secondary btn-sm rounded-pill" type="button" onclick="SuperAdmin.resetPanicConfig('main')">Restaurar Main</button>
+                                    <button class="btn btn-outline-secondary btn-sm rounded-pill" type="button" onclick="SuperAdmin.resetPanicConfig('groups')">Restaurar Groups</button>
+                                    <button class="btn btn-danger btn-sm rounded-pill fw-bold" type="button" onclick="SuperAdmin.savePanicConfig()">Guardar Panic</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card-body p-4">
+                            <div class="alert alert-warning small rounded-4 border-0 mb-4">
+                                <div class="fw-bold mb-1">Uso recomendado</div>
+                                <div>Edita solo los valores que entiendas. Si el JSON es inválido no se guardará. Los grupos curados esperados en v1 son <code>docentes</code>, <code>brigada_emergencia</code>, <code>servicios_medicos</code> y <code>seguridad_campus</code>.</div>
+                            </div>
+                            <div class="row g-4">
+                                <div class="col-lg-6">
+                                    <label for="sa-panic-main-json" class="form-label small fw-bold text-uppercase text-muted">panic_main</label>
+                                    <textarea id="sa-panic-main-json" class="form-control font-monospace" rows="18" spellcheck="false"></textarea>
+                                </div>
+                                <div class="col-lg-6">
+                                    <label for="sa-panic-groups-json" class="form-label small fw-bold text-uppercase text-muted">panic_groups</label>
+                                    <textarea id="sa-panic-groups-json" class="form-control font-monospace" rows="18" spellcheck="false"></textarea>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>`;
 
             // Load config + stream notices
@@ -1568,6 +1614,23 @@ if (!window.SuperAdmin) {
                     });
                 }
             } catch (e) { /* config load failed */ }
+
+            try {
+                const [panicMain, panicGroups] = await Promise.all([
+                    SuperAdminService.getGlobalConfig(_ctx, 'panic_main'),
+                    SuperAdminService.getGlobalConfig(_ctx, 'panic_groups')
+                ]);
+                const mainTextarea = document.getElementById('sa-panic-main-json');
+                const groupsTextarea = document.getElementById('sa-panic-groups-json');
+                if (mainTextarea) {
+                    mainTextarea.value = JSON.stringify(panicMain || getDefaultPanicMainConfig(), null, 2);
+                }
+                if (groupsTextarea) {
+                    groupsTextarea.value = JSON.stringify(panicGroups || getDefaultPanicGroupsConfig(), null, 2);
+                }
+            } catch (error) {
+                console.warn('[SuperAdmin] No se pudo cargar la configuración de panic:', error);
+            }
 
             // Stream notices
             const unsubNotices = SuperAdminService.streamGlobalNotices(_ctx, (snap) => {
@@ -1619,6 +1682,135 @@ if (!window.SuperAdmin) {
             }
         }
 
+        function getDefaultPanicMainConfig() {
+            return {
+                enabled: true,
+                allowedRecipientModes: ['custom', 'staff', 'school'],
+                curatedGroups: ['docentes', 'brigada_emergencia', 'servicios_medicos', 'seguridad_campus'],
+                campusZones: [
+                    'Edificio A',
+                    'Edificio B',
+                    'Biblioteca',
+                    'Cafeteria',
+                    'Laboratorios',
+                    'Patio central',
+                    'Estacionamiento',
+                    'Otro'
+                ],
+                cooldownsMinutes: {
+                    custom: 5,
+                    staff: 15,
+                    school: 60
+                },
+                tracking: {
+                    foregroundOnly: true,
+                    maxDurationSeconds: 300,
+                    distanceThresholdMeters: 15,
+                    minIntervalSeconds: 10
+                },
+                channels: {
+                    push: true,
+                    inApp: true,
+                    email: true,
+                    smsCritical: true
+                },
+                privacy: {
+                    schoolWideAudience: 'zone_only',
+                    responderAudience: 'exact_location'
+                },
+                ui: {
+                    holdToConfirmMs: 1800,
+                    requireReasonFor: ['staff', 'school']
+                },
+                smsCriticalRecipients: [],
+                templates: {
+                    custom: {
+                        title: 'Alerta de seguridad',
+                        protocol: 'Activar canal de apoyo y confirmar atención.'
+                    },
+                    staff: {
+                        title: 'Alerta de seguridad en campus',
+                        protocol: 'Seguir protocolo institucional y confirmar atención.'
+                    },
+                    school: {
+                        title: 'Protocolo de seguridad activo',
+                        protocol: 'Mantener comunicación institucional sin exponer la ubicación exacta a estudiantes.'
+                    }
+                }
+            };
+        }
+
+        function getDefaultPanicGroupsConfig() {
+            return {
+                docentes: {
+                    label: 'Docentes',
+                    mode: 'dynamic',
+                    dynamicType: 'docentes',
+                    memberUids: [],
+                    emails: [],
+                    phones: []
+                },
+                brigada_emergencia: {
+                    label: 'Brigada de emergencia',
+                    memberUids: [],
+                    emails: [],
+                    phones: []
+                },
+                servicios_medicos: {
+                    label: 'Servicios médicos',
+                    memberUids: [],
+                    emails: [],
+                    phones: []
+                },
+                seguridad_campus: {
+                    label: 'Seguridad del campus',
+                    memberUids: [],
+                    emails: [],
+                    phones: []
+                }
+            };
+        }
+
+        function parsePanicConfigEditor(textareaId, fallbackFactory) {
+            const raw = document.getElementById(textareaId)?.value || '';
+            if (!raw.trim()) return fallbackFactory();
+            return JSON.parse(raw);
+        }
+
+        async function savePanicConfig() {
+            try {
+                const mainConfig = parsePanicConfigEditor('sa-panic-main-json', getDefaultPanicMainConfig);
+                const groupsConfig = parsePanicConfigEditor('sa-panic-groups-json', getDefaultPanicGroupsConfig);
+                await Promise.all([
+                    SuperAdminService.setGlobalConfig(_ctx, 'panic_main', mainConfig),
+                    SuperAdminService.setGlobalConfig(_ctx, 'panic_groups', groupsConfig)
+                ]);
+                if (typeof showToast === 'function') showToast('Configuración de panic guardada', 'success');
+            } catch (error) {
+                console.error('[SuperAdmin] Error guardando panic config:', error);
+                if (typeof showToast === 'function') showToast('JSON inválido o error al guardar panic config', 'danger');
+            }
+        }
+
+        function resetPanicConfig(which) {
+            const mapping = {
+                main: {
+                    textareaId: 'sa-panic-main-json',
+                    data: getDefaultPanicMainConfig()
+                },
+                groups: {
+                    textareaId: 'sa-panic-groups-json',
+                    data: getDefaultPanicGroupsConfig()
+                }
+            };
+            const target = mapping[which];
+            if (!target) return;
+            const textarea = document.getElementById(target.textareaId);
+            if (textarea) {
+                textarea.value = JSON.stringify(target.data, null, 2);
+            }
+        }
+
         function addPermRow() {
             const container = document.getElementById('sa-edit-perms');
             if (!container) return;
@@ -1638,6 +1830,7 @@ if (!window.SuperAdmin) {
         return {
             init,
             switchTab,
+            openCampusMapEditor,
             // Audit
             filterLogs, loadMoreLogs, exportLogs,
             // Users
@@ -1645,7 +1838,7 @@ if (!window.SuperAdmin) {
             // Tickets
             filterTickets, loadMoreTickets, openTicketModal, respondTicket, saveTicketMeta,
             // Config
-            toggleModuleSwitch, createNotice, deleteNotice
+            toggleModuleSwitch, createNotice, deleteNotice, savePanicConfig, resetPanicConfig
         };
     })();
 }

@@ -6,6 +6,13 @@
       "**/.*",
       "**/node_modules/**"
     ],
+    "redirects": [
+      {
+        "source": "/mapa-campus",
+        "destination": "/campus-map/?public=1",
+        "type": 302
+      }
+    ],
     "rewrites": [
       {
         "source": "**",

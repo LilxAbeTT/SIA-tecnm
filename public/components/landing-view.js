@@ -284,6 +284,14 @@ class SiaLandingView extends HTMLElement {
         icon: 'bi-person-badge-fill',
         tone: 'is-emerald',
         tags: ['Perfil', 'Credencial', 'Acceso']
+      },
+      {
+        module: 'Mapa del Campus',
+        title: 'Ubicar edificios, talleres y puntos de reunion',
+        desc: 'Consulta el mapa fijo del campus y la informacion corregida de cada edificio antes de moverte.',
+        icon: 'bi-geo-alt-fill',
+        tone: 'is-cyan',
+        tags: ['Croquis', 'Edificios', 'Ubicacion']
       }
     ];
   }
@@ -378,6 +386,10 @@ class SiaLandingView extends HTMLElement {
                 <a href="#/test-vocacional" class="btn btn-outline-light landing-secondary-cta rounded-pill px-4 py-3 fw-semibold d-flex align-items-center justify-content-center gap-2">
                   <i class="bi bi-compass-fill"></i>
                   <span>Hacer Test Vocacional</span>
+                </a>
+                <a href="#/mapa-campus" class="btn landing-campus-cta rounded-pill px-4 py-3 fw-semibold d-flex align-items-center justify-content-center gap-2">
+                  <i class="bi bi-geo-alt-fill"></i>
+                  <span>Ver mapa del campus</span>
                 </a>
               </div>
 

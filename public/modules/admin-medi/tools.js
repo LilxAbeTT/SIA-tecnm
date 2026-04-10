@@ -1932,14 +1932,18 @@ window.AdminMedi.Tools = (function () {
     const list = document.getElementById('medi-recent-list');
     if (!list) return;
 
+    if (getRecentUnsub()) {
+      getRecentUnsub()();
+      setRecentUnsub(null);
+    }
+
     const operational = getOperationalContext();
     const profId = operational.profileId;
     const uid = operational.ownerUid;
+    list.innerHTML = '<div class="text-center py-4"><div class="spinner-border text-success" role="status"></div></div>';
 
-    // Unsubscribe previous if exists? (Not tracking strict unsubs for this one yet, assuming refresh)
-    // Ideally add to AdminMedi.State.unsubs
-
-    MediService.streamRecentActivity(AdminMedi.State.ctx, operational.role, uid, profId, 10, (docs) => {
+    const unsub = MediService.streamRecentActivity(AdminMedi.State.ctx, operational.role, uid, profId, 10, (docs) => {
+      if (getRecentUnsub() !== unsub) return;
       if (docs.length === 0) {
         list.innerHTML = '<div class="text-center py-4 text-muted small opacity-50">Sin actividad reciente</div>';
         return;
@@ -1965,6 +1969,8 @@ window.AdminMedi.Tools = (function () {
             </div>`;
       }).join('');
     }, operational.shift);
+
+    setRecentUnsub(unsub);
   }
 
   function showAllRecentModal() {

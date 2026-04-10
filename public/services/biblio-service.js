@@ -6,13 +6,37 @@ const BiblioService = (function () {
     const SUG_COLL = 'biblio-solicitudes';
     const WISHLIST_COLL = 'biblio-wishlist';
     const USERS_COLL = 'usuarios';
+    const BIBLIO_CONFIG_COLL = 'biblio-config';
+    const HOLIDAY_CALENDAR_DOC_ID = 'loan-calendar';
 
     const ACTIVE_LOAN_STATES = new Set(['pendiente', 'pendiente_entrega', 'entregado']);
     const CACHE_SCHEMA_VERSION = 2;
     const LOCAL_CACHE_TTL = 5 * 60 * 1000;
+    const HOLIDAY_CACHE_TTL = 5 * 60 * 1000;
+    const HOLIDAY_STORAGE_KEY = 'sia_biblio_holiday_calendar_v1';
     const SEARCH_TEXT_MIN_CHARS = 3;
     const PICKUP_WINDOW_MS = 24 * 60 * 60 * 1000;
     const ANON_DUPLICATE_WINDOW_MS = 45 * 1000;
+    const ACTIVE_VISIT_AUTO_CLOSE_MS = 60 * 60 * 1000;
+    const ACTIVE_VISIT_CLEANUP_TTL = 60 * 1000;
+    const PENDING_LOAN_CLEANUP_TTL = 60 * 1000;
+    const VISIT_SUMMARY_CACHE_TTL = 60 * 1000;
+    const RECENT_OVERDUE_CACHE_TTL = 5 * 60 * 1000;
+    const DEFAULT_LOAN_DAYS = 1;
+    const LITERATURE_LOAN_DAYS = 7;
+    const EXTENDED_LOAN_CATEGORIES = new Set([
+        'literatura',
+        'literatura / novela'
+    ]);
+    let _visitSummaryCache = null;
+    let _visitSummaryCacheTime = 0;
+    let _activeVisitCleanupTime = 0;
+    let _activeVisitCleanupPromise = null;
+    let _pendingLoanCleanupTime = 0;
+    let _recentOverdueCache = null;
+    let _recentOverdueCacheTime = 0;
+    let _holidayCalendarCache = loadHolidayCalendarFromStorage();
+    let _holidayCalendarCacheTime = _holidayCalendarCache?.updatedAtMs || 0;
 
     const COSTO_MULTA_DIARIA = 21;
     const LIMITE_BLOQUEO = 63; // 3 días de retraso
@@ -20,6 +44,201 @@ const BiblioService = (function () {
     // --- HELPERS LÓGICOS ---
     const norm = s => (s || '').toString().trim().toLowerCase()
         .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+    function normalizeRoleText(value) {
+        return norm(value || '');
+    }
+
+    function normalizeGeneroLabel(value) {
+        const label = String(value || '').trim();
+        const normalized = norm(label);
+        if (!normalized) return null;
+        if (['m', 'masculino', 'masc', 'hombre', 'varon', 'male'].includes(normalized)) return 'Masculino';
+        if (['f', 'femenino', 'fem', 'mujer', 'female'].includes(normalized)) return 'Femenino';
+        return null;
+    }
+
+    function normalizeTurnoLabel(value) {
+        const label = String(value || '').trim();
+        const normalized = norm(label);
+        if (!normalized) return null;
+        if (normalized.includes('matutin')) return 'Matutino';
+        if (normalized.includes('vespert')) return 'Vespertino';
+        return null;
+    }
+
+    function isLikelyControlNumber(value) {
+        const raw = String(value || '').trim();
+        if (!/^\d{8,10}$/.test(raw)) return false;
+        return raw.slice(2, 4) === '38';
+    }
+
+    function isExternalStudentMatricula(value) {
+        return /^b[\w-]+$/i.test(String(value || '').trim());
+    }
+
+    function isLikelyStudentIdentifier(value) {
+        return isLikelyControlNumber(value) || isExternalStudentMatricula(value);
+    }
+
+    function isLikelyAcademicOrStaffProfile(profile) {
+        const tipoUsuario = normalizeRoleText(profile?.tipoUsuario);
+        const role = normalizeRoleText(profile?.role);
+        const jobTitle = normalizeRoleText(profile?.originalJobTitle || profile?.jobTitle || profile?.puesto);
+
+        if (['docente', 'personal academico', 'academico', 'profesor', 'maestro', 'catedratico', 'administrativo', 'personal'].includes(tipoUsuario)) {
+            return true;
+        }
+
+        if (['aula', 'aula_admin', 'admin', 'superadmin', 'personal', 'docente'].includes(role)) {
+            return true;
+        }
+
+        return /(docente|profesor|maestro|catedratic|academico|administrativ|personal)/.test(jobTitle);
+    }
+
+    function toDisplayLabel(value) {
+        const raw = String(value || '').trim();
+        if (!raw) return '';
+        return raw
+            .replace(/[_-]+/g, ' ')
+            .replace(/\s+/g, ' ')
+            .replace(/\b\w/g, (match) => match.toUpperCase());
+    }
+
+    function pickFirstFilled(...values) {
+        for (const value of values) {
+            const text = String(value || '').trim();
+            if (text) return text;
+        }
+        return '';
+    }
+
+    function getAcademicInfo(profile = {}) {
+        const tipoUsuario = normalizeRoleText(profile?.tipoUsuario);
+        const role = normalizeRoleText(profile?.role);
+        const isStudent = tipoUsuario === 'estudiante'
+            || role === 'student'
+            || (!isLikelyAcademicOrStaffProfile(profile) && isLikelyStudentIdentifier(profile?.matricula));
+
+        if (isStudent) {
+            const carrera = pickFirstFilled(
+                profile?.carrera,
+                profile?.career,
+                profile?.programa,
+                profile?.program,
+                profile?.especialidad,
+                profile?.specialty
+            );
+            return {
+                kind: 'Carrera',
+                label: carrera || 'Sin carrera registrada'
+            };
+        }
+
+        const area = pickFirstFilled(
+            profile?.area,
+            profile?.areaAdscripcion,
+            profile?.adscripcion,
+            profile?.department,
+            profile?.departamento,
+            profile?.specialty,
+            profile?.especialidad,
+            profile?.originalJobTitle,
+            profile?.jobTitle,
+            profile?.puesto
+        );
+
+        return {
+            kind: 'Área',
+            label: toDisplayLabel(area || 'Sin área registrada')
+        };
+    }
+
+    function getBorrowerPolicy(profile) {
+        const matricula = String(profile?.matricula || '').trim();
+        const isStudentLike = isLikelyStudentIdentifier(matricula);
+        const isLikelyStaff = !isStudentLike && isLikelyAcademicOrStaffProfile(profile);
+        return {
+            matricula,
+            isStudentLike,
+            isLikelyStaff,
+            requiresConfirmation: !isStudentLike,
+            suggestedBorrowerKind: isLikelyStaff ? 'staff' : 'student',
+            prompt: !isStudentLike
+                ? 'Este usuario no parece alumno con numero de control regular. Confirma si el prestamo es para docente/personal.'
+                : ''
+        };
+    }
+
+    async function getQueryCountSafe(queryRef) {
+        if (!queryRef) return null;
+        if (typeof queryRef.count === 'function') {
+            try {
+                const snap = await queryRef.count().get();
+                return snap?.data?.().count ?? snap?.data().count ?? null;
+            } catch (error) {
+                console.warn('[BIBLIO] No se pudo obtener conteo agregado.', error);
+                return null;
+            }
+        }
+        return null;
+    }
+
+    function getBookCategory(source) {
+        if (!source) return '';
+        if (typeof source === 'string') return source;
+        return source.categoriaLibro ?? source.categoria ?? '';
+    }
+
+    function isWeeklyLoanCategory(category) {
+        return EXTENDED_LOAN_CATEGORIES.has(norm(category).replace(/\s+/g, ' '));
+    }
+
+    function getLoanPolicy(source, options = {}) {
+        const category = getBookCategory(source);
+        const borrowerKind = String(
+            options.borrowerKind
+            || source?.borrowerKind
+            || (options.staffLoan || source?.staffLoan || source?.lateFeeExempt ? 'staff' : 'student')
+        ).trim().toLowerCase();
+        const isWeekly = isWeeklyLoanCategory(category) || borrowerKind === 'staff';
+        const lateFeeExempt = borrowerKind === 'staff' || options.lateFeeExempt === true || source?.lateFeeExempt === true;
+        return {
+            category,
+            borrowerKind,
+            durationDays: isWeekly ? LITERATURE_LOAN_DAYS : DEFAULT_LOAN_DAYS,
+            isWeekly,
+            lateFeeExempt,
+            tracksLateWithoutCharge: lateFeeExempt,
+            label: isWeekly ? '1 semana' : '1 dia habil',
+            notice: isWeekly
+                ? 'Este libro tiene un prestamo especial de 1 semana.'
+                : 'Este libro tiene un prestamo de 1 dia habil.'
+        };
+    }
+
+    function getLateInfo(source) {
+        const loanPolicy = getLoanPolicy(source);
+        const fechaVencimiento = source?.fechaVencimiento ?? source;
+        const dueDate = toDateSafe(fechaVencimiento);
+        if (!dueDate) {
+            return { daysLate: 0, rawFine: 0, fine: 0, loanPolicy };
+        }
+        const now = new Date();
+        if (now <= dueDate) {
+            return { daysLate: 0, rawFine: 0, fine: 0, loanPolicy };
+        }
+
+        const daysLate = countBusinessLateDays(dueDate, now);
+        const rawFine = daysLate > 0 ? daysLate * COSTO_MULTA_DIARIA : 0;
+        return {
+            daysLate,
+            rawFine,
+            fine: loanPolicy.lateFeeExempt ? 0 : rawFine,
+            loanPolicy
+        };
+    }
 
     function getCaseVariants(value) {
         const base = (value || '').toString().trim();
@@ -36,6 +255,172 @@ const BiblioService = (function () {
 
     function getBookYear(data = {}) {
         return data.anio ?? data.año ?? data['año'] ?? null;
+    }
+
+    function formatDateKeyLocal(value) {
+        const fecha = value instanceof Date ? value : toDateSafe(value);
+        if (!fecha || Number.isNaN(fecha.getTime())) return '';
+        const year = fecha.getFullYear();
+        const month = String(fecha.getMonth() + 1).padStart(2, '0');
+        const day = String(fecha.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    }
+
+    function parseDateKeyLocal(value) {
+        const raw = String(value || '').trim();
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return null;
+        const [year, month, day] = raw.split('-').map(Number);
+        return new Date(year, month - 1, day, 12, 0, 0, 0);
+    }
+
+    function normalizeHolidayDateKey(value) {
+        if (!value) return '';
+        if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value.trim())) {
+            return value.trim();
+        }
+        return formatDateKeyLocal(value);
+    }
+
+    function normalizeHolidayDateList(values = []) {
+        return [...new Set((Array.isArray(values) ? values : [])
+            .map((value) => normalizeHolidayDateKey(value))
+            .filter(Boolean))]
+            .sort();
+    }
+
+    function createHolidayCalendarSnapshot(rawData = {}) {
+        const holidayDates = normalizeHolidayDateList(rawData.holidayDates || rawData.diasInhabiles || []);
+        const blockedDates = normalizeHolidayDateList(rawData.blockedDates || rawData.periodDates || rawData.rangoInhabilitado || []);
+        const nonBusinessDates = [...new Set([...holidayDates, ...blockedDates])].sort();
+        return {
+            holidayDates,
+            blockedDates,
+            blockedDateSet: new Set(blockedDates),
+            holidayDateSet: new Set(nonBusinessDates),
+            updatedAt: rawData.updatedAt || null,
+            updatedBy: rawData.updatedBy || '',
+            updatedAtMs: rawData.updatedAtMs || null
+        };
+    }
+
+    function persistHolidayCalendarToStorage(snapshot) {
+        if (typeof window === 'undefined' || !window.localStorage) return;
+        try {
+            window.localStorage.setItem(HOLIDAY_STORAGE_KEY, JSON.stringify({
+                holidayDates: snapshot?.holidayDates || [],
+                blockedDates: snapshot?.blockedDates || [],
+                updatedAtMs: snapshot?.updatedAtMs || Date.now(),
+                updatedBy: snapshot?.updatedBy || ''
+            }));
+        } catch (error) {
+            console.warn('[BIBLIO] No se pudo persistir calendario inhábil:', error);
+        }
+    }
+
+    function loadHolidayCalendarFromStorage() {
+        if (typeof window === 'undefined' || !window.localStorage) return createHolidayCalendarSnapshot();
+        try {
+            const raw = JSON.parse(window.localStorage.getItem(HOLIDAY_STORAGE_KEY) || 'null');
+            if (!raw) return createHolidayCalendarSnapshot();
+            return createHolidayCalendarSnapshot(raw);
+        } catch (error) {
+            console.warn('[BIBLIO] No se pudo leer calendario inhábil local:', error);
+            return createHolidayCalendarSnapshot();
+        }
+    }
+
+    function setHolidayCalendarCache(snapshot) {
+        _holidayCalendarCache = createHolidayCalendarSnapshot(snapshot);
+        _holidayCalendarCache.updatedAtMs = snapshot?.updatedAtMs || Date.now();
+        _holidayCalendarCacheTime = Date.now();
+        persistHolidayCalendarToStorage(_holidayCalendarCache);
+        return _holidayCalendarCache;
+    }
+
+    function getHolidayCalendarSnapshot() {
+        if (!_holidayCalendarCache) {
+            _holidayCalendarCache = createHolidayCalendarSnapshot();
+        }
+        return _holidayCalendarCache;
+    }
+
+    async function ensureHolidayCalendarLoaded(ctx, { force = false } = {}) {
+        const now = Date.now();
+        if (!force && _holidayCalendarCache && (now - _holidayCalendarCacheTime) < HOLIDAY_CACHE_TTL) {
+            return _holidayCalendarCache;
+        }
+
+        if (!ctx?.db) {
+            return getHolidayCalendarSnapshot();
+        }
+
+        try {
+            const doc = await ctx.db.collection(BIBLIO_CONFIG_COLL).doc(HOLIDAY_CALENDAR_DOC_ID).get();
+            const data = doc.exists ? doc.data() || {} : {};
+            return setHolidayCalendarCache({
+                holidayDates: data.holidayDates || data.diasInhabiles || [],
+                blockedDates: data.blockedDates || data.periodDates || [],
+                updatedAt: data.updatedAt || null,
+                updatedBy: data.updatedBy || '',
+                updatedAtMs: now
+            });
+        } catch (error) {
+            console.warn('[BIBLIO] No se pudo cargar calendario inhábil:', error);
+            return getHolidayCalendarSnapshot();
+        }
+    }
+
+    function isHolidayDate(fecha, calendar = getHolidayCalendarSnapshot()) {
+        return calendar?.holidayDateSet?.has(formatDateKeyLocal(fecha)) === true;
+    }
+
+    function isBusinessDay(fecha, calendar = getHolidayCalendarSnapshot()) {
+        const day = fecha.getDay();
+        return day !== 0 && day !== 6 && !isHolidayDate(fecha, calendar);
+    }
+
+    function moveDueDateToBusinessDay(fecha, calendar = getHolidayCalendarSnapshot()) {
+        fecha.setHours(12, 0, 0, 0);
+        while (!isBusinessDay(fecha, calendar)) {
+            fecha.setDate(fecha.getDate() + 1);
+        }
+        fecha.setHours(18, 0, 0, 0);
+        return fecha;
+    }
+
+    function addBusinessDays(fechaInicio, businessDays, calendar = getHolidayCalendarSnapshot()) {
+        const fecha = new Date(fechaInicio);
+        fecha.setHours(12, 0, 0, 0);
+        let remaining = Math.max(0, Number(businessDays) || 0);
+
+        while (remaining > 0) {
+            fecha.setDate(fecha.getDate() + 1);
+            if (isBusinessDay(fecha, calendar)) {
+                remaining -= 1;
+            }
+        }
+
+        return moveDueDateToBusinessDay(fecha, calendar);
+    }
+
+    function countBusinessLateDays(fechaVencimiento, comparisonDate = new Date(), calendar = getHolidayCalendarSnapshot()) {
+        const dueDate = toDateSafe(fechaVencimiento);
+        const endDate = comparisonDate instanceof Date ? comparisonDate : toDateSafe(comparisonDate);
+        if (!dueDate || !endDate || endDate <= dueDate) return 0;
+
+        const cursor = new Date(dueDate);
+        cursor.setHours(12, 0, 0, 0);
+        cursor.setDate(cursor.getDate() + 1);
+
+        const endKey = formatDateKeyLocal(endDate);
+        let daysLate = 0;
+        while (formatDateKeyLocal(cursor) <= endKey) {
+            if (isBusinessDay(cursor, calendar)) {
+                daysLate += 1;
+            }
+            cursor.setDate(cursor.getDate() + 1);
+        }
+        return daysLate;
     }
 
     function toDateSafe(value) {
@@ -739,6 +1124,35 @@ const BiblioService = (function () {
         return status === 'finalizada' || status === 'cancelada' || !!data.salida;
     }
 
+    function getVisitStartMs(data = {}) {
+        return Number(data.createdAtMs) || toMillisSafe(data.fecha) || 0;
+    }
+
+    function getVisitAutoCloseMs(data = {}) {
+        const explicitAutoClose = Number(data.autoCloseAtMs) || 0;
+        if (explicitAutoClose > 0) return explicitAutoClose;
+
+        const startMs = getVisitStartMs(data);
+        return startMs > 0 ? startMs + ACTIVE_VISIT_AUTO_CLOSE_MS : 0;
+    }
+
+    function isVisitExpired(data = {}, nowMs = Date.now()) {
+        if (isVisitClosed(data)) return false;
+        const autoCloseMs = getVisitAutoCloseMs(data);
+        return autoCloseMs > 0 && autoCloseMs <= nowMs;
+    }
+
+    function buildExpiredVisitUpdate(data = {}, nowMs = Date.now()) {
+        const closeMs = getVisitAutoCloseMs(data) || nowMs;
+        return {
+            salida: firebase.firestore.Timestamp.fromMillis(closeMs),
+            status: 'finalizada',
+            autoClosed: true,
+            autoClosedAtMs: nowMs,
+            autoClosedReason: 'visit_timeout'
+        };
+    }
+
     function buildVisitLockKey({ uid = '', matricula = '' } = {}) {
         if (hasUsableMatricula(matricula)) {
             return `mat_${norm(matricula)}`;
@@ -774,6 +1188,7 @@ const BiblioService = (function () {
             visitorType: visitData.visitorType || '',
             isUnregistered: visitData.isUnregistered === true,
             createdAtMs: visitData.createdAtMs || Date.now(),
+            autoCloseAtMs: visitData.autoCloseAtMs || getVisitAutoCloseMs(visitData) || null,
             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         };
     }
@@ -798,14 +1213,18 @@ const BiblioService = (function () {
         const visitRef = ctx.db.collection(VISITAS_COLL).doc(visitId);
         const visitSnap = await transaction.get(visitRef);
 
-        if (!visitSnap.exists || isVisitClosed(visitSnap.data() || {})) {
+        const visitData = visitSnap.data() || {};
+        if (!visitSnap.exists || isVisitClosed(visitData) || isVisitExpired(visitData)) {
+            if (visitSnap.exists && isVisitExpired(visitData)) {
+                transaction.update(visitRef, buildExpiredVisitUpdate(visitData));
+            }
             transaction.delete(lockRef);
             return { lockRef, existingVisit: null };
         }
 
         return {
             lockRef,
-            existingVisit: buildVisitDuplicatePayload(visitSnap.id, visitSnap.data(), { ...fallback, ...lockData, lockKey })
+            existingVisit: buildVisitDuplicatePayload(visitSnap.id, visitData, { ...fallback, ...lockData, lockKey })
         };
     }
 
@@ -863,6 +1282,7 @@ const BiblioService = (function () {
                 if (visitsMap.has(doc.id)) return;
                 const data = doc.data() || {};
                 if (isVisitClosed(data)) return;
+                if (isVisitExpired(data)) return;
                 visitsMap.set(doc.id, buildVisitDuplicatePayload(doc.id, data));
             });
         });
@@ -870,6 +1290,65 @@ const BiblioService = (function () {
         const visits = Array.from(visitsMap.values());
         visits.sort((a, b) => (b.createdAtMs || 0) - (a.createdAtMs || 0));
         return visits[0] || null;
+    }
+
+    async function cleanupExpiredActiveVisits(ctx, { force = false } = {}) {
+        const nowMs = Date.now();
+        if (!force && _activeVisitCleanupPromise) {
+            return _activeVisitCleanupPromise;
+        }
+        if (!force && (nowMs - _activeVisitCleanupTime) < ACTIVE_VISIT_CLEANUP_TTL) {
+            return [];
+        }
+
+        _activeVisitCleanupPromise = (async () => {
+            const snap = await ctx.db.collection(VISITAS_COLL)
+                .where('status', '==', 'en_curso')
+                .get();
+
+            if (snap.empty) {
+                _activeVisitCleanupTime = Date.now();
+                return [];
+            }
+
+            const batch = ctx.db.batch();
+            const closedVisits = [];
+
+            snap.docs.forEach((doc) => {
+                const data = doc.data() || {};
+                if (!isVisitExpired(data, nowMs)) return;
+
+                batch.update(doc.ref, buildExpiredVisitUpdate(data, nowMs));
+
+                const lockKey = data.lockKey || buildVisitLockKey({
+                    uid: data.studentId,
+                    matricula: data.matricula
+                });
+                if (lockKey) {
+                    batch.delete(ctx.db.collection(ACTIVE_VISITS_COLL).doc(lockKey));
+                }
+
+                closedVisits.push({
+                    id: doc.id,
+                    studentName: data.studentName || 'Visitante',
+                    matricula: data.matricula || 'S/N'
+                });
+            });
+
+            if (closedVisits.length > 0) {
+                await batch.commit();
+                console.log(`[BIBLIO] Visitas auto-cerradas: ${closedVisits.map((item) => `${item.studentName} (${item.matricula})`).join(', ')}`);
+            }
+
+            _activeVisitCleanupTime = Date.now();
+            return closedVisits;
+        })();
+
+        try {
+            return await _activeVisitCleanupPromise;
+        } finally {
+            _activeVisitCleanupPromise = null;
+        }
     }
 
     async function findBooksByAdquisicion(ctx, adq, limit = 5) {
@@ -949,29 +1428,19 @@ const BiblioService = (function () {
     // - Lun-Jue: Se entrega al día siguiente.
     // - Viernes: Se entrega el Lunes.
     // - Sab/Dom (Si aplica): Se entrega el Lunes.
-    function calcularFechaVencimiento(fechaInicio = new Date()) {
-        const fecha = new Date(fechaInicio);
-        const diaSemana = fecha.getDay(); // 0=Dom, 1=Lun, ..., 5=Vie, 6=Sab
-
-        // Lógica de adición de días
-        let diasAgregados = 1; // Default
-
-        if (diaSemana === 5) { // Viernes -> Lunes (+3)
-            diasAgregados = 3;
-        } else if (diaSemana === 6) { // Sábado -> Lunes (+2)
-            diasAgregados = 2;
-        } else if (diaSemana === 0) { // Domingo -> Lunes (+1)
-            diasAgregados = 1;
+    function recalcularFechaVencimientoPrestamo(loan) {
+        const startDate = toDateSafe(loan?.fechaEntrega) || toDateSafe(loan?.fechaSolicitud) || new Date();
+        let dueDate = calcularFechaVencimiento(startDate, loan);
+        const extensions = Math.max(0, Number(loan?.extensiones) || 0);
+        for (let index = 0; index < extensions; index += 1) {
+            dueDate = addBusinessDays(dueDate, 1);
         }
+        return dueDate;
+    }
 
-        fecha.setDate(fecha.getDate() + diasAgregados);
-
-        // Ajustar hora de vencimiento a las 23:59 del día de entrega o inicio de día
-        // El usuario mencionó "si se debe entregar ese día... pasadas las 3pm mostrar aviso".
-        // Asumimos vencimiento al final del día operativo, pero el aviso es visual a las 3pm.
-        fecha.setHours(18, 0, 0, 0); // Vence a las 6 PM (ejemplo)
-
-        return fecha;
+    function calcularFechaVencimiento(fechaInicio = new Date(), source = null) {
+        const policy = getLoanPolicy(source);
+        return addBusinessDays(fechaInicio, policy.durationDays);
     }
 
     function calcularFechaExpiracionRecoleccion(fechaInicio = new Date()) {
@@ -988,13 +1457,14 @@ const BiblioService = (function () {
 
     // Calcular multa acumulada
     function calcularMulta(fechaVencimiento) {
+        const lateInfo = getLateInfo(fechaVencimiento);
+        if (lateInfo.loanPolicy) return lateInfo.fine;
         if (!fechaVencimiento?.toDate) return 0;
         const hoy = new Date();
         const venc = fechaVencimiento.toDate();
         if (hoy <= venc) return 0;
 
-        const diffMs = hoy - venc;
-        const diffDias = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+        const diffDias = countBusinessLateDays(venc, hoy);
         // Si hay diferencia positiva de días, cobramos.
         return diffDias > 0 ? diffDias * COSTO_MULTA_DIARIA : 0;
     }
@@ -1231,14 +1701,31 @@ const BiblioService = (function () {
     }
 
     async function cleanupExpiredPendingLoans(ctx, uid = null) {
+        const nowMs = Date.now();
+        if (!uid) {
+            if ((nowMs - _pendingLoanCleanupTime) < PENDING_LOAN_CLEANUP_TTL) return 0;
+            _pendingLoanCleanupTime = nowMs;
+        }
         let query = ctx.db.collection(PRES_COLL)
-            .where('estado', 'in', ['pendiente', 'pendiente_entrega']);
+            .where('estado', 'in', ['pendiente', 'pendiente_entrega'])
+            .where('fechaExpiracionRecoleccion', '<=', new Date())
+            .limit(100);
 
         if (uid) {
             query = query.where('studentId', '==', uid);
         }
 
-        const snap = await query.get();
+        let snap = null;
+        try {
+            snap = await query.get();
+        } catch (error) {
+            if (error?.code !== 'failed-precondition') throw error;
+            console.warn('[BIBLIO] Faltó índice para limpieza optimizada; usando fallback temporal.', error);
+            let fallbackQuery = ctx.db.collection(PRES_COLL)
+                .where('estado', 'in', ['pendiente', 'pendiente_entrega']);
+            if (uid) fallbackQuery = fallbackQuery.where('studentId', '==', uid);
+            snap = await fallbackQuery.get();
+        }
         if (snap.empty) return 0;
 
         const now = new Date();
@@ -1261,10 +1748,12 @@ const BiblioService = (function () {
             }
         }
 
+        if (!uid) _pendingLoanCleanupTime = Date.now();
         return cleanedCount;
     }
 
     async function getPerfilBibliotecario(ctx, uid) {
+        await ensureHolidayCalendarLoaded(ctx);
         const userDoc = await ctx.db.collection(USERS_COLL).doc(uid).get();
         if (!userDoc.exists) return null;
 
@@ -1290,9 +1779,13 @@ const BiblioService = (function () {
                 solicitados.push(p);
             }
             else if (p.estado === 'entregado') {
-                const multa = calcularMulta(p.fechaVencimiento);
-                p.multaActual = multa;
-                if (multa > 0) deudaTotal += multa;
+                const lateInfo = getLateInfo(p);
+                p.multaActual = lateInfo.fine;
+                p.multaReferencia = lateInfo.rawFine;
+                p.diasRetraso = lateInfo.daysLate;
+                p.retrasoRegistrado = lateInfo.daysLate > 0;
+                p.sinCobroRetraso = lateInfo.loanPolicy.lateFeeExempt;
+                if (lateInfo.fine > 0) deudaTotal += lateInfo.fine;
                 recogidos.push(p);
             }
             else if (p.estado === 'cobro_pendiente') {
@@ -1324,11 +1817,9 @@ const BiblioService = (function () {
         // Actualizar flag de bloqueo
         // NUEVA REGLA: Bloqueo solo si tiene préstamos vencidos NO devueltos (status: 'entregado' && vencido).
         const hoy = new Date();
-        const tieneRetrasosActivos = recogidos.some(p => {
-            const venc = toDateSafe(p.fechaVencimiento);
-            return venc ? hoy > venc : false;
-        });
+        const tieneRetrasosActivos = recogidos.some(p => Number(p.multaActual) > 0);
         const shouldBlock = tieneRetrasosActivos || adeudos.length > 0;
+        const academicInfo = getAcademicInfo(userData);
 
         if (shouldBlock !== (userData.biblioBlocked === true)) {
             ctx.db.collection(USERS_COLL).doc(uid).update({ biblioBlocked: shouldBlock });
@@ -1340,6 +1831,15 @@ const BiblioService = (function () {
             nombre: nombreCompleto,
             matricula: matricula,
             email: userData.email,
+            emailInstitucional: userData.emailInstitucional || '',
+            role: userData.role || '',
+            tipoUsuario: userData.tipoUsuario || '',
+            carrera: userData.carrera || userData.programa || '',
+            area: userData.area || userData.areaAdscripcion || userData.adscripcion || '',
+            department: userData.department || userData.departamento || '',
+            jobTitle: userData.originalJobTitle || userData.jobTitle || userData.puesto || '',
+            academicInfoKind: academicInfo.kind,
+            academicInfoLabel: academicInfo.label,
             xp: userData.biblioXP || 0,
             nivel: userData.biblioNivel || 1,
             deudaTotal: deudaTotal,
@@ -1634,6 +2134,7 @@ const BiblioService = (function () {
                 groupSize: Number(data.groupSize) || 1,
                 groupNotes: data.groupNotes || '',
                 createdAtMs,
+                autoCloseAtMs: createdAtMs + ACTIVE_VISIT_AUTO_CLOSE_MS,
                 lockKey,
                 status: 'en_curso'
             };
@@ -1747,6 +2248,7 @@ const BiblioService = (function () {
             groupSize: Number(data.groupSize) || (validRelated.length > 0 ? validRelated.length + 1 : 1),
             groupNotes: data.groupNotes || '',
             createdAtMs,
+            autoCloseAtMs: createdAtMs + ACTIVE_VISIT_AUTO_CLOSE_MS,
             lockKey,
             status: 'en_curso'
         };
@@ -1789,6 +2291,7 @@ const BiblioService = (function () {
     // --- NUEVOS HELPERS PARA MODALES ADMIN ---
 
     async function getPrestamoInfo(ctx, matricula, bookAdquisicion) {
+        await ensureHolidayCalendarLoaded(ctx);
         // 1. Buscar Usuario
         const userProfile = await findUserByQuery(ctx, matricula);
         if (!userProfile) throw new Error("Usuario no encontrado.");
@@ -1804,12 +2307,19 @@ const BiblioService = (function () {
             .some(loan => isLoanStillActive(loan) && loan.libroId === book.id);
 
         // 4. Calcular Fecha Vencimiento simulada
-        const returnDate = calcularFechaVencimiento();
+        const borrowerPolicy = getBorrowerPolicy(userProfile);
+        const loanPolicy = getLoanPolicy(book);
+        const staffLoanPolicy = getLoanPolicy(book, { borrowerKind: 'staff', staffLoan: true });
+        const returnDate = calcularFechaVencimiento(new Date(), book);
 
         return {
             user: userProfile,
             book: book,
             returnDate: returnDate,
+            loanPolicy: loanPolicy,
+            borrowerPolicy: borrowerPolicy,
+            staffReturnDate: calcularFechaVencimiento(new Date(), { ...book, borrowerKind: 'staff', staffLoan: true, lateFeeExempt: true }),
+            staffLoanPolicy: staffLoanPolicy,
             canLoan: !tieneBloqueoActivo && !sinStock && !prestamoDuplicado,
             reason: tieneBloqueoActivo
                 ? "Usuario con préstamo vencido o bloqueo activo."
@@ -1820,6 +2330,7 @@ const BiblioService = (function () {
     }
 
     async function getDevolucionInfo(ctx, matricula, bookAdquisicion) {
+        await ensureHolidayCalendarLoaded(ctx);
         // 1. Buscar Usuario
         const userProfile = await findUserByQuery(ctx, matricula);
         if (!userProfile) throw new Error("Usuario no encontrado.");
@@ -1849,14 +2360,346 @@ const BiblioService = (function () {
         const loan = matchingLoans[0];
 
         // 3. Calcular Deuda Simulada
-        const multa = calcularMulta(loan.fechaVencimiento);
+        const lateInfo = getLateInfo(loan);
 
         return {
             user: userProfile,
             loan: loan,
-            daysLate: multa / COSTO_MULTA_DIARIA,
-            fine: multa,
-            totalDebt: userProfile.deudaTotal + multa
+            borrowerPolicy: getBorrowerPolicy(userProfile),
+            loanPolicy: lateInfo.loanPolicy,
+            daysLate: lateInfo.daysLate,
+            fine: lateInfo.fine,
+            referenceFine: lateInfo.rawFine,
+            totalDebt: userProfile.deudaTotal + lateInfo.fine
+        };
+    }
+
+    function getHistoricalLateDays(loan) {
+        const dueDate = toDateSafe(loan?.fechaVencimiento);
+        const returnDate = toDateSafe(loan?.fechaDevolucionReal);
+        if (!dueDate || !returnDate || returnDate <= dueDate) {
+            return Number(loan?.diasRetraso) || 0;
+        }
+
+        return countBusinessLateDays(dueDate, returnDate);
+    }
+
+    function buildCondonationRecord(loan, options = {}) {
+        const isActiveLoan = loan.estado === 'entregado';
+        const lateInfo = getLateInfo(loan);
+        const historicalLateDays = getHistoricalLateDays(loan);
+        const daysLate = isActiveLoan ? lateInfo.daysLate : historicalLateDays;
+        const currentAmount = isActiveLoan ? lateInfo.fine : (Number(loan.montoDeuda) || 0);
+        const referenceAmount = Number(loan.multaOriginal)
+            || Number(loan.multaReferencia)
+            || currentAmount
+            || (daysLate > 0 ? lateInfo.rawFine : 0);
+        const hadDebt = currentAmount > 0 || referenceAmount > 0;
+        const hadDelay = daysLate > 0 || loan.retrasoRegistrado === true || loan.sinCobroRetraso === true;
+        const condonable = isActiveLoan
+            ? (daysLate > 0 && lateInfo.loanPolicy.lateFeeExempt !== true && loan.perdonado !== true)
+            : (currentAmount > 0 && loan.perdonado !== true);
+
+        const academicSource = {
+            ...options.profileData,
+            tipoUsuario: options.tipoUsuario || options.profileData?.tipoUsuario || loan.tipoUsuario,
+            role: options.role || options.profileData?.role || loan.role,
+            matricula: options.studentMatricula || options.profileData?.matricula || loan.studentMatricula || loan.matricula,
+            carrera: options.carrera || options.profileData?.carrera || loan.carrera,
+            programa: options.programa || options.profileData?.programa || loan.programa,
+            especialidad: options.especialidad || options.profileData?.especialidad || loan.especialidad,
+            specialty: options.specialty || options.profileData?.specialty || loan.specialty,
+            area: options.area || options.profileData?.area || loan.area,
+            areaAdscripcion: options.areaAdscripcion || options.profileData?.areaAdscripcion || loan.areaAdscripcion,
+            adscripcion: options.adscripcion || options.profileData?.adscripcion || loan.adscripcion,
+            department: options.department || options.profileData?.department || loan.department,
+            departamento: options.departamento || options.profileData?.departamento || loan.departamento,
+            originalJobTitle: options.originalJobTitle || options.profileData?.originalJobTitle || loan.originalJobTitle,
+            jobTitle: options.jobTitle || options.profileData?.jobTitle || loan.jobTitle,
+            puesto: options.puesto || options.profileData?.puesto || loan.puesto
+        };
+        const academicInfo = getAcademicInfo(academicSource);
+
+        return {
+            ...loan,
+            studentName: options.studentName || loan.studentName || loan._resolvedStudentName || 'Usuario',
+            studentMatricula: options.studentMatricula || loan.studentMatricula || loan._resolvedStudentMatricula || loan.matricula || loan.studentId || 'S/N',
+            academicInfoKind: academicInfo.kind,
+            academicInfoLabel: academicInfo.label,
+            diasRetraso: daysLate,
+            montoDeuda: currentAmount,
+            montoReferencia: referenceAmount,
+            hadDebt,
+            hadDelay,
+            condonable,
+            isActiveLoan
+        };
+    }
+
+    async function recalculateActiveLoanDueDates(ctx) {
+        if (!ctx?.db) return { updatedCount: 0 };
+
+        const snap = await ctx.db.collection(PRES_COLL)
+            .where('estado', '==', 'entregado')
+            .get();
+
+        if (snap.empty) {
+            _recentOverdueCache = null;
+            _recentOverdueCacheTime = 0;
+            return { updatedCount: 0 };
+        }
+
+        let updatedCount = 0;
+        let batch = ctx.db.batch();
+        let ops = 0;
+
+        for (const doc of snap.docs) {
+            const loan = { id: doc.id, ...doc.data() };
+            const recalculatedDueDate = recalcularFechaVencimientoPrestamo(loan);
+            const currentDueMs = toMillisSafe(loan.fechaVencimiento) || 0;
+            const nextDueMs = recalculatedDueDate.getTime();
+            if (currentDueMs === nextDueMs) continue;
+
+            batch.update(doc.ref, {
+                fechaVencimiento: firebase.firestore.Timestamp.fromDate(recalculatedDueDate)
+            });
+            updatedCount += 1;
+            ops += 1;
+
+            if (ops >= 400) {
+                await batch.commit();
+                batch = ctx.db.batch();
+                ops = 0;
+            }
+        }
+
+        if (ops > 0) {
+            await batch.commit();
+        }
+
+        _recentOverdueCache = null;
+        _recentOverdueCacheTime = 0;
+        return { updatedCount };
+    }
+
+    async function getHolidayCalendarConfig(ctx, { force = false } = {}) {
+        const snapshot = await ensureHolidayCalendarLoaded(ctx, { force });
+        return {
+            holidayDates: [...(snapshot?.holidayDates || [])],
+            blockedDates: [...(snapshot?.blockedDates || [])],
+            updatedAt: snapshot?.updatedAt || null,
+            updatedBy: snapshot?.updatedBy || ''
+        };
+    }
+
+    async function saveHolidayCalendarConfig(ctx, payload = {}) {
+        const holidayDates = normalizeHolidayDateList(payload.holidayDates || payload.diasInhabiles || []);
+        const blockedDates = normalizeHolidayDateList(payload.blockedDates || payload.periodDates || []);
+        const docRef = ctx.db.collection(BIBLIO_CONFIG_COLL).doc(HOLIDAY_CALENDAR_DOC_ID);
+        await docRef.set({
+            holidayDates,
+            blockedDates,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            updatedBy: ctx.auth?.currentUser?.uid || ''
+        }, { merge: true });
+
+        setHolidayCalendarCache({
+            holidayDates,
+            blockedDates,
+            updatedAtMs: Date.now(),
+            updatedBy: ctx.auth?.currentUser?.uid || ''
+        });
+
+        const adjustment = await recalculateActiveLoanDueDates(ctx);
+        return {
+            holidayDates,
+            blockedDates,
+            adjustedLoans: adjustment.updatedCount || 0
+        };
+    }
+
+    async function getRecentOverdueLoans(ctx, limit = 25) {
+        await ensureHolidayCalendarLoaded(ctx);
+        const now = Date.now();
+        if (_recentOverdueCache && (now - _recentOverdueCacheTime) < RECENT_OVERDUE_CACHE_TTL) {
+            return _recentOverdueCache.slice(0, limit);
+        }
+
+        const fetchSize = Math.max(limit * 4, 60);
+        const overdueSnap = await ctx.db.collection(PRES_COLL)
+            .where('fechaVencimiento', '<', new Date())
+            .orderBy('fechaVencimiento', 'desc')
+            .limit(fetchSize)
+            .get();
+
+        const loans = overdueSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+        const usersById = await loadVisitUsersByIds(ctx, loans.map((loan) => loan.studentId));
+
+        const records = loans
+            .filter((loan) => loan.estado === 'entregado')
+            .map((loan) => {
+                const user = usersById[loan.studentId] || {};
+                return buildCondonationRecord(loan, {
+                    studentName: user.displayName || user.nombre || loan.studentName || 'Usuario',
+                    studentMatricula: user.matricula || loan.studentMatricula || loan.studentId || 'S/N',
+                    profileData: user
+                });
+            })
+            .filter((loan) => loan.diasRetraso > 0 || loan.montoDeuda > 0)
+            .sort((a, b) => {
+                const aDate = toMillisSafe(a.fechaVencimiento) || 0;
+                const bDate = toMillisSafe(b.fechaVencimiento) || 0;
+                return bDate - aDate;
+            });
+
+        _recentOverdueCache = records;
+        _recentOverdueCacheTime = now;
+        return records.slice(0, limit);
+    }
+
+    async function getCondonacionInfo(ctx, query) {
+        await ensureHolidayCalendarLoaded(ctx);
+        const userProfile = await findUserByQuery(ctx, query);
+        if (!userProfile) throw new Error("Usuario no encontrado.");
+
+        const records = [...(userProfile.recogidos || []), ...(userProfile.adeudos || []), ...(userProfile.historial || [])]
+            .map((loan) => buildCondonationRecord(loan, {
+                studentName: userProfile.nombre,
+                studentMatricula: userProfile.matricula,
+                profileData: userProfile
+            }))
+            .filter((loan) => loan.hadDebt || loan.hadDelay)
+            .sort((a, b) => {
+                const aDate = toMillisSafe(a.fechaDevolucionReal) || toMillisSafe(a.fechaVencimiento) || toMillisSafe(a.fechaPago) || toMillisSafe(a.fechaSolicitud) || 0;
+                const bDate = toMillisSafe(b.fechaDevolucionReal) || toMillisSafe(b.fechaVencimiento) || toMillisSafe(b.fechaPago) || toMillisSafe(b.fechaSolicitud) || 0;
+                return bDate - aDate;
+            });
+
+        return {
+            user: userProfile,
+            records
+        };
+    }
+
+    async function condonarRegistroPrestamo(ctx, loanId, justification = '') {
+        const loanRef = ctx.db.collection(PRES_COLL).doc(loanId);
+        const loanSnap = await loanRef.get();
+        if (!loanSnap.exists) throw new Error("El registro de préstamo ya no existe.");
+
+        const loan = loanSnap.data() || {};
+        const montoDeuda = Number(loan.montoDeuda) || 0;
+        if (montoDeuda <= 0) {
+            throw new Error("Este préstamo ya no tiene deuda por condonar.");
+        }
+
+        const daysLate = getHistoricalLateDays(loan);
+        const referenceAmount = Number(loan.multaOriginal) || Number(loan.multaReferencia) || montoDeuda;
+
+        await loanRef.update({
+            estado: 'finalizado',
+            montoDeuda: 0,
+            perdonado: true,
+            motivoPerdon: justification,
+            perdonadoPor: ctx.auth.currentUser.uid,
+            multaOriginal: referenceAmount,
+            multaReferencia: referenceAmount,
+            retrasoRegistrado: daysLate > 0,
+            sinCobroRetraso: daysLate > 0,
+            diasRetraso: daysLate,
+            fechaPago: firebase.firestore.FieldValue.delete()
+        });
+
+        if (loan.studentId) {
+            await getPerfilBibliotecario(ctx, loan.studentId).catch(() => null);
+            if (window.Notify) {
+                Notify.send(loan.studentId, {
+                    title: 'Registro condonado',
+                    message: `Se condono la deuda de "${loan.tituloLibro || 'tu libro'}". El retraso permanece solo como referencia administrativa.`,
+                    type: 'biblio'
+                });
+            }
+        }
+
+        return {
+            ...loan,
+            id: loanSnap.id,
+            montoDeuda: 0,
+            perdonado: true,
+            motivoPerdon: justification,
+            multaOriginal: referenceAmount,
+            multaReferencia: referenceAmount,
+            retrasoRegistrado: daysLate > 0,
+            sinCobroRetraso: daysLate > 0,
+            diasRetraso: daysLate
+        };
+    }
+
+    async function condonarRegistroPrestamoV2(ctx, loanId, justification = '') {
+        await ensureHolidayCalendarLoaded(ctx);
+        const loanRef = ctx.db.collection(PRES_COLL).doc(loanId);
+        const loanSnap = await loanRef.get();
+        if (!loanSnap.exists) throw new Error("El registro de préstamo ya no existe.");
+
+        const loan = loanSnap.data() || {};
+        const lateInfo = getLateInfo(loan);
+        const isActiveLoan = loan.estado === 'entregado';
+        const currentDebt = isActiveLoan ? lateInfo.fine : (Number(loan.montoDeuda) || 0);
+        if (currentDebt <= 0 && lateInfo.daysLate <= 0) {
+            throw new Error("Este préstamo ya no tiene retraso o deuda por condonar.");
+        }
+
+        const daysLate = isActiveLoan ? lateInfo.daysLate : getHistoricalLateDays(loan);
+        const referenceAmount = Number(loan.multaOriginal) || Number(loan.multaReferencia) || (isActiveLoan ? lateInfo.rawFine : currentDebt);
+        const updateData = {
+            perdonado: true,
+            motivoPerdon: justification,
+            perdonadoPor: ctx.auth.currentUser.uid,
+            multaOriginal: referenceAmount,
+            multaReferencia: referenceAmount,
+            retrasoRegistrado: daysLate > 0,
+            sinCobroRetraso: daysLate > 0,
+            diasRetraso: daysLate
+        };
+
+        if (isActiveLoan) {
+            updateData.lateFeeExempt = true;
+            updateData.tracksLateWithoutCharge = true;
+            updateData.montoDeuda = 0;
+        } else {
+            updateData.estado = 'finalizado';
+            updateData.montoDeuda = 0;
+            updateData.fechaPago = firebase.firestore.FieldValue.delete();
+        }
+
+        await loanRef.update(updateData);
+        _recentOverdueCache = null;
+        _recentOverdueCacheTime = 0;
+
+        if (loan.studentId) {
+            await getPerfilBibliotecario(ctx, loan.studentId).catch(() => null);
+            if (window.Notify) {
+                Notify.send(loan.studentId, {
+                    title: 'Registro condonado',
+                    message: `Se condono la deuda de "${loan.tituloLibro || 'tu libro'}". El retraso permanece solo como referencia administrativa.`,
+                    type: 'biblio'
+                });
+            }
+        }
+
+        return {
+            ...loan,
+            id: loanSnap.id,
+            estado: isActiveLoan ? loan.estado : 'finalizado',
+            montoDeuda: 0,
+            perdonado: true,
+            motivoPerdon: justification,
+            multaOriginal: referenceAmount,
+            multaReferencia: referenceAmount,
+            retrasoRegistrado: daysLate > 0,
+            sinCobroRetraso: daysLate > 0,
+            diasRetraso: daysLate,
+            lateFeeExempt: isActiveLoan ? true : loan.lateFeeExempt,
+            tracksLateWithoutCharge: isActiveLoan ? true : loan.tracksLateWithoutCharge
         };
     }
 
@@ -1900,6 +2743,7 @@ const BiblioService = (function () {
                         motivo,
                         groupSize: validUsers.length,
                         createdAtMs,
+                        autoCloseAtMs: createdAtMs + ACTIVE_VISIT_AUTO_CLOSE_MS,
                         lockKey,
                         status: 'en_curso'
                     };
@@ -1949,6 +2793,7 @@ const BiblioService = (function () {
                     motivo,
                     groupSize: validUsers.length,
                     createdAtMs,
+                    autoCloseAtMs: createdAtMs + ACTIVE_VISIT_AUTO_CLOSE_MS,
                     lockKey: buildVisitLockKey({ uid: u.uid, matricula: u.matricula }),
                     status: 'en_curso'
                 });
@@ -2006,8 +2851,65 @@ const BiblioService = (function () {
         }
     }
 
+    async function loadVisitUsersByIds(ctx, userIds = []) {
+        const uniqueIds = [...new Set((userIds || []).filter(Boolean))];
+        if (!uniqueIds.length) return {};
+
+        const usersById = {};
+        const chunkSize = 10;
+        for (let i = 0; i < uniqueIds.length; i += chunkSize) {
+            const chunk = uniqueIds.slice(i, i + chunkSize);
+            const snap = await ctx.db.collection(USERS_COLL)
+                .where(firebase.firestore.FieldPath.documentId(), 'in', chunk)
+                .get();
+
+            snap.forEach((doc) => {
+                usersById[doc.id] = doc.data() || {};
+            });
+        }
+
+        return usersById;
+    }
+
+    async function getVisitSummaryStats(ctx) {
+        const now = Date.now();
+        if (_visitSummaryCache && (now - _visitSummaryCacheTime) < VISIT_SUMMARY_CACHE_TTL) {
+            return _visitSummaryCache;
+        }
+
+        const nowDate = new Date();
+        const startOfDay = new Date(nowDate);
+        startOfDay.setHours(0, 0, 0, 0);
+
+        const startOfWeek = new Date(startOfDay);
+        const weekDay = startOfWeek.getDay();
+        const diffToMonday = weekDay === 0 ? 6 : weekDay - 1;
+        startOfWeek.setDate(startOfWeek.getDate() - diffToMonday);
+
+        const startOfYear = new Date(nowDate.getFullYear(), 0, 1);
+
+        const visitsRef = ctx.db.collection(VISITAS_COLL);
+        const [totalDia, totalSemana, totalAnio] = await Promise.all([
+            getQueryCountSafe(visitsRef.where('fecha', '>=', startOfDay).where('fecha', '<', new Date(startOfDay.getTime() + (24 * 60 * 60 * 1000)))),
+            getQueryCountSafe(visitsRef.where('fecha', '>=', startOfWeek)),
+            getQueryCountSafe(visitsRef.where('fecha', '>=', startOfYear))
+        ]);
+
+        const summary = {
+            totalDia: Number.isFinite(totalDia) ? totalDia : 0,
+            totalSemana: Number.isFinite(totalSemana) ? totalSemana : 0,
+            totalAnio: Number.isFinite(totalAnio) ? totalAnio : 0
+        };
+
+        _visitSummaryCache = summary;
+        _visitSummaryCacheTime = now;
+        return summary;
+    }
+
     async function getDashboardStats(ctx) {
+        await ensureHolidayCalendarLoaded(ctx);
         await cleanupExpiredPendingLoans(ctx);
+        await cleanupExpiredActiveVisits(ctx);
 
         const hoy = new Date();
         hoy.setHours(0, 0, 0, 0);
@@ -2015,19 +2917,32 @@ const BiblioService = (function () {
         manana.setDate(manana.getDate() + 1);
 
         // Consultas independientes (paralelizables en Promise.all)
-        const [visitasSnap, prestamosSnap, devolucionesSnap, activosSnap, retrasosSnap] = await Promise.all([
+        const activosRef = ctx.db.collection('biblio-activos').where('status', '==', 'ocupado');
+        const activosCountPromise = activosRef.count
+            ? activosRef.count().get().then((snap) => snap.data().count).catch(() => null)
+            : Promise.resolve(null);
+        const [visitasSnap, prestamosHoySnap, prestamosSnap, devolucionesSnap, activosSnap, activosCount, retrasosSnap] = await Promise.all([
             ctx.db.collection(VISITAS_COLL).where('fecha', '>=', hoy).where('fecha', '<', manana).orderBy('fecha', 'desc').get(),
-            ctx.db.collection(PRES_COLL).where('estado', 'in', ['pendiente', 'pendiente_entrega', 'entregado']).orderBy('fechaSolicitud', 'desc').get(),
+            ctx.db.collection(PRES_COLL)
+                .where('estado', 'in', ['pendiente', 'pendiente_entrega', 'entregado'])
+                .where('fechaSolicitud', '>=', hoy)
+                .where('fechaSolicitud', '<', manana)
+                .orderBy('fechaSolicitud', 'desc')
+                .limit(10)
+                .get(),
+            ctx.db.collection(PRES_COLL)
+                .where('estado', 'in', ['pendiente', 'pendiente_entrega', 'entregado'])
+                .orderBy('fechaSolicitud', 'desc')
+                .limit(3)
+                .get(),
             ctx.db.collection(PRES_COLL).where('estado', 'in', ['finalizado', 'cobro_pendiente']).orderBy('fechaDevolucionReal', 'desc').limit(10).get(),
-            ctx.db.collection('biblio-activos').where('status', '==', 'ocupado').get(),
+            activosRef.limit(3).get(),
+            activosCountPromise,
             ctx.db.collection(PRES_COLL).where('estado', '==', 'entregado').where('fechaVencimiento', '<', new Date()).limit(20).get()
         ]);
 
         // Filtrar préstamos de hoy para el conteo
-        const prestamosHoyDocs = prestamosSnap.docs.filter(d => {
-            const f = d.data().fechaSolicitud;
-            return f && f.toDate() >= hoy && f.toDate() < manana;
-        });
+        const prestamosHoyDocs = prestamosHoySnap.docs;
 
         const ultimasVisitas = visitasSnap.docs.slice(0, 3).map(d => ({ id: d.id, ...d.data() }));
         const ultimosPrestamos = prestamosSnap.docs.slice(0, 3).map(d => ({ id: d.id, ...d.data() }));
@@ -2057,8 +2972,12 @@ const BiblioService = (function () {
 
         const enrich = (item) => {
             if (item.studentId && usersMap[item.studentId]) {
-                item._resolvedStudentName = usersMap[item.studentId].displayName || usersMap[item.studentId].nombre || 'Estudiante';
-                item._resolvedStudentMatricula = usersMap[item.studentId].matricula || item.studentId;
+                const user = usersMap[item.studentId];
+                const academicInfo = getAcademicInfo(user);
+                item._resolvedStudentName = user.displayName || user.nombre || 'Estudiante';
+                item._resolvedStudentMatricula = user.matricula || item.studentId;
+                item._academicInfoKind = academicInfo.kind;
+                item._academicInfoLabel = academicInfo.label;
             }
             if (item.libroId && booksMap[item.libroId]) {
                 item.adquisicion = booksMap[item.libroId].adquisicion || booksMap[item.libroId].numeroAdquisicion || booksMap[item.libroId].isbn || '--';
@@ -2069,7 +2988,7 @@ const BiblioService = (function () {
         return {
             visitasHoy: visitasSnap.size,
             prestamosHoy: prestamosHoyDocs.length,
-            activosOcupados: activosSnap.size,
+            activosOcupados: Number.isFinite(activosCount) ? activosCount : activosSnap.size,
             retrasos: retrasosSnap.docs.map(d => ({ id: d.id, ...d.data() })),
             ultimasVisitas: ultimasVisitas,
             ultimosPrestamos: ultimosPrestamos.map(enrich),
@@ -2159,6 +3078,7 @@ const BiblioService = (function () {
 
     // EXTENDER / CANCELAR / PAGAR
     async function extenderPrestamo(ctx, loanId) {
+        await ensureHolidayCalendarLoaded(ctx);
         const ref = ctx.db.collection(PRES_COLL).doc(loanId);
 
         await ctx.db.runTransaction(async t => {
@@ -2182,16 +3102,7 @@ const BiblioService = (function () {
             if (new Date() > currentVenc) {
                 throw new Error("No puedes extender un préstamo vencido.");
             }
-            const nuevaFecha = new Date(currentVenc);
-
-            // Añadir 1 día hábil (si cae viernes → lunes, sáb → lunes, dom → lunes)
-            let daysToAdd = 1;
-            const diaVenc = nuevaFecha.getDay(); // día actual de vencimiento
-            if (diaVenc === 5) daysToAdd = 3; // Viernes → Lunes
-            else if (diaVenc === 6) daysToAdd = 2; // Sábado → Lunes
-            // Domingo: +1 = Lunes (ok)
-
-            nuevaFecha.setDate(nuevaFecha.getDate() + daysToAdd);
+            const nuevaFecha = addBusinessDays(currentVenc, 1);
 
             t.update(ref, {
                 fechaVencimiento: firebase.firestore.Timestamp.fromDate(nuevaFecha),
@@ -2364,6 +3275,7 @@ const BiblioService = (function () {
     }
 
     async function extenderPrestamoAdmin(ctx, loanId) {
+        await ensureHolidayCalendarLoaded(ctx);
         const ref = ctx.db.collection(PRES_COLL).doc(loanId);
 
         await ctx.db.runTransaction(async t => {
@@ -2372,15 +3284,7 @@ const BiblioService = (function () {
             const data = doc.data();
 
             const currentVenc = data.fechaVencimiento.toDate();
-            const nuevaFecha = new Date(currentVenc);
-
-            // Añadir 1 día hábil (si cae viernes → lunes, sáb → lunes, dom → lunes)
-            let daysToAdd = 1;
-            const diaVenc = nuevaFecha.getDay(); // día actual de vencimiento
-            if (diaVenc === 5) daysToAdd = 3; // Viernes → Lunes
-            else if (diaVenc === 6) daysToAdd = 2; // Sábado → Lunes
-
-            nuevaFecha.setDate(nuevaFecha.getDate() + daysToAdd);
+            const nuevaFecha = addBusinessDays(currentVenc, 1);
 
             t.update(ref, {
                 fechaVencimiento: firebase.firestore.Timestamp.fromDate(nuevaFecha),
@@ -2477,13 +3381,15 @@ const BiblioService = (function () {
     }
 
     async function recibirLibroAdmin(ctx, loanId, bookId, forgiveDebt = false, justification = '') {
+        await ensureHolidayCalendarLoaded(ctx);
         const loanRef = ctx.db.collection(PRES_COLL).doc(loanId);
         const loanDoc = await loanRef.get();
         const loan = loanDoc.data();
 
         if (loan.estado !== 'entregado') throw new Error("El libro no está marcado como prestado físico.");
 
-        let multa = calcularMulta(loan.fechaVencimiento);
+        const lateInfo = getLateInfo(loan);
+        let multa = lateInfo.fine;
         let nuevoEstado = 'finalizado';
 
         // Lógica de Perdón
@@ -2499,6 +3405,8 @@ const BiblioService = (function () {
             batch.update(loanRef, {
                 estado: nuevoEstado,
                 montoDeuda: multa,
+                diasRetraso: lateInfo.daysLate,
+                multaReferencia: lateInfo.rawFine,
                 fechaDevolucionReal: firebase.firestore.FieldValue.serverTimestamp()
             });
         } else {
@@ -2507,6 +3415,13 @@ const BiblioService = (function () {
                 estado: nuevoEstado,
                 fechaDevolucionReal: firebase.firestore.FieldValue.serverTimestamp()
             };
+
+            if (lateInfo.daysLate > 0) {
+                updateData.retrasoRegistrado = true;
+                updateData.diasRetraso = lateInfo.daysLate;
+                updateData.multaReferencia = lateInfo.rawFine;
+                updateData.sinCobroRetraso = lateInfo.loanPolicy.lateFeeExempt === true;
+            }
 
             if (forgiveDebt) {
                 updateData.perdonado = true;
@@ -2531,12 +3446,19 @@ const BiblioService = (function () {
 
             // 🔔 NOTIFICAR (Éxito / Perdón)
             if (window.Notify) {
-                const msg = forgiveDebt
+                const msg = lateInfo.loanPolicy.lateFeeExempt && lateInfo.daysLate > 0
+                    ? `Libro devuelto. Se registraron ${lateInfo.daysLate} dia(s) de retraso sin generar cobro.`
+                    : forgiveDebt
                     ? `Libro devuelto. La multa por retraso ha sido CONDONADA. Motivo: ${justification}`
                     : `Gracias por devolver "${loan.tituloLibro || 'tu libro'}" a tiempo. +50 XP`;
 
+                const notifyTitle = lateInfo.loanPolicy.lateFeeExempt && lateInfo.daysLate > 0
+                    ? 'Devolucion registrada'
+                    : (forgiveDebt ? 'Devolucion (Multa Perdonada)' : 'Libro Devuelto');
+
                 Notify.send(loan.studentId, {
                     title: forgiveDebt ? 'Devolución (Multa Perdonada)' : 'Libro Devuelto',
+                    title: notifyTitle,
                     message: msg,
                     type: 'biblio'
                 });
@@ -2582,7 +3504,8 @@ const BiblioService = (function () {
         }
     }
 
-    async function prestarLibroManual(ctx, uid, bookId) {
+    async function prestarLibroManual(ctx, uid, bookId, options = {}) {
+        await ensureHolidayCalendarLoaded(ctx);
         const perfil = await getPerfilBibliotecario(ctx, uid);
         if (perfil.estaBloqueado) throw new Error("Usuario con préstamo vencido o bloqueo activo.");
 
@@ -2604,7 +3527,9 @@ const BiblioService = (function () {
 
             t.update(bookRef, { copiasDisponibles: bData.copiasDisponibles - 1 });
 
-            const fechaVenc = calcularFechaVencimiento(); // Auto hoy
+            const borrowerKind = options.staffLoan ? 'staff' : 'student';
+            const loanPolicy = getLoanPolicy(bData, { borrowerKind, staffLoan: options.staffLoan });
+            const fechaVenc = calcularFechaVencimiento(new Date(), { ...bData, borrowerKind, staffLoan: options.staffLoan, lateFeeExempt: loanPolicy.lateFeeExempt });
             const newLoanRef = ctx.db.collection(PRES_COLL).doc();
             createdLoanId = newLoanRef.id;
 
@@ -2613,6 +3538,11 @@ const BiblioService = (function () {
                 studentEmail: perfil.email || '',
                 libroId: bookId,
                 tituloLibro: bData.titulo,
+                categoriaLibro: bData.categoria || '',
+                borrowerKind,
+                lateFeeExempt: loanPolicy.lateFeeExempt,
+                tracksLateWithoutCharge: loanPolicy.tracksLateWithoutCharge,
+                loanPolicyLabel: loanPolicy.label,
                 libroAdquisicion: bData.adquisicion || null,
                 fechaSolicitud: firebase.firestore.FieldValue.serverTimestamp(),
                 fechaEntrega: firebase.firestore.FieldValue.serverTimestamp(),
@@ -2679,6 +3609,7 @@ const BiblioService = (function () {
     }
 
     async function entregarApartadoSeguro(ctx, loanId) {
+        await ensureHolidayCalendarLoaded(ctx);
         const loanRef = ctx.db.collection(PRES_COLL).doc(loanId);
         let loanData = null;
         let fechaVenc = null;
@@ -2697,14 +3628,25 @@ const BiblioService = (function () {
                 throw new Error("La solicitud ya expiró. Debe generarse una nueva solicitud.");
             }
 
-            loanData = { id: loanSnap.id, ...data };
-            fechaVenc = calcularFechaVencimiento(new Date());
+            let categoriaLibro = data.categoriaLibro || '';
+            if (!categoriaLibro && data.libroId) {
+                const bookSnap = await t.get(ctx.db.collection(CAT_COLL).doc(data.libroId));
+                if (bookSnap.exists) categoriaLibro = bookSnap.data()?.categoria || '';
+            }
 
-            t.update(loanRef, {
+            loanData = { id: loanSnap.id, ...data, categoriaLibro };
+            fechaVenc = calcularFechaVencimiento(new Date(), { categoriaLibro });
+
+            const updatePayload = {
                 estado: 'entregado',
                 fechaEntrega: firebase.firestore.FieldValue.serverTimestamp(),
                 fechaVencimiento: firebase.firestore.Timestamp.fromDate(fechaVenc)
-            });
+            };
+            if (categoriaLibro && data.categoriaLibro !== categoriaLibro) {
+                updatePayload.categoriaLibro = categoriaLibro;
+            }
+
+            t.update(loanRef, updatePayload);
         });
 
         if (loanData?.studentId && window.Notify) {
@@ -2723,6 +3665,7 @@ const BiblioService = (function () {
     }
 
     async function autoPrestarLibroSeguro(ctx, { uid, email, bookId, titulo }) {
+        await ensureHolidayCalendarLoaded(ctx);
         const perfil = await getPerfilBibliotecario(ctx, uid);
         if (perfil.estaBloqueado) {
             throw new Error("Tienes un préstamo vencido o un bloqueo activo. No puedes solicitar préstamos.");
@@ -2762,6 +3705,7 @@ const BiblioService = (function () {
                 libroId: bookId,
                 libroAdquisicion: bookData.adquisicion || null,
                 tituloLibro: bookData.titulo || titulo,
+                categoriaLibro: bookData.categoria || '',
                 fechaSolicitud: firebase.firestore.FieldValue.serverTimestamp(),
                 fechaExpiracionRecoleccion: firebase.firestore.Timestamp.fromDate(calcularFechaExpiracionRecoleccion()),
                 estado: 'pendiente',
@@ -2912,11 +3856,14 @@ const BiblioService = (function () {
         searchCatalogo,
         getTopBooks,
         getBooksByCategory,
+        getLoanPolicy,
         getPerfilBibliotecario,
         registrarVisita,
         registrarVisitaGrupo,
         finalizarVisita,
+        cleanupExpiredActiveVisits,
         getDashboardStats,
+        getVisitSummaryStats,
         saveAsset,
         deleteAsset,
         asignarActivoManual,
@@ -2938,6 +3885,11 @@ const BiblioService = (function () {
         checkInActivo,
         getPrestamoInfo,
         getDevolucionInfo,
+        getCondonacionInfo,
+        getRecentOverdueLoans,
+        getHolidayCalendarConfig,
+        saveHolidayCalendarConfig,
+        condonarRegistroPrestamo: condonarRegistroPrestamoV2,
         extenderPrestamoAdmin,
         addSuggestion,
         getWishlist,

@@ -1,6 +1,20 @@
 {
     "indexes": [
         {
+            "collectionGroup": "panic_alerts",
+            "queryScope": "COLLECTION",
+            "fields": [
+                {
+                    "fieldPath": "initiatorUid",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "createdAt",
+                    "order": "DESCENDING"
+                }
+            ]
+        },
+        {
             "collectionGroup": "consultas",
             "queryScope": "COLLECTION_GROUP",
             "fields": [
@@ -25,6 +39,42 @@
                 {
                     "fieldPath": "createdAt",
                     "order": "DESCENDING"
+                }
+            ]
+        },
+        {
+            "collectionGroup": "citas-medi",
+            "queryScope": "COLLECTION",
+            "fields": [
+                {
+                    "fieldPath": "estado",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "tipoServicio",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "fechaHoraSlot",
+                    "order": "ASCENDING"
+                }
+            ]
+        },
+        {
+            "collectionGroup": "citas-medi",
+            "queryScope": "COLLECTION",
+            "fields": [
+                {
+                    "fieldPath": "estado",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "tipoServicio",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "fechaSolicitud",
+                    "order": "ASCENDING"
                 }
             ]
         },

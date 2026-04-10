@@ -8,15 +8,24 @@ window.AdminBiblio = Object.assign(window.AdminBiblio || {}, (function () {
     if (state.clockInterval === undefined) state.clockInterval = null;
     if (state.pcGridUnsub === undefined) state.pcGridUnsub = null;
     if (state.configAssetsUnsub === undefined) state.configAssetsUnsub = null;
+    if (state.scannerStationsUnsub === undefined) state.scannerStationsUnsub = null;
     if (state.currentAdminStats === undefined) state.currentAdminStats = null;
+    if (state.lastScannerScanKey === undefined) state.lastScannerScanKey = '';
+    if (state.scannerSessions === undefined) state.scannerSessions = {};
     if (state.ultimoDocHistorial === undefined) state.ultimoDocHistorial = null;
     if (state.tipoHistorialActivo === undefined) state.tipoHistorialActivo = null;
     if (state.visitUser === undefined) state.visitUser = null;
     if (state.currentPrestamoData === undefined) state.currentPrestamoData = null;
     if (state.currentDevolData === undefined) state.currentDevolData = null;
+    if (state.currentCondonacionData === undefined) state.currentCondonacionData = null;
     if (state.currentServiceType === undefined) state.currentServiceType = null;
     if (state.selectedAssetId === undefined) state.selectedAssetId = null;
     if (state.selectedTimeBlock === undefined) state.selectedTimeBlock = null;
+    if (state.holidayCalendarCursor === undefined) state.holidayCalendarCursor = null;
+    if (state.holidaySelectedDates === undefined) state.holidaySelectedDates = [];
+    if (state.holidayBlockedDates === undefined) state.holidayBlockedDates = [];
+    if (state.holidaySelectionAnchor === undefined) state.holidaySelectionAnchor = null;
+    if (state.holidayCalendarMeta === undefined) state.holidayCalendarMeta = null;
 
     function clearLiveAssetStreams() {
         if (state.pcGridUnsub) {
@@ -33,6 +42,13 @@ window.AdminBiblio = Object.assign(window.AdminBiblio || {}, (function () {
     function cleanupRuntime() {
         clearLiveAssetStreams();
         state.currentAdminStats = null;
+        state.lastScannerScanKey = '';
+        state.scannerSessions = {};
+
+        if (state.scannerStationsUnsub) {
+            try { state.scannerStationsUnsub(); } catch (error) { console.warn('[BiblioAdmin] Error clearing scanner stream:', error); }
+            state.scannerStationsUnsub = null;
+        }
 
         if (state.adminStatsInterval) {
             clearInterval(state.adminStatsInterval);

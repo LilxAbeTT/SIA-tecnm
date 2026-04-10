@@ -4,6 +4,13 @@ window.Medi.Factories = window.Medi.Factories || {};
 
 window.Medi.Factories.studentExperience = function(scope) {
   with (scope) {
+  function _ensureStudentArray(items, label = 'items') {
+    if (Array.isArray(items)) return items;
+    if (items == null) return [];
+    console.warn(`[Medi] ${label} llego con formato inesperado en experiencia estudiante:`, items);
+    return [];
+  }
+
   async function _loadQueuePosition(citaId, tipoServicio, citaDate, targetElId) {
     try {
       const el = document.getElementById(targetElId || ('queue-pos-' + citaId));
@@ -51,7 +58,7 @@ window.Medi.Factories.studentExperience = function(scope) {
     _unsubs.studentHistory = MediService.streamStudentHistory(_ctx, uid, (items) => {
       // 1. APPOINTMENTS (Citas)
       if (items.type === 'citas') {
-        const allCitas = items.data || [];
+        const allCitas = _ensureStudentArray(items.data, 'citas');
         _lastCitasFull = allCitas;
         _currentBookingLock = _getCurrentBlockingAppointment(allCitas);
         _refreshStudentBookingLock();
@@ -376,15 +383,17 @@ window.Medi.Factories.studentExperience = function(scope) {
 
       // 2. MEDICAL RECORDS (Expedientes)
       if (items.type === 'expedientes') {
+        const expedientes = _ensureStudentArray(items.data, 'expedientes');
+
         // Guardar para modal de historial completo y filtros
-        _lastConsultasFull = items.data || [];
+        _lastConsultasFull = expedientes;
 
         // Follow-up banner (M8)
-        _renderFollowUpBanner(items.data);
-        _renderDocumentsPanel(items.data);
+        _renderFollowUpBanner(expedientes);
+        _renderDocumentsPanel(expedientes);
 
         // Stats personales en pestaña Historial (N4)
-        _renderHistoryStats(items.data);
+        _renderHistoryStats(expedientes);
 
         // Render timeline con filtro activo (M2)
         const filtered = _historialFilterActivo === 'todos' ? _lastConsultasFull
@@ -401,7 +410,7 @@ window.Medi.Factories.studentExperience = function(scope) {
 
   // E3: Render follow-up banner for student — delega a la versión completa (M8)
   function _renderFollowUpBanner(expedientes) {
-    _renderFollowUpBannerComplete(expedientes);
+    _renderFollowUpBannerComplete(_ensureStudentArray(expedientes, 'expedientes'));
   }
 
   // ============================================================
@@ -1285,7 +1294,8 @@ window.Medi.Factories.studentExperience = function(scope) {
     const container = document.getElementById('medi-documents-panel');
     if (!container) return;
 
-    const recentDocs = (expedientes || []).filter(Boolean).slice(0, 3);
+    const safeExpedientes = _ensureStudentArray(expedientes, 'expedientes');
+    const recentDocs = safeExpedientes.filter(Boolean).slice(0, 3);
     if (recentDocs.length === 0) {
       container.innerHTML = '';
       return;
@@ -1297,7 +1307,7 @@ window.Medi.Factories.studentExperience = function(scope) {
           <div class="fw-bold text-dark small"><i class="bi bi-file-earmark-medical me-1 text-primary"></i>Documentos recientes</div>
           <div class="text-muted" style="font-size:.72rem;">Resumen rapido de tus ultimas consultas.</div>
         </div>
-        ${expedientes.length > 3 ? `<button class="btn btn-sm btn-link text-decoration-none px-0 fw-bold" onclick="Medi.showFullHistory()">Ver todo</button>` : ''}
+        ${safeExpedientes.length > 3 ? `<button class="btn btn-sm btn-link text-decoration-none px-0 fw-bold" onclick="Medi.showFullHistory()">Ver todo</button>` : ''}
       </div>
       <div class="row g-3">
         ${recentDocs.map((exp) => {
@@ -1344,12 +1354,13 @@ window.Medi.Factories.studentExperience = function(scope) {
   function _renderHistoryStats(expedientes) {
     const container = document.getElementById('medi-history-stats');
     if (!container) return;
-    if (!expedientes || expedientes.length === 0) { container.innerHTML = ''; return; }
+    const safeExpedientes = _ensureStudentArray(expedientes, 'expedientes');
+    if (safeExpedientes.length === 0) { container.innerHTML = ''; return; }
 
-    const total = expedientes.length;
-    const byMed = expedientes.filter((e) => _normalizeStudentServiceType(e.tipoServicio) !== 'Psicologo').length;
-    const byPsi = expedientes.filter((e) => _normalizeStudentServiceType(e.tipoServicio) === 'Psicologo').length;
-    const lastVisit = expedientes[0]?.safeDate;
+    const total = safeExpedientes.length;
+    const byMed = safeExpedientes.filter((e) => _normalizeStudentServiceType(e.tipoServicio) !== 'Psicologo').length;
+    const byPsi = safeExpedientes.filter((e) => _normalizeStudentServiceType(e.tipoServicio) === 'Psicologo').length;
+    const lastVisit = safeExpedientes[0]?.safeDate;
     const daysSince = lastVisit ? Math.floor((new Date() - lastVisit) / 86400000) : null;
 
     const stats = [
@@ -1846,7 +1857,7 @@ window.Medi.Factories.studentExperience = function(scope) {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const withFollowUp = (expedientes || [])
+    const withFollowUp = _ensureStudentArray(expedientes, 'expedientes')
       .filter((exp) => exp.followUp?.required)
       .filter((exp) => exp.followUp?.created !== true)
       .filter((exp) => !_isFollowUpDismissed(exp.id))

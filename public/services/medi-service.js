@@ -50,6 +50,12 @@ const MediService = (function () {
         if (val instanceof Date) return val;
         return new Date(val);
     };
+    const startOfDay = (val = new Date()) => {
+        const baseDate = safeDate(val) || new Date();
+        const copy = new Date(baseDate);
+        copy.setHours(0, 0, 0, 0);
+        return copy;
+    };
     const normalizePinInput = (pin) => String(pin ?? '').trim();
     const normalizeSigns = (data = {}) => {
         const signs = data.signos || {};
@@ -62,6 +68,24 @@ const MediService = (function () {
     };
 
     const ts = d => firebase.firestore.Timestamp.fromDate(d);
+
+    async function loadUsersByIds(ctx, ids = []) {
+        const uniqueIds = Array.from(new Set((ids || []).filter((id) => typeof id === 'string' && id && !id.startsWith('anon_'))));
+        const usersMap = new Map();
+        if (!uniqueIds.length) return usersMap;
+
+        for (let i = 0; i < uniqueIds.length; i += 10) {
+            const batch = uniqueIds.slice(i, i + 10);
+            const snap = await ctx.db.collection('usuarios')
+                .where(firebase.firestore.FieldPath.documentId(), 'in', batch)
+                .get()
+                .catch(() => null);
+            if (!snap) continue;
+            snap.forEach((doc) => usersMap.set(doc.id, doc.data() || {}));
+        }
+
+        return usersMap;
+    }
 
     async function hashPinValue(pin) {
         const normalizedPin = normalizePinInput(pin);
@@ -926,11 +950,14 @@ const MediService = (function () {
     function streamSalaEspera(ctx, role, shiftTag, callback) {
         const normalizedRole = normalizeServiceRole(role);
         console.log(`[MediService] Abriendo Sala de Espera para area: ${normalizedRole} [Shift: ${shiftTag || 'All'}]`);
+        const todayStart = ts(startOfDay());
 
         // Base Query
         let ref = ctx.db.collection(C_CITAS)
             .where('estado', '==', 'pendiente')
-            .where('tipoServicio', '==', normalizedRole);
+            .where('tipoServicio', '==', normalizedRole)
+            .where('fechaHoraSlot', '>=', todayStart)
+            .orderBy('fechaHoraSlot', 'asc');
 
         return ref.onSnapshot(snap => {
             let docs = snap.docs.map(d => ({
@@ -1629,9 +1656,12 @@ const MediService = (function () {
     // Refactor streamAgenda to support Profile ID filtering and Role filtering
     function streamAgenda(ctx, role, profesionalId, shiftTag, profileId, callback) {
         const normalizedRole = normalizeServiceRole(role);
+        const todayStart = ts(startOfDay());
         let ref = ctx.db.collection(C_CITAS)
             .where('tipoServicio', '==', normalizedRole)
-            .where('estado', '==', 'confirmada');
+            .where('estado', '==', 'confirmada')
+            .where('fechaHoraSlot', '>=', todayStart)
+            .orderBy('fechaHoraSlot', 'asc');
 
         return ref.onSnapshot(snap => {
             let docs = snap.docs.map(d => ({
@@ -1873,38 +1903,38 @@ const MediService = (function () {
             // Order & Limit
             // [FIX] Filter by finalized only to hide paused/drafts from "Recent" list
             q = q.where('estado', '==', 'finalizada');
-            q = q.orderBy('createdAt', 'desc').limit(Math.max(limit * 4, 20));
+            const safeLimit = Math.max(parseInt(limit, 10) || 5, 1);
+            const snapshotLimit = Math.min(Math.max(safeLimit * 2, 20), 80);
+            q = q.orderBy('createdAt', 'desc').limit(snapshotLimit);
 
             const unsubscribe = q.onSnapshot(async (snap) => {
                 console.log(`[MediService] Stream Recent Update: ${snap.size} docs found.`);
-                const docs = [];
-                // Process docs sequentially to fetch names if needed
-                for (const d of snap.docs) {
-                    const val = d.data();
-                    if (!matchesConsultationScope(val, normalizedRole, effectiveUid, shiftTag, profileId)) continue;
-                    let patientName = val.studentName || val.pacienteNombre;
-
-                    // If name is missing, try to fetch from 'usuarios' (Optimized: In a real app we'd cache this)
-                    if (!patientName && val.studentId) {
-                        try {
-                            const uSnap = await ctx.db.collection('usuarios').doc(val.studentId).get();
-                            if (uSnap.exists) {
-                                patientName = uSnap.data().displayName || uSnap.data().nombre;
-                            }
-                        } catch (err) { console.warn("Error fetching user name:", err); }
-                    }
-
-                    docs.push({
-                        id: d.id,
+                const scopedDocs = snap.docs
+                    .map((doc) => ({ id: doc.id, data: doc.data() }))
+                    .filter(({ data }) => matchesConsultationScope(data, normalizedRole, effectiveUid, shiftTag, profileId));
+                const missingIds = scopedDocs
+                    .filter(({ data }) => !data.studentName && !data.pacienteNombre && data.studentId)
+                    .map(({ data }) => data.studentId);
+                const usersMap = await loadUsersByIds(ctx, missingIds);
+                const docs = scopedDocs.map(({ id, data: val }) => {
+                    const patientData = usersMap.get(val.studentId) || null;
+                    const patientName = val.studentName
+                        || val.pacienteNombre
+                        || patientData?.displayName
+                        || patientData?.nombre
+                        || val.studentEmail
+                        || "Estudiante";
+                    return {
+                        id,
                         ...val,
                         signos: normalizeSigns(val),
                         isAnonymous: typeof val.studentId === 'string' && val.studentId.startsWith('anon_'),
-                        patientName: patientName || val.studentEmail || "Estudiante", // Fallback
+                        patientName,
                         safeDate: safeDate(val.createdAt)
-                    });
-                }
+                    };
+                });
                 docs.sort((a, b) => (b.safeDate || 0) - (a.safeDate || 0));
-                callback(docs.slice(0, limit));
+                callback(docs.slice(0, safeLimit));
             }, (error) => {
                 console.error("Error streaming recent consultations:", error);
                 callback([]);
@@ -1958,7 +1988,8 @@ const MediService = (function () {
 
         // 4. Pending appointments today (waiting room)
         let pendQ = ctx.db.collection(C_CITAS)
-            .where('estado', '==', 'pendiente');
+            .where('estado', '==', 'pendiente')
+            .where('fechaHoraSlot', '>=', ts(startOfDay));
 
         pendQ = pendQ.where('tipoServicio', '==', normalizedRole);
 
@@ -1979,7 +2010,8 @@ const MediService = (function () {
         // 5. Average wait time (from fechaSolicitud to fechaConfirmacion for today's finalized citas)
         let citasQ = ctx.db.collection(C_CITAS)
             .where('estado', '==', 'finalizada')
-            .where('tipoServicio', '==', normalizedRole);
+            .where('tipoServicio', '==', normalizedRole)
+            .where('fechaSolicitud', '>=', ts(startOfDay));
 
         let avgEspera = 0;
         try {
@@ -2012,7 +2044,7 @@ const MediService = (function () {
             .where('estado', '==', 'finalizada')
             .where('autorId', '==', uid);
 
-        const snap = await q.limit(200).get();
+        const snap = await q.limit(80).get();
         return snap.docs
             .map(d => ({ id: d.id, ...d.data() }))
             .filter((data) => matchesConsultationScope(data, normalizedRole, uid, normalizedShift, profileId))
@@ -2177,14 +2209,10 @@ const MediService = (function () {
             });
 
             const idsToEnrich = Array.from(grouped.keys()).slice(0, safeLimit * 2);
-            const userDocs = await Promise.all(idsToEnrich.map((studentId) =>
-                ctx.db.collection('usuarios').doc(studentId).get().catch(() => null)
-            ));
-
-            userDocs.forEach((snapDoc, index) => {
-                if (!snapDoc?.exists) return;
-                const studentId = idsToEnrich[index];
-                const data = snapDoc.data() || {};
+            const usersMap = await loadUsersByIds(ctx, idsToEnrich);
+            idsToEnrich.forEach((studentId) => {
+                const data = usersMap.get(studentId);
+                if (!data) return;
                 const current = grouped.get(studentId);
                 if (!current) return;
                 current.displayName = data.displayName || current.displayName;

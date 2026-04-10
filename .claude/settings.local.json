@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(/c/Python313/python:*)",
+      "Bash(node -c:*)",
+      "Bash(wc -l c:/Users/Abraham/Documents/SIA-tecnm-main/public/modules/*.js)",
+      "Bash(for f in public/modules/reportes.js public/modules/reportes/reportes-filters.js public/modules/reportes/reportes-charts.js public/modules/reportes/reportes-biblio.js public/modules/reportes/reportes-medico.js public/modules/reportes/reportes-poblacion.js public/services/reportes-service.js public/utils/export-utils.js)",
+      "Bash(do echo \"=== $f ===\")",
+      "Bash(done)",
+      "Bash(for f in public/modules/reportes.js public/modules/reportes/reportes-charts.js public/modules/reportes/reportes-biblio.js public/modules/reportes/reportes-medico.js public/modules/reportes/reportes-poblacion.js public/utils/export-utils.js)",
+      "Bash(for f in public/modules/reportes.js public/services/reportes-service.js public/utils/export-utils.js public/modules/reportes/reportes-biblio.js public/modules/reportes/reportes-medico.js public/modules/reportes/reportes-poblacion.js public/modules/reportes/reportes-filters.js public/modules/reportes/reportes-charts.js)",
+      "Bash(do echo -n \"$f: \")",
+      "Bash(node -e \"const fs=require\\(''fs''\\); [''public/modules/aula/aula-publicar.js'',''public/core/router.js'',''public/modules/admin.aula.js''].forEach\\(f=>{ try{ new Function\\(fs.readFileSync\\(f,''utf8''\\)\\); console.log\\(''OK:'',f\\); } catch\\(e\\){ console.error\\(''ERR:'',f,e.message\\); } }\\)\")",
+      "Bash(ls -la \"c:\\\\Users\\\\F4250\\\\Documents\\\\SIA-tecnm-main\\\\public\\\\modules\\\\aula\"\" 2>&1 || ls -lR \"c:UsersF4250DocumentsSIA-tecnm-mainpublicmodules\" | grep -A 20 \"aula \")",
+      "Bash(grep -v \"//\")"
+    ]
+  }
+}

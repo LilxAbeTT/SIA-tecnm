@@ -608,7 +608,7 @@ html[data-bs-theme="dark"] .dash-goal-meta-preview {
     width: 48px;
     height: 48px;
     border-radius: 50%;
-    background: linear-gradient(135deg, #ef4444, #dc2626) !important;
+    background: linear-gradient(135deg, #a855f7, #7c3aed) !important;
     color: #fff !important;
     border: none;
     display: flex;
@@ -621,7 +621,15 @@ html[data-bs-theme="dark"] .dash-goal-meta-preview {
 
 .dash-sos-btn:hover {
     transform: scale(1.1);
-    box-shadow: 0 0 20px rgba(239, 68, 68, 0.4);
+    box-shadow: 0 0 20px rgba(168, 85, 247, 0.42);
+}
+
+.dash-sos-btn.dash-sos-btn-active {
+    background: linear-gradient(135deg, #8b5cf6, #5b21b6) !important;
+}
+
+.dash-sos-btn.dash-sos-btn-error {
+    background: linear-gradient(135deg, #c084fc, #7e22ce) !important;
 }
 
 @keyframes sos-pulse {
@@ -640,7 +648,9 @@ html[data-bs-theme="dark"] .dash-goal-meta-preview {
     position: absolute;
     bottom: 56px;
     right: 0;
-    width: 260px;
+    width: min(360px, calc(100vw - 32px));
+    max-height: 70vh;
+    overflow-y: auto;
     background: var(--bg-card);
     border: 1px solid var(--border-color);
     animation: fadeIn 0.2s ease;
@@ -648,6 +658,21 @@ html[data-bs-theme="dark"] .dash-goal-meta-preview {
 
 html[data-bs-theme="light"] .dash-sos-panel {
     background: #fff;
+}
+
+.dash-panic-card {
+    background: var(--surface, rgba(255, 255, 255, 0.04));
+    border: 1px solid var(--border-color);
+}
+
+html[data-bs-theme="light"] .dash-panic-card {
+    background: #fff;
+    border-color: #e2e8f0;
+}
+
+.dash-panic-card .form-control,
+.dash-panic-card .form-select {
+    font-size: 0.82rem;
 }
 
 /* ── C3-04: Scorecard ── */

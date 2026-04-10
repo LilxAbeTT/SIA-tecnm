@@ -104,7 +104,7 @@ const Notify = {
         const created = latest.createdAt?.toDate ? latest.createdAt.toDate() : new Date();
         if ((Date.now() - created.getTime()) < 90000) {
           this._showToast(latest);
-          if (window.PushService && PushService.getPermissionState() === 'granted') {
+          if (!latest?.meta?.skipLocalEcho && window.PushService && PushService.getPermissionState() === 'granted') {
             window.PushService.showLocalNotification(latest.titulo, {
               body: latest.mensaje,
               icon: '/images/logo-sia.png',

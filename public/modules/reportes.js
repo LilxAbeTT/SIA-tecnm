@@ -132,6 +132,15 @@ var Reportes = (function () {
     function _getExportContext(area = _currentArea, tab = _currentTab) {
         const tabMeta = _getCurrentTabMeta(area, tab);
 
+        if (area === 'VOCACIONAL') {
+            return {
+                kind: 'vocacional',
+                tabLabel: tabMeta?.label || 'Test Vocacional',
+                supportsPeriod: false,
+                supportsTypeSelection: false
+            };
+        }
+
         if (area === 'BIBLIO' && tab === 'catalogo') {
             return {
                 kind: 'catalogo',
@@ -547,11 +556,20 @@ var Reportes = (function () {
                     ? `${kpis.consultasHoy} consultas hoy`
                     : '--';
             }
+
+            const landingVocacional = document.getElementById('landing-stat-VOCACIONAL');
+            if (landingVocacional) {
+                const totalAspirantes = Number(kpis.vocacional?.totalAspirantes);
+                const totalCompleted = Number(kpis.vocacional?.totalCompleted);
+                landingVocacional.textContent = Number.isFinite(totalAspirantes) && Number.isFinite(totalCompleted)
+                    ? `${totalCompleted} tests completados · ${totalAspirantes} prospectos`
+                    : '--';
+            }
         } catch (e) {
             if (requestId !== _landingRequestSeq || _currentView !== 'landing') return;
 
             console.warn('[Reportes] Error cargando KPIs de landing:', e);
-            ['kpi-usuarios', 'kpi-visitas', 'kpi-consultas'].forEach((id) => {
+            ['kpi-usuarios', 'kpi-visitas', 'kpi-consultas', 'landing-stat-VOCACIONAL'].forEach((id) => {
                 const el = document.getElementById(id);
                 if (el) el.textContent = '--';
             });
@@ -603,6 +621,7 @@ var Reportes = (function () {
         }
         // Actualizar estado visual de las pestañas
         _updateTabUI();
+        void _loadExtraDataForCurrentTab();
     }
 
     /**
@@ -620,6 +639,62 @@ var Reportes = (function () {
                 t.classList.add('btn-light', 'text-muted');
             }
         });
+    }
+
+    function _tabNeedsExtraData(area = _currentArea, tab = _currentTab) {
+        if (area === 'BIBLIO' && tab === 'catalogo') return true;
+        if (area === 'MEDICO' && tab === 'perfil') return true;
+        return false;
+    }
+
+    async function _ensureExtraDataForTab(area = _currentArea, tab = _currentTab) {
+        if (!_ctx || !window.ReportesService || !_tabNeedsExtraData(area, tab)) return false;
+
+        if (area === 'BIBLIO' && tab === 'catalogo') {
+            const needsCatalogo = !Array.isArray(_extraData.catalogo);
+            const needsActivos = !Array.isArray(_extraData.activos);
+            if (!needsCatalogo && !needsActivos) return false;
+
+            const [catalogo, activos] = await Promise.all([
+                needsCatalogo ? ReportesService.fetchBiblioCatalogo(_ctx) : Promise.resolve(_extraData.catalogo),
+                needsActivos ? ReportesService.fetchBiblioActivos(_ctx) : Promise.resolve(_extraData.activos)
+            ]);
+            _extraData.catalogo = catalogo;
+            _extraData.activos = activos;
+            return true;
+        }
+
+        if (area === 'MEDICO' && tab === 'perfil') {
+            if (Array.isArray(_extraData.expedientes)) return false;
+            _extraData.expedientes = await ReportesService.fetchExpedientesStats(_ctx);
+            return true;
+        }
+
+        return false;
+    }
+
+    function _loadExtraDataForCurrentTab() {
+        const area = _currentArea;
+        const tab = _currentTab;
+
+        if (!_tabNeedsExtraData(area, tab)) return Promise.resolve(false);
+
+        return _ensureExtraDataForTab(area, tab)
+            .then((loaded) => {
+                if (!loaded) return false;
+                if (area !== _currentArea || tab !== _currentTab || _currentView !== 'detail') return false;
+
+                const contentEl = document.getElementById('reportes-content');
+                if (contentEl) {
+                    destroyAllCharts();
+                    renderDashboardContent(contentEl);
+                }
+                return true;
+            })
+            .catch((error) => {
+                console.error('[Reportes] Error cargando extras para la pestaña:', error);
+                return false;
+            });
     }
 
     // ==================== CARGA DE DATOS ====================
@@ -669,16 +744,6 @@ var Reportes = (function () {
 
             // Obtener datos extra según el área (usando funciones del servicio)
             _extraData = {};
-            if (_currentArea === 'BIBLIO') {
-                const [catalogo, activos] = await Promise.all([
-                    ReportesService.fetchBiblioCatalogo(_ctx),
-                    ReportesService.fetchBiblioActivos(_ctx)
-                ]);
-                _extraData.catalogo = catalogo;
-                _extraData.activos = activos;
-            } else if (_currentArea === 'MEDICO') {
-                _extraData.expedientes = await ReportesService.fetchExpedientesStats(_ctx);
-            }
 
             if (requestId !== _loadRequestSeq || _currentView !== 'detail' || requestedArea !== _currentArea) return;
 
@@ -693,6 +758,7 @@ var Reportes = (function () {
             const currentContainer = document.getElementById('reportes-content');
             if (!currentContainer || requestId !== _loadRequestSeq || _currentView !== 'detail' || requestedArea !== _currentArea) return;
             renderDashboardContent(currentContainer);
+            void _loadExtraDataForCurrentTab();
         } catch (e) {
             if (requestId !== _loadRequestSeq || _currentView !== 'detail' || requestedArea !== _currentArea) return;
             console.error('[Reportes] Error cargando datos:', e);
@@ -1085,7 +1151,7 @@ var Reportes = (function () {
      * Muestra el modal de exportación con la configuración adecuada.
      * @param {string} format - 'excel' | 'pdf'
      */
-    function showExportModal(format) {
+    async function showExportModal(format) {
         const modal = document.getElementById('exportConfigModal');
         if (!modal) return;
         const exportContext = _getExportContext();
@@ -1605,6 +1671,44 @@ var Reportes = (function () {
         };
     }
 
+    function _exportBuildChartSpec(title, labels, values, options = {}) {
+        const safeLabels = Array.isArray(labels) ? labels.map((label) => _exportNormalizeValue(label, '')).filter(Boolean) : [];
+        const safeValues = Array.isArray(values) ? values.map((value) => Number(value) || 0) : [];
+
+        if (!safeLabels.length || !safeValues.length || safeLabels.length !== safeValues.length) {
+            return null;
+        }
+
+        const type = options.type || 'bar';
+        return {
+            title: title || 'Grafica',
+            type,
+            tone: options.tone || 'primary',
+            layout: options.layout || ((type === 'doughnut' || type === 'pie') ? 'half' : 'wide'),
+            labels: safeLabels,
+            values: safeValues,
+            legend: options.legend !== undefined ? options.legend : (type === 'doughnut' || type === 'pie'),
+            maxItems: options.maxItems || safeLabels.length
+        };
+    }
+
+    function _exportBuildChartFromSection(section, options = {}) {
+        if (!section || !Array.isArray(section.rows) || !section.rows.length) return null;
+        const rows = section.rows.slice(0, options.maxItems || section.rows.length);
+        return _exportBuildChartSpec(
+            options.title || section.title,
+            rows.map((row) => row[0]),
+            rows.map((row) => row[1]),
+            {
+                type: options.type || 'bar',
+                tone: options.tone || section.tone || 'primary',
+                layout: options.layout,
+                legend: options.legend,
+                maxItems: options.maxItems || rows.length
+            }
+        );
+    }
+
     function _exportCountUnique(records, getter) {
         const values = new Set();
         (Array.isArray(records) ? records : []).forEach((record) => {
@@ -1774,11 +1878,14 @@ var Reportes = (function () {
         `;
     }
 
-    function showExportModal(format) {
+    async function showExportModal(format) {
         const modal = document.getElementById('exportConfigModal');
         if (!modal) return;
 
         const exportContext = _getExportContext();
+        if (exportContext.kind !== 'records') {
+            await _ensureExtraDataForTab(_currentArea, _currentTab);
+        }
         const types = _getExportTypes();
         const supportsFilterMode = exportContext.kind === 'records' && _tabSupportsFilters();
         let selectedFormat = format || 'excel';
@@ -1882,6 +1989,11 @@ var Reportes = (function () {
                 _exportBuildSection('Origen del prestamo', _exportCollectCounts(records, (item) => item.origenPrestamo), records.length, { tone: 'accent', limit: 6 }),
                 _exportBuildSection('Carreras con mas movimiento', _exportCollectCounts(records, (item) => item.carrera), records.length, { tone: 'success', limit: 10 })
             ].filter(Boolean);
+            const charts = [
+                _exportBuildChartFromSection(sections[0], { type: 'doughnut', title: 'Distribucion por estado de prestamo' }),
+                _exportBuildChartFromSection(sections[1], { type: 'bar-horizontal', title: 'Top titulos mas solicitados', maxItems: 8 }),
+                _exportBuildChartFromSection(sections[3], { type: 'bar-horizontal', title: 'Carreras con mayor movimiento', maxItems: 8 })
+            ].filter(Boolean);
 
             const rows = records.map((item) => [
                 _exportFormatDate(item.fecha),
@@ -1911,15 +2023,18 @@ var Reportes = (function () {
                     { label: 'No recogido', value: noRecogido.toLocaleString('es-MX'), hint: 'Solicitudes no completadas' },
                     { label: 'Deuda estimada', value: `$${deudaTotal.toFixed(2)}`, hint: 'Multa actual o deuda registrada' }
                 ],
+                charts,
                 sections,
-                dataTitle: 'Detalle de prestamos',
-                detailSheetName: 'Prestamos',
-                columns: ['Fecha', 'Usuario', 'Matricula', 'Carrera', 'Titulo', 'Estado', 'Vencimiento', 'Devolucion', 'Monto', 'Extensiones', 'Origen'],
-                rows,
-                pdfRows: rows.slice(0, 80),
+                dataTitle: null,
+                detailSheetName: null,
+                columns: null,
+                rows: null,
+                pdfRows: null,
+                recordCount: records.length,
+                pdfOptions: { showDetailTable: false },
                 notes: [
-                    'El PDF resume indicadores y muestra una muestra operativa del detalle.',
-                    'El archivo Excel conserva el universo completo de registros exportados.'
+                    'La exportacion se limita al resumen ejecutivo y tablas agregadas.',
+                    'No se adjuntan listados fila por fila para evitar reportes pesados e innecesarios.'
                 ]
             };
         }
@@ -1934,6 +2049,11 @@ var Reportes = (function () {
                 limit: 8,
                 sorter: (a, b) => String(a[0]).localeCompare(String(b[0]), 'es')
             })
+        ].filter(Boolean);
+        const charts = [
+            _exportBuildChartFromSection(sections[0], { type: 'bar-horizontal', title: 'Motivos de visita mas frecuentes', maxItems: 8 }),
+            _exportBuildChartFromSection(sections[1], { type: 'doughnut', title: 'Estado de visita' }),
+            _exportBuildChartFromSection(sections[3], { type: 'bar', title: 'Horas de mayor afluencia', maxItems: 8 })
         ].filter(Boolean);
 
         const rows = records.map((item) => [
@@ -1964,15 +2084,18 @@ var Reportes = (function () {
                 { label: 'Duracion prom.', value: avgStay === null ? '--' : `${avgStay} min`, hint: 'Solo visitas con salida registrada' },
                 { label: 'En curso', value: records.filter((item) => String(item.status).toLowerCase().includes('curso')).length.toLocaleString('es-MX'), hint: 'Sin salida confirmada' }
             ],
+            charts,
             sections,
-            dataTitle: 'Detalle de visitas',
-            detailSheetName: 'Visitas',
-            columns: ['Fecha', 'Hora', 'Usuario', 'Matricula', 'Carrera', 'Genero', 'Motivo', 'Servicios', 'Estado', 'Salida', 'Duracion min', 'Visita grupal'],
-            rows,
-            pdfRows: rows.slice(0, 80),
+            dataTitle: null,
+            detailSheetName: null,
+            columns: null,
+            rows: null,
+            pdfRows: null,
+            recordCount: records.length,
+            pdfOptions: { showDetailTable: false },
             notes: [
-                'La muestra PDF prioriza lectura ejecutiva y deja el detalle completo para Excel.',
-                'Las filas conservan los datos operativos tal como se normalizaron desde reportes.'
+                'La exportacion se limita al resumen ejecutivo y tablas agregadas.',
+                'No se adjuntan listados fila por fila para evitar reportes pesados e innecesarios.'
             ]
         };
     }
@@ -1996,6 +2119,12 @@ var Reportes = (function () {
             _exportBuildSection('Profesionales con mas carga', _exportCollectCounts(records, (item) => item.profesional), records.length, { tone: 'success', limit: 10 }),
             _exportBuildSection('Carreras atendidas', _exportCollectCounts(records, (item) => item.carrera), records.length, { tone: 'warning', limit: 10 }),
             _exportBuildSection('Diagnosticos agrupados', diagnosticMap, diagnosticSource.length || records.length, { tone: 'danger', limit: 12 })
+        ].filter(Boolean);
+        const charts = [
+            _exportBuildChartFromSection(sections[0], { type: 'doughnut', title: 'Distribucion por tipo de atencion' }),
+            _exportBuildChartFromSection(sections[1], { type: 'doughnut', title: 'Estado de atencion' }),
+            _exportBuildChartFromSection(sections[2], { type: 'bar-horizontal', title: 'Profesionales con mayor carga', maxItems: 8 }),
+            _exportBuildChartFromSection(sections[4], { type: 'bar-horizontal', title: 'Diagnosticos agrupados principales', maxItems: 8 })
         ].filter(Boolean);
 
         const rows = records.map((item) => [
@@ -2029,15 +2158,18 @@ var Reportes = (function () {
                 { label: 'Cerradas', value: closedRecords.length.toLocaleString('es-MX'), hint: 'Con estado final' },
                 { label: 'Diag. agrupados', value: Object.keys(diagnosticMap).length.toLocaleString('es-MX'), hint: 'Categorias clinicas detectadas' }
             ],
+            charts,
             sections,
-            dataTitle: _currentTab === 'diagnosticos' ? 'Detalle clinico para diagnosticos' : 'Detalle de consultas',
-            detailSheetName: _currentTab === 'diagnosticos' ? 'Diagnosticos' : 'Consultas',
-            columns: ['Fecha', 'Hora', 'Paciente', 'Matricula', 'Tipo', 'Subarea', 'Motivo', 'Diagnostico', 'Estado', 'Profesional', 'Carrera', 'Genero', 'Turno'],
-            rows,
-            pdfRows: rows.slice(0, 80),
+            dataTitle: null,
+            detailSheetName: null,
+            columns: null,
+            rows: null,
+            pdfRows: null,
+            recordCount: records.length,
+            pdfOptions: { showDetailTable: false },
             notes: [
                 'Los diagnosticos agrupados consideran solo consultas cerradas para evitar mezclar pendientes con cierres clinicos.',
-                'Excel conserva el detalle completo del universo exportado.'
+                'No se adjuntan listados clinicos fila por fila en PDF ni Excel.'
             ]
         };
     }
@@ -2049,11 +2181,18 @@ var Reportes = (function () {
             const conDiscapacidad = records.filter((item) => Array.isArray(item.discapacidades) && item.discapacidades.length > 0).length;
             const conCronica = records.filter((item) => _exportSplitValues(item.enfermedadCronica).some((value) => _exportMeaningful(value))).length;
             const apoyoPsico = records.filter((item) => String(item.apoyoPsico || '').toLowerCase().startsWith('s')).length;
+            const usaLentes = records.filter((item) => String(item.usaLentes || '').toLowerCase().startsWith('s')).length;
             const sections = [
                 _exportBuildSection('Tipos de discapacidad', _exportCollectCounts(records, (item) => item.discapacidades, { multi: true }), records.length, { tone: 'info', limit: 12 }),
                 _exportBuildSection('Condiciones cronicas', _exportCollectCounts(records, (item) => item.enfermedadCronica, { multi: true }), records.length, { tone: 'danger', limit: 12 }),
                 _exportBuildSection('Alergias frecuentes', _exportCollectCounts(records, (item) => item.alergia, { multi: true }), records.length, { tone: 'warning', limit: 12 }),
                 _exportBuildSection('Apoyo psicologico', _exportCollectCounts(records, (item) => item.apoyoPsico, { includeMissing: true, missingLabel: 'No' }), records.length, { tone: 'accent', limit: 4 })
+            ].filter(Boolean);
+            const charts = [
+                _exportBuildChartFromSection(sections[0], { type: 'bar-horizontal', title: 'Discapacidades mas reportadas', maxItems: 8 }),
+                _exportBuildChartFromSection(sections[1], { type: 'bar-horizontal', title: 'Condiciones cronicas mas reportadas', maxItems: 8 }),
+                _exportBuildChartFromSection(sections[3], { type: 'doughnut', title: 'Necesidad de apoyo psicologico' }),
+                _exportBuildChartSpec('Uso de lentes', ['Si', 'No'], [usaLentes, Math.max(records.length - usaLentes, 0)], { type: 'doughnut', tone: 'warning', layout: 'half' })
             ].filter(Boolean);
 
             const rows = records.map((item) => [
@@ -2077,20 +2216,23 @@ var Reportes = (function () {
                 summary: commonSummary,
                 highlights: [
                     { label: 'Poblacion', value: records.length.toLocaleString('es-MX'), hint: 'Perfiles analizados' },
-                    { label: 'Usa lentes', value: records.filter((item) => String(item.usaLentes || '').toLowerCase().startsWith('s')).length.toLocaleString('es-MX'), hint: 'Apoyo visual detectado' },
+                    { label: 'Usa lentes', value: usaLentes.toLocaleString('es-MX'), hint: 'Apoyo visual detectado' },
                     { label: 'Discapacidad', value: conDiscapacidad.toLocaleString('es-MX'), hint: 'Con al menos una discapacidad registrada' },
                     { label: 'Cronica', value: conCronica.toLocaleString('es-MX'), hint: 'Con condicion cronica capturada' },
                     { label: 'Apoyo psico', value: apoyoPsico.toLocaleString('es-MX'), hint: 'Con necesidad de apoyo psicologico' }
                 ],
+                charts,
                 sections,
-                dataTitle: 'Detalle de salud poblacional',
-                detailSheetName: 'Salud',
-                columns: ['Nombre', 'Matricula', 'Subarea', 'Usa lentes', 'Discapacidades', 'Condicion cronica', 'Alergias', 'Apoyo psicologico', 'Genero', 'Carrera'],
-                rows,
-                pdfRows: rows.slice(0, 80),
+                dataTitle: null,
+                detailSheetName: null,
+                columns: null,
+                rows: null,
+                pdfRows: null,
+                recordCount: records.length,
+                pdfOptions: { showDetailTable: false },
                 notes: [
                     'Las listas multiples se normalizan para evitar agrupar valores concatenados como una sola categoria.',
-                    'Los totales conservan el detalle completo en Excel.'
+                    'La exportacion queda en formato ejecutivo, sin listado detallado de perfiles.'
                 ]
             };
         }
@@ -2106,6 +2248,12 @@ var Reportes = (function () {
                 _exportBuildSection('Idiomas extra', _exportCollectCounts(records, (item) => item.idiomas, { multi: true }), records.length, { tone: 'accent', limit: 12 }),
                 _exportBuildSection('Colonias con mayor presencia', _exportCollectCounts(records, (item) => item.colonia === 'No especificada' ? '' : item.colonia), records.length, { tone: 'warning', limit: 12 }),
                 _exportBuildSection('Dependientes', _exportCollectCounts(records, (item) => item.dependientes, { includeMissing: true, missingLabel: 'No' }), records.length, { tone: 'secondary', limit: 4 })
+            ].filter(Boolean);
+            const charts = [
+                _exportBuildChartFromSection(sections[0], { type: 'doughnut', title: 'Distribucion por beca' }),
+                _exportBuildChartFromSection(sections[1], { type: 'doughnut', title: 'Situacion laboral' }),
+                _exportBuildChartFromSection(sections[2], { type: 'bar-horizontal', title: 'Idiomas extra reportados', maxItems: 8 }),
+                _exportBuildChartFromSection(sections[3], { type: 'bar-horizontal', title: 'Colonias con mayor presencia', maxItems: 8 })
             ].filter(Boolean);
 
             const rows = records.map((item) => [
@@ -2134,15 +2282,18 @@ var Reportes = (function () {
                     { label: 'Idiomas', value: idiomas.toLocaleString('es-MX'), hint: 'Con idioma extra o dialecto' },
                     { label: 'Colonias', value: colonias.toLocaleString('es-MX'), hint: 'Colonias distintas detectadas' }
                 ],
+                charts,
                 sections,
-                dataTitle: 'Detalle socioeconomico',
-                detailSheetName: 'Socioeconomico',
-                columns: ['Nombre', 'Matricula', 'Subarea', 'Beca', 'Trabaja', 'Idiomas', 'Colonia', 'Dependientes', 'Carrera', 'Turno'],
-                rows,
-                pdfRows: rows.slice(0, 80),
+                dataTitle: null,
+                detailSheetName: null,
+                columns: null,
+                rows: null,
+                pdfRows: null,
+                recordCount: records.length,
+                pdfOptions: { showDetailTable: false },
                 notes: [
                     'La seccion de idiomas separa listas multiples para reflejar cada idioma como categoria propia.',
-                    'Las colonias sin texto util se excluyen de los rankings y permanecen visibles en el detalle.'
+                    'La exportacion queda en formato ejecutivo, sin listado detallado de perfiles.'
                 ]
             };
         }
@@ -2158,6 +2309,12 @@ var Reportes = (function () {
             }),
             _exportBuildSection('Turno', _exportCollectCounts(records, (item) => item.turno), records.length, { tone: 'info', limit: 6 }),
             _exportBuildSection('Estado civil', _exportCollectCounts(records, (item) => item.estadoCivil), records.length, { tone: 'secondary', limit: 8 })
+        ].filter(Boolean);
+        const charts = [
+            _exportBuildChartFromSection(sections[0], { type: 'doughnut', title: 'Distribucion por subarea' }),
+            _exportBuildChartFromSection(sections[1], { type: 'bar-horizontal', title: 'Carreras con mayor poblacion', maxItems: 8 }),
+            _exportBuildChartFromSection(sections[2], { type: 'doughnut', title: 'Distribucion por genero' }),
+            _exportBuildChartFromSection(sections[4], { type: 'bar', title: 'Distribucion por turno', maxItems: 6 })
         ].filter(Boolean);
 
         const rows = records.map((item) => [
@@ -2187,15 +2344,18 @@ var Reportes = (function () {
                 { label: 'Administrativos', value: records.filter((item) => item.subarea === 'ADMINISTRATIVO').length.toLocaleString('es-MX'), hint: 'Personal administrativo' },
                 { label: 'Admins modulo', value: records.filter((item) => item.subarea === 'ADMIN_MODULO').length.toLocaleString('es-MX'), hint: 'Roles administrativos del sistema' }
             ],
+            charts,
             sections,
-            dataTitle: 'Detalle demografico',
-            detailSheetName: 'Demografia',
-            columns: ['Nombre', 'Matricula', 'Subarea', 'Carrera', 'Genero', 'Turno', 'Generacion', 'Estado civil', 'Dependientes', 'Colonia', 'Registro'],
-            rows,
-            pdfRows: rows.slice(0, 80),
+            dataTitle: null,
+            detailSheetName: null,
+            columns: null,
+            rows: null,
+            pdfRows: null,
+            recordCount: records.length,
+            pdfOptions: { showDetailTable: false },
             notes: [
                 'Los rankings excluyen valores vacios o no especificados para priorizar informacion util.',
-                'El detalle conserva todas las filas del conjunto exportado.'
+                'La exportacion queda en formato ejecutivo, sin listado detallado de perfiles.'
             ]
         };
     }
@@ -2232,6 +2392,310 @@ var Reportes = (function () {
         };
     }
 
+    function _canManageVocacionalReportes() {
+        const profile = _ctx?.profile || {};
+        const permission = String(profile?.permissions?.vocacional || '').trim().toLowerCase();
+        const canAccessView = typeof window.SIA?.canAccessView === 'function'
+            ? window.SIA.canAccessView(profile, 'view-vocacional-admin')
+            : false;
+        const email = String(
+            profile?.emailInstitucional
+            || profile?.email
+            || _ctx?.auth?.currentUser?.email
+            || _ctx?.user?.email
+            || ''
+        ).trim().toLowerCase();
+
+        return profile?.role === 'superadmin'
+            || canAccessView
+            || permission === 'admin'
+            || email === 'difusion@loscabos.tecnm.mx';
+    }
+
+    async function _getVocacionalStatsForExport() {
+        if (window.VocacionalService?.getCRMStats) {
+            try {
+                return await window.VocacionalService.getCRMStats();
+            } catch (e) {
+                console.warn('[Reportes] No se pudieron cargar estadisticas vocacionales via VocacionalService:', e);
+            }
+        }
+
+        if (window.ReportesService?.fetchVocacionalStats) {
+            return await window.ReportesService.fetchVocacionalStats(_ctx);
+        }
+
+        return null;
+    }
+
+    function _parseVocacionalAlerts(alerts) {
+        if (!Array.isArray(alerts)) return '';
+
+        const normalized = alerts.map((alert) => {
+            if (typeof alert === 'string') {
+                try {
+                    const parsed = JSON.parse(alert);
+                    return parsed.msg || parsed.message || parsed.texto || parsed.text || alert;
+                } catch (e) {
+                    return alert;
+                }
+            }
+
+            if (alert && typeof alert === 'object') {
+                return alert.msg || alert.message || alert.texto || alert.text || JSON.stringify(alert);
+            }
+
+            return String(alert || '');
+        }).filter(Boolean);
+
+        return [...new Set(normalized)].join(', ');
+    }
+
+    async function _fetchAllVocacionalAspirantes(limitCount = 200, maxPages = 20) {
+        if (!window.VocacionalService?.getAspirantes) {
+            throw new Error('VocacionalService no esta disponible.');
+        }
+
+        let allDocs = [];
+        let lastDoc = null;
+
+        for (let page = 0; page < maxPages; page += 1) {
+            const response = await window.VocacionalService.getAspirantes(limitCount, lastDoc);
+            const docs = Array.isArray(response?.docs) ? response.docs : [];
+            allDocs = allDocs.concat(docs);
+
+            if (!response?.lastVisible || docs.length < limitCount) {
+                break;
+            }
+
+            lastDoc = response.lastVisible;
+        }
+
+        return allDocs;
+    }
+
+    async function _buildVocacionalExportPayload(exportContext) {
+        const adminAccess = _canManageVocacionalReportes();
+
+        if (_currentTab === 'dashboard') {
+            const stats = await _getVocacionalStatsForExport();
+            if (!stats) {
+                throw new Error('No hay estadisticas vocacionales disponibles para exportar.');
+            }
+
+            const totalAspirantes = Number(stats.totalAspirantes || 0);
+            const totalCompleted = Number(stats.totalCompleted || 0);
+            const pendingAspirantes = Math.max(totalAspirantes - totalCompleted, 0);
+            const ofertaTotal = Array.isArray(stats.ofertaEducativa) ? stats.ofertaEducativa.length : 0;
+            const careersWithDemand = Object.keys(stats.demandaCareers || {}).length;
+            const conversion = totalAspirantes > 0 ? `${((totalCompleted / totalAspirantes) * 100).toFixed(1)}%` : '0.0%';
+            const topCareer = Object.entries(stats.demandaCareers || {}).sort((a, b) => b[1] - a[1])[0] || null;
+            const topPrepa = Object.entries(stats.procedenciaPrepas || {}).sort((a, b) => b[1] - a[1])[0] || null;
+            const sections = [
+                _exportBuildSection('Demanda proyectada por carrera', stats.demandaCareers || {}, totalCompleted || 1, { tone: 'info', limit: 12 }),
+                _exportBuildSection('Procedencia por preparatoria', stats.procedenciaPrepas || {}, totalAspirantes || 1, { tone: 'primary', limit: 12 })
+            ].filter(Boolean);
+            const charts = [
+                _exportBuildChartSpec('Estatus general del test', ['Completados', 'Pendientes'], [totalCompleted, pendingAspirantes], { type: 'doughnut', tone: 'success', layout: 'half' }),
+                _exportBuildChartSpec('Cobertura de oferta educativa', ['Con demanda', 'Sin demanda'], [careersWithDemand, Math.max(ofertaTotal - careersWithDemand, 0)], { type: 'doughnut', tone: 'info', layout: 'half' }),
+                _exportBuildChartFromSection(sections[0], { type: 'bar-horizontal', title: 'Demanda proyectada por carrera', maxItems: 8 }),
+                _exportBuildChartFromSection(sections[1], { type: 'bar-horizontal', title: 'Procedencia por preparatoria', maxItems: 8 })
+            ].filter(Boolean);
+            const rows = [
+                ['KPI', 'Prospectos totales', totalAspirantes, '100.0%'],
+                ['KPI', 'Tests completados', totalCompleted, conversion],
+                ['KPI', 'Pendientes', pendingAspirantes, _exportPct(pendingAspirantes, totalAspirantes || 1)],
+                ['KPI', 'Cobertura de oferta', careersWithDemand, ofertaTotal > 0 ? _exportPct(careersWithDemand, ofertaTotal) : '0.0%'],
+                ...Object.entries(stats.demandaCareers || {}).map(([career, count]) => ['Top carrera', career, count, _exportPct(count, totalCompleted || 1)]),
+                ...Object.entries(stats.procedenciaPrepas || {}).map(([prepa, count]) => ['Top preparatoria', prepa, count, _exportPct(count, totalAspirantes || 1)])
+            ];
+
+            return {
+                kind: 'generic',
+                title: 'Test Vocacional · Estadisticas',
+                subtitle: 'Resumen ejecutivo del CRM vocacional',
+                filenameBase: _sanitizeFileName(`Reporte_${_currentArea}_${_currentTab}`),
+                summary: [
+                    ['Area', AREAS[_currentArea]?.name || _currentArea],
+                    ['Pestana', exportContext.tabLabel],
+                    ['Periodo', 'Historico acumulado'],
+                    ['Seleccion de datos', 'Resumen agregado del CRM'],
+                    ['Prospectos totales', totalAspirantes],
+                    ['Tests completados', totalCompleted],
+                    ['Pendientes', pendingAspirantes],
+                    ['Carreras con demanda', careersWithDemand],
+                    ['Oferta educativa', ofertaTotal],
+                    ['Conversion', conversion]
+                ],
+                highlights: [
+                    { label: 'Prospectos', value: totalAspirantes.toLocaleString('es-MX'), hint: 'Registros totales en CRM' },
+                    { label: 'Completados', value: totalCompleted.toLocaleString('es-MX'), hint: 'Aspirantes con resultado final' },
+                    { label: 'Pendientes', value: pendingAspirantes.toLocaleString('es-MX'), hint: 'Aspirantes sin cierre de test' },
+                    { label: 'Oferta cubierta', value: ofertaTotal > 0 ? `${careersWithDemand}/${ofertaTotal}` : careersWithDemand.toLocaleString('es-MX'), hint: 'Carreras con al menos una recomendacion' },
+                    { label: 'Top carrera', value: _exportNormalizeValue(topCareer?.[0]), hint: topCareer ? `${topCareer[1]} aspirantes` : 'Sin datos' },
+                    { label: 'Top prepa', value: _exportNormalizeValue(topPrepa?.[0]), hint: topPrepa ? `${topPrepa[1]} registros` : 'Sin datos' }
+                ],
+                charts,
+                sections,
+                dataTitle: 'Detalle agregado vocacional',
+                detailSheetName: 'Dashboard',
+                columns: ['Categoria', 'Elemento', 'Cantidad', 'Porcentaje'],
+                rows,
+                pdfRows: rows.slice(0, 80),
+                pdfOptions: {
+                    showDetailTable: false
+                },
+                notes: [
+                    'El tablero vocacional se exporta como historico acumulado; no depende de filtros de periodo de Reportes.',
+                    'El PDF prioriza graficas y resumen ejecutivo; el detalle agregado queda disponible en Excel.'
+                ]
+            };
+        }
+
+        if (_currentTab === 'prospectos') {
+            if (!adminAccess) {
+                throw new Error('La pestaña Base Prospectos requiere permisos administrativos del CRM vocacional.');
+            }
+
+            const records = await _fetchAllVocacionalAspirantes();
+            const stats = await _getVocacionalStatsForExport();
+            const statusCounts = _exportCollectCounts(records, (item) => item.testStatus, { includeMissing: true, missingLabel: 'Sin estado' });
+            const prepas = _exportCollectCounts(records, (item) => item.personalInfo?.highSchool, { includeMissing: true, missingLabel: 'Sin preparatoria' });
+            const top1Careers = _exportCollectCounts(records, (item) => item.recommendedCareers?.[0]?.name, { includeMissing: true, missingLabel: 'Sin resultado' });
+            const sections = [
+                _exportBuildSection('Estado del test', statusCounts, records.length || 1, { tone: 'warning', limit: 8 }),
+                _exportBuildSection('Preparatorias de procedencia', prepas, records.length || 1, { tone: 'primary', limit: 10 }),
+                _exportBuildSection('Carrera recomendada top 1', top1Careers, records.length || 1, { tone: 'info', limit: 10 })
+            ].filter(Boolean);
+            const charts = [
+                _exportBuildChartFromSection(sections[0], { type: 'doughnut', title: 'Estado del test' }),
+                _exportBuildChartFromSection(sections[1], { type: 'bar-horizontal', title: 'Preparatorias con mayor procedencia', maxItems: 8 }),
+                _exportBuildChartFromSection(sections[2], { type: 'bar-horizontal', title: 'Carreras recomendadas top 1', maxItems: 8 })
+            ].filter(Boolean);
+            const rows = records.map((item) => {
+                const personalInfo = item.personalInfo || {};
+                const top1 = item.recommendedCareers?.[0] || null;
+                const createdAt = item.createdAt?.toDate ? item.createdAt.toDate() : null;
+                return [
+                    _exportFormatDate(createdAt),
+                    _exportNormalizeValue(personalInfo.name),
+                    _exportNormalizeValue(personalInfo.phone),
+                    _exportNormalizeValue(personalInfo.email),
+                    _exportNormalizeValue(personalInfo.highSchool),
+                    _exportNormalizeValue(personalInfo.technicalCareer),
+                    _exportNormalizeValue(item.testStatus),
+                    _exportNormalizeValue(top1?.name),
+                    _exportNormalizeValue(top1?.score),
+                    _exportNormalizeValue(_parseVocacionalAlerts(item.psychopedagogicalAlerts), '')
+                ];
+            });
+
+            return {
+                kind: 'generic',
+                title: 'Test Vocacional · Base de prospectos',
+                subtitle: 'Detalle operativo del CRM vocacional',
+                filenameBase: _sanitizeFileName(`Reporte_${_currentArea}_${_currentTab}`),
+                summary: [
+                    ['Area', AREAS[_currentArea]?.name || _currentArea],
+                    ['Pestana', exportContext.tabLabel],
+                    ['Registros exportados', records.length],
+                    ['Tests completados', Number(stats?.totalCompleted || 0)],
+                    ['Prospectos con resultado', records.filter((item) => Array.isArray(item.recommendedCareers) && item.recommendedCareers.length > 0).length]
+                ],
+                highlights: [
+                    { label: 'Registros', value: records.length.toLocaleString('es-MX'), hint: 'Prospectos exportados' },
+                    { label: 'Completados', value: records.filter((item) => item.testStatus === 'completed').length.toLocaleString('es-MX'), hint: 'Con test finalizado' },
+                    { label: 'Prepas', value: _exportCountUnique(records, (item) => item.personalInfo?.highSchool).toLocaleString('es-MX'), hint: 'Procedencias unicas' },
+                    { label: 'Top 1 unicos', value: _exportCountUnique(records, (item) => item.recommendedCareers?.[0]?.name).toLocaleString('es-MX'), hint: 'Carreras recomendadas distintas' }
+                ],
+                charts,
+                sections,
+                dataTitle: 'Detalle de prospectos',
+                detailSheetName: 'Prospectos',
+                columns: ['Fecha', 'Nombre', 'Telefono', 'Email', 'Preparatoria', 'Carrera tecnica', 'Estado test', 'Top 1', 'Score top 1', 'Alertas'],
+                rows,
+                pdfRows: rows.slice(0, 80),
+                notes: [
+                    'La exportacion conserva los datos cargados directamente desde el CRM vocacional.',
+                    'Las alertas psicopedagogicas se normalizan en una sola columna para facilitar seguimiento.'
+                ]
+            };
+        }
+
+        if (_currentTab === 'configuracion') {
+            if (!adminAccess) {
+                throw new Error('La pestaña Configurar Test requiere permisos administrativos del CRM vocacional.');
+            }
+
+            await window.VocacionalService?.initTestData?.();
+            const blocks = Array.isArray(window.VocacionalService?.VOCACIONAL_TEST_DATA) ? window.VocacionalService.VOCACIONAL_TEST_DATA : [];
+            const rows = [];
+            const typeCounts = {};
+            const targetCounts = {};
+
+            blocks.forEach((block) => {
+                (block.questions || []).forEach((question) => {
+                    const type = _exportNormalizeValue(question.type, 'likert');
+                    typeCounts[type] = (typeCounts[type] || 0) + 1;
+                    Object.keys(question.targets || {}).forEach((target) => {
+                        targetCounts[target] = (targetCounts[target] || 0) + 1;
+                    });
+                    rows.push([
+                        block.block ?? '--',
+                        _exportNormalizeValue(block.title),
+                        _exportNormalizeValue(block.weight, '1'),
+                        _exportNormalizeValue(question.id),
+                        type,
+                        _exportNormalizeValue(question.text),
+                        _exportNormalizeValue(Object.entries(question.targets || {}).map(([target, value]) => `${target}:${value}`), ''),
+                        _exportNormalizeValue(question.alertId || question.alertTrigger, '')
+                    ]);
+                });
+            });
+            const sections = [
+                _exportBuildSection('Tipos de pregunta', typeCounts, rows.length || 1, { tone: 'primary', limit: 6 }),
+                _exportBuildSection('Carreras impactadas por ponderaciones', targetCounts, rows.length || 1, { tone: 'accent', limit: 12 })
+            ].filter(Boolean);
+            const charts = [
+                _exportBuildChartFromSection(sections[0], { type: 'doughnut', title: 'Tipos de pregunta' }),
+                _exportBuildChartFromSection(sections[1], { type: 'bar-horizontal', title: 'Carreras impactadas por ponderaciones', maxItems: 8 })
+            ].filter(Boolean);
+
+            return {
+                kind: 'generic',
+                title: 'Test Vocacional · Configuracion',
+                subtitle: 'Inventario del banco de preguntas y ponderaciones',
+                filenameBase: _sanitizeFileName(`Reporte_${_currentArea}_${_currentTab}`),
+                summary: [
+                    ['Area', AREAS[_currentArea]?.name || _currentArea],
+                    ['Pestana', exportContext.tabLabel],
+                    ['Bloques', blocks.length],
+                    ['Preguntas', rows.length],
+                    ['Tipos de reactivo', Object.keys(typeCounts).length]
+                ],
+                highlights: [
+                    { label: 'Bloques', value: blocks.length.toLocaleString('es-MX'), hint: 'Secciones configuradas' },
+                    { label: 'Preguntas', value: rows.length.toLocaleString('es-MX'), hint: 'Reactivos activos' },
+                    { label: 'Tipos', value: Object.keys(typeCounts).length.toLocaleString('es-MX'), hint: 'Variantes de reactivo' },
+                    { label: 'Carreras objetivo', value: Object.keys(targetCounts).length.toLocaleString('es-MX'), hint: 'Claves impactadas por ponderaciones' }
+                ],
+                charts,
+                sections,
+                dataTitle: 'Inventario de preguntas',
+                detailSheetName: 'Configuracion',
+                columns: ['Bloque', 'Titulo bloque', 'Peso', 'Pregunta ID', 'Tipo', 'Texto', 'Targets', 'Alerta'],
+                rows,
+                pdfRows: rows.slice(0, 80),
+                notes: [
+                    'La exportacion refleja el estado actual del banco de preguntas cargado en vocacional_config.',
+                    'Los targets se presentan como pares carrera:peso para facilitar auditoria.'
+                ]
+            };
+        }
+
+        throw new Error('La pestaña vocacional seleccionada no tiene una exportacion configurada.');
+    }
+
     function _buildSpecialExportPayload(exportContext, config = {}) {
         if (exportContext.kind === 'catalogo') {
             const catalogo = Array.isArray(_extraData.catalogo) ? _extraData.catalogo : [];
@@ -2243,14 +2707,16 @@ var Reportes = (function () {
                 'Inactivos': catalogo.filter((item) => item.active === false).length
             };
             const activosStatus = _exportCollectCounts(activos, (item) => item.status, { includeMissing: true, missingLabel: 'Sin estado' });
-            const rows = catalogo.map((item) => [
-                _exportNormalizeValue(item.titulo),
-                _exportNormalizeValue(item.autor),
-                _exportNormalizeValue(item.categoria),
-                item.copiasDisponibles ?? 0,
-                item.active === false ? 'Inactivo' : 'Activo'
-            ]);
-
+            const sections = [
+                _exportBuildSection('Categorias con mas volumen', categorias, catalogo.length, { tone: 'warning', limit: 12 }),
+                _exportBuildSection('Disponibilidad del catalogo', disponibilidad, catalogo.length, { tone: 'primary', limit: 6 }),
+                _exportBuildSection('Estado de activos de biblioteca', activosStatus, activos.length || 1, { tone: 'accent', limit: 8 })
+            ].filter(Boolean);
+            const charts = [
+                _exportBuildChartFromSection(sections[0], { type: 'bar-horizontal', title: 'Categorias con mas volumen', maxItems: 8 }),
+                _exportBuildChartFromSection(sections[1], { type: 'doughnut', title: 'Disponibilidad del catalogo' }),
+                _exportBuildChartFromSection(sections[2], { type: 'doughnut', title: 'Estado de activos' })
+            ].filter(Boolean);
             return {
                 kind: 'generic',
                 title: 'Biblioteca · Catalogo',
@@ -2271,19 +2737,18 @@ var Reportes = (function () {
                     { label: 'Activos', value: catalogo.filter((item) => item.active !== false).length.toLocaleString('es-MX'), hint: 'Titulos activos' },
                     { label: 'Sin copias', value: disponibilidad['Sin copias'].toLocaleString('es-MX'), hint: 'No disponibles al momento' }
                 ],
-                sections: [
-                    _exportBuildSection('Categorias con mas volumen', categorias, catalogo.length, { tone: 'warning', limit: 12 }),
-                    _exportBuildSection('Disponibilidad del catalogo', disponibilidad, catalogo.length, { tone: 'primary', limit: 6 }),
-                    _exportBuildSection('Estado de activos de biblioteca', activosStatus, activos.length || 1, { tone: 'accent', limit: 8 })
-                ].filter(Boolean),
-                dataTitle: 'Detalle de catalogo',
-                detailSheetName: 'Catalogo',
-                columns: ['Titulo', 'Autor', 'Categoria', 'Copias disponibles', 'Estado'],
-                rows,
-                pdfRows: rows.slice(0, 80),
+                charts,
+                sections,
+                dataTitle: null,
+                detailSheetName: null,
+                columns: null,
+                rows: null,
+                pdfRows: null,
+                recordCount: catalogo.length,
+                pdfOptions: { showDetailTable: false },
                 notes: [
                     'El resumen combina catalogo bibliografico y estado de activos cuando esa informacion esta cargada.',
-                    'Excel conserva todos los titulos del catalogo.'
+                    'La exportacion ejecutiva no adjunta el listado completo de titulos ni en PDF ni en Excel.'
                 ]
             };
         }
@@ -2293,17 +2758,16 @@ var Reportes = (function () {
             const cronicas = _exportCollectCounts(expedientes, (item) => item.enfermedadesCronicas, { multi: true });
             const alergias = _exportCollectCounts(expedientes, (item) => item.alergias, { multi: true });
             const tiposSangre = _exportCollectCounts(expedientes, (item) => item.tipoSangre);
-            const rows = expedientes.map((item) => [
-                _exportNormalizeValue(item.nombre),
-                _exportNormalizeValue(item.tipoSangre),
-                _exportNormalizeValue(item.enfermedadesCronicas),
-                _exportNormalizeValue(item.alergias),
-                _exportNormalizeValue(item.peso),
-                _exportNormalizeValue(item.altura),
-                _exportNormalizeValue(item.presion),
-                _exportNormalizeValue(item.frecuenciaCardiaca)
-            ]);
-
+            const sections = [
+                _exportBuildSection('Tipos de sangre', tiposSangre, expedientes.length, { tone: 'danger', limit: 10 }),
+                _exportBuildSection('Condiciones cronicas', cronicas, expedientes.length, { tone: 'warning', limit: 12 }),
+                _exportBuildSection('Alergias frecuentes', alergias, expedientes.length, { tone: 'accent', limit: 12 })
+            ].filter(Boolean);
+            const charts = [
+                _exportBuildChartFromSection(sections[0], { type: 'doughnut', title: 'Distribucion por tipo de sangre' }),
+                _exportBuildChartFromSection(sections[1], { type: 'bar-horizontal', title: 'Condiciones cronicas mas frecuentes', maxItems: 8 }),
+                _exportBuildChartFromSection(sections[2], { type: 'bar-horizontal', title: 'Alergias mas frecuentes', maxItems: 8 })
+            ].filter(Boolean);
             return {
                 kind: 'generic',
                 title: 'Servicios Medicos · Perfil clinico',
@@ -2322,19 +2786,18 @@ var Reportes = (function () {
                     { label: 'Alergias', value: expedientes.filter((item) => _exportSplitValues(item.alergias).some((value) => _exportMeaningful(value))).length.toLocaleString('es-MX'), hint: 'Con alergia capturada' },
                     { label: 'Tipos sangre', value: Object.keys(tiposSangre).length.toLocaleString('es-MX'), hint: 'Diversidad de tipos reportados' }
                 ],
-                sections: [
-                    _exportBuildSection('Tipos de sangre', tiposSangre, expedientes.length, { tone: 'danger', limit: 10 }),
-                    _exportBuildSection('Condiciones cronicas', cronicas, expedientes.length, { tone: 'warning', limit: 12 }),
-                    _exportBuildSection('Alergias frecuentes', alergias, expedientes.length, { tone: 'accent', limit: 12 })
-                ].filter(Boolean),
-                dataTitle: 'Detalle de expedientes',
-                detailSheetName: 'Expedientes',
-                columns: ['Paciente', 'Tipo de sangre', 'Condiciones cronicas', 'Alergias', 'Peso', 'Altura', 'Presion', 'Frecuencia cardiaca'],
-                rows,
-                pdfRows: rows.slice(0, 80),
+                charts,
+                sections,
+                dataTitle: null,
+                detailSheetName: null,
+                columns: null,
+                rows: null,
+                pdfRows: null,
+                recordCount: expedientes.length,
+                pdfOptions: { showDetailTable: false },
                 notes: [
                     'Las condiciones y alergias se separan por lista para reflejar cada categoria clinica correctamente.',
-                    'El detalle Excel conserva todos los expedientes cargados en la vista.'
+                    'La exportacion ejecutiva no adjunta listados de expedientes clinicos.'
                 ]
             };
         }
@@ -2378,12 +2841,18 @@ var Reportes = (function () {
                 throw new Error('Utilidades de exportacion no disponibles');
             }
 
+            if (exportContext.kind !== 'records') {
+                await _ensureExtraDataForTab(_currentArea, _currentTab);
+            }
+
             if (config.scope === 'custom' && exportContext.supportsTypeSelection && config.selectedTypes.length === 0) {
                 throw new Error('Selecciona al menos un tipo para exportar');
             }
 
             let payload;
-            if (exportContext.kind !== 'records') {
+            if (exportContext.kind === 'vocacional') {
+                payload = await _buildVocacionalExportPayload(exportContext);
+            } else if (exportContext.kind !== 'records') {
                 payload = _buildSpecialExportPayload(exportContext, config);
             } else {
                 let sourceData = _rawData;

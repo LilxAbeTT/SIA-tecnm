@@ -23,6 +23,7 @@ window.AdminMedi = Object.assign(window.AdminMedi || {}, (function () {
   let _initInFlight = null;
   let _isDashboardBooted = false;
   let _lastInitUid = null;
+  let _cleanupRegisteredCtx = null;
 
   // --- ADMIN MEDI STATE BRIDGE ---
   if (!window.AdminMedi) window.AdminMedi = {};
@@ -273,6 +274,11 @@ window.AdminMedi = Object.assign(window.AdminMedi || {}, (function () {
   }
   function _cleanupRuntime() {
     _cleanupListeners();
+    _cleanupRegisteredCtx = null;
+
+    if (window.AdminMedi?.Chat?.cleanupChatRuntime) {
+      try { window.AdminMedi.Chat.cleanupChatRuntime(); } catch (error) { console.warn('[AdminMedi] Error cleaning chat runtime:', error); }
+    }
 
     if (_recentUnsub) {
       _recentUnsub();
@@ -922,127 +928,7 @@ window.AdminMedi = Object.assign(window.AdminMedi || {}, (function () {
   let _unsubRecent = null;
 
   async function loadRecentActivity() {
-    console.log("[medi] loadRecentActivity called (v5 - Visual Cards)");
-
-    // Avatar color pool [bg, text]
-    const RECENT_COLORS = [
-      ['#e0f2fe', '#0369a1'], ['#d1fae5', '#065f46'], ['#fef3c7', '#92400e'],
-      ['#fce7f3', '#9d174d'], ['#ede9fe', '#5b21b6'], ['#fee2e2', '#991b1b']
-    ];
-    const recentAvatar = (name) => {
-      const i = (name || '?').charCodeAt(0) % RECENT_COLORS.length;
-      return RECENT_COLORS[i];
-    };
-
-    // Tiempo relativo legible
-    const timeAgo = (date) => {
-      const d = Math.floor((new Date() - date) / 86400000);
-      if (d === 0) return 'Hoy';
-      if (d === 1) return 'Ayer';
-      if (d < 7) return `Hace ${d} d\u00edas`;
-      return date.toLocaleDateString('es-MX', { day: 'numeric', month: 'short' });
-    };
-
-    let list = document.getElementById('medi-recent-list');
-    if (list) {
-      list.innerHTML = `<div class="medi-empty-state" >
-        <span class="spinner-border spinner-border-sm text-success mb-2"></span>
-        <p>Cargando actividad...</p>
-      </div> `;
-    }
-
-    if (_unsubRecent) { _unsubRecent(); _unsubRecent = null; }
-
-    if (_myRole === 'Psicologo' && !_currentProfile) {
-      console.warn("[medi] Actividad reciente omitida: Falta perfil");
-      if (list) list.innerHTML = `<div class="medi-empty-state" ><i class="bi bi-person-badge"></i><p>Selecciona un perfil para continuar</p></div> `;
-      return;
-    }
-
-    const operational = getOperationalContext();
-    const profId = operational.profileId;
-    const uidToUse = operational.ownerUid || _ctx.user.uid;
-    console.log("[medi] Subscribing stream...", { role: operational.role, uid: uidToUse, profId, shift: operational.shift });
-
-    // Badge de tipo de servicio
-    const serviceBadge = (c) => {
-      if (c.isAnonymous || (typeof c.studentId === 'string' && c.studentId.startsWith('anon_')))
-        return `<span class="badge bg-warning-subtle text-warning border border-warning" style = "font-size:.58rem;" > Walk -in</span> `;
-      const tipo = (c.tipoServicio || c.categoria || '').toLowerCase();
-      if (tipo.includes('psico') || tipo.includes('mental'))
-        return `<span class="badge bg-primary-subtle text-primary" style = "font-size:.58rem;" > <i class="bi bi-chat-heart-fill me-1"></i>Psicolog\u00eda</span> `;
-      if (tipo.includes('medic') || tipo.includes('general'))
-        return `<span class="badge bg-info-subtle text-info" style = "font-size:.58rem;" > <i class="bi bi-bandaid-fill me-1"></i>Medicina</span> `;
-      return `<span class="badge bg-secondary-subtle text-secondary" style = "font-size:.58rem;" > Consulta</span> `;
-    };
-
-    const safetyTimer = setTimeout(() => {
-      const el = document.getElementById('medi-recent-list');
-      if (el && el.querySelector('.spinner-border')) {
-        el.innerHTML = `<div class="medi-empty-state text-danger" >
-          <i class="bi bi-wifi-off"></i>
-          <p>Tiempo de espera agotado. <button class="btn btn-link btn-sm p-0" onclick="AdminMedi.loadRecentActivity()">Reintentar</button></p>
-        </div> `;
-      }
-    }, 8000);
-
-    _unsubRecent = MediService.streamRecentConsultations(_ctx, operational.role, uidToUse, profId, 3, (docs) => {
-      clearTimeout(safetyTimer);
-      const currentList = document.getElementById('medi-recent-list');
-      if (!currentList) return;
-
-      if (docs.length === 0) {
-        currentList.innerHTML = `<div class="medi-empty-state" >
-          <i class="bi bi-clipboard-x"></i>
-          <p>Sin actividad reciente registrada</p>
-        </div> `;
-        return;
-      }
-
-      currentList.innerHTML = docs.map((c, idx) => {
-        const fecha = c.safeDate || new Date();
-        const timeStr = fecha.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        const relDate = timeAgo(fecha);
-        const encoded = encodeURIComponent(JSON.stringify(c));
-        const name = c.patientName || c.studentEmail || 'Estudiante';
-        const initial = name.charAt(0).toUpperCase();
-        const [bgC, fgC] = recentAvatar(name);
-        const diag = escapeHtml(c.diagnostico || c.motivo || 'General');
-
-        return `
-  <div class="medi-recent-card p-3" style = "animation-delay:${idx * 0.07}s;" >
-    <div class="d-flex align-items-start gap-3">
-      <div class="medi-avatar flex-shrink-0" style="background:${bgC};color:${fgC};">${initial}</div>
-      <div class="flex-fill" style="min-width:0;">
-        <div class="d-flex justify-content-between align-items-start gap-2 mb-1">
-          <div class="fw-bold text-dark text-truncate" style="font-size:.85rem;">${escapeHtml(name)}</div>
-          <div class="text-muted flex-shrink-0 text-end" style="font-size:.65rem;line-height:1.2;">
-            <div>${escapeHtml(relDate)}</div>
-            <div>${escapeHtml(timeStr)}</div>
-          </div>
-        </div>
-        <div class="fw-semibold text-primary text-truncate mb-1" style="font-size:.78rem;">${diag}</div>
-        <div class="d-flex align-items-center justify-content-between gap-2">
-          ${serviceBadge(c)}
-          <button class="btn btn-xs btn-primary rounded-pill px-3 fw-bold flex-shrink-0"
-            style="font-size:.65rem;"
-            onclick="AdminMedi.showConsultationQuickDetail('${encoded}')">
-            <i class="bi bi-eye me-1"></i>Ver
-          </button>
-        </div>
-      </div>
-    </div>
-          </div> `;
-      }).join('');
-
-      const btnDiv = document.createElement('div');
-      btnDiv.className = "text-center pt-2";
-      btnDiv.innerHTML = `
-  <button class="btn btn-link btn-sm text-decoration-none fw-bold small text-success" onclick = "AdminMedi.showAllRecentModal()" >
-    Ver todo el historial <i class="bi bi-arrow-right-short" ></i>
-        </button> `;
-      currentList.appendChild(btnDiv);
-    }, operational.shift);
+    return AdminMedi.Tools['_loadRecentActivity']();
   }
 
   // 1. Toggle Service
@@ -1639,6 +1525,14 @@ style="cursor: pointer;">
 
   function init(ctx, options = {}) {
     if (!ctx || !ctx.profile || !ctx.user?.uid) return Promise.resolve();
+
+    if (ctx.ModuleManager?.addSubscription && _cleanupRegisteredCtx !== ctx) {
+      _cleanupRegisteredCtx = ctx;
+      ctx.ModuleManager.addSubscription(() => {
+        _cleanupRuntime();
+        if (_cleanupRegisteredCtx === ctx) _cleanupRegisteredCtx = null;
+      });
+    }
 
     const force = !!options.force;
     if (!force && _initInFlight) return _initInFlight;

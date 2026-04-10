@@ -6,7 +6,10 @@ window.AdminBiblio.Reportes = (function () {
     let _adminStatsInterval = null;
     let _clockInterval = null;
     let _pcGridUnsub = null;
+    let _scannerStationsUnsub = null;
     let _currentAdminStats = null;
+    let _lastScannerScanKey = '';
+    let _scannerSessions = {};
     let _visitUser = null;
     let _currentServiceType = null;
     let _selectedAssetId = null;
@@ -17,7 +20,10 @@ window.AdminBiblio.Reportes = (function () {
         _adminStatsInterval = state.adminStatsInterval;
         _clockInterval = state.clockInterval;
         _pcGridUnsub = state.pcGridUnsub;
+        _scannerStationsUnsub = state.scannerStationsUnsub;
         _currentAdminStats = state.currentAdminStats;
+        _lastScannerScanKey = state.lastScannerScanKey;
+        _scannerSessions = state.scannerSessions || {};
         _visitUser = state.visitUser;
         _currentServiceType = state.currentServiceType;
         _selectedAssetId = state.selectedAssetId;
@@ -29,7 +35,10 @@ window.AdminBiblio.Reportes = (function () {
         state.adminStatsInterval = _adminStatsInterval;
         state.clockInterval = _clockInterval;
         state.pcGridUnsub = _pcGridUnsub;
+        state.scannerStationsUnsub = _scannerStationsUnsub;
         state.currentAdminStats = _currentAdminStats;
+        state.lastScannerScanKey = _lastScannerScanKey;
+        state.scannerSessions = _scannerSessions;
         state.visitUser = _visitUser;
         state.currentServiceType = _currentServiceType;
         state.selectedAssetId = _selectedAssetId;
@@ -92,6 +101,15 @@ window.AdminBiblio.Reportes = (function () {
         state.pcGridUnsub = null;
     }
 
+    function clearScannerListener() {
+        if (_scannerStationsUnsub) {
+            try { _scannerStationsUnsub(); } catch (error) { console.warn('[BiblioAdmin] Error clearing scanner listener:', error); }
+            _scannerStationsUnsub = null;
+        }
+
+        state.scannerStationsUnsub = null;
+    }
+
     function cleanupRuntime(...args) { return window.AdminBiblio.cleanupRuntime(...args); }
     function init(...args) { return window.AdminBiblio.init(...args); }
     function abrirModalHistorial(...args) { return window.AdminBiblio.abrirModalHistorial(...args); }
@@ -104,6 +122,7 @@ window.AdminBiblio.Reportes = (function () {
     function consultarDevolucion(...args) { return window.AdminBiblio.consultarDevolucion(...args); }
     function perdonarRetrasoModal(...args) { return window.AdminBiblio.perdonarRetrasoModal(...args); }
     function confirmarDevolucion(...args) { return window.AdminBiblio.confirmarDevolucion(...args); }
+    function abrirModalCondonacion(...args) { return window.AdminBiblio.abrirModalCondonacion(...args); }
     function mostrarLibrosUsuario(...args) { return window.AdminBiblio.mostrarLibrosUsuario(...args); }
     function confirmarRenovacion(...args) { return window.AdminBiblio.confirmarRenovacion(...args); }
     function confirmarRecibirSinLibro(...args) { return window.AdminBiblio.confirmarRecibirSinLibro(...args); }
@@ -140,6 +159,306 @@ window.AdminBiblio.Reportes = (function () {
         if (!modalEl) return;
         const modal = bootstrap.Modal.getInstance(modalEl);
         if (modal) modal.hide();
+    }
+
+    function updateVisitScanStatus(message = '', tone = 'primary') {
+        const el = document.getElementById('visit-scan-status');
+        if (!el) return;
+
+        if (!message) {
+            el.textContent = '';
+            el.className = 'small text-center mt-2 d-none';
+            return;
+        }
+
+        el.textContent = message;
+        el.className = `small text-center mt-2 text-${tone}`;
+    }
+
+    function getScanSourceLabel(scan = {}) {
+        return scan.stationName || scan.stationId || 'escáner de biblioteca';
+    }
+
+    function normalizeScannerMode(value) {
+        const normalized = String(value || '').trim().toLowerCase();
+        if (['prestamo', 'loan'].includes(normalized)) return 'prestamo';
+        if (['devolucion', 'return', 'devolucion_libro'].includes(normalized)) return 'devolucion';
+        if (['pc', 'computadora', 'computadoras'].includes(normalized)) return 'pc';
+        if (['servicio', 'reserva'].includes(normalized)) return 'servicio';
+        return 'visita';
+    }
+
+    function updateDualScanStatus(elementId, message = '', tone = 'primary') {
+        const el = document.getElementById(elementId);
+        if (!el) return;
+
+        if (!message) {
+            el.textContent = '';
+            el.className = 'small text-center mt-2 d-none';
+            return;
+        }
+
+        el.textContent = message;
+        el.className = `small text-center mt-2 text-${tone}`;
+    }
+
+    function getScannerSession(stationId, mode) {
+        const key = stationId || 'default-station';
+        const existing = _scannerSessions[key];
+        if (existing && existing.mode === mode) return existing;
+
+        const next = {
+            stationId: key,
+            mode,
+            userQuery: '',
+            bookQuery: '',
+            stationName: ''
+        };
+        _scannerSessions[key] = next;
+        syncToState();
+        return next;
+    }
+
+    function resetScannerSession(stationId) {
+        const key = stationId || 'default-station';
+        delete _scannerSessions[key];
+        syncToState();
+    }
+
+    function isLikelyUserIdentifier(value) {
+        const candidate = String(value || '').trim();
+        if (!candidate) return false;
+        return /^\d{7,10}$/.test(candidate)
+            || candidate.includes('@')
+            || /^[A-Za-z0-9_-]{20,}$/.test(candidate);
+    }
+
+    async function resolveBiblioScanRole(query, session = {}) {
+        const candidate = String(query || '').trim();
+        if (!candidate) return { role: null, label: '' };
+
+        const preferUser = isLikelyUserIdentifier(candidate);
+        const attempts = preferUser ? ['user', 'book'] : ['book', 'user'];
+
+        if (session.userQuery && !session.bookQuery) attempts.unshift('book');
+        if (session.bookQuery && !session.userQuery) attempts.unshift('user');
+
+        const orderedAttempts = [...new Set(attempts)];
+
+        for (const attempt of orderedAttempts) {
+            if (attempt === 'user') {
+                try {
+                    const user = await BiblioService.findUserByQuery(_ctx, candidate);
+                    if (user?.uid) {
+                        return {
+                            role: 'user',
+                            query: user.matricula || candidate,
+                            label: `${user.nombre || 'Usuario'} (${user.matricula || candidate})`
+                        };
+                    }
+                } catch (error) {
+                    console.warn('[BiblioAdmin] No se pudo resolver usuario de escaneo:', error);
+                }
+            }
+
+            if (attempt === 'book') {
+                try {
+                    const book = await BiblioService.findBookByCode(_ctx, candidate);
+                    if (book?.id) {
+                        return {
+                            role: 'book',
+                            query: candidate,
+                            label: book.titulo || candidate
+                        };
+                    }
+                } catch (error) {
+                    console.warn('[BiblioAdmin] No se pudo resolver libro de escaneo:', error);
+                }
+            }
+        }
+
+        return { role: null, query: candidate, label: candidate };
+    }
+
+    function fillScannerFlowFields(fieldIds = {}, session = {}, statusElementId = '', scan = {}) {
+        const userInput = fieldIds.user ? document.getElementById(fieldIds.user) : null;
+        const bookInput = fieldIds.book ? document.getElementById(fieldIds.book) : null;
+
+        if (userInput) userInput.value = session.userQuery || '';
+        if (bookInput) bookInput.value = session.bookQuery || '';
+
+        if (session.userQuery && session.bookQuery) {
+            updateDualScanStatus(
+                statusElementId,
+                `Datos completos recibidos desde ${getScanSourceLabel(scan)}. Verificando usuario y libro.`,
+                'success'
+            );
+            return;
+        }
+
+        if (session.userQuery) {
+            updateDualScanStatus(
+                statusElementId,
+                `Usuario escaneado desde ${getScanSourceLabel(scan)}. Falta escanear el libro.`,
+                'primary'
+            );
+            return;
+        }
+
+        if (session.bookQuery) {
+            updateDualScanStatus(
+                statusElementId,
+                `Libro escaneado desde ${getScanSourceLabel(scan)}. Falta escanear el usuario.`,
+                'warning'
+            );
+            return;
+        }
+
+        updateDualScanStatus(statusElementId, '');
+    }
+
+    function isLoanFlowModalOpen(mode = 'prestamo') {
+        const userFieldId = mode === 'devolucion' ? 'devol-user' : 'prestamo-user';
+        const modalEl = document.getElementById('modal-admin-action');
+        if (!modalEl?.classList?.contains('show')) return false;
+        return Boolean(document.getElementById(userFieldId));
+    }
+
+    function openCompletedLoanScannerFlow(modalConfig = {}, session = {}, scan = {}) {
+        modalConfig.open();
+
+        const hydrateAndConsult = () => {
+            fillScannerFlowFields(modalConfig.fieldIds, session, modalConfig.statusId, scan);
+            if (session.userQuery && session.bookQuery) {
+                void modalConfig.consult();
+            }
+        };
+
+        setTimeout(() => {
+            const userFieldId = modalConfig.fieldIds?.user;
+            if (userFieldId && !document.getElementById(userFieldId)) {
+                modalConfig.open();
+                setTimeout(hydrateAndConsult, 200);
+                return;
+            }
+            hydrateAndConsult();
+        }, 250);
+    }
+
+    async function applyLoanScannerPayload(scan = {}, mode = 'prestamo') {
+        const query = scan.queryCandidate || scan.rawCode || '';
+        if (!query) {
+            showToast('Se recibio un escaneo sin datos utilizables.', 'warning');
+            return;
+        }
+
+        const modalConfig = mode === 'devolucion'
+            ? {
+                open: abrirModalDevolucion,
+                consult: consultarDevolucion,
+                fieldIds: { user: 'devol-user', book: 'devol-book' },
+                statusId: 'devol-scan-status',
+                modeLabel: 'devolucion'
+            }
+            : {
+                open: abrirModalPrestamo,
+                consult: consultarPrestamo,
+                fieldIds: { user: 'prestamo-user', book: 'prestamo-book' },
+                statusId: 'prestamo-scan-status',
+                modeLabel: 'prestamo'
+            };
+
+        _lastScannerScanKey = scan.scanKey || `${scan.stationId || mode}:${query}`;
+        let session = getScannerSession(scan.stationId, mode);
+
+        if (session.userQuery && session.bookQuery) {
+            resetScannerSession(scan.stationId);
+            session = getScannerSession(scan.stationId, mode);
+        }
+
+        session.stationName = scan.stationName || session.stationName || '';
+
+        const resolved = await resolveBiblioScanRole(query, session);
+        if (!resolved.role) {
+            showToast(`El escaneo no coincide con usuario ni libro para ${modalConfig.modeLabel}.`, 'warning');
+            return;
+        }
+
+        if (resolved.role === 'user') {
+            session.userQuery = resolved.query || query;
+            syncToState();
+            showToast(`Usuario detectado para ${modalConfig.modeLabel}.`, 'info');
+        } else {
+            session.bookQuery = resolved.query || query;
+            syncToState();
+            showToast(`Libro detectado para ${modalConfig.modeLabel}.`, 'info');
+        }
+
+        if (!(session.userQuery && session.bookQuery)) {
+            if (isLoanFlowModalOpen(mode)) {
+                fillScannerFlowFields(modalConfig.fieldIds, session, modalConfig.statusId, scan);
+            } else {
+                const missingLabel = session.userQuery ? 'libro' : 'usuario';
+                showToast(
+                    `Escaneo recibido para ${modalConfig.modeLabel}. Falta escanear el ${missingLabel}.`,
+                    'info'
+                );
+            }
+            return;
+        }
+
+        openCompletedLoanScannerFlow(modalConfig, session, scan);
+    }
+
+    async function applyVisitScanPayload(scan = {}) {
+        const query = scan.queryCandidate || scan.rawCode || '';
+        if (!query) {
+            showToast('Se recibió un escaneo sin datos utilizables.', 'warning');
+            return;
+        }
+
+        _lastScannerScanKey = scan.scanKey || `${scan.stationId || 'scanner'}:${query}`;
+        abrirModalVisita();
+
+        setTimeout(() => {
+            const input = document.getElementById('visita-input-matricula');
+            if (!input) return;
+
+            input.disabled = false;
+            input.value = query;
+            input.focus();
+            input.select?.();
+            updateVisitScanStatus(`Escaneo recibido desde ${getScanSourceLabel(scan)}. Revisa los datos antes de confirmar.`);
+            void verificarUsuarioVisita();
+        }, 250);
+    }
+
+    function setupVisitScannerListener() {
+        clearScannerListener();
+
+        if (!_ctx?.db || !window.ScannerService?.listenModuleStations) {
+            return;
+        }
+
+        _scannerStationsUnsub = window.ScannerService.listenModuleStations(_ctx, 'biblio', (scan) => {
+            if (!scan?.scanKey || scan.scanKey === _lastScannerScanKey) return;
+            const mode = normalizeScannerMode(scan.mode);
+
+            if (mode === 'prestamo') {
+                void applyLoanScannerPayload(scan, 'prestamo');
+                return;
+            }
+
+            if (mode === 'devolucion') {
+                void applyLoanScannerPayload(scan, 'devolucion');
+                return;
+            }
+
+            showToast(`Escaneo recibido desde ${getScanSourceLabel(scan)}.`, 'info');
+            void applyVisitScanPayload(scan);
+        });
+
+        state.scannerStationsUnsub = _scannerStationsUnsub;
     }
 
     function formatVisitDuplicateHour(visit = {}) {
@@ -238,7 +557,7 @@ window.AdminBiblio.Reportes = (function () {
             <div id="admin-dashboard-content" class="container-fluid px-4 py-4">
                 
                 <!-- ACTIONS ROW -->
-                <div class="row g-4 mb-4 row-cols-1 row-cols-md-5 justify-content-center">
+                <div class="row g-4 mb-4 row-cols-1 row-cols-md-6 justify-content-center">
                     <!-- 1. REGISTRAR VISITA -->
                     <div class="col">
                         <div class="card border-0 shadow-lg h-100 hover-scale cursor-pointer bg-white" onclick="AdminBiblio.abrirModalVisita()">
@@ -291,7 +610,20 @@ window.AdminBiblio.Reportes = (function () {
                         </div>
                     </div>
                     
-                    <!-- 5. GESTION LIBROS (NEW) -->
+                    <!-- 5. CONDONACION -->
+                    <div class="col">
+                        <div class="card border-0 shadow-lg h-100 hover-scale cursor-pointer bg-white" onclick="AdminBiblio.abrirModalCondonacion()">
+                            <div class="card-body p-4 text-center d-flex flex-column align-items-center justify-content-center">
+                                <div class="bg-secondary-subtle p-4 rounded-circle mb-4 text-secondary">
+                                    <i class="bi bi-shield-check display-4"></i>
+                                </div>
+                                <h4 class="fw-bold text-dark">Retrasos y Condonaciones</h4>
+                                <p class="text-muted small mb-0">Activos y por usuario</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 6. GESTION LIBROS (NEW) -->
                     <div class="col">
                         <div class="card border-0 shadow-lg h-100 hover-scale cursor-pointer bg-white" onclick="AdminBiblio.abrirModalGestionLibros()">
                             <div class="card-body p-4 text-center d-flex flex-column align-items-center justify-content-center">
@@ -307,16 +639,21 @@ window.AdminBiblio.Reportes = (function () {
                 
                  <!-- CONFIG BUTTON ROW -->
                  <div class="col-12 text-center mt-2 mb-4">
-                    <button class="btn btn-light rounded-pill px-4 text-muted small shadow-sm border" onclick="AdminBiblio.abrirModalConfig()">
-                        <i class="bi bi-gear-fill me-2"></i>Configuración de Espacios
-                    </button>
+                    <div class="d-inline-flex flex-wrap justify-content-center gap-2">
+                        <button class="btn btn-light rounded-pill px-4 text-muted small shadow-sm border" onclick="AdminBiblio.abrirModalConfig()">
+                            <i class="bi bi-gear-fill me-2"></i>Configuración de Espacios
+                        </button>
+                        <button class="btn btn-light rounded-pill px-4 text-muted small shadow-sm border" onclick="AdminBiblio.abrirModalDiasInhabiles()">
+                            <i class="bi bi-calendar-x-fill me-2"></i>Días inhábiles
+                        </button>
+                    </div>
                  </div>
             </div>
 
             <!-- STATS CARDS -->
-            <div class="row g-4 mt-2 animate__animated animate__fadeInUp" style="animation-delay:0.2s;">
+            <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 row-cols-xl-5 g-4 mt-2 animate__animated animate__fadeInUp" style="animation-delay:0.2s;">
                 <!-- Stats Visitas -->
-                <div class="col-md-6 col-lg-3">
+                <div class="col">
                     <div class="card border-0 shadow-sm rounded-4 h-100" style="background: linear-gradient(135deg, #e8f4fd 0%, #f8fbff 100%);">
                         <div class="card-body p-3">
                             <div class="d-flex align-items-center justify-content-between mb-3">
@@ -338,7 +675,7 @@ window.AdminBiblio.Reportes = (function () {
                     </div>
                 </div>
                 <!-- Stats Préstamos -->
-                <div class="col-md-6 col-lg-3">
+                <div class="col">
                     <div class="card border-0 shadow-sm rounded-4 h-100" style="background: linear-gradient(135deg, rgba(255,210,77,0.08) 0%, rgba(255,210,77,0.03) 100%);">
                         <div class="card-body p-3">
                             <div class="d-flex align-items-center justify-content-between mb-3">
@@ -360,7 +697,7 @@ window.AdminBiblio.Reportes = (function () {
                     </div>
                 </div>
                 <!-- Stats Devoluciones -->
-                <div class="col-md-6 col-lg-3">
+                <div class="col">
                     <div class="card border-0 shadow-sm rounded-4 h-100" style="background: linear-gradient(135deg, #e8faf0 0%, #f5fdf9 100%);">
                         <div class="card-body p-3">
                             <div class="d-flex align-items-center justify-content-between mb-3">
@@ -382,7 +719,7 @@ window.AdminBiblio.Reportes = (function () {
                     </div>
                 </div>
                 <!-- Stats PCs -->
-                <div class="col-md-6 col-lg-3">
+                <div class="col">
                     <div class="card border-0 shadow-sm rounded-4 h-100" style="background: linear-gradient(135deg, #e8f8fd 0%, #f3fcff 100%);">
                         <div class="card-body p-3">
                             <div class="d-flex justify-content-between align-items-center">
@@ -399,6 +736,23 @@ window.AdminBiblio.Reportes = (function () {
                             </div>
                             <div class="mt-auto pt-2 border-top border-info border-opacity-25 text-center">
                                 <button class="btn btn-sm btn-link text-decoration-none fw-bold text-info w-100" onclick="AdminBiblio.abrirModalHistorial('pcs')">Ver más <i class="bi bi-chevron-down ms-1"></i></button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Stats Resumen -->
+                <div class="col">
+                    <div class="card border-0 shadow-sm rounded-4 h-100" style="background: linear-gradient(135deg, #f3f0ff 0%, #faf8ff 100%);">
+                        <div class="card-body p-3">
+                            <div class="d-flex align-items-center gap-2 mb-3">
+                                <div class="bg-secondary bg-opacity-10 rounded-circle p-2 d-flex align-items-center justify-content-center" style="width:36px;height:36px;">
+                                    <i class="bi bi-bar-chart-line text-secondary"></i>
+                                </div>
+                                <span class="fw-bold small text-dark">Estadísticas</span>
+                            </div>
+                            <div id="stat-summary-list" class="d-flex flex-column gap-2">
+                                <div class="text-center text-muted small py-2"><span class="spinner-border spinner-border-sm"></span></div>
                             </div>
                         </div>
                     </div>
@@ -424,6 +778,7 @@ window.AdminBiblio.Reportes = (function () {
         `;
 
         clearLiveAssetStreams();
+        setupVisitScannerListener();
         startClock();
         loadAdminStats();
 
@@ -437,9 +792,10 @@ window.AdminBiblio.Reportes = (function () {
         if (_adminStatsInterval) clearInterval(_adminStatsInterval);
 
         // Contador interno para solo refrescar stats de firebase cada 5 minutos (evitar exceso de lecturas)
-        let _ticks = 0;
+        let _ticks = 4;
 
         _adminStatsInterval = setInterval(() => {
+            if (document.hidden) return;
             _ticks++;
             // Cada 5 minutos (5 ticks de 60s) recarga los stats masivos
             if (_ticks >= 5) {
@@ -449,7 +805,7 @@ window.AdminBiblio.Reportes = (function () {
 
             // *REMOVIDO* el auto-check global para evitar que relojes locales desfasados liberen PCs antes de tiempo.
             // Ahora la limpieza es manual vía el botón "Limpiar Expirados" en el Modal de Computadoras.
-        }, 60000);
+        }, 15 * 60 * 1000);
     }
 
 
@@ -477,6 +833,31 @@ window.AdminBiblio.Reportes = (function () {
 
     // --- STATS CARDS LOADER ---
 
+    async function loadVisitSummaryCard() {
+        const summaryEl = document.getElementById('stat-summary-list');
+        if (!summaryEl || !_ctx) return;
+
+        try {
+            const stats = await BiblioService.getVisitSummaryStats(_ctx);
+            summaryEl.innerHTML = `
+                <div class="d-flex justify-content-between align-items-center bg-white rounded-3 p-2 shadow-sm">
+                    <span class="small text-muted">Visitas hoy</span>
+                    <span class="fw-bold text-dark">${stats.totalDia}</span>
+                </div>
+                <div class="d-flex justify-content-between align-items-center bg-white rounded-3 p-2 shadow-sm">
+                    <span class="small text-muted">Visitas semana</span>
+                    <span class="fw-bold text-dark">${stats.totalSemana}</span>
+                </div>
+                <div class="d-flex justify-content-between align-items-center bg-white rounded-3 p-2 shadow-sm">
+                    <span class="small text-muted">Visitas anual</span>
+                    <span class="fw-bold text-dark">${stats.totalAnio}</span>
+                </div>
+            `;
+        } catch (e) {
+            console.warn('[ADMIN SUMMARY] Error loading:', e);
+            summaryEl.innerHTML = '<p class="text-muted small text-center mb-0">No se pudieron cargar las estadisticas.</p>';
+        }
+    }
 
     async function loadAdminStats() {
         try {
@@ -606,6 +987,10 @@ window.AdminBiblio.Reportes = (function () {
                     }).join('');
                 }
             }
+
+            setTimeout(() => {
+                loadVisitSummaryCard().catch((error) => console.warn('[ADMIN SUMMARY] Lazy load failed:', error));
+            }, 0);
 
         } catch (e) {
             console.warn('[ADMIN STATS] Error loading:', e);
@@ -754,6 +1139,9 @@ window.AdminBiblio.Reportes = (function () {
             const fDev = dDev ? dDev.toLocaleString() : '--';
             const multa = item.montoDeuda || 0;
             const perdonado = item.perdonado ? `<span class="badge bg-info text-dark">Multa Perdonada</span>` : '';
+            const retrasoSinCobro = item.sinCobroRetraso
+                ? `<span class="badge bg-primary text-white">Retraso sin cobro${item.diasRetraso ? ` · ${item.diasRetraso} dia(s)` : ''}</span>`
+                : '';
             const studentDis = escapeHtml(item._resolvedStudentName ? `${item._resolvedStudentName} (${item._resolvedStudentMatricula})` : (item.studentId || 'Estudiante'));
             const adquisicionId = escapeHtml(item.adquisicion || item.libroAdquisicion || item.libroId || '--');
             const tituloLibro = escapeHtml(item.tituloLibro || 'Libro');
@@ -768,7 +1156,7 @@ window.AdminBiblio.Reportes = (function () {
                     </div>
                     <h5 class="fw-bold mb-0 text-truncate px-3" title="${tituloLibro}">${tituloLibro}</h5>
                     <p class="text-muted small mb-0">No. Adquisición: ${adquisicionId}</p>
-                    <p class="text-muted small mt-1 mb-0">${perdonado}</p>
+                    <p class="text-muted small mt-1 mb-0">${perdonado} ${retrasoSinCobro}</p>
                 </div>
                 <div class=" rounded-3 p-3 small">
                     <div class="d-flex justify-content-between mb-1 gap-2">
@@ -781,8 +1169,9 @@ window.AdminBiblio.Reportes = (function () {
                     </div>
                     <div class="d-flex justify-content-between gap-2">
                         <span class="text-muted">Multa / Deuda:</span>
-                        <span class="fw-bold ${multa > 0 ? 'text-danger' : 'text-dark'} text-end">$${multa}</span>
+                        <span class="fw-bold ${multa > 0 ? 'text-danger' : 'text-dark'} text-end">${item.sinCobroRetraso ? 'Sin cobro' : `$${multa}`}</span>
                     </div>
+                    ${item.sinCobroRetraso ? `<div class="d-flex justify-content-between gap-2 mt-1"><span class="text-muted">Retraso registrado:</span><span class="fw-bold text-primary text-end">${item.diasRetraso || 0} dia(s)</span></div>` : ''}
                     ${item.perdonado ? `<div class="mt-2 pt-2 border-top text-muted fst-italic">"${motivoPerdon}"</div>` : ''}
                 </div>
                 ${canRegisterPayment ? `
@@ -888,7 +1277,9 @@ window.AdminBiblio.Reportes = (function () {
     function abrirModalVisita() {
         clearLiveAssetStreams();
         _visitUser = null;
+        syncToState();
         renderVisitModalContent();
+        updateVisitScanStatus('');
         new bootstrap.Modal(document.getElementById('modal-admin-action')).show();
         setTimeout(() => {
             const input = document.getElementById('visita-input-matricula');
@@ -917,7 +1308,8 @@ window.AdminBiblio.Reportes = (function () {
                          <i class="bi bi-person-x-fill me-2 fs-4"></i> Sin Matrícula
                     </button>
                 </div>
-                
+                <div id="visit-scan-status" class="small text-center mt-2 d-none"></div>
+
                 <div id="visit-options-container" class="d-none animate__animated animate__fadeInUp">
                      <!-- USER INFO HEADER -->
                      <div class="text-center mb-4">
@@ -1040,6 +1432,7 @@ window.AdminBiblio.Reportes = (function () {
             if (!user) throw new Error("Estudiante NO encontrado.");
 
             _visitUser = user;
+            syncToState();
 
             // Show first name + first last name
             const parts = (user.nombre || 'Estudiante').split(' ');
@@ -1064,7 +1457,10 @@ window.AdminBiblio.Reportes = (function () {
             document.getElementById('visit-options-container').classList.remove('d-none');
         } catch (e) {
             // No se encontro usuario
+            _visitUser = null;
+            syncToState();
             document.getElementById('visit-unregistered-container').classList.remove('d-none');
+            updateVisitScanStatus('El código se recibió, pero no coincide con un usuario registrado. Puedes capturarlo como visitante.', 'warning');
             input.disabled = false;
         }
     }
@@ -1077,6 +1473,7 @@ window.AdminBiblio.Reportes = (function () {
 
     function mostrarRegistroAnonimo() {
         _visitUser = null;
+        syncToState();
         const input = document.getElementById('visita-input-matricula');
         if (input) {
             input.value = '';
@@ -1636,6 +2033,7 @@ window.AdminBiblio.Reportes = (function () {
         addTeamMember: withState(addTeamMember),
         confirmarVisitaDirecta: withState(confirmarVisitaDirecta),
         confirmarVisitaUnregistered: withState(confirmarVisitaUnregistered),
+        applyVisitScanPayload: withState(applyVisitScanPayload),
         abrirModalComputadoras: withState(abrirModalComputadoras),
         forzarLimpiezaPCs: withState(forzarLimpiezaPCs),
         loadPCGrid: withState(loadPCGrid),

@@ -207,13 +207,6 @@ class SiaOnboardingTour extends HTMLElement {
                 condition: () => isVisible('#dash-sos-fab')
             },
             {
-                target: '#btn-report-problem',
-                title: 'Reportar problema',
-                description: 'Si detectas un error en SIA, usa este boton para enviar un reporte con mas contexto y facilitar la correccion.',
-                position: 'left',
-                condition: () => isVisible('#btn-report-problem')
-            },
-            {
                 target: null,
                 title: 'Listo para usar SIA',
                 description: 'Ya conoces las zonas principales del dashboard. Puedes volver a esta guia en cualquier momento desde el boton Tutorial.',

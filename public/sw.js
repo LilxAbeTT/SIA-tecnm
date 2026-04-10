@@ -3,7 +3,7 @@
 // ⚠️ Los mensajes push de FCM en background los maneja firebase-messaging-sw.js
 // (Firebase Messaging SDK lo registra automáticamente en /firebase-messaging-sw.js)
 
-const CACHE_NAME = 'sia-cache-v_NOTIF_4';
+const CACHE_NAME = 'sia-cache-v_MAP_6';
 
 const urlsToCache = [
   './',

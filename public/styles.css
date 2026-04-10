@@ -17,6 +17,7 @@
 @import url("/styles/13-medi-components.css");
 @import url("/styles/14-superadmin.css");
 @import url("/styles/15-comunidad-module.css");
+@import url("/styles/16-campus-map.css");
 .avs-surface {
   background: var(--bs-body-bg, #fff);
 }

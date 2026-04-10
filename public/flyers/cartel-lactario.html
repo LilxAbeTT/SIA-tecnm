@@ -1,0 +1,490 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cartel | Lactario en SIA</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,700;9..144,800&family=Sora:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --plum: #4d1230;
+      --plum-2: #6a1a42;
+      --rose: #d63384;
+      --rose-2: #f472b6;
+      --peach: #ffd7c2;
+      --cream: #fff9f7;
+      --blush: #fff0f6;
+      --ink: #4b1830;
+      --muted: #7e5368;
+      --line: rgba(214, 51, 132, 0.14);
+      --shadow: 0 30px 70px rgba(82, 22, 52, 0.18);
+    }
+
+    * { box-sizing: border-box; }
+
+    @page {
+      size: A4 portrait;
+      margin: 0;
+    }
+
+    html,
+    body {
+      margin: 0;
+      min-height: 100%;
+      background:
+        radial-gradient(circle at 14% 16%, rgba(255, 215, 194, 0.45), transparent 22%),
+        radial-gradient(circle at 82% 22%, rgba(244, 114, 182, 0.22), transparent 20%),
+        linear-gradient(180deg, #fff4f8 0%, #fff9f7 100%);
+      font-family: "Sora", sans-serif;
+      color: var(--ink);
+    }
+
+    body {
+      display: grid;
+      place-items: center;
+      padding: 24px;
+    }
+
+    .poster-shell {
+      width: min(100%, 760px);
+    }
+
+    .poster {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 210 / 297;
+      overflow: hidden;
+      border-radius: 34px;
+      background: linear-gradient(180deg, #5d173b 0%, #6f1b46 41%, #fff9f7 41%, #fff9f7 100%);
+      box-shadow: var(--shadow);
+      isolation: isolate;
+    }
+
+    .poster::before,
+    .poster::after {
+      content: "";
+      position: absolute;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .poster::before {
+      width: 380px;
+      height: 380px;
+      top: -150px;
+      right: -120px;
+      border-radius: 36px;
+      transform: rotate(22deg);
+      background: linear-gradient(135deg, rgba(255, 255, 255, 0.14), rgba(255, 215, 194, 0.12));
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .poster::after {
+      width: 260px;
+      height: 260px;
+      right: -60px;
+      top: 145px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(244, 114, 182, 0.22), rgba(244, 114, 182, 0));
+    }
+
+    .content {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      padding: 20mm 17mm 15mm;
+    }
+
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 16px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .brand-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      backdrop-filter: blur(16px);
+    }
+
+    .brand img {
+      display: block;
+      object-fit: contain;
+    }
+
+    .brand .sia {
+      width: 34px;
+      height: 34px;
+      background: white;
+      padding: 5px;
+      border-radius: 50%;
+    }
+
+    .brand .lactario {
+      width: 34px;
+      height: 34px;
+      background: white;
+      padding: 5px;
+      border-radius: 50%;
+    }
+
+    .brand .tecnm {
+      height: 18px;
+      width: auto;
+    }
+
+    .module-tag {
+      padding: 10px 14px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      color: #ffe4f0;
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: 1.2fr 0.8fr;
+      gap: 18px;
+      align-items: start;
+      margin-bottom: 22px;
+    }
+
+    .hero-copy {
+      color: white;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 14px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.1);
+      color: #ffd8e9;
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      margin-bottom: 14px;
+    }
+
+    .eyebrow::before {
+      content: "";
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--peach);
+    }
+
+    h1 {
+      margin: 0 0 12px;
+      font-family: "Fraunces", serif;
+      font-size: clamp(56px, 8.3vw, 92px);
+      line-height: 0.88;
+      letter-spacing: -0.05em;
+    }
+
+    .hero-accent {
+      display: block;
+      color: var(--peach);
+    }
+
+    .subcopy {
+      margin: 0;
+      max-width: 93%;
+      color: rgba(255, 240, 246, 0.84);
+      font-size: 16px;
+      line-height: 1.55;
+    }
+
+    .subcopy strong {
+      color: #ffffff;
+    }
+
+    .qr-stage {
+      position: relative;
+      padding-top: 22px;
+    }
+
+    .qr-card {
+      position: relative;
+      width: 100%;
+      background: white;
+      border-radius: 30px;
+      padding: 18px;
+      box-shadow: 0 24px 46px rgba(52, 12, 34, 0.28);
+    }
+
+    .qr-label {
+      display: inline-flex;
+      margin-bottom: 12px;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: var(--blush);
+      color: var(--rose);
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+    }
+
+    .qr-card img {
+      display: block;
+      width: 100%;
+      border-radius: 20px;
+    }
+
+    .qr-card strong {
+      display: block;
+      margin-top: 12px;
+      color: var(--ink);
+      font-size: 17px;
+      line-height: 1.25;
+    }
+
+    .qr-card span {
+      display: block;
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.4;
+    }
+
+    .hook {
+      position: absolute;
+      left: -16px;
+      top: 0;
+      padding: 10px 12px;
+      border-radius: 16px;
+      background: linear-gradient(135deg, var(--rose), var(--rose-2));
+      color: white;
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      box-shadow: 0 16px 30px rgba(214, 51, 132, 0.28);
+    }
+
+    .body {
+      display: grid;
+      gap: 14px;
+      margin-top: 8px;
+    }
+
+    .feature {
+      display: grid;
+      grid-template-columns: 62px 1fr;
+      gap: 16px;
+      align-items: center;
+      padding: 16px 18px;
+      border-radius: 24px;
+      background: white;
+      border: 1px solid var(--line);
+    }
+
+    .feature-no {
+      width: 62px;
+      height: 62px;
+      display: grid;
+      place-items: center;
+      border-radius: 18px;
+      background: linear-gradient(135deg, var(--rose), var(--rose-2));
+      color: white;
+      font-size: 22px;
+      font-weight: 800;
+      box-shadow: 0 16px 28px rgba(214, 51, 132, 0.18);
+    }
+
+    .feature h2,
+    .feature p {
+      margin: 0;
+    }
+
+    .feature h2 {
+      font-size: 18px;
+      line-height: 1.1;
+      color: var(--ink);
+      margin-bottom: 4px;
+    }
+
+    .feature p {
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.45;
+    }
+
+    .bottom {
+      margin-top: auto;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 18px;
+      align-items: end;
+      padding-top: 16px;
+    }
+
+    .bottom-copy {
+      display: grid;
+      gap: 6px;
+    }
+
+    .bottom-label {
+      color: var(--rose);
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+    }
+
+    .bottom-title {
+      margin: 0;
+      font-family: "Fraunces", serif;
+      font-size: 32px;
+      line-height: 1;
+      color: var(--ink);
+    }
+
+    .bottom-url {
+      margin: 0;
+      color: var(--rose);
+      font-size: 28px;
+      font-weight: 800;
+      line-height: 1;
+    }
+
+    .bottom-chip {
+      padding: 12px 14px;
+      border-radius: 18px;
+      background: var(--blush);
+      color: var(--rose-deep);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      text-align: center;
+    }
+
+    @media (max-width: 720px) {
+      body { padding: 0; }
+      .poster-shell { width: 100%; }
+      .poster { border-radius: 0; min-height: 100vh; }
+      .content { padding: 28px 20px 22px; }
+      .hero,
+      .bottom { grid-template-columns: 1fr; }
+      .subcopy { max-width: 100%; }
+    }
+
+    @media print {
+      html,
+      body { background: white; }
+      body { padding: 0; }
+      .poster-shell { width: 210mm; }
+      .poster {
+        width: 210mm;
+        height: 297mm;
+        border-radius: 0;
+        box-shadow: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="poster-shell">
+    <section class="poster" aria-label="Cartel vertical de Lactario en SIA">
+      <div class="content">
+        <header class="topbar">
+          <div class="brand-badge">
+            <div class="brand" aria-label="Logos institucionales">
+              <img class="sia" src="../images/logo-sia.png" alt="Logo SIA">
+              <img class="tecnm" src="../images/tecnm-logo-claro.png" alt="Logo TecNM">
+            </div>
+          </div>
+          <div class="module-tag">M&oacute;dulo Sala de Lactancia</div>
+        </header>
+
+        <section class="hero">
+          <div class="hero-copy">
+            <div class="eyebrow">Reserva, acceso QR y seguimiento</div>
+            <h1>
+              Sala de
+              <span class="hero-accent">Lactancia</span>
+            </h1>
+            <p class="subcopy">
+              Agenda tu espacio y haz uso de sala de lactancia, <strong>privacidad y comodidad</strong>
+              dentro del campus.
+
+            </p>
+            
+          </div>
+
+          <div class="qr-stage">
+            <div class="hook">Escanea aqu&iacute;</div>
+            <br>
+            <div class="qr-card">
+              <div class="qr-label">Acceso principal</div>
+              <img src="./siaites-site-qr.svg" alt="QR hacia siaites.site">
+              <strong>Abre SIA y entra al m&oacute;dulo de Sala de Lactancia</strong>
+              <span>siaites.site</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="body" aria-label="Beneficios del m&oacute;dulo">
+          <article class="feature">
+            <div class="feature-no">01</div>
+            <div>
+              <h2>Reserva o reagenda tu visita</h2>
+              <p>Consulta disponibilidad y confirma tu espacio sin depender de formatos separados.</p>
+            </div>
+          </article>
+
+          <article class="feature">
+            <div class="feature-no">02</div>
+            <div>
+              <h2>Haz uso de tu espacio privado</h2>
+              <p>Ingresa con escaneo o c&oacute;digo manual para acceder y hacer uso del espacio.</p>
+            </div>
+          </article>
+
+          <article class="feature">
+            <div class="feature-no">03</div>
+            <div>
+              <h2>Gestiona frigobar y apoyo vinculado</h2>
+              <p>Registra resguardo, retiro y seguimiento desde el mismo flujo del m&oacute;dulo.</p>
+            </div>
+          </article>
+        </section>
+
+        <section class="bottom">
+          <div class="bottom-copy">
+            <div class="bottom-label">Sitio principal de SIA</div>
+            <h2 class="bottom-title">Tu acceso digital al servicio</h2>
+            <p class="bottom-url">siaites.site</p>
+          </div>
+        </section>
+      </div>
+    </section>
+  </main>
+</body>
+</html>
