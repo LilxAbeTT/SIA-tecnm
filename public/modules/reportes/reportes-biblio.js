@@ -12,6 +12,45 @@ window.Reportes.Biblio = (function () {
     const H = () => Reportes.Charts;
     const S = () => Reportes.getState();
     const R = () => Reportes.getChartRegistry();
+    const ACADEMIC_CROSS_MODAL_ID = 'biblioAcademicCrossModal';
+    const ACADEMIC_CROSS_FIELDS = [
+        { key: 'generacion', label: 'Generacion' },
+        { key: 'carrera', label: 'Carrera' },
+        { key: 'genero', label: 'Genero' },
+        { key: 'turno', label: 'Turno' },
+        { key: 'tipoUsuario', label: 'Tipo de usuario' }
+    ];
+    const ACADEMIC_CROSS_PERIODS = [
+        { id: 'current', label: 'Periodo actual' },
+        { id: 'daily', label: 'Hoy' },
+        { id: 'monthly', label: 'Mes' },
+        { id: 'quarterly', label: 'Trimestre' },
+        { id: 'custom', label: 'Entre fechas' }
+    ];
+    const ACADEMIC_CROSS_DEFAULTS = {
+        visitas: { primary: 'generacion', secondary: 'carrera', tertiary: 'genero' },
+        prestamos: { primary: 'generacion', secondary: 'carrera', tertiary: 'genero' }
+    };
+    let _academicCrossState = {
+        selections: {
+            visitas: { ...ACADEMIC_CROSS_DEFAULTS.visitas },
+            prestamos: { ...ACADEMIC_CROSS_DEFAULTS.prestamos }
+        },
+        periodByTab: {
+            visitas: 'current',
+            prestamos: 'current'
+        },
+        periodMetaByTab: {
+            visitas: null,
+            prestamos: null
+        },
+        matrix: null,
+        exportPayload: null,
+        dateStart: null,
+        dateEnd: null,
+        periodLabel: 'Periodo actual',
+        activeTab: 'visitas'
+    };
 
     // ============================
     // API pública
@@ -371,6 +410,1137 @@ window.Reportes.Biblio = (function () {
             : String(value ?? 0);
     }
 
+    function getAcademicCrossFields(tab) {
+        if (tab === 'prestamos') {
+            return ACADEMIC_CROSS_FIELDS.filter((field) => field.key !== 'tipoUsuario');
+        }
+        return ACADEMIC_CROSS_FIELDS;
+    }
+
+    function getAcademicCrossFieldLabel(key, tab) {
+        return getAcademicCrossFields(tab).find((field) => field.key === key)?.label || key;
+    }
+
+    function getCurrentBiblioTabContext() {
+        const state = S();
+        const tab = state.currentTab || 'visitas';
+        const tabMeta = (state.areas?.BIBLIO?.tabs || getTabs()).find((item) => item.id === tab) || getTabs()[0];
+        const source = Array.isArray(state.filteredData) ? state.filteredData : [];
+
+        if (tab === 'visitas') {
+            return {
+                tab,
+                tabLabel: tabMeta?.label || 'Visitas',
+                supported: true,
+                records: source.filter((item) => item.subarea === 'Visitas')
+            };
+        }
+
+        if (tab === 'prestamos') {
+            return {
+                tab,
+                tabLabel: tabMeta?.label || 'Prestamos',
+                supported: true,
+                records: source.filter((item) => item.subarea === 'PrÃ©stamos')
+            };
+        }
+
+        return {
+            tab,
+            tabLabel: tabMeta?.label || 'Catalogo',
+            supported: false,
+            records: []
+        };
+    }
+
+    async function resolveAcademicCrossDataset(context, period, periodMeta = {}) {
+        const range = getAcademicCrossRange(period, periodMeta);
+        const state = S();
+
+        if (period === 'current') {
+            return {
+                period: range.period,
+                periodLabel: range.label,
+                dateStart: range.start,
+                dateEnd: range.end,
+                records: context.records
+            };
+        }
+
+        if (!window.ReportesService || !state.ctx) {
+            return {
+                period: range.period,
+                periodLabel: range.label,
+                dateStart: range.start,
+                dateEnd: range.end,
+                records: []
+            };
+        }
+
+        const allData = await window.ReportesService.getReportData(state.ctx, {
+            start: range.start,
+            end: range.end,
+            areas: ['BIBLIO']
+        });
+        const filtered = applyCurrentDemoFilters(allData);
+        const tabRecords = context.tab === 'visitas'
+            ? filtered.filter((item) => item.subarea === 'Visitas')
+            : filtered.filter((item) => item.subarea === 'PrÃ©stamos');
+
+        return {
+            period: range.period,
+            periodLabel: range.label,
+            dateStart: range.start,
+            dateEnd: range.end,
+            records: tabRecords
+        };
+    }
+
+    function getAcademicCrossSelection(tab) {
+        if (!_academicCrossState.selections[tab]) {
+            _academicCrossState.selections[tab] = { ...(ACADEMIC_CROSS_DEFAULTS[tab] || ACADEMIC_CROSS_DEFAULTS.visitas) };
+        }
+        return _academicCrossState.selections[tab];
+    }
+
+    function setAcademicCrossSelection(tab, selection) {
+        _academicCrossState.selections[tab] = {
+            ...(ACADEMIC_CROSS_DEFAULTS[tab] || ACADEMIC_CROSS_DEFAULTS.visitas),
+            ...(selection || {})
+        };
+    }
+
+    function sanitizeFilename(value) {
+        return String(value || 'Cruce_Biblioteca')
+            .replace(/[\\/:*?"<>|]+/g, '_')
+            .replace(/\s+/g, '_')
+            .replace(/_+/g, '_')
+            .replace(/^_+|_+$/g, '') || 'Cruce_Biblioteca';
+    }
+
+    function padAcademicNumber(value) {
+        return String(value).padStart(2, '0');
+    }
+
+    function toAcademicDateInputValue(value) {
+        if (!(value instanceof Date) || Number.isNaN(value.getTime())) return '';
+        return `${value.getFullYear()}-${padAcademicNumber(value.getMonth() + 1)}-${padAcademicNumber(value.getDate())}`;
+    }
+
+    function parseAcademicDateInput(value, endOfDay = false) {
+        const safeValue = String(value || '').trim();
+        if (!safeValue) return null;
+        const isoValue = `${safeValue}T${endOfDay ? '23:59:59.999' : '00:00:00.000'}`;
+        const parsed = new Date(isoValue);
+        return Number.isNaN(parsed.getTime()) ? null : parsed;
+    }
+
+    function getCurrentMonthRef() {
+        const now = new Date();
+        return `${now.getFullYear()}-${padAcademicNumber(now.getMonth() + 1)}`;
+    }
+
+    function getCurrentQuarterMeta() {
+        const now = new Date();
+        return {
+            year: now.getFullYear(),
+            quarter: Math.floor(now.getMonth() / 3) + 1
+        };
+    }
+
+    function getAcademicCrossPeriodMeta(tab) {
+        if (!_academicCrossState.periodMetaByTab[tab]) {
+            const quarterMeta = getCurrentQuarterMeta();
+            const state = S();
+            _academicCrossState.periodMetaByTab[tab] = {
+                monthRef: getCurrentMonthRef(),
+                quarterYear: quarterMeta.year,
+                quarterNumber: quarterMeta.quarter,
+                customStart: toAcademicDateInputValue(state.dateStart),
+                customEnd: toAcademicDateInputValue(state.dateEnd)
+            };
+        }
+        return _academicCrossState.periodMetaByTab[tab];
+    }
+
+    function setAcademicCrossPeriodMeta(tab, meta = {}) {
+        const current = getAcademicCrossPeriodMeta(tab);
+        _academicCrossState.periodMetaByTab[tab] = {
+            ...current,
+            ...(meta || {})
+        };
+    }
+
+    function formatAcademicDate(value) {
+        if (!(value instanceof Date) || Number.isNaN(value.getTime())) return '--';
+        return value.toLocaleDateString('es-MX');
+    }
+
+    function getAcademicCrossPeriod(tab) {
+        return _academicCrossState.periodByTab[tab] || 'current';
+    }
+
+    function setAcademicCrossPeriod(tab, period) {
+        _academicCrossState.periodByTab[tab] = period || 'current';
+    }
+
+    function getAcademicCrossPeriodLabel(period) {
+        return ACADEMIC_CROSS_PERIODS.find((item) => item.id === period)?.label || 'Periodo actual';
+    }
+
+    function getAcademicCrossYearOptions() {
+        const currentYear = new Date().getFullYear();
+        return Array.from({ length: 8 }, (_, index) => currentYear - index);
+    }
+
+    function renderAcademicCrossPeriodDetailControls(tab, period) {
+        const meta = getAcademicCrossPeriodMeta(tab);
+
+        if (period === 'monthly') {
+            return `
+                <div class="col-xl-3 col-md-6" id="biblio-cross-period-month-wrap">
+                    <label class="form-label small text-muted fw-semibold mb-1" for="biblio-cross-month">Mes</label>
+                    <input type="month" class="form-control form-control-sm rounded-4" id="biblio-cross-month" value="${escapeHtml(meta.monthRef || getCurrentMonthRef())}">
+                </div>
+            `;
+        }
+
+        if (period === 'quarterly') {
+            return `
+                <div class="col-xl-2 col-md-4" id="biblio-cross-period-quarter-wrap">
+                    <label class="form-label small text-muted fw-semibold mb-1" for="biblio-cross-quarter-year">Ano</label>
+                    <select class="form-select form-select-sm rounded-4" id="biblio-cross-quarter-year">
+                        ${getAcademicCrossYearOptions().map((year) => `<option value="${year}" ${Number(meta.quarterYear) === Number(year) ? 'selected' : ''}>${year}</option>`).join('')}
+                    </select>
+                </div>
+                <div class="col-xl-2 col-md-4" id="biblio-cross-period-quarter-number-wrap">
+                    <label class="form-label small text-muted fw-semibold mb-1" for="biblio-cross-quarter-number">Trimestre</label>
+                    <select class="form-select form-select-sm rounded-4" id="biblio-cross-quarter-number">
+                        ${[1, 2, 3, 4].map((quarter) => `<option value="${quarter}" ${Number(meta.quarterNumber) === quarter ? 'selected' : ''}>T${quarter}</option>`).join('')}
+                    </select>
+                </div>
+            `;
+        }
+
+        if (period === 'custom') {
+            return `
+                <div class="col-xl-3 col-md-6" id="biblio-cross-period-custom-start-wrap">
+                    <label class="form-label small text-muted fw-semibold mb-1" for="biblio-cross-custom-start">Desde</label>
+                    <input type="date" class="form-control form-control-sm rounded-4" id="biblio-cross-custom-start" value="${escapeHtml(meta.customStart || '')}">
+                </div>
+                <div class="col-xl-3 col-md-6" id="biblio-cross-period-custom-end-wrap">
+                    <label class="form-label small text-muted fw-semibold mb-1" for="biblio-cross-custom-end">Hasta</label>
+                    <input type="date" class="form-control form-control-sm rounded-4" id="biblio-cross-custom-end" value="${escapeHtml(meta.customEnd || '')}">
+                </div>
+            `;
+        }
+
+        return '';
+    }
+
+    function readAcademicCrossPeriodMeta(period) {
+        if (period === 'monthly') {
+            return {
+                monthRef: document.getElementById('biblio-cross-month')?.value || getCurrentMonthRef()
+            };
+        }
+
+        if (period === 'quarterly') {
+            const currentQuarter = getCurrentQuarterMeta();
+            return {
+                quarterYear: Number.parseInt(document.getElementById('biblio-cross-quarter-year')?.value, 10) || currentQuarter.year,
+                quarterNumber: Number.parseInt(document.getElementById('biblio-cross-quarter-number')?.value, 10) || currentQuarter.quarter
+            };
+        }
+
+        if (period === 'custom') {
+            return {
+                customStart: document.getElementById('biblio-cross-custom-start')?.value || '',
+                customEnd: document.getElementById('biblio-cross-custom-end')?.value || ''
+            };
+        }
+
+        return {};
+    }
+
+    function validateAcademicCrossPeriodMeta(period, meta = {}) {
+        if (period !== 'custom') return '';
+        const start = parseAcademicDateInput(meta.customStart);
+        const end = parseAcademicDateInput(meta.customEnd, true);
+        if (!start || !end) {
+            return 'Selecciona ambas fechas para consultar un lapso personalizado.';
+        }
+        if (start > end) {
+            return 'La fecha inicial debe ser anterior o igual a la fecha final.';
+        }
+        return '';
+    }
+
+    function onAcademicCrossPeriodChange() {
+        const context = getCurrentBiblioTabContext();
+        if (!context.supported) return;
+        const period = document.getElementById('biblio-cross-period')?.value || 'current';
+        const wrapper = document.getElementById('biblio-cross-period-detail-wrap');
+        if (wrapper) {
+            wrapper.innerHTML = renderAcademicCrossPeriodDetailControls(context.tab, period);
+        }
+    }
+
+    function getAcademicCrossRange(period, meta = {}) {
+        const state = S();
+        if (period === 'current') {
+            return {
+                period: 'current',
+                label: 'Periodo actual',
+                start: state.dateStart,
+                end: state.dateEnd
+            };
+        }
+
+        if (period === 'monthly') {
+            const monthRef = String(meta.monthRef || getCurrentMonthRef()).trim();
+            const match = monthRef.match(/^(\d{4})-(\d{2})$/);
+            if (match) {
+                const year = Number.parseInt(match[1], 10);
+                const monthIndex = Number.parseInt(match[2], 10) - 1;
+                const start = new Date(year, monthIndex, 1);
+                const end = new Date(year, monthIndex + 1, 0, 23, 59, 59, 999);
+                const label = start.toLocaleDateString('es-MX', { month: 'long', year: 'numeric' });
+                return {
+                    period,
+                    label: `Mes: ${label}`,
+                    start,
+                    end
+                };
+            }
+        }
+
+        if (period === 'quarterly') {
+            const year = Number.parseInt(meta.quarterYear, 10) || getCurrentQuarterMeta().year;
+            const quarterNumber = Number.parseInt(meta.quarterNumber, 10) || getCurrentQuarterMeta().quarter;
+            const quarterIndex = Math.min(Math.max(quarterNumber, 1), 4) - 1;
+            const startMonth = quarterIndex * 3;
+            const start = new Date(year, startMonth, 1);
+            const end = new Date(year, startMonth + 3, 0, 23, 59, 59, 999);
+            return {
+                period,
+                label: `Trimestre T${quarterIndex + 1} ${year}`,
+                start,
+                end
+            };
+        }
+
+        if (period === 'custom') {
+            const start = parseAcademicDateInput(meta.customStart);
+            const end = parseAcademicDateInput(meta.customEnd, true);
+            if (start && end && start <= end) {
+                return {
+                    period,
+                    label: `Entre ${formatAcademicDate(start)} y ${formatAcademicDate(end)}`,
+                    start,
+                    end
+                };
+            }
+        }
+
+        const filtersModule = window.Reportes?.Filters;
+        const range = filtersModule?.getDateRange
+            ? filtersModule.getDateRange(period)
+            : { start: state.dateStart, end: state.dateEnd };
+
+        return {
+            period,
+            label: getAcademicCrossPeriodLabel(period),
+            start: range?.start || state.dateStart,
+            end: range?.end || state.dateEnd
+        };
+    }
+
+    function applyCurrentDemoFilters(records) {
+        const filters = S().demoFilters || {};
+        return (Array.isArray(records) ? records : []).filter((item) => {
+            if (filters.carrera && item.carrera !== filters.carrera) return false;
+            if (filters.turno && item.turno !== filters.turno) return false;
+            if (filters.genero && item.genero !== filters.genero) return false;
+            if (filters.generacion && item.generacion !== Number.parseInt(filters.generacion, 10)) return false;
+            return true;
+        });
+    }
+
+    function getActiveAcademicFilterBadges() {
+        const state = S();
+        const entries = [];
+        if (state.demoFilters?.carrera) entries.push(`Carrera: ${normalizeCarreraLabel(state.demoFilters.carrera)}`);
+        if (state.demoFilters?.turno) entries.push(`Turno: ${normalizeTurnoLabel(state.demoFilters.turno)}`);
+        if (state.demoFilters?.genero) entries.push(`Genero: ${normalizeGeneroLabel(state.demoFilters.genero)}`);
+        if (state.demoFilters?.generacion) entries.push(`Generacion: ${normalizeGeneracionLabel(state.demoFilters.generacion)}`);
+        return entries;
+    }
+
+    function normalizeAcademicValue(record, fieldKey) {
+        switch (fieldKey) {
+            case 'genero':
+                return normalizeGeneroLabel(record?.genero);
+            case 'carrera':
+                return normalizeCarreraLabel(record?.carrera);
+            case 'generacion':
+                return normalizeGeneracionLabel(record?.generacion);
+            case 'turno':
+                return normalizeTurnoLabel(record?.turno);
+            case 'tipoUsuario':
+                return normalizeTipoUsuarioLabel(record?.tipoUsuario);
+            default:
+                return toTitleCase(record?.[fieldKey] || 'Sin dato');
+        }
+    }
+
+    function compareAcademicValues(fieldKey, left, right) {
+        const a = String(left || '').trim();
+        const b = String(right || '').trim();
+        const isMissingA = !a || a === 'Sin dato';
+        const isMissingB = !b || b === 'Sin dato';
+        if (isMissingA && !isMissingB) return 1;
+        if (!isMissingA && isMissingB) return -1;
+
+        if (fieldKey === 'generacion') {
+            const numA = Number.parseInt(a, 10);
+            const numB = Number.parseInt(b, 10);
+            if (Number.isFinite(numA) && Number.isFinite(numB) && numA !== numB) return numB - numA;
+        }
+
+        const ordered = {
+            genero: ['Hombre', 'Mujer', 'No binario', 'Otro', 'Sin dato'],
+            turno: ['Matutino', 'Vespertino', 'Nocturno', 'Mixto', 'Sin dato'],
+            tipoUsuario: ['Estudiante', 'Docente', 'Personal', 'Externo', 'Sin dato']
+        }[fieldKey];
+
+        if (ordered) {
+            const idxA = ordered.indexOf(a);
+            const idxB = ordered.indexOf(b);
+            if (idxA !== idxB) {
+                const safeA = idxA === -1 ? Number.MAX_SAFE_INTEGER : idxA;
+                const safeB = idxB === -1 ? Number.MAX_SAFE_INTEGER : idxB;
+                return safeA - safeB;
+            }
+        }
+
+        return a.localeCompare(b, 'es', { sensitivity: 'base' });
+    }
+
+    function sortAcademicEntries(fieldKey, entries) {
+        return [...(entries || [])].sort((left, right) => compareAcademicValues(fieldKey, left, right));
+    }
+
+    function shouldUseSemanticPrimaryOrder(fieldKey) {
+        return ['turno', 'genero', 'tipoUsuario', 'generacion'].includes(fieldKey);
+    }
+
+    function sortAcademicCrossSummaryRows(rows, primaryDimension) {
+        const safeRows = Array.isArray(rows) ? [...rows] : [];
+
+        safeRows.sort((left, right) => {
+            if (shouldUseSemanticPrimaryOrder(primaryDimension)) {
+                const labelComparison = compareAcademicValues(primaryDimension, left.label, right.label);
+                if (labelComparison !== 0) return labelComparison;
+                return right.count - left.count;
+            }
+
+            if (left.count !== right.count) return right.count - left.count;
+            return compareAcademicValues(primaryDimension, left.label, right.label);
+        });
+
+        return safeRows;
+    }
+
+    function sortAcademicCrossPivotRows(entries, rowDimensions) {
+        const safeEntries = Array.isArray(entries) ? [...entries] : [];
+
+        safeEntries.sort((left, right) => {
+            const primaryComparison = compareAcademicValues(rowDimensions[0], left.rowValues[0], right.rowValues[0]);
+            if (primaryComparison !== 0) return primaryComparison;
+
+            if (left.total !== right.total) return right.total - left.total;
+
+            for (let index = 1; index < rowDimensions.length; index += 1) {
+                const comparison = compareAcademicValues(rowDimensions[index], left.rowValues[index], right.rowValues[index]);
+                if (comparison !== 0) return comparison;
+            }
+            return 0;
+        });
+
+        return safeEntries;
+    }
+
+    function createEmptyCountMap(labels) {
+        return labels.reduce((acc, label) => {
+            acc[label] = 0;
+            return acc;
+        }, {});
+    }
+
+    function buildAcademicCrossMatrix(records, dimensions, tab) {
+        const selectedDimensions = Array.from(new Set((dimensions || []).filter(Boolean)));
+        const safeRecords = Array.isArray(records) ? records : [];
+        if (!selectedDimensions.length) return null;
+
+        if (selectedDimensions.length === 1) {
+            const primaryDimension = selectedDimensions[0];
+            const counts = {};
+            safeRecords.forEach((record) => {
+                const label = normalizeAcademicValue(record, primaryDimension);
+                counts[label] = (counts[label] || 0) + 1;
+            });
+
+            const orderedRows = sortAcademicCrossSummaryRows(
+                Object.keys(counts).map((label) => ({ label, count: counts[label] || 0 })),
+                primaryDimension
+            );
+            const dataRows = orderedRows.map((item) => ({
+                type: 'data',
+                cells: [item.label, item.count, safeRecords.length > 0 ? `${((item.count / safeRecords.length) * 100).toFixed(1)}%` : '0.0%']
+            }));
+
+            const totalRow = {
+                type: 'total',
+                cells: ['Total general', safeRecords.length, safeRecords.length > 0 ? '100.0%' : '0.0%']
+            };
+
+            return {
+                type: 'summary',
+                selectedDimensions,
+                dimensionPath: selectedDimensions.map((key) => getAcademicCrossFieldLabel(key, tab)).join(' > '),
+                headers: [getAcademicCrossFieldLabel(primaryDimension, tab), 'Cantidad', '%'],
+                renderRows: [...dataRows, totalRow],
+                exportRows: [...dataRows.map((row) => row.cells), totalRow.cells],
+                primaryDimension,
+                primarySummary: orderedRows.map((item) => ({ label: item.label, count: item.count })),
+                columnDimension: null,
+                columnValues: [],
+                numericStartIndex: 1,
+                baseRecords: safeRecords.length,
+                combinations: dataRows.length
+            };
+        }
+
+        const rowDimensions = selectedDimensions.slice(0, selectedDimensions.length - 1);
+        const columnDimension = selectedDimensions[selectedDimensions.length - 1];
+        const columnValueSet = new Set();
+        const rowMap = new Map();
+
+        safeRecords.forEach((record) => {
+            const rowValues = rowDimensions.map((dimension) => normalizeAcademicValue(record, dimension));
+            const columnValue = normalizeAcademicValue(record, columnDimension);
+            const rowKey = rowValues.join('||');
+            if (!rowMap.has(rowKey)) {
+                rowMap.set(rowKey, {
+                    rowValues,
+                    counts: {},
+                    total: 0
+                });
+            }
+            const current = rowMap.get(rowKey);
+            current.counts[columnValue] = (current.counts[columnValue] || 0) + 1;
+            current.total += 1;
+            columnValueSet.add(columnValue);
+        });
+
+        const columnValues = sortAcademicEntries(columnDimension, Array.from(columnValueSet));
+        const rowEntries = sortAcademicCrossPivotRows(Array.from(rowMap.values()), rowDimensions);
+        const columnTotals = createEmptyCountMap(columnValues);
+        const renderRows = [];
+        const exportRows = [];
+        const primaryTotals = rowEntries.reduce((acc, entry) => {
+            const primaryLabel = entry.rowValues[0];
+            acc[primaryLabel] = (acc[primaryLabel] || 0) + entry.total;
+            return acc;
+        }, {});
+
+        let currentGroup = null;
+        let groupAccumulator = createEmptyCountMap(columnValues);
+        let groupTotal = 0;
+
+        rowEntries.forEach((entry) => {
+            const primaryLabel = entry.rowValues[0];
+            const isNewGroup = primaryLabel !== currentGroup;
+
+            if (rowDimensions.length > 1 && currentGroup !== null && isNewGroup) {
+                const subtotalCells = [
+                    `Subtotal ${currentGroup}`,
+                    ...new Array(rowDimensions.length - 1).fill(''),
+                    ...columnValues.map((label) => groupAccumulator[label] || 0),
+                    groupTotal
+                ];
+                renderRows.push({ type: 'subtotal', cells: subtotalCells });
+                exportRows.push(subtotalCells);
+                groupAccumulator = createEmptyCountMap(columnValues);
+                groupTotal = 0;
+            }
+
+            if (rowDimensions.length > 1 && isNewGroup) {
+                renderRows.push({
+                    type: 'group',
+                    colspan: rowDimensions.length + columnValues.length + 1,
+                    label: `${getAcademicCrossFieldLabel(rowDimensions[0], tab)}: ${primaryLabel}`,
+                    meta: `${chartsSafeNumber(primaryTotals[primaryLabel] || 0)} registros`
+                });
+            }
+
+            currentGroup = primaryLabel;
+            columnValues.forEach((label) => {
+                const count = entry.counts[label] || 0;
+                columnTotals[label] = (columnTotals[label] || 0) + count;
+                groupAccumulator[label] = (groupAccumulator[label] || 0) + count;
+            });
+            groupTotal += entry.total;
+
+            const exportCells = [
+                ...entry.rowValues,
+                ...columnValues.map((label) => entry.counts[label] || 0),
+                entry.total
+            ];
+            const renderCells = [
+                ...(rowDimensions.length > 1 ? ['', ...entry.rowValues.slice(1)] : entry.rowValues),
+                ...columnValues.map((label) => entry.counts[label] || 0),
+                entry.total
+            ];
+            renderRows.push({ type: 'data', cells: renderCells });
+            exportRows.push(exportCells);
+        });
+
+        if (rowDimensions.length > 1 && currentGroup !== null) {
+            const subtotalCells = [
+                `Subtotal ${currentGroup}`,
+                ...new Array(rowDimensions.length - 1).fill(''),
+                ...columnValues.map((label) => groupAccumulator[label] || 0),
+                groupTotal
+            ];
+            renderRows.push({ type: 'subtotal', cells: subtotalCells });
+            exportRows.push(subtotalCells);
+        }
+
+        const totalCells = [
+            'Total general',
+            ...new Array(rowDimensions.length - 1).fill(''),
+            ...columnValues.map((label) => columnTotals[label] || 0),
+            safeRecords.length
+        ];
+        renderRows.push({ type: 'total', cells: totalCells });
+        exportRows.push(totalCells);
+
+        return {
+            type: 'pivot',
+            selectedDimensions,
+            dimensionPath: selectedDimensions.map((key) => getAcademicCrossFieldLabel(key, tab)).join(' > '),
+            headers: rowDimensions.map((dimension) => getAcademicCrossFieldLabel(dimension, tab)).concat(columnValues, 'Total'),
+            renderRows,
+            exportRows,
+            primaryDimension: rowDimensions[0],
+            primarySummary: sortAcademicCrossSummaryRows(
+                Object.keys(primaryTotals).map((label) => ({ label, count: primaryTotals[label] || 0 })),
+                rowDimensions[0]
+            ).map((item) => ({
+                label: item.label,
+                count: item.count
+            })),
+            columnDimension,
+            columnValues,
+            columnSummary: columnValues.map((label) => ({ label, count: columnTotals[label] || 0 })),
+            numericStartIndex: rowDimensions.length,
+            baseRecords: safeRecords.length,
+            combinations: rowEntries.length
+        };
+    }
+
+    function renderAcademicCrossLauncher({ accent = '#f59e0b', enabled = true, tabLabel = 'Visitas' } = {}) {
+        const actionButton = enabled
+            ? `<button class="btn btn-light btn-lg rounded-pill px-4 fw-bold shadow-sm" onclick="Reportes.Biblio.openAcademicCrossModal()">
+                    <i class="bi bi-sliders2 me-2"></i>Seleccionar cruce
+               </button>`
+            : `<button class="btn btn-outline-secondary btn-lg rounded-pill px-4 fw-bold" disabled>
+                    <i class="bi bi-lock me-2"></i>Disponible en Visitas y Prestamos
+               </button>`;
+
+        const helperText = enabled
+            ? 'Combina genero, carrera, generacion y turno en una sola matriz comparativa lista para exportar.'
+            : 'El cruce academico se habilita cuando la pestana tiene registros demograficos comparables.';
+
+        return `
+            <div class="card border-0 shadow-sm rounded-4 reportes-biblio-cross-hero" style="background:linear-gradient(135deg, ${hexToRgba(accent, 0.98)}, ${hexToRgba(accent, 0.82)});">
+                <div class="card-body p-4">
+                    <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-4">
+                        <div class="text-white">
+                            <div class="small fw-bold text-uppercase mb-2 opacity-75">Cruce academico visible</div>
+                            <h5 class="fw-bold mb-2">Explora ${escapeHtml(tabLabel)} con combinaciones reales de datos</h5>
+                            <p class="mb-0 opacity-90">${escapeHtml(helperText)}</p>
+                        </div>
+                        <div class="d-flex flex-column align-items-lg-end gap-2">
+                            <div class="d-flex flex-wrap gap-2 justify-content-lg-end">
+                                <span class="badge rounded-pill text-bg-light border">Genero</span>
+                                <span class="badge rounded-pill text-bg-light border">Carrera</span>
+                                <span class="badge rounded-pill text-bg-light border">Generacion</span>
+                            </div>
+                            ${actionButton}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    function renderAcademicCrossModal(tab, tabLabel) {
+        const selection = getAcademicCrossSelection(tab);
+        const options = getAcademicCrossFields(tab);
+        const activeFilterBadges = getActiveAcademicFilterBadges();
+        const selectedPeriod = getAcademicCrossPeriod(tab);
+        const renderSelectOptions = (selectedValue) => [
+            '<option value="">Sin usar</option>',
+            ...options.map((field) => `<option value="${escapeHtml(field.key)}" ${selectedValue === field.key ? 'selected' : ''}>${escapeHtml(field.label)}</option>`)
+        ].join('');
+
+        return `
+            <div class="modal fade" id="${ACADEMIC_CROSS_MODAL_ID}" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-xl modal-dialog-centered">
+                    <div class="modal-content border-0 shadow rounded-4">
+                        <div class="modal-header border-0 pb-2">
+                            <div>
+                                <h5 class="modal-title fw-bold mb-1">Cruce academico de Biblioteca</h5>
+                                <div class="text-muted small">${escapeHtml(tabLabel)} - La vista respeta el periodo y los filtros visibles.</div>
+                            </div>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                        </div>
+                        <div class="modal-body pt-0 reportes-biblio-cross-modal-body">
+                            <div class="rounded-4 border p-3 mb-3 reportes-biblio-cross-filter-panel">
+                                <div class="d-flex flex-column flex-xl-row align-items-xl-center justify-content-between gap-3 mb-3">
+                                    <div>
+                                        <div class="fw-semibold text-dark">Selecciona el lapso y el tipo de cruce</div>
+                                        <div class="small text-muted">Compacta el filtro arriba y deja la matriz lista para lectura y exportacion.</div>
+                                    </div>
+                                    <div class="d-flex flex-wrap gap-2">
+                                        <button class="btn btn-primary btn-sm rounded-pill px-4" onclick="Reportes.Biblio.applyAcademicCrossConfig()">
+                                            <i class="bi bi-funnel me-2"></i>Actualizar vista
+                                        </button>
+                                        <button class="btn btn-outline-secondary btn-sm rounded-pill px-4" onclick="Reportes.Biblio.resetAcademicCrossConfig()">
+                                            <i class="bi bi-arrow-counterclockwise me-2"></i>Restablecer
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div class="row g-2 align-items-end">
+                                    <div class="col-xl-3 col-md-6">
+                                        <label class="form-label small text-muted fw-semibold mb-1" for="biblio-cross-period">Lapso</label>
+                                        <select class="form-select form-select-sm rounded-4" id="biblio-cross-period" onchange="Reportes.Biblio.onAcademicCrossPeriodChange()">
+                                            ${ACADEMIC_CROSS_PERIODS.map((item) => `<option value="${escapeHtml(item.id)}" ${selectedPeriod === item.id ? 'selected' : ''}>${escapeHtml(item.label)}</option>`).join('')}
+                                        </select>
+                                    </div>
+                                    <div id="biblio-cross-period-detail-wrap" class="contents">
+                                        ${renderAcademicCrossPeriodDetailControls(tab, selectedPeriod)}
+                                    </div>
+                                    <div class="col-xl-2 col-md-4">
+                                        <label class="form-label small text-muted fw-semibold mb-1" for="biblio-cross-primary">Primero</label>
+                                        <select class="form-select form-select-sm rounded-4" id="biblio-cross-primary">
+                                            ${options.map((field) => `<option value="${escapeHtml(field.key)}" ${selection.primary === field.key ? 'selected' : ''}>${escapeHtml(field.label)}</option>`).join('')}
+                                        </select>
+                                    </div>
+                                    <div class="col-xl-2 col-md-4">
+                                        <label class="form-label small text-muted fw-semibold mb-1" for="biblio-cross-secondary">Luego</label>
+                                        <select class="form-select form-select-sm rounded-4" id="biblio-cross-secondary">
+                                            ${renderSelectOptions(selection.secondary)}
+                                        </select>
+                                    </div>
+                                    <div class="col-xl-2 col-md-4">
+                                        <label class="form-label small text-muted fw-semibold mb-1" for="biblio-cross-tertiary">Columnas</label>
+                                        <select class="form-select form-select-sm rounded-4" id="biblio-cross-tertiary">
+                                            ${renderSelectOptions(selection.tertiary)}
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div id="biblio-cross-feedback" class="alert alert-warning rounded-4 d-none"></div>
+
+                            <div class="d-flex flex-wrap gap-2 mb-3">
+                                ${activeFilterBadges.length
+                ? activeFilterBadges.map((badge) => `<span class="badge rounded-pill text-bg-light border">${escapeHtml(badge)}</span>`).join('')
+                : '<span class="badge rounded-pill text-bg-light border">Sin filtros demograficos adicionales</span>'}
+                            </div>
+
+                            <div id="biblio-cross-preview"></div>
+                        </div>
+                        <div class="modal-footer border-0 pt-0 d-flex justify-content-between flex-wrap gap-2">
+                            <div class="small text-muted">Exporta solo la matriz generada desde este modal.</div>
+                            <div class="d-flex flex-wrap gap-2">
+                                <button class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">
+                                    <i class="bi bi-x-circle me-2"></i>Salir
+                                </button>
+                                <button class="btn btn-outline-success rounded-pill px-4" id="biblio-cross-export-excel" onclick="Reportes.Biblio.exportAcademicCross('excel')">
+                                    <i class="bi bi-file-earmark-excel me-2"></i>Excel
+                                </button>
+                                <button class="btn btn-outline-danger rounded-pill px-4" id="biblio-cross-export-pdf" onclick="Reportes.Biblio.exportAcademicCross('pdf')">
+                                    <i class="bi bi-file-earmark-pdf me-2"></i>PDF
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    function setAcademicCrossFeedback(message = '', tone = 'warning') {
+        const feedbackEl = document.getElementById('biblio-cross-feedback');
+        if (!feedbackEl) return;
+
+        if (!message) {
+            feedbackEl.className = 'alert alert-warning rounded-4 d-none';
+            feedbackEl.textContent = '';
+            return;
+        }
+
+        feedbackEl.className = `alert alert-${tone} rounded-4`;
+        feedbackEl.textContent = message;
+    }
+
+    function setAcademicCrossExportEnabled(enabled) {
+        ['biblio-cross-export-excel', 'biblio-cross-export-pdf'].forEach((id) => {
+            const button = document.getElementById(id);
+            if (button) button.disabled = !enabled;
+        });
+    }
+
+    function renderAcademicCrossPreview(matrix, tabLabel, periodLabel = 'Periodo actual', dateStart = null, dateEnd = null) {
+        const previewEl = document.getElementById('biblio-cross-preview');
+        if (!previewEl) return;
+
+        if (!matrix) {
+            previewEl.innerHTML = `
+                <div class="rounded-4 border border-dashed p-4 text-center text-muted">
+                    Configura al menos un cruce para ver la matriz comparativa.
+                </div>
+            `;
+            return;
+        }
+
+        const columnSummaryHtml = matrix.columnSummary?.length
+            ? matrix.columnSummary.map((item) => `
+                <span class="badge rounded-pill" style="background:${hexToRgba('#f59e0b', 0.12)}; color:#92400e;">
+                    ${escapeHtml(item.label)}: ${escapeHtml(chartsSafeNumber(item.count))}
+                </span>
+            `).join('')
+            : '<span class="text-muted small">Sin columnas comparativas adicionales.</span>';
+        const renderTableRow = (row) => {
+            if (row.colspan) {
+                return `
+                    <tr class="reportes-biblio-cross-row-${escapeHtml(row.type)}">
+                        <td colspan="${row.colspan}">
+                            <div class="reportes-biblio-cross-group-row">
+                                <span class="reportes-biblio-cross-group-title">${escapeHtml(row.label)}</span>
+                                ${row.meta ? `<span class="reportes-biblio-cross-group-meta">${escapeHtml(row.meta)}</span>` : ''}
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }
+
+            return `
+                <tr class="reportes-biblio-cross-row-${escapeHtml(row.type)}">
+                    ${row.cells.map((cell, index) => {
+                const alignClass = index >= (matrix.numericStartIndex || 0) ? 'text-end fw-semibold' : '';
+                const emptyClass = cell === '' ? 'reportes-biblio-cross-empty-cell' : '';
+                return `<td class="${alignClass} ${emptyClass}">${escapeHtml(cell)}</td>`;
+            }).join('')}
+                </tr>
+            `;
+        };
+
+        previewEl.innerHTML = `
+            <div class="d-flex flex-column gap-3">
+                <div class="row g-3">
+                    <div class="col-lg-4">
+                        <div class="card border-0 shadow-sm rounded-4 h-100">
+                            <div class="card-body">
+                                <div class="text-muted small fw-bold text-uppercase mb-1">Registros analizados</div>
+                                <div class="display-6 fw-bold text-dark mb-1">${escapeHtml(chartsSafeNumber(matrix.baseRecords))}</div>
+                                <div class="small text-muted">${escapeHtml(tabLabel)} visible para ${escapeHtml(periodLabel.toLowerCase())}.</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-lg-4">
+                        <div class="card border-0 shadow-sm rounded-4 h-100">
+                            <div class="card-body">
+                                <div class="text-muted small fw-bold text-uppercase mb-1">Cruce activo</div>
+                                <div class="fw-bold text-dark mb-2">${escapeHtml(matrix.dimensionPath)}</div>
+                                <div class="small text-muted">${escapeHtml(chartsSafeNumber(matrix.combinations))} combinaciones visibles en la matriz.</div>
+                                <div class="small text-muted mt-1">${escapeHtml(formatAcademicDate(dateStart))} a ${escapeHtml(formatAcademicDate(dateEnd))}</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-lg-4">
+                        <div class="card border-0 shadow-sm rounded-4 h-100">
+                            <div class="card-body">
+                                <div class="text-muted small fw-bold text-uppercase mb-1">Columnas comparadas</div>
+                                <div class="d-flex flex-wrap gap-2">${columnSummaryHtml}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card border-0 shadow-sm rounded-4">
+                    <div class="card-body">
+                        <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-2 mb-3">
+                            <div>
+                                <h6 class="fw-bold mb-1">Matriz comparativa solicitada</h6>
+                                <div class="small text-muted">Cuando una combinacion se aprecia mejor en tabla, esta vista prioriza lectura y exportacion.</div>
+                            </div>
+                            <span class="badge rounded-pill text-bg-light border">${escapeHtml(matrix.dimensionPath)}</span>
+                        </div>
+                        <div class="table-responsive reportes-biblio-cross-table-wrap">
+                            <table class="table table-sm align-middle mb-0 reportes-biblio-cross-table">
+                                <thead>
+                                    <tr>
+                                        ${matrix.headers.map((header) => `<th>${escapeHtml(header)}</th>`).join('')}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${matrix.renderRows.map((row) => renderTableRow(row)).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    function buildAcademicCrossExportPayload(matrix, context) {
+        const activeFilters = getActiveAcademicFilterBadges();
+        const primarySectionRows = (matrix.primarySummary || []).map((item) => [item.label, item.count]);
+        const columnSectionRows = (matrix.columnSummary || []).map((item) => [item.label, item.count]);
+        const safeTabLabel = context?.tabLabel || 'Biblioteca';
+        const filenameBase = sanitizeFilename(`Cruce_Biblioteca_${context?.tab || 'tab'}_${matrix.selectedDimensions.join('_')}`);
+
+        return {
+            kind: 'generic',
+            title: 'Cruce academico - Biblioteca',
+            subtitle: `${safeTabLabel} - ${matrix.dimensionPath}`,
+            filenameBase,
+            recordCount: matrix.baseRecords,
+            summary: [
+                ['Pestana', safeTabLabel],
+                ['Lapso solicitado', context?.periodLabel || 'Periodo actual'],
+                ['Cruce solicitado', matrix.dimensionPath],
+                ['Registros base', matrix.baseRecords],
+                ['Combinaciones visibles', matrix.combinations],
+                ['Rango', `${formatAcademicDate(context?.dateStart)} a ${formatAcademicDate(context?.dateEnd)}`],
+                ['Filtros activos', activeFilters.length ? activeFilters.join(' | ') : 'Sin filtros demograficos adicionales']
+            ],
+            highlights: [
+                { label: 'Registros analizados', value: matrix.baseRecords.toLocaleString('es-MX'), hint: 'Subset visible de la pestana actual.' },
+                { label: 'Filas comparativas', value: matrix.combinations.toLocaleString('es-MX'), hint: 'Combinaciones unicas generadas en la tabla.' },
+                { label: 'Columnas activas', value: (matrix.columnValues?.length || 0).toLocaleString('es-MX'), hint: matrix.columnDimension ? `Distribuidas por ${getAcademicCrossFieldLabel(matrix.columnDimension, context?.tab)}` : 'Vista resumida sin columnas cruzadas.' }
+            ],
+            sections: [
+                primarySectionRows.length ? {
+                    title: `Totales por ${getAcademicCrossFieldLabel(matrix.primaryDimension, context?.tab)}`,
+                    headers: [getAcademicCrossFieldLabel(matrix.primaryDimension, context?.tab), 'Cantidad'],
+                    rows: primarySectionRows,
+                    tone: 'warning'
+                } : null,
+                columnSectionRows.length && matrix.columnDimension ? {
+                    title: `Totales por ${getAcademicCrossFieldLabel(matrix.columnDimension, context?.tab)}`,
+                    headers: [getAcademicCrossFieldLabel(matrix.columnDimension, context?.tab), 'Cantidad'],
+                    rows: columnSectionRows,
+                    tone: 'primary'
+                } : null
+            ].filter(Boolean),
+            dataTitle: 'Matriz comparativa solicitada',
+            detailSheetName: 'CruceBiblioteca',
+            columns: matrix.headers,
+            rows: matrix.exportRows,
+            pdfRows: matrix.exportRows.slice(0, 90),
+            notes: [
+                'Esta exportacion contiene solo la matriz solicitada desde el cruce academico.',
+                'El contenido respeta la pestana activa, el periodo visible y los filtros demograficos ya aplicados.'
+            ],
+            pdfOptions: {
+                showDetailTable: true
+            }
+        };
+    }
+
+    async function applyAcademicCrossConfig() {
+        const context = getCurrentBiblioTabContext();
+        const previewEl = document.getElementById('biblio-cross-preview');
+        if (!previewEl) return;
+
+        if (!context.supported) {
+            setAcademicCrossFeedback('El cruce academico esta disponible solo en las pestanas de Visitas y Prestamos.');
+            renderAcademicCrossPreview(null, context.tabLabel);
+            setAcademicCrossExportEnabled(false);
+            _academicCrossState.matrix = null;
+            _academicCrossState.exportPayload = null;
+            return;
+        }
+
+        const primary = document.getElementById('biblio-cross-primary')?.value || '';
+        const secondary = document.getElementById('biblio-cross-secondary')?.value || '';
+        const tertiary = document.getElementById('biblio-cross-tertiary')?.value || '';
+        const period = document.getElementById('biblio-cross-period')?.value || 'current';
+        const periodMeta = readAcademicCrossPeriodMeta(period);
+        const selected = [primary, secondary, tertiary].filter(Boolean);
+        const uniqueSelected = new Set(selected);
+        const periodValidationError = validateAcademicCrossPeriodMeta(period, periodMeta);
+
+        if (!primary) {
+            setAcademicCrossFeedback('Selecciona al menos el agrupador principal para construir la matriz.');
+            renderAcademicCrossPreview(null, context.tabLabel);
+            setAcademicCrossExportEnabled(false);
+            return;
+        }
+
+        if (uniqueSelected.size !== selected.length) {
+            setAcademicCrossFeedback('Cada nivel del cruce debe usar una dimension distinta para evitar duplicados.');
+            renderAcademicCrossPreview(null, context.tabLabel);
+            setAcademicCrossExportEnabled(false);
+            return;
+        }
+
+        if (periodValidationError) {
+            setAcademicCrossFeedback(periodValidationError);
+            renderAcademicCrossPreview(null, context.tabLabel);
+            setAcademicCrossExportEnabled(false);
+            return;
+        }
+
+        setAcademicCrossSelection(context.tab, { primary, secondary, tertiary });
+        setAcademicCrossPeriod(context.tab, period);
+        setAcademicCrossPeriodMeta(context.tab, periodMeta);
+        _academicCrossState.activeTab = context.tab;
+        previewEl.innerHTML = `
+            <div class="rounded-4 border p-4 text-center text-muted">
+                <div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div>
+                Preparando cruce academico para ${escapeHtml(getAcademicCrossPeriodLabel(period).toLowerCase())}...
+            </div>
+        `;
+        setAcademicCrossExportEnabled(false);
+
+        try {
+            const dataset = await resolveAcademicCrossDataset(context, period, periodMeta);
+            if (!dataset.records.length) {
+                setAcademicCrossFeedback('No hay registros visibles en esta pestana para construir el cruce con la configuracion actual.', 'info');
+                renderAcademicCrossPreview(null, context.tabLabel, dataset.periodLabel, dataset.dateStart, dataset.dateEnd);
+                _academicCrossState.matrix = null;
+                _academicCrossState.exportPayload = null;
+                _academicCrossState.dateStart = dataset.dateStart;
+                _academicCrossState.dateEnd = dataset.dateEnd;
+                _academicCrossState.periodLabel = dataset.periodLabel;
+                return;
+            }
+
+            const exportContext = {
+                ...context,
+                period: dataset.period,
+                periodLabel: dataset.periodLabel,
+                dateStart: dataset.dateStart,
+                dateEnd: dataset.dateEnd
+            };
+            const matrix = buildAcademicCrossMatrix(dataset.records, selected, context.tab);
+            _academicCrossState.matrix = matrix;
+            _academicCrossState.exportPayload = matrix ? buildAcademicCrossExportPayload(matrix, exportContext) : null;
+            _academicCrossState.dateStart = dataset.dateStart;
+            _academicCrossState.dateEnd = dataset.dateEnd;
+            _academicCrossState.periodLabel = dataset.periodLabel;
+            setAcademicCrossFeedback('');
+            renderAcademicCrossPreview(matrix, context.tabLabel, dataset.periodLabel, dataset.dateStart, dataset.dateEnd);
+            setAcademicCrossExportEnabled(!!_academicCrossState.exportPayload);
+        } catch (error) {
+            console.error('[Reportes.Biblio] Error generando cruce academico:', error);
+            setAcademicCrossFeedback('No se pudo cargar el lapso solicitado para el cruce academico.', 'danger');
+            renderAcademicCrossPreview(null, context.tabLabel, getAcademicCrossPeriodLabel(period));
+            _academicCrossState.matrix = null;
+            _academicCrossState.exportPayload = null;
+        }
+    }
+
+    function resetAcademicCrossConfig() {
+        const context = getCurrentBiblioTabContext();
+        if (!context.supported) return;
+        const defaults = { ...(ACADEMIC_CROSS_DEFAULTS[context.tab] || ACADEMIC_CROSS_DEFAULTS.visitas) };
+        setAcademicCrossSelection(context.tab, defaults);
+        setAcademicCrossPeriod(context.tab, 'current');
+        setAcademicCrossPeriodMeta(context.tab, {
+            monthRef: getCurrentMonthRef(),
+            quarterYear: getCurrentQuarterMeta().year,
+            quarterNumber: getCurrentQuarterMeta().quarter,
+            customStart: toAcademicDateInputValue(S().dateStart),
+            customEnd: toAcademicDateInputValue(S().dateEnd)
+        });
+
+        const primarySelect = document.getElementById('biblio-cross-primary');
+        const secondarySelect = document.getElementById('biblio-cross-secondary');
+        const tertiarySelect = document.getElementById('biblio-cross-tertiary');
+        const periodSelect = document.getElementById('biblio-cross-period');
+        if (primarySelect) primarySelect.value = defaults.primary;
+        if (secondarySelect) secondarySelect.value = defaults.secondary;
+        if (tertiarySelect) tertiarySelect.value = defaults.tertiary;
+        if (periodSelect) periodSelect.value = 'current';
+        onAcademicCrossPeriodChange();
+
+        void applyAcademicCrossConfig();
+    }
+
+    function openAcademicCrossModal() {
+        const context = getCurrentBiblioTabContext();
+        if (!context.supported) {
+            alert('El cruce academico esta disponible solo en las pestanas de Visitas y Prestamos.');
+            return;
+        }
+
+        const modal = document.getElementById(ACADEMIC_CROSS_MODAL_ID);
+        if (!modal) return;
+
+        const selection = getAcademicCrossSelection(context.tab);
+        const selectedPeriod = getAcademicCrossPeriod(context.tab);
+        const primarySelect = document.getElementById('biblio-cross-primary');
+        const secondarySelect = document.getElementById('biblio-cross-secondary');
+        const tertiarySelect = document.getElementById('biblio-cross-tertiary');
+        const periodSelect = document.getElementById('biblio-cross-period');
+        if (primarySelect) primarySelect.value = selection.primary;
+        if (secondarySelect) secondarySelect.value = selection.secondary;
+        if (tertiarySelect) tertiarySelect.value = selection.tertiary;
+        if (periodSelect) periodSelect.value = selectedPeriod;
+        onAcademicCrossPeriodChange();
+
+        void applyAcademicCrossConfig();
+        new bootstrap.Modal(modal).show();
+    }
+
+    async function exportAcademicCross(format) {
+        if (!window.ExportUtils) {
+            alert('Las utilidades de exportacion no estan disponibles.');
+            return;
+        }
+
+        const context = getCurrentBiblioTabContext();
+        const payload = _academicCrossState.exportPayload;
+        if (!payload || !_academicCrossState.matrix || !context.supported) {
+            alert('Primero genera una matriz valida dentro del cruce academico.');
+            return;
+        }
+
+        const selectedPeriod = getAcademicCrossPeriod(_academicCrossState.activeTab || context.tab);
+        const config = {
+            period: selectedPeriod === 'current' ? (S().presetPeriod || 'current') : selectedPeriod,
+            dateStart: _academicCrossState.dateStart,
+            dateEnd: _academicCrossState.dateEnd
+        };
+
+        if (format === 'pdf') {
+            await window.ExportUtils.generatePDF(config, payload, 'BIBLIO');
+        } else {
+            window.ExportUtils.generateExcel(config, payload, 'BIBLIO');
+        }
+    }
+
     function renderMetricCard({ title, value, subtitle = '', icon = 'bi-bar-chart', accent = '#6366f1', canvasId = '', colClass = 'col-xl-4 col-md-6' }) {
         return `
             <div class="${colClass}">
@@ -635,9 +1805,135 @@ window.Reportes.Biblio = (function () {
                     color: #0f172a;
                 }
 
+                .reportes-biblio-cross-hero {
+                    overflow: hidden;
+                }
+
+                .reportes-biblio-cross-modal-body {
+                    overflow: hidden;
+                }
+
+                .reportes-biblio-cross-filter-panel {
+                    background:
+                        radial-gradient(circle at top right, rgba(245, 158, 11, 0.08), transparent 38%),
+                        linear-gradient(180deg, #fffdf9 0%, #fffaf3 100%);
+                    border-color: #fed7aa !important;
+                }
+
+                .reportes-biblio-cross-filter-panel .form-label {
+                    letter-spacing: 0.01em;
+                }
+
+                .reportes-biblio-cross-filter-panel .form-select,
+                .reportes-biblio-cross-filter-panel .form-control {
+                    border-color: #fed7aa;
+                    background-color: rgba(255, 255, 255, 0.96);
+                }
+
+                .reportes-biblio-cross-filter-panel .form-select:focus,
+                .reportes-biblio-cross-filter-panel .form-control:focus {
+                    border-color: #f59e0b;
+                    box-shadow: 0 0 0 0.2rem rgba(245, 158, 11, 0.15);
+                }
+
+                .contents {
+                    display: contents;
+                }
+
+                .reportes-biblio-cross-table-wrap {
+                    max-height: none;
+                    overflow-x: auto;
+                    overflow-y: hidden;
+                }
+
+                .reportes-biblio-cross-table thead th {
+                    position: sticky;
+                    top: 0;
+                    z-index: 1;
+                    background: #fff7ed;
+                    color: #9a3412;
+                    border-bottom-width: 1px;
+                    white-space: nowrap;
+                }
+
+                .reportes-biblio-cross-table tbody td {
+                    white-space: nowrap;
+                    vertical-align: middle;
+                    border-color: #f1f5f9;
+                    padding-top: 0.7rem;
+                    padding-bottom: 0.7rem;
+                }
+
+                .reportes-biblio-cross-table tbody tr.reportes-biblio-cross-row-data:nth-child(even) td {
+                    background: #fcfcfd;
+                }
+
+                .reportes-biblio-cross-table tbody tr.reportes-biblio-cross-row-data:hover td {
+                    background: #fffaf2;
+                }
+
+                .reportes-biblio-cross-empty-cell {
+                    color: transparent;
+                }
+
+                .reportes-biblio-cross-row-group td {
+                    background: linear-gradient(90deg, #fff7ed 0%, #fffbf5 100%);
+                    border-top: 2px solid #fdba74;
+                    border-bottom: 1px solid #fed7aa;
+                    padding-top: 0.8rem;
+                    padding-bottom: 0.8rem;
+                }
+
+                .reportes-biblio-cross-group-row {
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    gap: 1rem;
+                }
+
+                .reportes-biblio-cross-group-title {
+                    font-weight: 800;
+                    color: #9a3412;
+                    letter-spacing: 0.01em;
+                }
+
+                .reportes-biblio-cross-group-meta {
+                    display: inline-flex;
+                    align-items: center;
+                    justify-content: center;
+                    padding: 0.2rem 0.7rem;
+                    border-radius: 999px;
+                    background: rgba(154, 52, 18, 0.08);
+                    color: #9a3412;
+                    font-size: 0.8rem;
+                    font-weight: 700;
+                }
+
+                .reportes-biblio-cross-row-subtotal td {
+                    background: #fff7ed;
+                    font-weight: 700;
+                    color: #9a3412;
+                    border-top: 1px dashed #fdba74;
+                }
+
+                .reportes-biblio-cross-row-total td {
+                    background: linear-gradient(90deg, #fef3c7 0%, #fff7ed 100%);
+                    font-weight: 700;
+                    color: #78350f;
+                    border-top: 2px solid #f59e0b;
+                }
+
                 @media (max-width: 991.98px) {
                     .reportes-biblio-list-scroll {
                         max-height: none;
+                    }
+
+                    .reportes-biblio-cross-table-wrap {
+                        max-height: none;
+                    }
+
+                    .reportes-biblio-cross-filter-panel .btn {
+                        width: 100%;
                     }
                 }
             </style>
@@ -670,6 +1966,8 @@ window.Reportes.Biblio = (function () {
 
         return `
             <div class="d-flex flex-column gap-4 pb-5">
+                ${renderAcademicCrossLauncher({ accent: charts.COLORS.warning, enabled: true, tabLabel: 'Visitas' })}
+
                 <div class="row g-3">
                     ${renderMetricCard({
             title: 'Total visitas',
@@ -763,9 +2061,10 @@ window.Reportes.Biblio = (function () {
             icon: 'bi-calendar-range',
             accent: charts.COLORS.info,
             rows: generacionRows
-        })}
+                        })}
                 </div>
 
+                ${renderAcademicCrossModal('visitas', 'Visitas')}
                 ${renderBiblioSharedStyles()}
             </div>
         `;
@@ -788,6 +2087,8 @@ window.Reportes.Biblio = (function () {
     }) {
         return `
             <div class="d-flex flex-column gap-4 pb-5">
+                ${renderAcademicCrossLauncher({ accent: charts.COLORS.primary, enabled: true, tabLabel: 'Prestamos' })}
+
                 <div class="row g-3">
                     ${renderMetricCard({ title: 'Total prestamos', value: chartsSafeNumber(total), subtitle: 'Movimientos registrados en el periodo', icon: 'bi-book', accent: charts.COLORS.primary, colClass: 'col-xl-3 col-md-6' })}
                     ${renderMetricCard({ title: 'Activos', value: chartsSafeNumber(activos), subtitle: 'Prestamos vigentes o pendientes', icon: 'bi-bookmark-check', accent: charts.COLORS.success, colClass: 'col-xl-3 col-md-6' })}
@@ -860,9 +2161,10 @@ window.Reportes.Biblio = (function () {
             icon: 'bi-people',
             accent: charts.COLORS.teal,
             rows: carreraRows
-        })}
+                        })}
                 </div>
 
+                ${renderAcademicCrossModal('prestamos', 'Prestamos')}
                 ${renderBiblioSharedStyles()}
             </div>
         `;
@@ -883,6 +2185,8 @@ window.Reportes.Biblio = (function () {
     }) {
         return `
             <div class="d-flex flex-column gap-4 pb-5">
+                ${renderAcademicCrossLauncher({ accent: charts.COLORS.info, enabled: false, tabLabel: 'Catalogo' })}
+
                 <div class="row g-3">
                     ${renderMetricCard({ title: 'Total titulos', value: chartsSafeNumber(totalTitulos), subtitle: 'Acervo bibliografico cargado', icon: 'bi-collection', accent: charts.COLORS.primary, colClass: 'col-xl-3 col-md-6' })}
                     ${renderMetricCard({ title: 'Sin copias disponibles', value: chartsSafeNumber(sinCopias), subtitle: 'Titulos agotados en este momento', icon: 'bi-x-circle', accent: charts.COLORS.danger, colClass: 'col-xl-3 col-md-6' })}
@@ -1468,6 +2772,14 @@ window.Reportes.Biblio = (function () {
     // ============================
     // Retorno público
     // ============================
-    return { render, getTabs };
+    return {
+        render,
+        getTabs,
+        openAcademicCrossModal,
+        onAcademicCrossPeriodChange,
+        applyAcademicCrossConfig,
+        resetAcademicCrossConfig,
+        exportAcademicCross
+    };
 
 })();

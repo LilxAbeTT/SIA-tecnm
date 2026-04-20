@@ -19,7 +19,7 @@ var Reportes = (function () {
     let _ctx = null;
     /** @type {'landing'|'detail'} Vista actual */
     let _currentView = 'landing';
-    /** @type {'BIBLIO'|'MEDICO'|'POBLACION'|null} Área seleccionada */
+    /** @type {'BIBLIO'|'MEDICO'|'PSICOPEDAGOGICO'|'POBLACION'|null} Área seleccionada */
     let _currentArea = null;
     /** @type {string|null} Pestaña activa dentro del área */
     let _currentTab = null;
@@ -65,15 +65,27 @@ var Reportes = (function () {
         },
         MEDICO: {
             name: 'Servicios Médicos',
-            fullName: 'Servicios Médicos y Psicopedagógicos',
+            fullName: 'Servicios Médicos',
             icon: 'bi-heart-pulse-fill',
             color: 'primary',
             gradient: 'linear-gradient(135deg, #6366f1, #4f46e5)',
-            description: 'Atención médica, consultas psicológicas y seguimiento clínico.',
+            description: 'Atención médica, diagnósticos y seguimiento clínico.',
             tabs: [
                 { id: 'consultas', label: 'Consultas', icon: 'bi-clipboard2-pulse' },
                 { id: 'diagnosticos', label: 'Diagnósticos', icon: 'bi-activity' },
                 { id: 'perfil', label: 'Perfil Clínico', icon: 'bi-heart-pulse' }
+            ]
+        },
+        PSICOPEDAGOGICO: {
+            name: 'Atención Psicopedagógica',
+            fullName: 'Atención Psicopedagógica',
+            icon: 'bi-chat-heart-fill',
+            color: 'info',
+            gradient: 'linear-gradient(135deg, #0ea5e9, #0284c7)',
+            description: 'Atenciones psicopedagógicas, diagnósticos y seguimiento de acompañamiento.',
+            tabs: [
+                { id: 'consultas', label: 'Consultas', icon: 'bi-clipboard2-pulse' },
+                { id: 'diagnosticos', label: 'Diagnósticos', icon: 'bi-activity' }
             ]
         },
         POBLACION: {
@@ -124,6 +136,14 @@ var Reportes = (function () {
             if (tab === 'visitas') return source.filter(d => d.subarea === 'Visitas');
             if (tab === 'prestamos') return source.filter(d => d.subarea === 'Préstamos');
             if (tab === 'catalogo') return [];
+        }
+
+        if (area === 'MEDICO') {
+            return source.filter(d => (d.areaKey || '').toUpperCase() === 'MEDICO');
+        }
+
+        if (area === 'PSICOPEDAGOGICO') {
+            return source.filter(d => (d.areaKey || '').toUpperCase() === 'PSICOPEDAGOGICO');
         }
 
         return source;
@@ -202,7 +222,8 @@ var Reportes = (function () {
             if (type === 'PRESTAMOS') return item.subarea === 'Préstamos';
         } else if (_currentArea === 'MEDICO') {
             if (type === 'Consulta Médica') return item.tipo === 'Consulta Médica';
-            if (type === 'Consulta Psicológica') return item.tipo === 'Consulta Psicológica';
+        } else if (_currentArea === 'PSICOPEDAGOGICO') {
+            if (type === 'Consulta Psicopedagógica') return item.tipo === 'Consulta Psicopedagógica';
         } else if (_currentArea === 'POBLACION') {
             if (type === 'ESTUDIANTE') return item.subarea === 'ESTUDIANTE';
             if (type === 'DOCENTE') return item.subarea === 'DOCENTE';
@@ -552,8 +573,14 @@ var Reportes = (function () {
             if (kpiConsultas) kpiConsultas.textContent = formatCount(kpis.consultasHoy);
             const landingMedico = document.getElementById('landing-stat-MEDICO');
             if (landingMedico) {
-                landingMedico.textContent = Number.isFinite(kpis.consultasHoy)
-                    ? `${kpis.consultasHoy} consultas hoy`
+                landingMedico.textContent = Number.isFinite(kpis.consultasMedicasHoy)
+                    ? `${kpis.consultasMedicasHoy} consultas hoy`
+                    : '--';
+            }
+            const landingPsico = document.getElementById('landing-stat-PSICOPEDAGOGICO');
+            if (landingPsico) {
+                landingPsico.textContent = Number.isFinite(kpis.consultasPsicopedagogicasHoy)
+                    ? `${kpis.consultasPsicopedagogicasHoy} consultas hoy`
                     : '--';
             }
 
@@ -580,7 +607,7 @@ var Reportes = (function () {
 
     /**
      * Navega a la vista de detalle de un área.
-     * @param {string} area - 'BIBLIO' | 'MEDICO' | 'POBLACION'
+     * @param {string} area - 'BIBLIO' | 'MEDICO' | 'PSICOPEDAGOGICO' | 'POBLACION'
      */
     function navigateTo(area) {
         _currentArea = area;
@@ -907,7 +934,7 @@ var Reportes = (function () {
      */
     function renderDashboardContent(container) {
         const R = window.Reportes || {};
-        const subMap = { BIBLIO: R.Biblio, MEDICO: R.Medico, POBLACION: R.Poblacion, VOCACIONAL: R.Vocacional };
+        const subMap = { BIBLIO: R.Biblio, MEDICO: R.Medico, PSICOPEDAGOGICO: R.Medico, POBLACION: R.Poblacion, VOCACIONAL: R.Vocacional };
         const sub = subMap[_currentArea];
 
         if (sub && typeof sub.render === 'function') {
@@ -917,6 +944,7 @@ var Reportes = (function () {
             const fileMap = {
                 BIBLIO: 'modules/reportes/reportes-biblio.js',
                 MEDICO: 'modules/reportes/reportes-medico.js',
+                PSICOPEDAGOGICO: 'modules/reportes/reportes-medico.js',
                 POBLACION: 'modules/reportes/reportes-poblacion.js',
                 VOCACIONAL: 'modules/vocacional-admin.js'
             };
@@ -943,7 +971,7 @@ var Reportes = (function () {
 
                 _renderFilterBar();
 
-                const sub2 = { BIBLIO: R2.Biblio, MEDICO: R2.Medico, POBLACION: R2.Poblacion, VOCACIONAL: R2.Vocacional }[_currentArea];
+                const sub2 = { BIBLIO: R2.Biblio, MEDICO: R2.Medico, PSICOPEDAGOGICO: R2.Medico, POBLACION: R2.Poblacion, VOCACIONAL: R2.Vocacional }[_currentArea];
                 if (sub2 && typeof sub2.render === 'function') {
                     console.log('[Reportes] Sub-modulo cargado dinamicamente:', _currentArea);
                     sub2.render(container);
@@ -1240,8 +1268,11 @@ var Reportes = (function () {
         } else if (area === 'MEDICO') {
             if (tab === 'perfil') return [];
             return [
-                { id: 'medica', value: 'Consulta Médica', label: 'Consulta Medica' },
-                { id: 'psico', value: 'Consulta Psicológica', label: 'Consulta Psicologica' }
+                { id: 'medica', value: 'Consulta Médica', label: 'Consulta Medica' }
+            ];
+        } else if (area === 'PSICOPEDAGOGICO') {
+            return [
+                { id: 'psico', value: 'Consulta Psicopedagógica', label: 'Consulta Psicopedagogica' }
             ];
         } else if (area === 'POBLACION') {
             return [
@@ -2147,14 +2178,16 @@ var Reportes = (function () {
         return {
             kind: 'generic',
             title: `${AREAS[_currentArea]?.name || 'Servicios Medicos'} · ${titleSuffix}`,
-            subtitle: 'Exportacion ejecutiva clinica y psicopedagogica',
+            subtitle: _currentArea === 'PSICOPEDAGOGICO'
+                ? 'Exportacion ejecutiva de atencion psicopedagogica'
+                : 'Exportacion ejecutiva clinica y operativa',
             filenameBase: _sanitizeFileName(`Reporte_${_currentArea}_${_currentTab}_${config.requestedPeriod}`),
             summary: commonSummary,
             highlights: [
                 { label: 'Atenciones', value: records.length.toLocaleString('es-MX'), hint: 'Citas exportadas' },
                 { label: 'Pacientes unicos', value: _exportCountUnique(records, (item) => item._uid || item.matricula || item.usuario).toLocaleString('es-MX'), hint: 'Personas distintas atendidas' },
                 { label: 'Medicas', value: records.filter((item) => item.tipo === 'Consulta Médica' || item.tipo === 'Consulta MÃ©dica').length.toLocaleString('es-MX'), hint: 'Consulta medica general' },
-                { label: 'Psicologicas', value: records.filter((item) => item.tipo === 'Consulta Psicológica' || item.tipo === 'Consulta PsicolÃ³gica').length.toLocaleString('es-MX'), hint: 'Consulta psicologica' },
+                { label: 'Psicopedagogicas', value: records.filter((item) => item.tipo === 'Consulta Psicopedagógica' || item.tipo === 'Consulta PsicopedagÃ³gica' || item.tipo === 'Consulta Psicológica' || item.tipo === 'Consulta PsicolÃ³gica').length.toLocaleString('es-MX'), hint: 'Atencion psicopedagogica' },
                 { label: 'Cerradas', value: closedRecords.length.toLocaleString('es-MX'), hint: 'Con estado final' },
                 { label: 'Diag. agrupados', value: Object.keys(diagnosticMap).length.toLocaleString('es-MX'), hint: 'Categorias clinicas detectadas' }
             ],
@@ -2364,7 +2397,7 @@ var Reportes = (function () {
         if (_currentArea === 'BIBLIO') {
             return _buildBiblioExportPayload(records, exportContext, config);
         }
-        if (_currentArea === 'MEDICO') {
+        if (_currentArea === 'MEDICO' || _currentArea === 'PSICOPEDAGOGICO') {
             return _buildMedicoExportPayload(records, exportContext, config);
         }
         if (_currentArea === 'POBLACION') {
@@ -3127,7 +3160,7 @@ var Reportes = (function () {
                 if (tipo === 'meddiag' || tipo === 'psicodiag') {
                     if (!_isClosedMedicalRecord(d)) return false;
                     const grouped = typeof medicoCategorizer === 'function' ? medicoCategorizer(desc) : desc;
-                    const isPsicoRecord = d.tipo === 'Consulta Psicológica' || d.subarea === 'Psicología';
+                    const isPsicoRecord = d.tipo === 'Consulta Psicopedagógica' || d.tipo === 'Consulta Psicológica' || d.subarea === 'Psicología';
                     if (grouped !== diagnostico) return false;
                     return tipo === 'psicodiag' ? isPsicoRecord : !isPsicoRecord;
                 }

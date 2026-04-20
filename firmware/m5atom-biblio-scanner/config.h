@@ -3,8 +3,8 @@
 
 // Renombra este archivo a config.h antes de compilar.
 
-#define WIFI_SSID "INFINITUM54B5"
-#define WIFI_PASSWORD "XgVzNZ3YFz"
+#define WIFI_SSID "14+"
+#define WIFI_PASSWORD "soytuperra"
 
 #define SCANNER_FUNCTION_URL "https://us-central1-sia-tecnm.cloudfunctions.net/ingestScannerEvent"
 #define SCANNER_DEVICE_KEY "ej4Ir8pDfgq4422JBxec8BAebNeqfX3BOBd_DohPk6o"

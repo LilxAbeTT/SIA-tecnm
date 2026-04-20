@@ -20,6 +20,7 @@ export class Router {
             'view-reportes': '/reportes',
             'view-encuestas': '/encuestas',
             'view-encuesta-publica': '/encuesta-publica',
+            'view-admisiones-public': '/admisiones',
             'view-register': '/register',
             'view-test-vocacional': '/test-vocacional',
             'view-vocacional-test-active': '/vocacional/test',
@@ -112,6 +113,7 @@ export class Router {
             else if (path.startsWith('/quejas')) viewId = 'view-quejas';
             else if (path.startsWith('/reportes')) viewId = 'view-reportes';
             else if (path.startsWith('/encuestas')) viewId = 'view-encuestas';
+            else if (path.startsWith('/admisiones')) viewId = 'view-admisiones-public';
             else if (path.startsWith('/superadmin')) viewId = 'view-superadmin-dashboard';
             else if (path.startsWith('/test-vocacional')) viewId = 'view-test-vocacional';
             else if (path.startsWith('/vocacional/test')) viewId = 'view-vocacional-test-active';
@@ -126,6 +128,7 @@ export class Router {
 
         // Public routes - no auth required
         if (viewId === 'view-encuesta-publica'
+            || viewId === 'view-admisiones-public'
             || viewId === 'view-test-vocacional'
             || viewId === 'view-vocacional-test-active'
             || viewId === 'view-campus-map-public'
@@ -160,6 +163,7 @@ export class Router {
         if (viewId === 'view-test-vocacional'
             || viewId === 'view-vocacional-test-active'
             || viewId === 'view-encuesta-publica'
+            || viewId === 'view-admisiones-public'
             || viewId === 'view-campus-map-public'
             || viewId === 'view-qa-secret-login') {
             const landing = document.getElementById('landing-view');
@@ -386,6 +390,7 @@ export class Router {
                     '/modules/admin-biblio/prestamos.js',
                     '/modules/admin-biblio/devoluciones.js',
                     '/modules/admin-biblio/historial.js',
+                    '/modules/admin-biblio/inventario.js',
                     '/modules/admin-biblio/reportes.js',
                     '/modules/admin.biblio.js'
                 ] : ['/modules/biblio.js'])
@@ -466,6 +471,9 @@ export class Router {
                 '/modules/encuestas/encuestas-responses.js',
                 '/modules/encuestas/encuestas-nav.js',
                 '/modules/encuestas.js'
+            ],
+            'view-admisiones-public': [
+                '/modules/admisiones-public.js'
             ],
             'view-vocacional-admin': [
                 '/services/vocacional-service.js',
@@ -712,6 +720,12 @@ export class Router {
             const surveyId = hash.replace('#/encuesta-publica/', '').split('?')[0];
             if (window.Encuestas && window.Encuestas.initPublic) {
                 window.Encuestas.initPublic(surveyId);
+            }
+        }
+
+        if (viewId === 'view-admisiones-public') {
+            if (window.AdmisionesPublic && window.AdmisionesPublic.init) {
+                window.AdmisionesPublic.init(ctx);
             }
         }
 

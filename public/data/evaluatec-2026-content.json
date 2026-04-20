@@ -1,0 +1,1026 @@
+{
+  "version": "2026.1",
+  "careers": [
+    {
+      "id": "iadm",
+      "name": "Ingenieria en Administracion",
+      "shortName": "Ing. en Administracion",
+      "routeAreaIds": ["matematicas", "administracion", "comprension-lectora", "estructura-lenguaje", "ingles"]
+    },
+    {
+      "id": "cp",
+      "name": "Contador Publico",
+      "shortName": "Contador Publico",
+      "routeAreaIds": ["matematicas", "administracion", "comprension-lectora", "estructura-lenguaje", "ingles"]
+    },
+    {
+      "id": "arq",
+      "name": "Arquitectura",
+      "shortName": "Arquitectura",
+      "routeAreaIds": ["matematicas", "arquitectura", "comprension-lectora", "estructura-lenguaje", "ingles"]
+    },
+    {
+      "id": "gastro",
+      "name": "Gastronomia",
+      "shortName": "Gastronomia",
+      "routeAreaIds": ["matematicas", "estructura-lenguaje", "quimica", "comprension-lectora", "ingles"]
+    },
+    {
+      "id": "tur",
+      "name": "Licenciatura en Turismo",
+      "shortName": "Turismo",
+      "routeAreaIds": ["matematicas", "estructura-lenguaje", "tics", "comprension-lectora", "ingles"]
+    },
+    {
+      "id": "isc",
+      "name": "Ingenieria en Sistemas Computacionales",
+      "shortName": "ISC",
+      "routeAreaIds": ["matematicas", "fisica", "quimica", "comprension-lectora", "ingles"]
+    },
+    {
+      "id": "civil",
+      "name": "Ingenieria Civil",
+      "shortName": "Ing. Civil",
+      "routeAreaIds": ["matematicas", "fisica", "quimica", "comprension-lectora", "ingles"]
+    },
+    {
+      "id": "electro",
+      "name": "Ingenieria Electromecanica",
+      "shortName": "Ing. Electromecanica",
+      "routeAreaIds": ["matematicas", "fisica", "quimica", "comprension-lectora", "ingles"]
+    }
+  ],
+  "areas": [
+    {
+      "id": "matematicas",
+      "title": "Matematicas",
+      "role": "troncal",
+      "roleLabel": "Base comun",
+      "summary": "Matematicas aparece como habilidad basica para todas las carreras. Enfoca tu estudio en comprender procesos, no solo en memorizar reglas.",
+      "strategy": "Empieza por aritmetica y algebra, practica con ejercicios cortos todos los dias y deja calculo para el final si tu carrera lo requiere.",
+      "officialCoverage": [
+        "Aritmetica",
+        "Algebra",
+        "Geometria analitica",
+        "Trigonometria",
+        "Geometria",
+        "Reconocimiento de patrones",
+        "Calculo"
+      ],
+      "topics": [
+        {
+          "id": "aritmetica",
+          "title": "Aritmetica",
+          "summary": "Debes dominar operaciones basicas con enteros, decimales y fracciones, asi como razones y proporciones.",
+          "officialCoverage": ["Jerarquia de operaciones", "Operaciones con enteros", "Decimales y fracciones", "Razones", "Proporciones"],
+          "explanation": "La aritmetica de admision mide rapidez y orden mental. La clave es respetar la jerarquia de operaciones, convertir fracciones o decimales cuando convenga y comprobar si la respuesta tiene sentido antes de elegirla.",
+          "solvedExample": {
+            "problem": "Resuelve 18 - 6 / 3 + 4 x 2.",
+            "steps": ["Primero division y multiplicacion: 6 / 3 = 2 y 4 x 2 = 8.", "La expresion queda 18 - 2 + 8.", "Resuelve de izquierda a derecha: 16 + 8 = 24."],
+            "answer": "24"
+          },
+          "commonMistakes": ["Sumar o restar antes de dividir o multiplicar.", "Olvidar simplificar fracciones antes de operar.", "Usar proporcion inversa cuando la relacion es directa."],
+          "microPractice": {
+            "question": "Si 3 cuadernos cuestan 45 pesos, cuanto cuestan 5 cuadernos al mismo precio?",
+            "options": ["60", "70", "75", "90"],
+            "correctIndex": 2,
+            "explanation": "Cada cuaderno cuesta 15 pesos. Multiplica 15 x 5 y obtienes 75."
+          },
+          "checkpoint": {
+            "prompt": "Antes de seguir, verifica que puedes:",
+            "items": ["Resolver operaciones combinadas sin cambiar el orden correcto.", "Pasar de una razon a una proporcion equivalente.", "Decidir si un resultado numerico es razonable."]
+          },
+          "estimatedMinutes": 35
+        },
+        {
+          "id": "algebra",
+          "title": "Algebra",
+          "summary": "Trabaja expresiones algebraicas, productos notables y ecuaciones lineales o cuadraticas.",
+          "officialCoverage": ["Monomios", "Polinomios", "Productos notables", "Despeje", "Ecuaciones", "Sistemas de ecuaciones"],
+          "explanation": "En algebra importa reconocer patrones. Si identificas terminos semejantes, sabes cuando factorizar y ordenas una ecuacion antes de despejar, la mayor parte de los reactivos se vuelve mecanica y segura.",
+          "solvedExample": {
+            "problem": "Resuelve 2x + 5 = 17.",
+            "steps": ["Resta 5 en ambos lados: 2x = 12.", "Divide entre 2: x = 6.", "Sustituye para comprobar: 2(6) + 5 = 17."],
+            "answer": "x = 6"
+          },
+          "commonMistakes": ["Sumar terminos no semejantes.", "Cambiar de signo solo en un lado de la ecuacion.", "Confundir binomios conjugados con binomio al cuadrado."],
+          "microPractice": {
+            "question": "Cual es el resultado de (a + b)(a - b)?",
+            "options": ["a^2 + 2ab + b^2", "a^2 - b^2", "a^2 + b^2", "a^2 - 2ab + b^2"],
+            "correctIndex": 1,
+            "explanation": "Es un producto de binomios conjugados y siempre produce diferencia de cuadrados."
+          },
+          "checkpoint": {
+            "prompt": "Debes poder:",
+            "items": ["Reducir expresiones con terminos semejantes.", "Resolver ecuaciones de primer grado con seguridad.", "Reconocer productos notables al verlos."]
+          },
+          "estimatedMinutes": 45
+        },
+        {
+          "id": "geometria-analitica",
+          "title": "Geometria analitica",
+          "summary": "Ubica puntos, interpreta segmentos y trabaja con pendiente, ecuacion y grafica de la recta.",
+          "officialCoverage": ["Plano cartesiano", "Puntos y coordenadas", "Segmentos", "Ecuacion de la recta", "Pendiente"],
+          "explanation": "La geometria analitica traduce figuras a numeros. Si sabes leer coordenadas, calcular pendiente y detectar si una recta sube o baja, puedes resolver problemas visuales incluso sin dibujar perfecto.",
+          "solvedExample": {
+            "problem": "Calcula la pendiente de la recta que pasa por (2, 1) y (6, 9).",
+            "steps": ["Usa m = (y2 - y1) / (x2 - x1).", "Sustituye: m = (9 - 1) / (6 - 2) = 8 / 4.", "Simplifica: m = 2."],
+            "answer": "La pendiente es 2."
+          },
+          "commonMistakes": ["Intercambiar x con y al aplicar la formula.", "Olvidar que una pendiente negativa indica que la recta baja.", "No revisar si el denominador queda en cero."],
+          "microPractice": {
+            "question": "Que representa un punto (x, y) en el plano cartesiano?",
+            "options": ["Un angulo", "Una ubicacion", "Una fraccion", "Una proporcion"],
+            "correctIndex": 1,
+            "explanation": "Un punto en el plano indica una ubicacion especifica dada por sus coordenadas."
+          },
+          "checkpoint": {
+            "prompt": "Comprueba que ya puedes:",
+            "items": ["Ubicar puntos por cuadrante.", "Calcular pendiente con dos coordenadas.", "Interpretar si dos rectas son paralelas comparando pendientes."]
+          },
+          "estimatedMinutes": 30
+        },
+        {
+          "id": "trigonometria",
+          "title": "Trigonometria",
+          "summary": "Repasa seno, coseno, tangente, razones trigonometricas y resolucion de triangulos.",
+          "officialCoverage": ["Funciones trigonometricas", "Seno", "Coseno", "Tangente", "Ley de senos", "Ley de cosenos"],
+          "explanation": "La trigonometria de admision suele pedir relacionar lados y angulos. Identifica primero si el triangulo es rectangulo; si no lo es, piensa en ley de senos o ley de cosenos en lugar de forzar seno, coseno o tangente.",
+          "solvedExample": {
+            "problem": "En un triangulo rectangulo, el cateto opuesto mide 3 y el adyacente 4. Calcula tan(theta).",
+            "steps": ["La tangente se define como opuesto entre adyacente.", "Sustituye: tan(theta) = 3 / 4.", "El valor es 0.75."],
+            "answer": "tan(theta) = 3/4"
+          },
+          "commonMistakes": ["Confundir opuesto y adyacente segun el angulo observado.", "Usar seno cuando el dato pide tangente.", "Olvidar que la ley de cosenos se usa mucho en triangulos oblicuangulos."],
+          "microPractice": {
+            "question": "En un triangulo rectangulo, seno de un angulo es:",
+            "options": ["Adyacente / hipotenusa", "Opuesto / hipotenusa", "Opuesto / adyacente", "Hipotenusa / opuesto"],
+            "correctIndex": 1,
+            "explanation": "El seno relaciona cateto opuesto con hipotenusa."
+          },
+          "checkpoint": {
+            "prompt": "No avances hasta poder:",
+            "items": ["Distinguir seno, coseno y tangente.", "Reconocer cuando usar ley de senos o cosenos.", "Resolver un triangulo rectangulo con dos datos."]
+          },
+          "estimatedMinutes": 35
+        },
+        {
+          "id": "geometria",
+          "title": "Geometria",
+          "summary": "Estudia paralelismo, congruencia, semejanza y formulas de perimetro, area y volumen.",
+          "officialCoverage": ["Paralelismo", "Congruencia", "Semejanza", "Perimetro", "Area", "Volumen"],
+          "explanation": "En geometria el examen busca que identifiques relaciones entre figuras y apliques formulas basicas. No basta memorizar; debes saber cuando una figura es semejante o congruente y que magnitud te estan pidiendo.",
+          "solvedExample": {
+            "problem": "Calcula el area de un triangulo con base 10 y altura 6.",
+            "steps": ["Usa la formula area = base x altura / 2.", "Sustituye: 10 x 6 / 2 = 60 / 2.", "El area es 30 unidades cuadradas."],
+            "answer": "30"
+          },
+          "commonMistakes": ["Usar perimetro cuando el reactivo pide area.", "No distinguir unidades lineales de unidades cuadradas o cubicas.", "Confundir congruencia con semejanza."],
+          "microPractice": {
+            "question": "Si dos figuras tienen misma forma pero distinto tamano, son:",
+            "options": ["Congruentes", "Semejantes", "Perpendiculares", "Secantes"],
+            "correctIndex": 1,
+            "explanation": "Las figuras semejantes conservan forma y angulos, pero no necesariamente medidas."
+          },
+          "checkpoint": {
+            "prompt": "Valida que puedes:",
+            "items": ["Reconocer figuras semejantes o congruentes.", "Aplicar formulas de area y volumen sin confundir unidades.", "Resolver problemas geometricos con datos simples."]
+          },
+          "estimatedMinutes": 30
+        },
+        {
+          "id": "patrones",
+          "title": "Reconocimiento de patrones",
+          "summary": "Analiza sucesiones numericas, alfanumericas y de figuras para identificar reglas de formacion.",
+          "officialCoverage": ["Sucesiones numericas", "Sucesiones alfanumericas", "Sucesiones de figuras"],
+          "explanation": "Este tipo de reactivos miden observacion y razonamiento. Antes de contestar, busca si el cambio es por suma, resta, multiplicacion, alternancia, posicion o rotacion; no te precipites con la primera regla que parezca funcionar.",
+          "solvedExample": {
+            "problem": "Completa la sucesion 2, 4, 8, 16, __.",
+            "steps": ["Observa que cada termino se multiplica por 2.", "16 x 2 = 32.", "La regla es duplicar el termino anterior."],
+            "answer": "32"
+          },
+          "commonMistakes": ["Buscar diferencias cuando la serie es multiplicativa.", "No comprobar la regla en todos los terminos previos.", "Ignorar alternancias como par-impar o figura-letra."],
+          "microPractice": {
+            "question": "Que sigue en la serie A, C, E, G, __?",
+            "options": ["H", "I", "J", "K"],
+            "correctIndex": 1,
+            "explanation": "La secuencia avanza de dos en dos en el alfabeto: A, C, E, G, I."
+          },
+          "checkpoint": {
+            "prompt": "Antes de dejar el tema:",
+            "items": ["Comprueba reglas con mas de un salto.", "Identifica alternancias y ciclos.", "Explica la serie con una frase corta y clara."]
+          },
+          "estimatedMinutes": 25
+        },
+        {
+          "id": "calculo",
+          "title": "Calculo",
+          "summary": "Repasa numeros reales, limites, derivadas e integrales en su nivel introductorio.",
+          "officialCoverage": ["Numeros reales", "Limites", "Formas indeterminadas", "Derivacion", "Integracion", "Integral definida"],
+          "explanation": "Aunque no todas las carreras profundizan igual, la guia si menciona calculo. La preparacion para admision debe enfocarse en entender idea de limite, derivada como tasa de cambio e integral como acumulacion, mas que en tecnicas avanzadas.",
+          "solvedExample": {
+            "problem": "Deriva f(x) = x^2.",
+            "steps": ["Aplica la regla de potencia: d/dx de x^n = n x^(n-1).", "Aqui n = 2, entonces 2x^(1).", "El resultado final es 2x."],
+            "answer": "f'(x) = 2x"
+          },
+          "commonMistakes": ["Intentar resolver limites sin simplificar primero.", "Olvidar que derivar reduce el exponente en una unidad.", "Confundir integral definida con antiderivada simple."],
+          "microPractice": {
+            "question": "La derivada se interpreta mejor como:",
+            "options": ["Acumulacion total", "Tasa de cambio", "Numero imaginario", "Promedio aritmetico"],
+            "correctIndex": 1,
+            "explanation": "La derivada describe como cambia una cantidad respecto a otra."
+          },
+          "checkpoint": {
+            "prompt": "Cierra el tema si ya puedes:",
+            "items": ["Explicar que es un limite con tus palabras.", "Derivar funciones basicas.", "Diferenciar entre derivada e integral."]
+          },
+          "estimatedMinutes": 40
+        }
+      ]
+    },
+    {
+      "id": "comprension-lectora",
+      "title": "Comprension lectora",
+      "role": "troncal",
+      "roleLabel": "Base comun",
+      "summary": "Todas las carreras presentan este modulo. La meta es leer con precision, distinguir lo explicito de lo implicito y detectar relaciones entre ideas.",
+      "strategy": "Lee textos cortos, subraya palabras clave, identifica el tipo de informacion que el reactivo te pide y evita responder por intuicion.",
+      "officialCoverage": ["Categorias gramaticales", "Reglas ortograficas", "Relaciones semanticas", "Logica textual", "Mensaje del texto"],
+      "topics": [
+        {
+          "id": "categorias-gramaticales",
+          "title": "Categorias gramaticales",
+          "summary": "Reconoce funciones de verbos, sustantivos, adjetivos, adverbios y preposiciones dentro de una oracion.",
+          "officialCoverage": ["Verbos", "Sustantivos", "Adjetivos", "Adverbios", "Preposiciones"],
+          "explanation": "Muchos reactivos de comprension se apoyan en gramatica. Si identificas quien realiza la accion, como se modifica y que relacion existe entre palabras, responderas con mas seguridad preguntas de sentido y estructura.",
+          "solvedExample": {
+            "problem": "En la oracion 'Los alumnos llegaron temprano', cual es el adverbio?",
+            "steps": ["Busca la palabra que indica como o cuando ocurre la accion.", "El verbo es 'llegaron'.", "'Temprano' modifica al verbo y funciona como adverbio."],
+            "answer": "temprano"
+          },
+          "commonMistakes": ["Confundir adjetivo con adverbio.", "No reconocer verbos compuestos.", "Pensar que toda palabra terminada en -mente es la unica forma de adverbio."],
+          "microPractice": {
+            "question": "En 'Maria estudio mucho', la palabra 'mucho' funciona como:",
+            "options": ["Sustantivo", "Adverbio", "Verbo", "Preposicion"],
+            "correctIndex": 1,
+            "explanation": "Modifica al verbo 'estudio' e indica cantidad."
+          },
+          "checkpoint": {
+            "prompt": "Asegurate de poder:",
+            "items": ["Distinguir verbo, sustantivo, adjetivo y adverbio.", "Identificar tiempos verbales simples y compuestos.", "Reconocer el valor de una preposicion dentro del contexto."]
+          },
+          "estimatedMinutes": 25
+        },
+        {
+          "id": "ortografia",
+          "title": "Ortografia y puntuacion",
+          "summary": "Refuerza acentuacion, signos de puntuacion y uso correcto de grafias frecuentes.",
+          "officialCoverage": ["Coma", "Punto", "Punto y coma", "Interrogacion", "Acento grafico", "Acento diacritico", "Grafemas"],
+          "explanation": "La ortografia mejora la comprension porque organiza el texto. El examen puede pedir elegir la opcion mejor escrita o interpretar el efecto de un signo. No estudies reglas aisladas; relaciona cada signo con el sentido que produce.",
+          "solvedExample": {
+            "problem": "Cual opcion esta correctamente acentuada: 'examen', 'camion', 'arbol', 'feliz'?",
+            "steps": ["Revisa la silaba tonica de cada palabra.", "'Arbol' es grave y termina en consonante distinta de n o s, por eso lleva tilde.", "Las otras palabras listadas no llevan tilde en esa forma."],
+            "answer": "arbol"
+          },
+          "commonMistakes": ["Poner tilde por intuicion sin ubicar la silaba tonica.", "Usar coma donde debe ir punto y coma o punto.", "Confundir grafias como b y v por sonido."],
+          "microPractice": {
+            "question": "Que signo ayuda a separar elementos de una enumeracion simple?",
+            "options": ["Coma", "Guion largo", "Comillas", "Parentesis"],
+            "correctIndex": 0,
+            "explanation": "La coma separa elementos de una serie cuando no hay conjunciones finales complejas."
+          },
+          "checkpoint": {
+            "prompt": "Verifica que sabes:",
+            "items": ["Clasificar palabras en agudas, graves y esdrujulas.", "Aplicar coma, punto y punto y coma con criterio.", "Distinguir acento grafico de acento diacritico."]
+          },
+          "estimatedMinutes": 25
+        },
+        {
+          "id": "relaciones-semanticas",
+          "title": "Relaciones semanticas",
+          "summary": "Trabaja sinonimos, antonimos, paronimos, homofonos y homonimos.",
+          "officialCoverage": ["Sinonimos", "Antonimos", "Paronimos", "Homofonos", "Homonimos"],
+          "explanation": "En esta parte no basta saber el diccionario. Debes decidir cual palabra conserva mejor el sentido del texto y cual cambia la idea por oposicion, parecido fonetico o doble significado.",
+          "solvedExample": {
+            "problem": "Un sinonimo cercano de 'rapido' es:",
+            "steps": ["Busca una palabra con significado parecido.", "'Veloz' conserva la idea de rapidez.", "No elijas una palabra solo por sonar similar."],
+            "answer": "veloz"
+          },
+          "commonMistakes": ["Elegir una palabra por sonido y no por significado.", "Confundir homofono con sinonimo.", "No considerar el contexto donde aparece la palabra."],
+          "microPractice": {
+            "question": "Cual pareja expresa antonimos?",
+            "options": ["Subir / bajar", "Casa / hogar", "Cima / sima", "Votar / botar"],
+            "correctIndex": 0,
+            "explanation": "Subir y bajar expresan acciones opuestas."
+          },
+          "checkpoint": {
+            "prompt": "Debes poder:",
+            "items": ["Distinguir sinonimo, antonimo y paronimo.", "Explicar por que dos homofonos no significan lo mismo.", "Usar el contexto para elegir la palabra correcta."]
+          },
+          "estimatedMinutes": 20
+        },
+        {
+          "id": "logica-textual",
+          "title": "Logica textual",
+          "summary": "Analiza cohesion, tipos de oracion y jerarquia entre idea principal y secundarias.",
+          "officialCoverage": ["Cohesion", "Tipos de oraciones", "Estructura del parrafo"],
+          "explanation": "La logica textual revisa como se conectan las ideas. Un texto claro presenta una idea central y oraciones de apoyo; por eso conviene detectar conectores, oposiciones, causa y consecuencia antes de responder.",
+          "solvedExample": {
+            "problem": "En un parrafo, como identificas la idea principal?",
+            "steps": ["Lee todas las oraciones sin enfocarte aun en detalles.", "Busca la afirmacion que organiza o resume las demas.", "Comprueba que las otras oraciones la desarrollan."],
+            "answer": "La idea principal es la que da unidad al parrafo."
+          },
+          "commonMistakes": ["Escoger el dato mas llamativo y no la idea central.", "Ignorar conectores como pero, porque o ademas.", "Pensar que la primera oracion siempre es la principal."],
+          "microPractice": {
+            "question": "El conector 'sin embargo' suele introducir:",
+            "options": ["Suma", "Explicacion", "Contraste", "Tiempo"],
+            "correctIndex": 2,
+            "explanation": "Marca oposicion o contraste entre ideas."
+          },
+          "checkpoint": {
+            "prompt": "No cierres el tema hasta poder:",
+            "items": ["Detectar idea principal y secundarias.", "Reconocer relaciones de contraste, causa y adicion.", "Explicar la cohesion de un parrafo breve."]
+          },
+          "estimatedMinutes": 25
+        },
+        {
+          "id": "mensaje-texto",
+          "title": "Mensaje del texto",
+          "summary": "Distingue informacion explicita e implicita, tema, premisa, conclusion y secuencias narrativas.",
+          "officialCoverage": ["Informacion explicita", "Informacion implicita", "Tema", "Premisa", "Conclusion", "Secuencias narrativas"],
+          "explanation": "La comprension profunda consiste en leer lo que el texto dice y tambien lo que sugiere. Para responder bien, separa hechos, opiniones y conclusiones, y pregunta siempre que intenta comunicar el autor.",
+          "solvedExample": {
+            "problem": "Si un texto presenta datos y luego una recomendacion final, que parte funciona como conclusion?",
+            "steps": ["Ubica la idea que resume o se desprende de los datos previos.", "La recomendacion final retoma la informacion anterior.", "Por eso cumple la funcion de conclusion."],
+            "answer": "La recomendacion final"
+          },
+          "commonMistakes": ["Confundir tema con titulo.", "Tomar una opinion como si fuera hecho comprobado.", "Responder por experiencia personal y no por evidencia del texto."],
+          "microPractice": {
+            "question": "La informacion implicita es la que:",
+            "options": ["Se copia textual", "Debe inferirse", "No tiene sentido", "Siempre esta al final"],
+            "correctIndex": 1,
+            "explanation": "La informacion implicita no aparece de forma directa; se deduce."
+          },
+          "checkpoint": {
+            "prompt": "Debes lograr:",
+            "items": ["Separar hechos de opiniones.", "Inferir una conclusion razonable.", "Identificar el tema general del texto."]
+          },
+          "estimatedMinutes": 30
+        }
+      ]
+    },
+    {
+      "id": "estructura-lenguaje",
+      "title": "Estructura del lenguaje",
+      "role": "especifica",
+      "roleLabel": "Modulo especifico",
+      "summary": "Este modulo aparece en administracion, contador, arquitectura, gastronomia y turismo. Evalua organizacion, coherencia y correccion del discurso escrito.",
+      "strategy": "Trabaja con parrafos cortos: ordena ideas, corrige conectores, detecta errores y piensa en la intencion comunicativa.",
+      "officialCoverage": ["Organizacion textual", "Contenido discursivo", "Correccion ortografica y gramatical", "Cohesion y coherencia"],
+      "topics": [
+        {
+          "id": "organizacion-textual",
+          "title": "Organizacion textual",
+          "summary": "Entiende estructura textual, jerarquizacion de ideas y tipologia de textos.",
+          "officialCoverage": ["Estructura textual", "Jerarquizacion de ideas", "Tipologia textual"],
+          "explanation": "Un texto bien organizado deja claro que idea manda y cuales desarrollan. El examen suele presentar parrafos o fragmentos para decidir su orden o el tipo de texto al que pertenecen.",
+          "solvedExample": {
+            "problem": "Si un texto explica un procedimiento paso a paso, que tipologia domina?",
+            "steps": ["Observa la intencion principal.", "Cuando un texto ensena como hacer algo, predomina lo instructivo o procedimental.", "La secuencia ordenada confirma la respuesta."],
+            "answer": "Texto instructivo"
+          },
+          "commonMistakes": ["Confundir narracion con explicacion.", "No distinguir idea principal de detalle.", "Ordenar frases solo por intuicion y no por coherencia."],
+          "microPractice": {
+            "question": "Que idea debe aparecer primero en un texto organizado?",
+            "options": ["La menos importante", "La que introduce el tema", "La conclusion final", "Un ejemplo aislado"],
+            "correctIndex": 1,
+            "explanation": "La introduccion presenta el tema y guia al lector."
+          },
+          "checkpoint": {
+            "prompt": "Comprueba que puedes:",
+            "items": ["Ordenar ideas de introduccion a cierre.", "Reconocer texto narrativo, expositivo e instructivo.", "Jerarquizar ideas principales y secundarias."]
+          },
+          "estimatedMinutes": 20
+        },
+        {
+          "id": "contenido-discursivo",
+          "title": "Contenido discursivo",
+          "summary": "Interpreta ideas, realiza inferencias y detecta intencion comunicativa.",
+          "officialCoverage": ["Interpretacion", "Inferencia", "Intencion comunicativa"],
+          "explanation": "Interpretar no es repetir. Debes entender que quiere lograr el emisor: informar, convencer, explicar o invitar a una accion. Esa intencion orienta la respuesta correcta.",
+          "solvedExample": {
+            "problem": "Si un anuncio usa argumentos para convencerte de comprar, cual es su intencion?",
+            "steps": ["Analiza el verbo de accion que busca provocar.", "Los argumentos apuntan a persuadir.", "La intencion comunicativa es apelativa o persuasiva."],
+            "answer": "Persuadir"
+          },
+          "commonMistakes": ["Confundir tono con intencion.", "Ignorar pistas como verbos imperativos o llamadas a la accion.", "Responder segun opinion personal."],
+          "microPractice": {
+            "question": "Cuando un texto te convence de adoptar una postura, su intencion principal es:",
+            "options": ["Narrar", "Persuadir", "Describir", "Enumerar"],
+            "correctIndex": 1,
+            "explanation": "Busca influir en tu decision o actitud."
+          },
+          "checkpoint": {
+            "prompt": "Debes poder identificar:",
+            "items": ["La intencion dominante del texto.", "Inferencias que se apoyan en evidencias del fragmento.", "La diferencia entre interpretar y repetir."]
+          },
+          "estimatedMinutes": 20
+        },
+        {
+          "id": "correccion-gramatical",
+          "title": "Correccion ortografica y gramatical",
+          "summary": "Detecta errores de ortografia y de estructura gramatical en frases y parrafos.",
+          "officialCoverage": ["Ortografia", "Correccion gramatical"],
+          "explanation": "Este bloque suele presentarse como opcion correcta entre varias frases parecidas. La forma mas segura de resolverlo es revisar concordancia, uso de preposiciones y consistencia de tiempos verbales.",
+          "solvedExample": {
+            "problem": "Elige la forma correcta: 'Hubieron problemas' o 'Hubo problemas'.",
+            "steps": ["Recuerda que 'haber' impersonal se usa en singular.", "Por eso se dice 'Hubo problemas'.", "La otra opcion es un error frecuente."],
+            "answer": "Hubo problemas"
+          },
+          "commonMistakes": ["Aceptar construcciones comunes pero incorrectas.", "No revisar concordancia entre sujeto y verbo.", "Usar preposiciones por costumbre y no por norma."],
+          "microPractice": {
+            "question": "Cual frase esta mejor construida?",
+            "options": ["Habian tres opciones", "Habia tres opciones", "Habian tres opcion", "Habria tres opciones ayer"],
+            "correctIndex": 1,
+            "explanation": "El verbo haber impersonal se mantiene en singular: habia."
+          },
+          "checkpoint": {
+            "prompt": "Asegurate de que puedes:",
+            "items": ["Detectar errores de concordancia.", "Elegir la forma verbal correcta en contexto.", "Revisar preposiciones y nexos con criterio."]
+          },
+          "estimatedMinutes": 20
+        },
+        {
+          "id": "cohesion-coherencia",
+          "title": "Cohesion y coherencia",
+          "summary": "Trabaja conectores, unidad tematica, orden interno y logica del discurso.",
+          "officialCoverage": ["Conectores", "Unidad tematica", "Organizacion de la informacion", "Marcadores discursivos"],
+          "explanation": "La cohesion une frases; la coherencia mantiene una idea central. Un texto puede estar bien escrito pero ser incoherente si cambia de tema o si los conectores no corresponden a la relacion logica que intenta expresar.",
+          "solvedExample": {
+            "problem": "Que conector completa mejor: 'Estudio diario; ___, mejoro mis resultados'?",
+            "steps": ["Identifica la relacion entre estudiar y mejorar.", "Existe consecuencia.", "Un conector adecuado es 'por lo tanto' o 'por eso'."],
+            "answer": "por lo tanto"
+          },
+          "commonMistakes": ["Usar conectores de contraste cuando la relacion es consecuencia.", "Cambiar de tema sin transicion.", "Repetir ideas sin aportar progreso al texto."],
+          "microPractice": {
+            "question": "Que conector expresa causa?",
+            "options": ["Sin embargo", "Porque", "Despues", "Aunque"],
+            "correctIndex": 1,
+            "explanation": "Porque introduce la razon o causa de una accion."
+          },
+          "checkpoint": {
+            "prompt": "No avances si aun te cuesta:",
+            "items": ["Escoger conectores segun causa, contraste o consecuencia.", "Mantener una sola unidad tematica.", "Ordenar ideas para que el texto progrese."]
+          },
+          "estimatedMinutes": 25
+        }
+      ]
+    },
+    {
+      "id": "administracion",
+      "title": "Administracion, gestion y contabilidad",
+      "role": "especifica",
+      "roleLabel": "Modulo especifico",
+      "summary": "Area propia de Ingenieria en Administracion y Contador Publico. Revisa fundamentos administrativos, economia y contabilidad basica.",
+      "strategy": "Relaciona conceptos con ejemplos de empresa real: areas funcionales, oferta-demanda y registros contables sencillos.",
+      "officialCoverage": ["Introduccion a la administracion", "Gestion", "Contabilidad"],
+      "topics": [
+        {
+          "id": "fundamentos-administracion",
+          "title": "Fundamentos de administracion",
+          "summary": "Repasa origen, definicion, eficiencia, eficacia, productividad y proceso administrativo.",
+          "officialCoverage": ["Enfoques de administracion", "Eficiencia", "Eficacia", "Productividad", "Planeacion", "Organizacion", "Direccion", "Control"],
+          "explanation": "La administracion organiza recursos para alcanzar objetivos. En examen suelen aparecer definiciones o situaciones practicas para decidir si un caso habla de planeacion, organizacion, direccion o control.",
+          "solvedExample": {
+            "problem": "Si una empresa fija metas y decide como alcanzarlas, que etapa aplica?",
+            "steps": ["Observa que todavia no ejecuta, solo decide rumbo.", "Eso corresponde a planear.", "La etapa es planeacion."],
+            "answer": "Planeacion"
+          },
+          "commonMistakes": ["Confundir eficacia con eficiencia.", "Pensar que productividad es lo mismo que trabajar mas horas.", "Mezclar control con direccion."],
+          "microPractice": {
+            "question": "Ser eficaz significa:",
+            "options": ["Gastar menos siempre", "Lograr objetivos", "Vender mas que la competencia", "Trabajar sin plan"],
+            "correctIndex": 1,
+            "explanation": "La eficacia se enfoca en alcanzar la meta propuesta."
+          },
+          "checkpoint": {
+            "prompt": "Valida que puedes:",
+            "items": ["Diferenciar eficacia, eficiencia y productividad.", "Relacionar un caso practico con una etapa administrativa.", "Reconocer las areas funcionales de una empresa."]
+          },
+          "estimatedMinutes": 25
+        },
+        {
+          "id": "gestion-economica",
+          "title": "Gestion y economia",
+          "summary": "Domina oferta, demanda, tipos de mercado, inversion y gasto publico.",
+          "officialCoverage": ["Modelos economicos", "Microeconomia", "Macroeconomia", "Oferta y demanda", "Precios", "Competencia"],
+          "explanation": "La economia para admision busca lectura clara de relaciones basicas: si sube el precio, que pasa con la demanda; si cambia la oferta, como se ajusta el mercado. Comprender estas conexiones vale mas que memorizar definiciones sueltas.",
+          "solvedExample": {
+            "problem": "Si el precio de un producto aumenta y todo lo demas permanece constante, que suele ocurrir con su demanda?",
+            "steps": ["Recuerda la relacion inversa basica entre precio y cantidad demandada.", "Un precio mayor reduce la cantidad que la gente quiere comprar.", "Por eso la demanda baja."],
+            "answer": "La demanda tiende a disminuir."
+          },
+          "commonMistakes": ["Confundir movimiento de la demanda con cambio en la demanda.", "Pensar que micro y macroeconomia estudian exactamente lo mismo.", "Olvidar que oferta y demanda se analizan con 'todo lo demas constante'."],
+          "microPractice": {
+            "question": "La macroeconomia estudia principalmente:",
+            "options": ["Una tienda en particular", "La economia en su conjunto", "Un producto aislado", "Solo el gasto familiar"],
+            "correctIndex": 1,
+            "explanation": "La macroeconomia analiza variables agregadas como inflacion, empleo y crecimiento."
+          },
+          "checkpoint": {
+            "prompt": "Asegurate de saber:",
+            "items": ["Explicar oferta y demanda con ejemplos cotidianos.", "Diferenciar microeconomia de macroeconomia.", "Leer una situacion simple de mercado."]
+          },
+          "estimatedMinutes": 25
+        },
+        {
+          "id": "contabilidad-basica",
+          "title": "Contabilidad basica",
+          "summary": "Trabaja partida doble, catalogo de cuentas, cargos, abonos y estados financieros basicos.",
+          "officialCoverage": ["Conceptos de contabilidad", "Usuarios", "Partida doble", "Catalogo de cuentas", "Cargo y abono", "Estado de situacion financiera", "Estado de resultados"],
+          "explanation": "La contabilidad organiza informacion financiera para tomar decisiones. En admision se pregunta lo esencial: que es una cuenta, como funciona la partida doble y que muestra cada estado financiero basico.",
+          "solvedExample": {
+            "problem": "Si la empresa compra mercancia al contado, que sucede en partida doble?",
+            "steps": ["Aumenta inventario o almacenes, por lo que se carga esa cuenta.", "Disminuye caja o bancos, por lo que se abona esa cuenta.", "El registro mantiene equilibrio."],
+            "answer": "Se carga inventario y se abona caja o bancos."
+          },
+          "commonMistakes": ["Pensar que cargo siempre significa perdida.", "No distinguir activo, pasivo y capital.", "Confundir estado de resultados con balance general."],
+          "microPractice": {
+            "question": "Que principio indica que todo cargo tiene un abono correspondiente?",
+            "options": ["Oferta y demanda", "Partida doble", "Depreciacion", "Planeacion"],
+            "correctIndex": 1,
+            "explanation": "La partida doble mantiene equilibrio contable."
+          },
+          "checkpoint": {
+            "prompt": "Debes poder:",
+            "items": ["Clasificar cuentas basicas.", "Explicar la logica de cargo y abono.", "Reconocer para que sirve un estado de resultados."]
+          },
+          "estimatedMinutes": 30
+        }
+      ]
+    },
+    {
+      "id": "fisica",
+      "title": "Fisica",
+      "role": "especifica",
+      "roleLabel": "Modulo especifico",
+      "summary": "Fisica aparece para ISC, Civil y Electromecanica. Evalua fundamentos, mecanica, energia, termodinamica, electromagnetismo y ondas.",
+      "strategy": "Convierte unidades, dibuja vectores simples y revisa formulas con significado fisico antes de sustituir numeros.",
+      "officialCoverage": ["Conversiones", "Mecanica", "Leyes de Newton", "Trabajo y energia", "Termodinamica", "Electromagnetismo", "Optica y acustica"],
+      "topics": [
+        {
+          "id": "conversiones-vectores",
+          "title": "Conversiones y vectores",
+          "summary": "Practica unidades, magnitudes y suma o resta de vectores.",
+          "officialCoverage": ["Sistemas de conversiones", "Magnitudes", "Suma y resta de vectores"],
+          "explanation": "Muchos errores en fisica vienen de unidades mal convertidas. Antes de resolver, revisa si trabajas con metros, segundos o newtons, y si un vector requiere sentido ademas de magnitud.",
+          "solvedExample": {
+            "problem": "Convierte 2.5 km a metros.",
+            "steps": ["1 kilometro equivale a 1000 metros.", "Multiplica 2.5 x 1000.", "Obtienes 2500 metros."],
+            "answer": "2500 m"
+          },
+          "commonMistakes": ["No convertir todo al mismo sistema.", "Tratar vectores como si fueran solo numeros.", "Olvidar signo o direccion."],
+          "microPractice": {
+            "question": "1 hora equivale a:",
+            "options": ["60 s", "360 s", "3600 s", "6000 s"],
+            "correctIndex": 2,
+            "explanation": "Una hora son 60 minutos y cada minuto tiene 60 segundos: 60 x 60 = 3600."
+          },
+          "checkpoint": {
+            "prompt": "Confirma que puedes:",
+            "items": ["Convertir longitud, tiempo y masa.", "Reconocer que un vector tiene magnitud y direccion.", "Resolver operaciones simples con vectores en linea recta."]
+          },
+          "estimatedMinutes": 20
+        },
+        {
+          "id": "mecanica-movimiento",
+          "title": "Mecanica y movimiento",
+          "summary": "Repasa MRU, MUA, MCU y equilibrio estatico.",
+          "officialCoverage": ["Fenomenos mecanicos", "Equilibrio estatico", "MRU", "MUA", "MCU"],
+          "explanation": "La mecanica pregunta como se mueve un cuerpo. Si distingues velocidad constante de aceleracion constante y sabes leer los datos del problema, puedes elegir la formula adecuada sin perder tiempo.",
+          "solvedExample": {
+            "problem": "Un auto recorre 120 km en 2 horas a velocidad constante. Cual es su velocidad?",
+            "steps": ["Usa velocidad = distancia / tiempo.", "120 / 2 = 60.", "La velocidad es 60 km/h."],
+            "answer": "60 km/h"
+          },
+          "commonMistakes": ["Usar formula de aceleracion cuando el movimiento es uniforme.", "No revisar unidades de distancia y tiempo.", "Confundir rapidez con velocidad vectorial."],
+          "microPractice": {
+            "question": "En MRU, la aceleracion es:",
+            "options": ["Positiva", "Negativa", "Variable", "Cero"],
+            "correctIndex": 3,
+            "explanation": "Si la velocidad es constante, la aceleracion es cero."
+          },
+          "checkpoint": {
+            "prompt": "Comprueba que ya puedes:",
+            "items": ["Diferenciar MRU de MUA.", "Calcular velocidad promedio.", "Leer un problema de movimiento sin cambiar de formula por impulso."]
+          },
+          "estimatedMinutes": 25
+        },
+        {
+          "id": "fuerzas-energia",
+          "title": "Fuerzas, leyes de Newton y energia",
+          "summary": "Estudia fuerza, trabajo, potencia, energia mecanica y conservacion.",
+          "officialCoverage": ["Leyes de Newton", "Fuerza", "Trabajo", "Potencia", "Energia cinetica", "Energia potencial", "Friccion"],
+          "explanation": "La fisica de admision suele unir dinamica y energia. Piensa siempre en causa y efecto: una fuerza cambia el movimiento; el trabajo transfiere energia; la friccion disipa parte del sistema.",
+          "solvedExample": {
+            "problem": "Calcula la fuerza sobre un cuerpo de 5 kg con aceleracion de 2 m/s^2.",
+            "steps": ["Aplica la segunda ley de Newton: F = m x a.", "Sustituye 5 x 2.", "La fuerza es 10 N."],
+            "answer": "10 N"
+          },
+          "commonMistakes": ["Confundir masa con peso.", "Usar energia cuando el problema pide fuerza.", "Olvidar que la potencia incluye el factor tiempo."],
+          "microPractice": {
+            "question": "La formula correcta de la segunda ley de Newton es:",
+            "options": ["F = m / a", "F = m x a", "F = p x t", "F = v / t"],
+            "correctIndex": 1,
+            "explanation": "La fuerza neta es igual a masa por aceleracion."
+          },
+          "checkpoint": {
+            "prompt": "No cierres el bloque si aun no puedes:",
+            "items": ["Aplicar leyes de Newton en ejercicios simples.", "Distinguir trabajo, potencia y energia.", "Explicar el efecto de la friccion."]
+          },
+          "estimatedMinutes": 30
+        },
+        {
+          "id": "termodinamica",
+          "title": "Termodinamica",
+          "summary": "Revisa calor, temperatura, variables termodinamicas y leyes basicas.",
+          "officialCoverage": ["Calor y temperatura", "Variables termodinamicas", "Leyes de la termodinamica", "Teoria cinetica de los gases"],
+          "explanation": "Calor no es lo mismo que temperatura. El examen busca que distingas energia transferida, estado termico y comportamiento general de gases bajo cambios de presion, volumen o temperatura.",
+          "solvedExample": {
+            "problem": "Que variable suele aumentar cuando un gas se calienta en un recipiente cerrado y rigido?",
+            "steps": ["Si el recipiente es rigido, el volumen se mantiene.", "Al aumentar la temperatura, las particulas chocan con mas fuerza.", "La presion tiende a aumentar."],
+            "answer": "La presion"
+          },
+          "commonMistakes": ["Usar calor como sinonimo de temperatura.", "Olvidar que algunas variables permanecen constantes segun el caso.", "Responder sin imaginar el comportamiento del sistema."],
+          "microPractice": {
+            "question": "La temperatura mide principalmente:",
+            "options": ["Cantidad total de materia", "Energia interna promedio", "Volumen fijo", "Trabajo mecanico"],
+            "correctIndex": 1,
+            "explanation": "Se relaciona con la energia cinetica promedio de las particulas."
+          },
+          "checkpoint": {
+            "prompt": "Debes poder:",
+            "items": ["Separar calor de temperatura.", "Reconocer variables termodinamicas basicas.", "Explicar un caso sencillo de gas ideal."]
+          },
+          "estimatedMinutes": 20
+        },
+        {
+          "id": "electromagnetismo-ondas",
+          "title": "Electromagnetismo, optica y ondas",
+          "summary": "Integra ley de Coulomb, ley de Ohm, circuitos, luz, sonido y ondas mecanicas.",
+          "officialCoverage": ["Carga electrica", "Ley de Coulomb", "Ley de Ohm", "Circuitos", "Reflexion", "Refraccion", "Ondas"],
+          "explanation": "Esta parte combina electricidad y fenomenos ondulatorios. Entiende que la corriente circula por diferencia de potencial y que las ondas transportan energia; a partir de eso, los reactivos se vuelven mas intuitivos.",
+          "solvedExample": {
+            "problem": "Si V = 12 volts y R = 4 ohms, cual es la corriente?",
+            "steps": ["Usa la ley de Ohm: I = V / R.", "12 / 4 = 3.", "La corriente es 3 amperes."],
+            "answer": "3 A"
+          },
+          "commonMistakes": ["Confundir voltaje con corriente.", "Olvidar que reflexion y refraccion son fenomenos distintos.", "Pensar que toda onda necesita el mismo medio."],
+          "microPractice": {
+            "question": "Que ley relaciona voltaje, corriente y resistencia?",
+            "options": ["Ley de Newton", "Ley de Ohm", "Ley de Pascal", "Ley de senos"],
+            "correctIndex": 1,
+            "explanation": "La ley de Ohm establece la relacion V = I x R."
+          },
+          "checkpoint": {
+            "prompt": "Asegurate de saber:",
+            "items": ["Resolver un circuito electrico simple.", "Distinguir reflexion de refraccion.", "Reconocer rasgos basicos de una onda."]
+          },
+          "estimatedMinutes": 30
+        }
+      ]
+    },
+    {
+      "id": "quimica",
+      "title": "Quimica",
+      "role": "especifica",
+      "roleLabel": "Modulo especifico",
+      "summary": "Quimica aparece para ISC, Civil, Electromecanica y Gastronomia. Revisa estructura atomica, enlaces y reacciones.",
+      "strategy": "Ubica los elementos en la tabla periodica, entiende por que se unen y practica balanceo sencillo antes de pasar a estequiometria.",
+      "officialCoverage": ["Estructura atomica", "Tabla periodica", "Enlaces quimicos", "Reacciones", "Balanceo", "Estequiometria", "Termoquimica", "Equilibrio quimico"],
+      "topics": [
+        {
+          "id": "estructura-atomica",
+          "title": "Estructura atomica y tabla periodica",
+          "summary": "Comprende atomos, grupos, periodos y propiedades periodicas.",
+          "officialCoverage": ["Atomo", "Grupos y periodos", "Electronegatividad", "Radio atomico", "Energia de ionizacion"],
+          "explanation": "La tabla periodica organiza elementos con propiedades comunes. Si entiendes su orden, puedes anticipar tendencias como radio atomico o electronegatividad sin memorizar todos los valores.",
+          "solvedExample": {
+            "problem": "Que indica el numero de periodo de un elemento?",
+            "steps": ["Ubica el elemento en una fila horizontal.", "El periodo representa el nivel de energia principal mas externo ocupado.", "Por eso senala la fila del elemento."],
+            "answer": "La fila o nivel de energia principal"
+          },
+          "commonMistakes": ["Confundir grupo con periodo.", "No relacionar propiedades con posicion en la tabla.", "Pensar que todos los metales reaccionan igual."],
+          "microPractice": {
+            "question": "Los gases nobles se caracterizan por:",
+            "options": ["Ser muy reactivos", "Tener baja estabilidad", "Presentar gran estabilidad", "Ser solo liquidos"],
+            "correctIndex": 2,
+            "explanation": "Tienen capa de valencia completa y por eso suelen ser muy estables."
+          },
+          "checkpoint": {
+            "prompt": "Verifica que puedes:",
+            "items": ["Ubicar grupo y periodo de un elemento.", "Identificar metales, no metales y gases nobles.", "Explicar una tendencia periodica basica."]
+          },
+          "estimatedMinutes": 25
+        },
+        {
+          "id": "enlaces-quimicos",
+          "title": "Enlaces quimicos",
+          "summary": "Distingue enlaces ionico, covalente y metalico, junto con propiedades fisicas asociadas.",
+          "officialCoverage": ["Configuracion electronica", "Enlace metalico", "Enlace ionico", "Enlace covalente", "Conductividad", "Solubilidad", "Punto de fusion"],
+          "explanation": "Los enlaces explican por que una sustancia conduce, se disuelve o se funde a cierta temperatura. La pregunta tipica no pide desarrollar teoria avanzada, sino reconocer el tipo de union segun sus propiedades.",
+          "solvedExample": {
+            "problem": "Que tipo de enlace predomina en el NaCl?",
+            "steps": ["El sodio es metal y el cloro es no metal.", "Cuando hay transferencia de electrones entre metal y no metal, el enlace es ionico.", "NaCl es una sustancia ionica."],
+            "answer": "Ionico"
+          },
+          "commonMistakes": ["Elegir covalente para cualquier molecula.", "Olvidar que el enlace metalico explica conductividad en metales.", "No relacionar propiedades fisicas con tipo de enlace."],
+          "microPractice": {
+            "question": "Que tipo de enlace suele presentar alta conductividad en estado metalico?",
+            "options": ["Ionico", "Covalente", "Metalico", "Puente de hidrogeno"],
+            "correctIndex": 2,
+            "explanation": "Los electrones deslocalizados del enlace metalico facilitan la conductividad."
+          },
+          "checkpoint": {
+            "prompt": "Debes poder:",
+            "items": ["Diferenciar enlace ionico, covalente y metalico.", "Asociar propiedades fisicas con tipo de enlace.", "Leer configuraciones de forma introductoria."]
+          },
+          "estimatedMinutes": 25
+        },
+        {
+          "id": "reacciones-quimicas",
+          "title": "Reacciones y ecuaciones quimicas",
+          "summary": "Practica tipos de reaccion, balanceo, estequiometria y equilibrio de manera introductoria.",
+          "officialCoverage": ["Combinacion", "Descomposicion", "Sustitucion", "Oxido-reduccion", "Neutralizacion", "Balanceo", "Estequiometria", "Equilibrio"],
+          "explanation": "Una reaccion quimica muestra como se transforman sustancias. La habilidad principal de admision es reconocer el tipo de reaccion y balancear ecuaciones sencillas para conservar el numero de atomos.",
+          "solvedExample": {
+            "problem": "Balancea H2 + O2 -> H2O.",
+            "steps": ["Primero ajusta oxigeno colocando 2 en H2O.", "Ahora hay 4 hidrogenos a la derecha, coloca 2 en H2.", "La ecuacion balanceada es 2H2 + O2 -> 2H2O."],
+            "answer": "2H2 + O2 -> 2H2O"
+          },
+          "commonMistakes": ["Cambiar subindices en lugar de coeficientes.", "Balancear un elemento y desajustar otro sin volver a revisar.", "Responder estequiometria sin ecuacion balanceada."],
+          "microPractice": {
+            "question": "Que se conserva al balancear una ecuacion?",
+            "options": ["El color", "El numero de atomos", "La temperatura", "La masa del recipiente"],
+            "correctIndex": 1,
+            "explanation": "El balanceo conserva la cantidad de atomos de cada elemento."
+          },
+          "checkpoint": {
+            "prompt": "No cierres el area hasta poder:",
+            "items": ["Reconocer tipos basicos de reaccion.", "Balancear ecuaciones sencillas.", "Entender que la estequiometria parte de proporciones quimicas."]
+          },
+          "estimatedMinutes": 30
+        }
+      ]
+    },
+    {
+      "id": "arquitectura",
+      "title": "Arquitectura",
+      "role": "especifica",
+      "roleLabel": "Modulo especifico",
+      "summary": "Modulo propio de Arquitectura. Reune geometria, razonamiento espacial y dibujo tecnico.",
+      "strategy": "Visualiza formas, practica escalas y repasa convenciones de dibujo tecnico con ejercicios simples.",
+      "officialCoverage": ["Geometria", "Razonamiento", "Dibujo"],
+      "topics": [
+        {
+          "id": "geometria-arquitectonica",
+          "title": "Geometria aplicada",
+          "summary": "Revisa rectas paralelas, relaciones entre angulos, areas, perimetros y volumen.",
+          "officialCoverage": ["Rectas paralelas", "Angulos", "Areas", "Perimetros", "Volumen"],
+          "explanation": "La geometria para arquitectura conecta medida y forma. En los reactivos conviene imaginar el objeto real: un plano, una fachada o un espacio, para decidir si piden longitud, superficie o volumen.",
+          "solvedExample": {
+            "problem": "Si un rectangulo mide 8 por 5, cual es su perimetro?",
+            "steps": ["El perimetro suma todos los lados.", "2(8 + 5) = 2 x 13.", "El perimetro es 26."],
+            "answer": "26"
+          },
+          "commonMistakes": ["Confundir area con perimetro.", "Olvidar que el volumen requiere tres dimensiones.", "No aprovechar propiedades de rectas paralelas."],
+          "microPractice": {
+            "question": "Que magnitud se expresa en unidades cubicas?",
+            "options": ["Perimetro", "Area", "Volumen", "Angulo"],
+            "correctIndex": 2,
+            "explanation": "El volumen mide espacio ocupado por un cuerpo tridimensional."
+          },
+          "checkpoint": {
+            "prompt": "Valida que puedes:",
+            "items": ["Usar formulas geometricas basicas.", "Resolver relaciones elementales entre angulos.", "Elegir la magnitud correcta para cada figura."]
+          },
+          "estimatedMinutes": 20
+        },
+        {
+          "id": "razonamiento-espacial",
+          "title": "Razonamiento espacial, abstracto y mecanico",
+          "summary": "Entrena visualizacion, rotacion mental y lectura de patrones de forma.",
+          "officialCoverage": ["Razonamiento espacial", "Razonamiento abstracto", "Razonamiento mecanico"],
+          "explanation": "Este bloque mide como imaginas objetos y relaciones en el espacio. Para mejorar, conviene describir movimientos con palabras: gira, refleja, avanza, secciona, se superpone. Esa verbalizacion reduce errores.",
+          "solvedExample": {
+            "problem": "Si una figura gira 90 grados a la derecha, que cambia?",
+            "steps": ["No cambia el tamano ni la forma.", "Cambia la orientacion.", "La figura queda con la misma estructura, solo rotada."],
+            "answer": "La orientacion"
+          },
+          "commonMistakes": ["Suponer que girar es lo mismo que reflejar.", "No fijarse en referencias como arriba, abajo y derecha.", "Responder por intuicion sin reconstruir el movimiento."],
+          "microPractice": {
+            "question": "Una rotacion conserva principalmente:",
+            "options": ["Forma y tamano", "Solo el color", "La posicion exacta", "El volumen aparente"],
+            "correctIndex": 0,
+            "explanation": "Rotar cambia la orientacion, pero mantiene forma y tamano."
+          },
+          "checkpoint": {
+            "prompt": "Asegurate de lograr:",
+            "items": ["Distinguir giro, reflejo y traslacion.", "Interpretar una secuencia espacial simple.", "Explicar un cambio mecanico con claridad."]
+          },
+          "estimatedMinutes": 20
+        },
+        {
+          "id": "dibujo-tecnico",
+          "title": "Dibujo tecnico",
+          "summary": "Repasa formatos de papel, escalas, rotulacion, acotaciones y axonometria.",
+          "officialCoverage": ["Tipos de dibujo tecnico", "Formatos de papel", "Rotulacion a escala", "Acotaciones", "Axonometria"],
+          "explanation": "En dibujo tecnico el examen revisa lenguaje grafico basico. Necesitas saber para que sirve la escala, como se colocan cotas y que una axonometria representa un objeto tridimensional sobre un plano.",
+          "solvedExample": {
+            "problem": "Que significa una escala 1:100?",
+            "steps": ["La unidad del dibujo representa 100 unidades reales.", "El dibujo esta reducido respecto al objeto real.", "Si mides 2 cm en el plano, representan 200 cm reales."],
+            "answer": "Una unidad dibujada equivale a cien reales."
+          },
+          "commonMistakes": ["Pensar que 1:100 aumenta el tamano.", "Colocar cotas sin referencia clara.", "Confundir vista tecnica con dibujo artistico."],
+          "microPractice": {
+            "question": "La acotacion sirve para:",
+            "options": ["Dar color al plano", "Mostrar medidas", "Ocultar detalles", "Reducir sombras"],
+            "correctIndex": 1,
+            "explanation": "Las cotas comunican dimensiones y distancias."
+          },
+          "checkpoint": {
+            "prompt": "Comprueba que sabes:",
+            "items": ["Leer una escala simple.", "Explicar la funcion de las cotas.", "Reconocer una representacion axonometrica."]
+          },
+          "estimatedMinutes": 25
+        }
+      ]
+    },
+    {
+      "id": "tics",
+      "title": "Tecnologias de informacion y comunicacion",
+      "role": "especifica",
+      "roleLabel": "Modulo especifico",
+      "summary": "Modulo especifico para Turismo. Revisa historia de la computacion, conceptos basicos y herramientas digitales comunes.",
+      "strategy": "Relaciona cada herramienta con su uso real: redactar, calcular, presentar y comunicar por internet.",
+      "officialCoverage": ["Historia de las computadoras", "Hardware", "Software", "Procesadores de texto", "Hojas de calculo", "Presentaciones", "Servicios de internet"],
+      "topics": [
+        {
+          "id": "historia-computadoras",
+          "title": "Historia de las computadoras",
+          "summary": "Ubica etapas generales de evolucion tecnologica y su impacto en el uso actual.",
+          "officialCoverage": ["Historia de las computadoras"],
+          "explanation": "No se trata de memorizar fechas aisladas, sino de entender la evolucion desde maquinas grandes y limitadas hasta equipos personales, moviles y conectados a internet.",
+          "solvedExample": {
+            "problem": "Cual es una caracteristica clara de las computadoras actuales frente a las primeras generaciones?",
+            "steps": ["Compara tamano, velocidad y capacidad.", "Las actuales son mas pequenas y potentes.", "Tambien permiten conectividad constante."],
+            "answer": "Mayor potencia y menor tamano"
+          },
+          "commonMistakes": ["Responder con detalles sin relacion con la evolucion tecnologica.", "Confundir hardware historico con software moderno.", "Pensar que historia solo es cronologia sin cambios de uso."],
+          "microPractice": {
+            "question": "Una tendencia clara de la computacion moderna es:",
+            "options": ["Mas tamano y menos velocidad", "Menor conectividad", "Mayor movilidad y potencia", "Desaparicion del software"],
+            "correctIndex": 2,
+            "explanation": "Los equipos son mas portables y mucho mas potentes."
+          },
+          "checkpoint": {
+            "prompt": "Asegurate de poder:",
+            "items": ["Explicar la evolucion general de las computadoras.", "Relacionar historia con uso cotidiano actual.", "Distinguir hardware y software en cada etapa."]
+          },
+          "estimatedMinutes": 15
+        },
+        {
+          "id": "hardware-software",
+          "title": "Conceptos basicos de hardware y software",
+          "summary": "Reconoce componentes fisicos y programas, junto con sus funciones basicas.",
+          "officialCoverage": ["Hardware", "Software"],
+          "explanation": "El hardware es lo tangible; el software son las instrucciones que permiten operar el equipo. Saber esta diferencia ayuda a resolver preguntas sobre dispositivos, sistemas operativos y aplicaciones.",
+          "solvedExample": {
+            "problem": "Que categoria corresponde a un teclado?",
+            "steps": ["Es un componente fisico del equipo.", "Sirve para introducir datos.", "Por eso es hardware."],
+            "answer": "Hardware"
+          },
+          "commonMistakes": ["Llamar software a cualquier cosa que use computadora.", "No distinguir perifericos de programas.", "Confundir sistema operativo con dispositivo fisico."],
+          "microPractice": {
+            "question": "Cual opcion es software?",
+            "options": ["Monitor", "Mouse", "Procesador de texto", "Memoria RAM"],
+            "correctIndex": 2,
+            "explanation": "Un procesador de texto es un programa."
+          },
+          "checkpoint": {
+            "prompt": "Debes poder:",
+            "items": ["Separar hardware de software con ejemplos.", "Reconocer perifericos de entrada y salida.", "Explicar la funcion general de un sistema operativo."]
+          },
+          "estimatedMinutes": 15
+        },
+        {
+          "id": "ofimatica",
+          "title": "Ofimatica",
+          "summary": "Repasa procesadores de texto, hojas de calculo y presentaciones electronicas.",
+          "officialCoverage": ["Procesadores de texto", "Hojas de calculo", "Presentaciones electronicas"],
+          "explanation": "En TIC para admision se espera que distingas para que sirve cada herramienta. Piensa en tareas concretas: redactar informes, organizar datos o exponer informacion visualmente.",
+          "solvedExample": {
+            "problem": "Que herramienta es mas adecuada para calcular promedios de ventas?",
+            "steps": ["Necesitas celdas, formulas y tablas.", "Eso corresponde a una hoja de calculo.", "Por ejemplo, una columna de ventas y una formula de promedio."],
+            "answer": "Hoja de calculo"
+          },
+          "commonMistakes": ["Elegir presentacion cuando el problema requiere calculo.", "Pensar que todas las herramientas resuelven igual una tarea.", "No distinguir entre documento, diapositiva y tabla."],
+          "microPractice": {
+            "question": "Para exponer un proyecto con imagenes y titulos conviene usar:",
+            "options": ["Hoja de calculo", "Presentacion electronica", "Correo electronico", "Explorador de archivos"],
+            "correctIndex": 1,
+            "explanation": "Las presentaciones permiten organizar ideas visualmente en diapositivas."
+          },
+          "checkpoint": {
+            "prompt": "Verifica que sabes:",
+            "items": ["Para que sirve cada herramienta de ofimatica.", "Escoger la opcion mas eficiente segun la tarea.", "Relacionar funciones simples con cada programa."]
+          },
+          "estimatedMinutes": 20
+        },
+        {
+          "id": "internet-servicios",
+          "title": "Servicios de internet",
+          "summary": "Trabaja redes, redes sociales, navegadores, buscadores y correo electronico.",
+          "officialCoverage": ["Redes", "Redes sociales", "Navegadores y buscadores", "Correo electronico"],
+          "explanation": "Internet no es solo navegar. El examen revisa nociones basicas de comunicacion digital, busqueda de informacion y uso responsable de herramientas conectadas.",
+          "solvedExample": {
+            "problem": "Que diferencia principal hay entre navegador y buscador?",
+            "steps": ["El navegador es el programa con el que accedes a la web.", "El buscador es el servicio que localiza informacion dentro de la web.", "Por eso uno contiene al otro en el uso diario."],
+            "answer": "El navegador abre sitios; el buscador localiza informacion."
+          },
+          "commonMistakes": ["Usar navegador y buscador como sinonimos.", "Creer que toda informacion encontrada en internet es confiable.", "Ignorar la etiqueta basica en correo electronico."],
+          "microPractice": {
+            "question": "Que herramienta sirve para enviar mensajes formales con archivos adjuntos?",
+            "options": ["Red social", "Correo electronico", "Presentacion", "Memoria USB"],
+            "correctIndex": 1,
+            "explanation": "El correo electronico se usa para comunicacion formal y adjuntos."
+          },
+          "checkpoint": {
+            "prompt": "Debes poder:",
+            "items": ["Distinguir navegador de buscador.", "Reconocer funciones basicas del correo electronico.", "Explicar para que sirve una red."]
+          },
+          "estimatedMinutes": 20
+        }
+      ]
+    },
+    {
+      "id": "ingles",
+      "title": "Ingles",
+      "role": "diagnostico",
+      "roleLabel": "Obligatorio / no pondera",
+      "summary": "El ingles es obligatorio para todas las carreras, pero la propia guia indica que no suma al puntaje global del examen de admision.",
+      "strategy": "Trabaja lectura breve y gramatica funcional. No descuides el modulo: aunque no pondera, si debes presentarlo.",
+      "officialCoverage": ["Comprension lectora", "Gramatica"],
+      "topics": [
+        {
+          "id": "ingles-reading",
+          "title": "Reading comprehension",
+          "summary": "Practica textos breves, temas familiares, intencionalidad y estados de animo.",
+          "officialCoverage": ["Textos breves", "Temas familiares", "Intencionalidad", "Estados de animo"],
+          "explanation": "En reading comprehension busca primero idea general, despues detalles. Muchas preguntas se responden identificando palabras clave, tono y contexto, incluso si no conoces cada palabra del texto.",
+          "solvedExample": {
+            "problem": "If a note says 'Please arrive early because the room closes at 9:00', what is the main instruction?",
+            "steps": ["Identify the action requested.", "The phrase 'Please arrive early' states the instruction.", "The closing time explains the reason."],
+            "answer": "Arrive early."
+          },
+          "commonMistakes": ["Traducir palabra por palabra y perder la idea general.", "Ignorar conectores like because, but or before.", "Responder por intuicion sin buscar evidencia en el texto."],
+          "microPractice": {
+            "question": "The word 'early' means:",
+            "options": ["Late", "Soon / before time", "Always", "Slowly"],
+            "correctIndex": 1,
+            "explanation": "Early means before the expected time."
+          },
+          "checkpoint": {
+            "prompt": "Before moving on, make sure you can:",
+            "items": ["Find the main idea in a short text.", "Use context clues to infer vocabulary.", "Identify tone or intention."]
+          },
+          "estimatedMinutes": 20
+        },
+        {
+          "id": "ingles-grammar",
+          "title": "Grammar essentials",
+          "summary": "Repasa present, past, future, comparatives, pronouns, connectors, passive voice and common structures.",
+          "officialCoverage": ["Present simple, continuous and perfect", "Past simple, continuous and perfect", "Future with will and going to", "Comparatives", "Adjectives", "Adverbs", "Connectors", "Passive voice", "Indirect questions", "Prepositions", "Used to"],
+          "explanation": "La gramatica en admision se resuelve mejor si relacionas tiempo verbal con contexto. Palabras como yesterday, now, tomorrow, since o already suelen guiar la eleccion correcta.",
+          "solvedExample": {
+            "problem": "Choose the correct sentence: 'She is studying now' or 'She studies now'?",
+            "steps": ["The clue 'now' points to an action in progress.", "An action happening at the moment uses present continuous.", "The correct sentence is 'She is studying now'."],
+            "answer": "She is studying now."
+          },
+          "commonMistakes": ["Elegir tiempo verbal sin leer el marcador temporal.", "Confundir future will con be going to en todos los casos.", "Olvidar que comparatives usually end in -er or use more."],
+          "microPractice": {
+            "question": "Which sentence is correct?",
+            "options": ["He go to school yesterday.", "He went to school yesterday.", "He goes to school yesterday.", "He going to school yesterday."],
+            "correctIndex": 1,
+            "explanation": "Yesterday indicates simple past, so the correct form is went."
+          },
+          "checkpoint": {
+            "prompt": "You should be able to:",
+            "items": ["Match time markers with tense.", "Recognize basic passive voice.", "Use comparatives and common prepositions correctly."]
+          },
+          "estimatedMinutes": 25
+        }
+      ]
+    }
+  ]
+}

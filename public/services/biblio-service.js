@@ -8,6 +8,10 @@ const BiblioService = (function () {
     const USERS_COLL = 'usuarios';
     const BIBLIO_CONFIG_COLL = 'biblio-config';
     const HOLIDAY_CALENDAR_DOC_ID = 'loan-calendar';
+    const INVENTORY_COLL = 'biblio-inventarios';
+    const INVENTORY_META_DOC_ID = 'inventory-current';
+    const INVENTORY_FOUND_SUBCOLL = 'encontrados';
+    const INVENTORY_MISSING_SUBCOLL = 'faltantes';
 
     const ACTIVE_LOAN_STATES = new Set(['pendiente', 'pendiente_entrega', 'entregado']);
     const CACHE_SCHEMA_VERSION = 2;
@@ -1388,6 +1392,358 @@ const BiblioService = (function () {
         }
     }
 
+    function normalizeInventoryQuantity(value) {
+        const parsed = Math.floor(Number(value) || 0);
+        return parsed > 0 ? parsed : 1;
+    }
+
+    function getInventoryMetaRef(ctx) {
+        return ctx.db.collection(BIBLIO_CONFIG_COLL).doc(INVENTORY_META_DOC_ID);
+    }
+
+    function summarizeInventorySession(id, data = {}) {
+        return {
+            id,
+            name: data.name || '',
+            status: data.status || 'inactive',
+            matchedItems: Number(data.matchedItems) || 0,
+            missingItems: Number(data.missingItems) || 0,
+            totalObserved: Number(data.totalObserved) || 0,
+            startedAt: data.startedAt || null,
+            pausedAt: data.pausedAt || null,
+            finishedAt: data.finishedAt || null,
+            updatedAt: data.updatedAt || null,
+            startedBy: data.startedBy || '',
+            updatedBy: data.updatedBy || '',
+            notes: data.notes || '',
+            lastEntry: data.lastEntry || null,
+            summary: data.summary || null,
+            catalogAdjustedAt: data.catalogAdjustedAt || null,
+            catalogAdjustedBy: data.catalogAdjustedBy || '',
+            catalogAdjustedAtMs: Number(data.catalogAdjustedAtMs) || 0
+        };
+    }
+
+    function sumInventoryObserved(entries = []) {
+        return (entries || []).reduce((total, entry) => total + (Number(entry?.totalObserved || entry?.cantidad || entry?.lastQuantity || 0) || 0), 0);
+    }
+
+    function buildInventorySessionSummary(session = {}, foundEntries = [], missingEntries = [], catalogSummary = null) {
+        const systemTotal = Number(catalogSummary?.totalCopies) || 0;
+        const registeredCatalog = sumInventoryObserved(foundEntries);
+        const outsideCatalog = sumInventoryObserved(missingEntries);
+        const totalCaptured = Number(session?.totalObserved) || (registeredCatalog + outsideCatalog);
+        const estimatedMissing = Math.max(systemTotal - registeredCatalog, 0);
+        const progress = systemTotal > 0
+            ? Math.min(100, Math.max(0, Math.round((registeredCatalog / systemTotal) * 100)))
+            : 0;
+
+        return {
+            systemTotal,
+            registeredCatalog,
+            outsideCatalog,
+            totalCaptured,
+            estimatedMissing,
+            progress,
+            matchedTitles: Array.isArray(foundEntries) ? foundEntries.length : 0,
+            outsideTitles: Array.isArray(missingEntries) ? missingEntries.length : 0
+        };
+    }
+
+    function getInventorySystemCopiesFromBook(book = {}) {
+        const total = Number(book?.copiasTotales ?? book?.copiasDisponibles);
+        return Number.isFinite(total) && total > 0 ? total : 1;
+    }
+
+    function buildInventoryGroupKey(book = {}) {
+        const explicitKey = norm(book?.inventoryGroupKey || book?.groupKey || book?.obraKey);
+        if (explicitKey) return explicitKey;
+
+        const titleKey = book?.tituloSearch || norm(book?.titulo);
+        const authorKey = book?.autorSearch || norm(book?.autor);
+        const categoryKey = norm(book?.categoria);
+        const classificationKey = norm(book?.clasificacion || book?.ubicacionCatalogo || book?.ubicacion);
+        const yearKey = norm(getBookYear(book));
+        const derivedKey = [titleKey, authorKey, categoryKey, classificationKey, yearKey]
+            .filter(Boolean)
+            .join('|');
+
+        return derivedKey || `book:${String(book?.id || book?.adquisicion || '').trim()}`;
+    }
+
+    function sortInventoryEntriesByUpdatedAt(entries = []) {
+        return [...entries].sort((left, right) => {
+            const leftTime = toMillisSafe(left?.updatedAt) || Number(left?.updatedAtMs) || Number(left?.createdAtMs) || 0;
+            const rightTime = toMillisSafe(right?.updatedAt) || Number(right?.updatedAtMs) || Number(right?.createdAtMs) || 0;
+            return rightTime - leftTime;
+        });
+    }
+
+    function buildInventoryMissingKey(value) {
+        const normalized = norm(value || '')
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/^-+|-+$/g, '')
+            .slice(0, 120);
+        return normalized || `sin-nombre-${Date.now()}`;
+    }
+
+    async function getInventorySessionDetails(ctx, sessionId, { includeLists = false } = {}) {
+        const rawSessionId = String(sessionId || '').trim();
+        if (!rawSessionId) return { session: null, foundEntries: [], missingEntries: [] };
+
+        const sessionRef = ctx.db.collection(INVENTORY_COLL).doc(rawSessionId);
+        const sessionSnap = await sessionRef.get();
+        if (!sessionSnap.exists) {
+            return { session: null, foundEntries: [], missingEntries: [] };
+        }
+
+        const session = summarizeInventorySession(sessionSnap.id, sessionSnap.data() || {});
+        if (!includeLists) {
+            return { session, foundEntries: [], missingEntries: [] };
+        }
+
+        const [foundSnap, missingSnap] = await Promise.all([
+            sessionRef.collection(INVENTORY_FOUND_SUBCOLL).get(),
+            sessionRef.collection(INVENTORY_MISSING_SUBCOLL).get()
+        ]);
+
+        const foundEntries = sortInventoryEntriesByUpdatedAt(
+            foundSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
+        );
+        const missingEntries = sortInventoryEntriesByUpdatedAt(
+            missingSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
+        );
+
+        return { session, foundEntries, missingEntries };
+    }
+
+    async function getCurrentInventorySession(ctx, { includeLists = false } = {}) {
+        const metaSnap = await getInventoryMetaRef(ctx).get();
+        const sessionId = String(metaSnap.data()?.sessionId || '').trim();
+        if (!sessionId) {
+            return { session: null, foundEntries: [], missingEntries: [] };
+        }
+
+        const details = await getInventorySessionDetails(ctx, sessionId, { includeLists });
+        if (!details.session || details.session.status === 'finished') {
+            return { session: null, foundEntries: [], missingEntries: [] };
+        }
+
+        return details;
+    }
+
+    async function getLatestFinishedInventorySession(ctx, { includeLists = false } = {}) {
+        const latestSnap = await ctx.db
+            .collection(INVENTORY_COLL)
+            .orderBy('finishedAtMs', 'desc')
+            .limit(1)
+            .get();
+
+        if (latestSnap.empty) {
+            return { session: null, foundEntries: [], missingEntries: [] };
+        }
+
+        const latestDoc = latestSnap.docs[0];
+        return getInventorySessionDetails(ctx, latestDoc.id, { includeLists });
+    }
+
+    async function getInventoryClosurePreview(ctx, sessionId) {
+        const details = await getInventorySessionDetails(ctx, sessionId, { includeLists: true });
+        if (!details?.session) {
+            return { session: null, summary: null, foundEntries: [], missingEntries: [] };
+        }
+
+        const catalogSummary = await getInventoryCatalogSummary(ctx);
+        const summary = buildInventorySessionSummary(details.session, details.foundEntries, details.missingEntries, catalogSummary);
+        return {
+            session: details.session,
+            summary,
+            foundEntries: details.foundEntries,
+            missingEntries: details.missingEntries
+        };
+    }
+
+    async function applyFinishedInventoryToCatalog(ctx, sessionId) {
+        const rawSessionId = String(sessionId || '').trim();
+        if (!rawSessionId) throw new Error('No hay un inventario cerrado para ajustar.');
+
+        const details = await getInventorySessionDetails(ctx, rawSessionId, { includeLists: true });
+        if (!details?.session) throw new Error('La sesion de inventario no existe.');
+        if (details.session.status !== 'finished') throw new Error('Primero cierra oficialmente el inventario.');
+
+        const foundEntries = Array.isArray(details.foundEntries) ? details.foundEntries : [];
+        const allBooks = await _loadCatalogCache(ctx);
+        const groups = new Map();
+        const foundByGroup = new Map();
+
+        foundEntries.forEach((entry) => {
+            const groupKey = String(entry?.groupKey || '').trim();
+            if (groupKey) {
+                foundByGroup.set(groupKey, Number(entry?.totalObserved) || 0);
+            }
+        });
+
+        allBooks.forEach((book) => {
+            const groupKey = buildInventoryGroupKey(book);
+            if (!groups.has(groupKey)) groups.set(groupKey, []);
+            groups.get(groupKey).push(book);
+        });
+
+        const actorId = ctx?.auth?.currentUser?.uid || '';
+        const nowMs = Date.now();
+        let adjustedGroups = 0;
+        let activeCopies = 0;
+        let inactiveCopies = 0;
+        let forcedByLoans = 0;
+        let batch = ctx.db.batch();
+        let opCount = 0;
+        const commitBatchIfNeeded = async (force = false) => {
+            if (opCount >= 400 || (force && opCount > 0)) {
+                await batch.commit();
+                batch = ctx.db.batch();
+                opCount = 0;
+            }
+        };
+
+        for (const [groupKey, members] of groups.entries()) {
+            const sortedMembers = [...members].sort((left, right) => {
+                const leftParent = left?.isCatalogCopy === true ? 1 : 0;
+                const rightParent = right?.isCatalogCopy === true ? 1 : 0;
+                if (leftParent !== rightParent) return leftParent - rightParent;
+                return String(left?.adquisicion || left?.id || '').localeCompare(String(right?.adquisicion || right?.id || ''));
+            });
+
+            const targetCount = Math.max(0, Number(foundByGroup.get(groupKey)) || 0);
+            let remainingActive = targetCount;
+            adjustedGroups += 1;
+
+            for (const member of sortedMembers) {
+                const activeLoans = await countActiveLoansForBook(ctx, member.id);
+                const mustStayActive = activeLoans > 0;
+                const shouldStayActive = mustStayActive || remainingActive > 0;
+
+                if (remainingActive > 0) {
+                    remainingActive -= 1;
+                }
+
+                if (mustStayActive && targetCount === 0) {
+                    forcedByLoans += 1;
+                }
+
+                if (shouldStayActive) {
+                    activeCopies += 1;
+                } else {
+                    inactiveCopies += 1;
+                }
+
+                batch.set(ctx.db.collection(CAT_COLL).doc(member.id), {
+                    active: shouldStayActive,
+                    inventoryGroupKey: groupKey,
+                    copiasTotales: Math.max(1, activeLoans || 1),
+                    copiasDisponibles: shouldStayActive ? Math.max(0, 1 - activeLoans) : 0,
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                }, { merge: true });
+                opCount += 1;
+                await commitBatchIfNeeded();
+            }
+        }
+
+        batch.set(ctx.db.collection(INVENTORY_COLL).doc(rawSessionId), {
+            catalogAdjustedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            catalogAdjustedAtMs: nowMs,
+            catalogAdjustedBy: actorId
+        }, { merge: true });
+        opCount += 1;
+        await commitBatchIfNeeded(true);
+
+        invalidateCatalogCache();
+
+        return {
+            session: {
+                ...details.session,
+                catalogAdjustedAtMs: nowMs,
+                catalogAdjustedBy: actorId
+            },
+            adjustedGroups,
+            activeCopies,
+            inactiveCopies,
+            forcedByLoans,
+            summary: details.session.summary || buildInventorySessionSummary(details.session, details.foundEntries, details.missingEntries, await getInventoryCatalogSummary(ctx))
+        };
+    }
+
+    async function searchCatalogoAdmin(ctx, term, limit = 10) {
+        const rawTerm = (term || '').toString().trim();
+        if (!rawTerm) return [];
+
+        const normalizedTerm = norm(rawTerm);
+        const results = [];
+        const seen = new Set();
+
+        const pushUnique = (items = []) => {
+            items.forEach((item) => {
+                if (!item?.id || seen.has(item.id)) return;
+                seen.add(item.id);
+                results.push(item);
+            });
+        };
+
+        try {
+            const exactDoc = await ctx.db.collection(CAT_COLL).doc(rawTerm).get();
+            if (exactDoc.exists) {
+                pushUnique([{ id: exactDoc.id, ...exactDoc.data() }]);
+            }
+
+            const byAcquisition = await findBooksByAdquisicion(ctx, rawTerm, limit);
+            pushUnique(byAcquisition);
+
+            if (normalizedTerm.length >= SEARCH_TEXT_MIN_CHARS) {
+                const allBooks = await _loadCatalogCache(ctx);
+                const words = normalizedTerm.split(/\s+/).filter((word) => word.length >= 2);
+
+                const scored = allBooks
+                    .map((book) => {
+                        if (!book?.id || seen.has(book.id)) return null;
+
+                        const tituloNorm = book.tituloSearch || norm(book.titulo);
+                        const autorNorm = book.autorSearch || norm(book.autor);
+                        const adquisicionNorm = norm(book.adquisicion);
+                        let score = 0;
+
+                        if (adquisicionNorm === normalizedTerm) score += 220;
+                        else if (adquisicionNorm.includes(normalizedTerm)) score += 140;
+
+                        if (tituloNorm.startsWith(normalizedTerm)) score += 120;
+                        else if (tituloNorm.includes(normalizedTerm)) score += 70;
+
+                        if (autorNorm.includes(normalizedTerm)) score += 45;
+
+                        words.forEach((word) => {
+                            if (tituloNorm.includes(word)) score += 15;
+                            if (autorNorm.includes(word)) score += 8;
+                        });
+
+                        if (score <= 0) return null;
+                        return { ...book, _score: score };
+                    })
+                    .filter(Boolean)
+                    .sort((a, b) => {
+                        if (b._score !== a._score) return b._score - a._score;
+                        return norm(a.titulo).localeCompare(norm(b.titulo));
+                    })
+                    .slice(0, limit)
+                    .map(({ _score, ...book }) => book);
+
+                pushUnique(scored);
+            }
+
+            return results.slice(0, limit);
+        } catch (error) {
+            console.error('[BIBLIO] Error en busqueda admin:', error);
+            return results.slice(0, limit);
+        }
+    }
+
     async function countActiveLoansForBook(ctx, bookId) {
         const snap = await ctx.db.collection(PRES_COLL)
             .where('libroId', '==', bookId)
@@ -1538,6 +1894,8 @@ const BiblioService = (function () {
     // Cache local del catalogo para busqueda client-side
     let _catalogCache = null;
     let _catalogCacheTime = 0;
+    let _inventoryLookupCache = null;
+    let _inventoryLookupCacheTime = 0;
     const CACHE_TTL = LOCAL_CACHE_TTL;
 
     async function _loadCatalogCache(ctx) {
@@ -1572,6 +1930,9 @@ const BiblioService = (function () {
                 titulo: data.titulo,
                 autor: data.autor,
                 adquisicion: data.adquisicion,
+                inventoryGroupKey: data.inventoryGroupKey || '',
+                catalogParentId: data.catalogParentId || '',
+                isCatalogCopy: data.isCatalogCopy === true,
                 copiasDisponibles: data.copiasDisponibles,
                 copiasTotales: data.copiasTotales,
                 active: data.active,
@@ -1595,9 +1956,150 @@ const BiblioService = (function () {
         return _catalogCache;
     }
 
+    function buildInventoryLookupCache(books = []) {
+        const groups = new Map();
+
+        books
+            .filter((book) => book?.id && book.active !== false)
+            .forEach((book) => {
+                const groupKey = buildInventoryGroupKey(book);
+                if (!groups.has(groupKey)) {
+                    groups.set(groupKey, []);
+                }
+                groups.get(groupKey).push(book);
+            });
+
+        const byDocId = new Map();
+        const byAcquisition = new Map();
+        const groupedBooks = [];
+        let totalCopies = 0;
+
+        groups.forEach((members, groupKey) => {
+            const sortedMembers = [...members].sort((left, right) => {
+                const leftKey = norm(left?.adquisicion || left?.id);
+                const rightKey = norm(right?.adquisicion || right?.id);
+                return leftKey.localeCompare(rightKey);
+            });
+            const representative = sortedMembers[0] || {};
+            const systemTotal = sortedMembers.reduce((sum, member) => sum + getInventorySystemCopiesFromBook(member), 0);
+            const availableTotal = sortedMembers.reduce((sum, member) => {
+                const available = Number(member?.copiasDisponibles);
+                return sum + (Number.isFinite(available) && available > 0 ? available : 0);
+            }, 0);
+            const aggregated = {
+                id: representative.id,
+                representativeId: representative.id,
+                groupKey,
+                titulo: representative.titulo || 'Sin titulo',
+                autor: representative.autor || '',
+                categoria: representative.categoria || '',
+                clasificacion: representative.clasificacion || '',
+                anio: getBookYear(representative),
+                adquisicion: representative.adquisicion || '',
+                systemTotal,
+                availableTotal,
+                groupSize: sortedMembers.length,
+                memberIds: sortedMembers.map((member) => member.id).filter(Boolean),
+                relatedAdquisiciones: sortedMembers
+                    .map((member) => String(member.adquisicion || '').trim())
+                    .filter(Boolean)
+            };
+
+            totalCopies += systemTotal;
+            groupedBooks.push(aggregated);
+
+            sortedMembers.forEach((member) => {
+                byDocId.set(member.id, aggregated);
+                getCaseVariants(member.adquisicion).forEach((variant) => {
+                    byAcquisition.set(variant, aggregated);
+                });
+            });
+        });
+
+        return {
+            byDocId,
+            byAcquisition,
+            groupedBooks,
+            summary: {
+                totalTitles: groupedBooks.length,
+                totalCopies
+            }
+        };
+    }
+
+    async function getInventoryLookupCache(ctx) {
+        const now = Date.now();
+        if (_inventoryLookupCache && (now - _inventoryLookupCacheTime) < CACHE_TTL) {
+            return _inventoryLookupCache;
+        }
+
+        const books = await _loadCatalogCache(ctx);
+        _inventoryLookupCache = buildInventoryLookupCache(books);
+        _inventoryLookupCacheTime = now;
+        return _inventoryLookupCache;
+    }
+
+    async function preloadInventoryLookup(ctx) {
+        await getInventoryLookupCache(ctx);
+        return true;
+    }
+
+    async function getInventoryCatalogSummary(ctx) {
+        const lookup = await getInventoryLookupCache(ctx);
+        return { ...(lookup?.summary || { totalTitles: 0, totalCopies: 0 }) };
+    }
+
+    async function findInventoryBookByCode(ctx, { code, sessionId = '' } = {}) {
+        const rawCode = String(code || '').trim();
+        if (!rawCode) return null;
+
+        const lookup = await getInventoryLookupCache(ctx);
+        let match = lookup.byDocId.get(rawCode) || null;
+
+        if (!match) {
+            for (const variant of getCaseVariants(rawCode)) {
+                match = lookup.byAcquisition.get(variant) || null;
+                if (match) break;
+            }
+        }
+
+        if (!match) return null;
+
+        const result = {
+            ...match,
+            matchedAcquisition: rawCode,
+            registeredObserved: 0
+        };
+
+        const rawSessionId = String(sessionId || '').trim();
+        if (!rawSessionId) return result;
+
+        const sessionRef = ctx.db.collection(INVENTORY_COLL).doc(rawSessionId);
+        const directSnap = await sessionRef.collection(INVENTORY_FOUND_SUBCOLL).doc(match.id).get();
+        if (directSnap.exists) {
+            result.registeredObserved = Number(directSnap.data()?.totalObserved) || 0;
+            return result;
+        }
+
+        if (!match.groupKey) return result;
+
+        const groupedSnap = await sessionRef.collection(INVENTORY_FOUND_SUBCOLL)
+            .where('groupKey', '==', match.groupKey)
+            .limit(1)
+            .get();
+
+        if (!groupedSnap.empty) {
+            result.registeredObserved = Number(groupedSnap.docs[0].data()?.totalObserved) || 0;
+        }
+
+        return result;
+    }
+
     function invalidateCatalogCache() {
         _catalogCache = null;
         _catalogCacheTime = 0;
+        _inventoryLookupCache = null;
+        _inventoryLookupCacheTime = 0;
         try {
             localStorage.removeItem('sia_biblio_catalog_meta');
             localStorage.removeItem('sia_biblio_catalog');
@@ -3071,9 +3573,657 @@ const BiblioService = (function () {
         return ctx.db.collection(CAT_COLL).add(cleanData);
     }
 
+    async function registerInventoryManualBook(ctx, data = {}) {
+        const sessionId = String(data.sessionId || '').trim();
+        const acquisition = String(data.acquisition || data.adquisicion || '').trim().toUpperCase();
+        const title = String(data.title || data.titulo || '').trim();
+        const author = String(data.author || data.autor || '').trim();
+        const classification = String(data.classification || data.clasificacion || '').trim();
+
+        if (!sessionId) throw new Error('No hay una sesion de inventario activa.');
+        if (!acquisition) throw new Error('Falta el numero de adquisicion.');
+        if (!title) throw new Error('Escribe el nombre del libro.');
+
+        await ensureUniqueAdquisicion(ctx, acquisition);
+        const sessionSnap = await ctx.db.collection(INVENTORY_COLL).doc(sessionId).get();
+        if (!sessionSnap.exists) throw new Error('La sesion de inventario ya no existe.');
+        if ((sessionSnap.data()?.status || '') === 'finished') {
+            throw new Error('La sesion ya fue finalizada. Inicia una nueva para continuar.');
+        }
+
+        const newBookRef = await addLibro(ctx, {
+            adquisicion: acquisition,
+            titulo: title,
+            autor: author,
+            clasificacion: classification,
+            categoria: '',
+            ubicacion: 'Estanteria',
+            copiasTotales: 1,
+            copiasDisponibles: 1
+        });
+
+        invalidateCatalogCache();
+        return {
+            bookId: newBookRef.id,
+            acquisition
+        };
+    }
+
+    async function registerInventoryAssociatedCopy(ctx, data = {}) {
+        const sessionId = String(data.sessionId || '').trim();
+        const baseBookId = String(data.baseBookId || '').trim();
+        const acquisition = String(data.acquisition || data.adquisicion || '').trim().toUpperCase();
+        const quantity = normalizeInventoryQuantity(data.quantity);
+
+        if (!sessionId) throw new Error('No hay una sesion de inventario activa.');
+        if (!baseBookId) throw new Error('Selecciona el libro base para asociar la copia.');
+        if (!acquisition) throw new Error('Ingresa el numero de adquisicion de la copia.');
+
+        const nowMs = Date.now();
+        const actorId = ctx?.auth?.currentUser?.uid || '';
+        const sessionRef = ctx.db.collection(INVENTORY_COLL).doc(sessionId);
+        const baseBookRef = ctx.db.collection(CAT_COLL).doc(baseBookId);
+        const variants = getCaseVariants(acquisition);
+        const duplicateQuery = variants.length > 0
+            ? ctx.db.collection(CAT_COLL).where('adquisicion', 'in', variants).limit(1)
+            : null;
+        const newBookRef = ctx.db.collection(CAT_COLL).doc();
+
+        await ctx.db.runTransaction(async (transaction) => {
+            const reads = [
+                transaction.get(sessionRef),
+                transaction.get(baseBookRef)
+            ];
+            if (duplicateQuery) {
+                reads.push(transaction.get(duplicateQuery));
+            }
+
+            const [sessionSnap, baseBookSnap, duplicateSnap] = await Promise.all(reads);
+
+            if (!sessionSnap.exists) throw new Error('La sesion de inventario ya no existe.');
+            if (!baseBookSnap.exists) throw new Error('El libro base ya no existe en catalogo.');
+            if (duplicateSnap && !duplicateSnap.empty) {
+                throw new Error(`Ya existe un libro con el No. de adquisicion ${acquisition}.`);
+            }
+
+            const sessionData = sessionSnap.data() || {};
+            if (sessionData.status === 'finished') {
+                throw new Error('La sesion ya fue finalizada. Inicia una nueva para continuar.');
+            }
+
+            const baseBookData = baseBookSnap.data() || {};
+            const groupKey = buildInventoryGroupKey({ id: baseBookId, ...baseBookData });
+            const existingGroupSnap = await transaction.get(
+                sessionRef.collection(INVENTORY_FOUND_SUBCOLL).where('groupKey', '==', groupKey).limit(1)
+            );
+            const existingFoundDoc = existingGroupSnap && !existingGroupSnap.empty ? existingGroupSnap.docs[0] : null;
+            const foundRef = existingFoundDoc
+                ? sessionRef.collection(INVENTORY_FOUND_SUBCOLL).doc(existingFoundDoc.id)
+                : sessionRef.collection(INVENTORY_FOUND_SUBCOLL).doc(baseBookId);
+            const previousEntry = existingFoundDoc ? (existingFoundDoc.data() || {}) : null;
+            const cleanData = {
+                adquisicion: acquisition,
+                titulo: baseBookData.titulo || 'Sin titulo',
+                autor: baseBookData.autor || '',
+                anio: getBookYear(baseBookData) || '',
+                categoria: baseBookData.categoria || '',
+                clasificacion: baseBookData.clasificacion || '',
+                ubicacion: baseBookData.ubicacion || 'Estanteria',
+                active: true,
+                inventoryGroupKey: groupKey,
+                catalogParentId: baseBookId,
+                parentAdquisicion: baseBookData.adquisicion || '',
+                isCatalogCopy: true,
+                tituloSearch: norm(baseBookData.titulo),
+                autorSearch: norm(baseBookData.autor),
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                copiasTotales: 1,
+                copiasDisponibles: 1
+            };
+
+            transaction.set(newBookRef, cleanData);
+            transaction.set(foundRef, {
+                bookId: previousEntry?.bookId || baseBookId,
+                representativeId: previousEntry?.representativeId || baseBookId,
+                groupKey,
+                titulo: previousEntry?.titulo || cleanData.titulo,
+                autor: previousEntry?.autor || cleanData.autor,
+                adquisicion: previousEntry?.adquisicion || baseBookData.adquisicion || acquisition,
+                catalogAdquisicion: previousEntry?.catalogAdquisicion || baseBookData.adquisicion || '',
+                categoria: previousEntry?.categoria || cleanData.categoria,
+                clasificacion: previousEntry?.clasificacion || cleanData.clasificacion,
+                active: true,
+                systemTotal: Math.max(Number(previousEntry?.systemTotal) || 0, 1),
+                groupSize: Math.max(Number(previousEntry?.groupSize) || 0, 1),
+                totalObserved: (Number(previousEntry?.totalObserved) || 0) + quantity,
+                lastQuantity: quantity,
+                lastQuery: acquisition,
+                updatedBy: actorId,
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                updatedAtMs: nowMs,
+                ...(previousEntry ? {} : {
+                    createdBy: actorId,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    createdAtMs: nowMs
+                })
+            }, { merge: true });
+
+            transaction.set(sessionRef, {
+                status: 'active',
+                matchedItems: (Number(sessionData.matchedItems) || 0) + (previousEntry ? 0 : 1),
+                totalObserved: (Number(sessionData.totalObserved) || 0) + quantity,
+                updatedBy: actorId,
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                updatedAtMs: nowMs,
+                lastEntry: {
+                    type: 'catalogo',
+                    bookId: previousEntry?.bookId || baseBookId,
+                    titulo: cleanData.titulo,
+                    adquisicion: acquisition,
+                    cantidad: quantity,
+                    systemTotal: Math.max(Number(previousEntry?.systemTotal) || 0, 1),
+                    query: acquisition,
+                    atMs: nowMs
+                }
+            }, { merge: true });
+        });
+
+        await getInventoryMetaRef(ctx).set({
+            sessionId,
+            status: 'active',
+            updatedBy: actorId,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            updatedAtMs: nowMs
+        }, { merge: true });
+
+        invalidateCatalogCache();
+        return {
+            bookId: newBookRef.id,
+            acquisition,
+            baseBookId
+        };
+    }
+
+    async function syncInventoryCopyAcquisitions(ctx, data = {}) {
+        const baseBookId = String(data.baseBookId || '').trim();
+        const acquisitions = Array.isArray(data.acquisitions) ? data.acquisitions : [];
+        if (!baseBookId) throw new Error('Falta el libro base para asociar copias.');
+
+        const normalizedAcquisitions = [...new Set(
+            acquisitions
+                .map((value) => String(value || '').trim().toUpperCase())
+                .filter(Boolean)
+        )];
+
+        if (!normalizedAcquisitions.length) {
+            return { created: 0, linked: 0, skipped: 0 };
+        }
+
+        const baseBookSnap = await ctx.db.collection(CAT_COLL).doc(baseBookId).get();
+        if (!baseBookSnap.exists) throw new Error('El libro base ya no existe en catalogo.');
+
+        const baseBookData = baseBookSnap.data() || {};
+        const baseAcquisition = String(baseBookData.adquisicion || '').trim().toUpperCase();
+        const groupKey = buildInventoryGroupKey({ id: baseBookId, ...baseBookData });
+        const actorNow = firebase.firestore.FieldValue.serverTimestamp();
+
+        let created = 0;
+        let linked = 0;
+        let skipped = 0;
+
+        for (const acquisition of normalizedAcquisitions) {
+            if (!acquisition || acquisition === baseAcquisition) {
+                skipped += 1;
+                continue;
+            }
+
+            const matches = await findBooksByAdquisicion(ctx, acquisition, 2);
+            if (matches.length > 1) {
+                throw new Error(`Hay multiples libros con el No. de adquisicion ${acquisition}.`);
+            }
+
+            if (matches.length === 1) {
+                const existing = matches[0];
+                if (existing.id === baseBookId) {
+                    skipped += 1;
+                    continue;
+                }
+
+                await ctx.db.collection(CAT_COLL).doc(existing.id).set({
+                    inventoryGroupKey: groupKey,
+                    catalogParentId: baseBookId,
+                    parentAdquisicion: baseBookData.adquisicion || '',
+                    isCatalogCopy: true,
+                    updatedAt: actorNow
+                }, { merge: true });
+                linked += 1;
+                continue;
+            }
+
+            await addLibro(ctx, {
+                adquisicion: acquisition,
+                titulo: baseBookData.titulo || 'Sin titulo',
+                autor: baseBookData.autor || '',
+                anio: getBookYear(baseBookData) || '',
+                categoria: baseBookData.categoria || '',
+                clasificacion: baseBookData.clasificacion || '',
+                ubicacion: baseBookData.ubicacion || 'Estanteria',
+                inventoryGroupKey: groupKey,
+                catalogParentId: baseBookId,
+                parentAdquisicion: baseBookData.adquisicion || '',
+                isCatalogCopy: true,
+                copiasTotales: 1,
+                copiasDisponibles: 1
+            });
+            created += 1;
+        }
+
+        invalidateCatalogCache();
+        return { created, linked, skipped };
+    }
+
     async function toggleLibroStatus(ctx, id, isActive) {
         invalidateCatalogCache();
         return ctx.db.collection(CAT_COLL).doc(id).update({ active: isActive });
+    }
+
+    async function startInventorySession(ctx, options = {}) {
+        const current = await getCurrentInventorySession(ctx);
+        if (current.session) return current;
+
+        const nowMs = Date.now();
+        const actorId = ctx?.auth?.currentUser?.uid || '';
+        const sessionRef = ctx.db.collection(INVENTORY_COLL).doc();
+        const name = String(options.name || '').trim() || `Inventario ${new Date(nowMs).toLocaleDateString('es-MX')}`;
+        const batch = ctx.db.batch();
+
+        batch.set(sessionRef, {
+            name,
+            status: 'active',
+            matchedItems: 0,
+            missingItems: 0,
+            totalObserved: 0,
+            notes: String(options.notes || '').trim(),
+            startedBy: actorId,
+            updatedBy: actorId,
+            lastEntry: null,
+            startedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            startedAtMs: nowMs,
+            updatedAtMs: nowMs
+        });
+
+        batch.set(getInventoryMetaRef(ctx), {
+            sessionId: sessionRef.id,
+            status: 'active',
+            updatedBy: actorId,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            updatedAtMs: nowMs
+        }, { merge: true });
+
+        await batch.commit();
+        return getCurrentInventorySession(ctx);
+    }
+
+    async function pauseInventorySession(ctx, sessionId) {
+        const rawSessionId = String(sessionId || '').trim();
+        if (!rawSessionId) throw new Error('No hay una sesion activa para pausar.');
+
+        const nowMs = Date.now();
+        const actorId = ctx?.auth?.currentUser?.uid || '';
+        const sessionRef = ctx.db.collection(INVENTORY_COLL).doc(rawSessionId);
+
+        await sessionRef.set({
+            status: 'paused',
+            pausedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            pausedAtMs: nowMs,
+            updatedBy: actorId,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            updatedAtMs: nowMs
+        }, { merge: true });
+
+        await getInventoryMetaRef(ctx).set({
+            sessionId: rawSessionId,
+            status: 'paused',
+            updatedBy: actorId,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            updatedAtMs: nowMs
+        }, { merge: true });
+
+        return getCurrentInventorySession(ctx);
+    }
+
+    async function resumeInventorySession(ctx, sessionId) {
+        const rawSessionId = String(sessionId || '').trim();
+        if (!rawSessionId) throw new Error('No hay una sesion para reanudar.');
+
+        const nowMs = Date.now();
+        const actorId = ctx?.auth?.currentUser?.uid || '';
+        const sessionRef = ctx.db.collection(INVENTORY_COLL).doc(rawSessionId);
+
+        await sessionRef.set({
+            status: 'active',
+            updatedBy: actorId,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            updatedAtMs: nowMs
+        }, { merge: true });
+
+        await getInventoryMetaRef(ctx).set({
+            sessionId: rawSessionId,
+            status: 'active',
+            updatedBy: actorId,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            updatedAtMs: nowMs
+        }, { merge: true });
+
+        return getCurrentInventorySession(ctx);
+    }
+
+    async function registerInventoryMatch(ctx, data = {}) {
+        const sessionId = String(data.sessionId || '').trim();
+        const bookId = String(data.bookId || '').trim();
+        const query = String(data.query || '').trim();
+        const groupKey = String(data.groupKey || '').trim();
+        const matchedAcquisition = String(data.matchedAcquisition || query || '').trim();
+        const systemTotal = normalizeInventoryQuantity(data.systemTotal);
+        const groupSize = normalizeInventoryQuantity(data.groupSize);
+        const quantity = normalizeInventoryQuantity(data.quantity);
+
+        if (!sessionId) throw new Error('No hay una sesion de inventario activa.');
+        if (!bookId) throw new Error('Selecciona un libro del catalogo antes de registrar.');
+
+        const nowMs = Date.now();
+        const actorId = ctx?.auth?.currentUser?.uid || '';
+        const sessionRef = ctx.db.collection(INVENTORY_COLL).doc(sessionId);
+        const foundRef = sessionRef.collection(INVENTORY_FOUND_SUBCOLL).doc(bookId);
+        const bookRef = ctx.db.collection(CAT_COLL).doc(bookId);
+
+        await ctx.db.runTransaction(async (transaction) => {
+            const [sessionSnap, foundSnap, bookSnap] = await Promise.all([
+                transaction.get(sessionRef),
+                transaction.get(foundRef),
+                transaction.get(bookRef)
+            ]);
+
+            if (!sessionSnap.exists) throw new Error('La sesion de inventario ya no existe.');
+            if (!bookSnap.exists) throw new Error('El libro seleccionado ya no existe en catalogo.');
+
+            const sessionData = sessionSnap.data() || {};
+            if (sessionData.status === 'finished') {
+                throw new Error('La sesion ya fue finalizada. Inicia una nueva para continuar.');
+            }
+
+            const previousEntry = foundSnap.exists ? (foundSnap.data() || {}) : null;
+            const bookData = bookSnap.data() || {};
+            const nextTotal = (Number(previousEntry?.totalObserved) || 0) + quantity;
+            const resolvedGroupKey = groupKey || buildInventoryGroupKey({ id: bookId, ...bookData });
+            const displayAdquisicion = matchedAcquisition || bookData.adquisicion || query;
+
+            transaction.set(foundRef, {
+                bookId,
+                representativeId: bookId,
+                groupKey: resolvedGroupKey,
+                titulo: bookData.titulo || 'Sin titulo',
+                autor: bookData.autor || '',
+                adquisicion: displayAdquisicion || '',
+                catalogAdquisicion: bookData.adquisicion || '',
+                categoria: bookData.categoria || '',
+                clasificacion: bookData.clasificacion || '',
+                active: bookData.active !== false,
+                systemTotal,
+                groupSize,
+                totalObserved: nextTotal,
+                lastQuantity: quantity,
+                lastQuery: query,
+                updatedBy: actorId,
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                updatedAtMs: nowMs,
+                ...(previousEntry ? {} : {
+                    createdBy: actorId,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    createdAtMs: nowMs
+                })
+            }, { merge: true });
+
+            transaction.set(sessionRef, {
+                status: 'active',
+                matchedItems: (Number(sessionData.matchedItems) || 0) + (previousEntry ? 0 : 1),
+                totalObserved: (Number(sessionData.totalObserved) || 0) + quantity,
+                updatedBy: actorId,
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                updatedAtMs: nowMs,
+                lastEntry: {
+                    type: 'catalogo',
+                    bookId,
+                    titulo: bookData.titulo || 'Sin titulo',
+                    adquisicion: displayAdquisicion || '',
+                    cantidad: quantity,
+                    systemTotal,
+                    query,
+                    atMs: nowMs
+                }
+            }, { merge: true });
+        });
+
+        await getInventoryMetaRef(ctx).set({
+            sessionId,
+            status: 'active',
+            updatedBy: actorId,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            updatedAtMs: nowMs
+        }, { merge: true });
+
+        return getCurrentInventorySession(ctx);
+    }
+
+    async function reviewInventoryFoundEntry(ctx, data = {}) {
+        const sessionId = String(data.sessionId || '').trim();
+        const entryId = String(data.entryId || '').trim();
+        const nextQuantity = Math.max(0, Math.floor(Number(data.quantity) || 0));
+        const addedAcquisitions = Array.isArray(data.addedAcquisitions)
+            ? [...new Set(data.addedAcquisitions.map((value) => String(value || '').trim().toUpperCase()).filter(Boolean))]
+            : [];
+
+        if (!sessionId) throw new Error('No hay una sesion de inventario activa.');
+        if (!entryId) throw new Error('Selecciona un registro para revisar.');
+
+        const nowMs = Date.now();
+        const actorId = ctx?.auth?.currentUser?.uid || '';
+        const sessionRef = ctx.db.collection(INVENTORY_COLL).doc(sessionId);
+        const foundRef = sessionRef.collection(INVENTORY_FOUND_SUBCOLL).doc(entryId);
+
+        const [sessionSnap, foundSnap] = await Promise.all([
+            sessionRef.get(),
+            foundRef.get()
+        ]);
+
+        if (!sessionSnap.exists) throw new Error('La sesion de inventario ya no existe.');
+        if (!foundSnap.exists) throw new Error('El registro ya no existe en inventario.');
+        if ((sessionSnap.data()?.status || '') === 'finished') {
+            throw new Error('La sesion ya fue finalizada. Inicia una nueva para continuar.');
+        }
+
+        const previousEntry = foundSnap.data() || {};
+        const baseBookId = String(previousEntry.representativeId || previousEntry.bookId || '').trim();
+        let syncResult = { created: 0, linked: 0, skipped: 0 };
+        if (addedAcquisitions.length > 0) {
+            syncResult = await syncInventoryCopyAcquisitions(ctx, {
+                baseBookId,
+                acquisitions: addedAcquisitions
+            });
+        }
+
+        await ctx.db.runTransaction(async (transaction) => {
+            const [liveSessionSnap, liveFoundSnap] = await Promise.all([
+                transaction.get(sessionRef),
+                transaction.get(foundRef)
+            ]);
+
+            if (!liveSessionSnap.exists) throw new Error('La sesion de inventario ya no existe.');
+            if (!liveFoundSnap.exists) throw new Error('El registro ya no existe en inventario.');
+
+            const sessionData = liveSessionSnap.data() || {};
+            const liveEntry = liveFoundSnap.data() || {};
+            const previousTotal = Number(liveEntry.totalObserved) || 0;
+            const delta = nextQuantity - previousTotal;
+
+            if (nextQuantity <= 0) {
+                transaction.delete(foundRef);
+            } else {
+                transaction.set(foundRef, {
+                    totalObserved: nextQuantity,
+                    lastQuantity: delta !== 0 ? Math.abs(delta) : Number(liveEntry.lastQuantity) || nextQuantity,
+                    systemTotal: Math.max(Number(liveEntry.systemTotal) || 0, 1) + Number(syncResult.created || 0) + Number(syncResult.linked || 0),
+                    groupSize: Math.max(Number(liveEntry.groupSize) || 0, 1) + Number(syncResult.created || 0) + Number(syncResult.linked || 0),
+                    updatedBy: actorId,
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    updatedAtMs: nowMs
+                }, { merge: true });
+            }
+
+            transaction.set(sessionRef, {
+                totalObserved: Math.max(0, (Number(sessionData.totalObserved) || 0) + delta),
+                matchedItems: Math.max(0, (Number(sessionData.matchedItems) || 0) + (nextQuantity <= 0 ? -1 : 0)),
+                updatedBy: actorId,
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                updatedAtMs: nowMs,
+                lastEntry: {
+                    type: 'catalogo',
+                    bookId: String(liveEntry.bookId || baseBookId || ''),
+                    titulo: liveEntry.titulo || 'Sin titulo',
+                    adquisicion: liveEntry.adquisicion || liveEntry.catalogAdquisicion || '',
+                    cantidad: nextQuantity,
+                    systemTotal: Math.max(Number(liveEntry.systemTotal) || 0, 1) + Number(syncResult.created || 0) + Number(syncResult.linked || 0),
+                    query: liveEntry.lastQuery || liveEntry.adquisicion || '',
+                    atMs: nowMs
+                }
+            }, { merge: true });
+        });
+
+        return getInventorySessionDetails(ctx, sessionId, { includeLists: true });
+    }
+
+    async function registerInventoryMissing(ctx, data = {}) {
+        const sessionId = String(data.sessionId || '').trim();
+        const query = String(data.query || '').trim();
+        const title = String(data.title || data.nombre || '').trim();
+        const displayName = title || query;
+        const quantity = normalizeInventoryQuantity(data.quantity);
+
+        if (!sessionId) throw new Error('No hay una sesion de inventario activa.');
+        if (!displayName) throw new Error('Escribe el nombre del libro faltante para guardarlo.');
+
+        const nowMs = Date.now();
+        const actorId = ctx?.auth?.currentUser?.uid || '';
+        const entryId = buildInventoryMissingKey(displayName);
+        const sessionRef = ctx.db.collection(INVENTORY_COLL).doc(sessionId);
+        const missingRef = sessionRef.collection(INVENTORY_MISSING_SUBCOLL).doc(entryId);
+
+        await ctx.db.runTransaction(async (transaction) => {
+            const [sessionSnap, missingSnap] = await Promise.all([
+                transaction.get(sessionRef),
+                transaction.get(missingRef)
+            ]);
+
+            if (!sessionSnap.exists) throw new Error('La sesion de inventario ya no existe.');
+
+            const sessionData = sessionSnap.data() || {};
+            if (sessionData.status === 'finished') {
+                throw new Error('La sesion ya fue finalizada. Inicia una nueva para continuar.');
+            }
+
+            const previousEntry = missingSnap.exists ? (missingSnap.data() || {}) : null;
+            const nextTotal = (Number(previousEntry?.totalObserved) || 0) + quantity;
+
+            transaction.set(missingRef, {
+                displayName,
+                normalizedName: norm(displayName),
+                lastQuery: query,
+                totalObserved: nextTotal,
+                lastQuantity: quantity,
+                updatedBy: actorId,
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                updatedAtMs: nowMs,
+                ...(previousEntry ? {} : {
+                    createdBy: actorId,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    createdAtMs: nowMs
+                })
+            }, { merge: true });
+
+            transaction.set(sessionRef, {
+                status: 'active',
+                missingItems: (Number(sessionData.missingItems) || 0) + (previousEntry ? 0 : 1),
+                totalObserved: (Number(sessionData.totalObserved) || 0) + quantity,
+                updatedBy: actorId,
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                updatedAtMs: nowMs,
+                lastEntry: {
+                    type: 'faltante',
+                    titulo: displayName,
+                    cantidad: quantity,
+                    query,
+                    atMs: nowMs
+                }
+            }, { merge: true });
+        });
+
+        await getInventoryMetaRef(ctx).set({
+            sessionId,
+            status: 'active',
+            updatedBy: actorId,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            updatedAtMs: nowMs
+        }, { merge: true });
+
+        return getCurrentInventorySession(ctx);
+    }
+
+    async function finalizeInventorySession(ctx, sessionId) {
+        const rawSessionId = String(sessionId || '').trim();
+        if (!rawSessionId) throw new Error('No hay una sesion para finalizar.');
+
+        const nowMs = Date.now();
+        const actorId = ctx?.auth?.currentUser?.uid || '';
+        const sessionRef = ctx.db.collection(INVENTORY_COLL).doc(rawSessionId);
+        const metaRef = getInventoryMetaRef(ctx);
+        const [details, catalogSummary] = await Promise.all([
+            getInventorySessionDetails(ctx, rawSessionId, { includeLists: true }),
+            getInventoryCatalogSummary(ctx)
+        ]);
+        const finalSummary = buildInventorySessionSummary(details?.session, details?.foundEntries, details?.missingEntries, catalogSummary);
+
+        await ctx.db.runTransaction(async (transaction) => {
+            const [sessionSnap, metaSnap] = await Promise.all([
+                transaction.get(sessionRef),
+                transaction.get(metaRef)
+            ]);
+
+            if (!sessionSnap.exists) throw new Error('La sesion de inventario ya no existe.');
+
+            transaction.set(sessionRef, {
+                status: 'finished',
+                updatedBy: actorId,
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                updatedAtMs: nowMs,
+                finishedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                finishedAtMs: nowMs,
+                summary: finalSummary
+            }, { merge: true });
+
+            if (metaSnap.exists && String(metaSnap.data()?.sessionId || '').trim() === rawSessionId) {
+                transaction.set(metaRef, {
+                    sessionId: '',
+                    status: 'idle',
+                    updatedBy: actorId,
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    updatedAtMs: nowMs
+                }, { merge: true });
+            }
+        });
+
+        return getInventorySessionDetails(ctx, rawSessionId, { includeLists: true });
     }
 
     // EXTENDER / CANCELAR / PAGAR
@@ -3854,6 +5004,7 @@ const BiblioService = (function () {
         findUserByQuery,
         findBookByCode,
         searchCatalogo,
+        searchCatalogoAdmin,
         getTopBooks,
         getBooksByCategory,
         getLoanPolicy,
@@ -3900,6 +5051,24 @@ const BiblioService = (function () {
         joinWaitlist,
         leaveWaitlist,
         isBookInWaitlist,
+        preloadInventoryLookup,
+        getInventoryCatalogSummary,
+        findInventoryBookByCode,
+        getCurrentInventorySession,
+        getInventorySessionDetails,
+        getLatestFinishedInventorySession,
+        getInventoryClosurePreview,
+        applyFinishedInventoryToCatalog,
+        startInventorySession,
+        pauseInventorySession,
+        resumeInventorySession,
+        registerInventoryMatch,
+        reviewInventoryFoundEntry,
+        registerInventoryManualBook,
+        registerInventoryAssociatedCopy,
+        syncInventoryCopyAcquisitions,
+        registerInventoryMissing,
+        finalizeInventorySession,
         getLastAddedBook, getBookByAdquisicion, // [NEW]
         invalidateCatalogCache
     };

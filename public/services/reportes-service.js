@@ -4,7 +4,8 @@ window.ReportesService = (function () {
     const MODULES = {
         'POBLACION': { name: 'Población SIA', color: '#0f766e', icon: 'bi-people-fill', gradient: 'linear-gradient(135deg, #0d9488, #0f766e)' },
         'BIBLIO': { name: 'Biblioteca', color: '#f59e0b', icon: 'bi-book-half', gradient: 'linear-gradient(135deg, #f59e0b, #d97706)' },
-        'MEDICO': { name: 'Servicio Médico / Psicología', color: '#6366f1', icon: 'bi-heart-pulse-fill', gradient: 'linear-gradient(135deg, #6366f1, #4f46e5)' }
+        'MEDICO': { name: 'Servicios Médicos', color: '#6366f1', icon: 'bi-heart-pulse-fill', gradient: 'linear-gradient(135deg, #6366f1, #4f46e5)' },
+        'PSICOPEDAGOGICO': { name: 'Atención Psicopedagógica', color: '#0ea5e9', icon: 'bi-chat-heart-fill', gradient: 'linear-gradient(135deg, #0ea5e9, #0284c7)' }
     };
 
     const MODULE_VOCACIONAL = { name: 'Test Vocacional', color: '#0bacbe', icon: 'bi-journal-check', gradient: 'linear-gradient(135deg, #0dcaf0, #0bacbe)' };
@@ -557,9 +558,10 @@ window.ReportesService = (function () {
             allData = [...allData, ...visitas, ...prestamos];
         }
 
-        if (requestedAreas.includes('MEDICO')) {
+        if (requestedAreas.includes('MEDICO') || requestedAreas.includes('PSICOPEDAGOGICO')) {
             const citas = await fetchCitasMedi(ctx, start, end);
-            allData = [...allData, ...citas];
+            const healthAreaSet = new Set(requestedAreas.filter((area) => area === 'MEDICO' || area === 'PSICOPEDAGOGICO'));
+            allData = [...allData, ...citas.filter((item) => healthAreaSet.has(item.areaKey || 'MEDICO'))];
         }
 
         if (requestedAreas.includes('POBLACION')) {
@@ -666,7 +668,16 @@ window.ReportesService = (function () {
                 safeMetric('vocacional', () => fetchVocacionalStats(ctx))
             ]);
 
-            return { usuarios, visitasHoy, consultasHoy, vocacional };
+            const citasHoyRaw = await safeMetric('consultas-detalle', () => fetchCitasMedi(ctx, today, todayEnd));
+            const citasHoy = Array.isArray(citasHoyRaw) ? citasHoyRaw : [];
+            const consultasMedicasHoy = Array.isArray(citasHoy)
+                ? citasHoy.filter((item) => item.areaKey === 'MEDICO').length
+                : null;
+            const consultasPsicopedagogicasHoy = Array.isArray(citasHoy)
+                ? citasHoy.filter((item) => item.areaKey === 'PSICOPEDAGOGICO').length
+                : null;
+
+            return { usuarios, visitasHoy, consultasHoy, consultasMedicasHoy, consultasPsicopedagogicasHoy, vocacional };
         });
     }
 
@@ -819,9 +830,10 @@ window.ReportesService = (function () {
                     usuario: d.studentName || d.pacienteNombre || 'Paciente',
                     matricula: d.matricula || 'N/A',
                     _uid: d.studentId || null,
-                    area: 'Servicios Médicos',
+                    areaKey: isPsico ? 'PSICOPEDAGOGICO' : 'MEDICO',
+                    area: isPsico ? 'Atención Psicopedagógica' : 'Servicios Médicos',
                     subarea: isPsico ? 'Psicología' : 'Medicina General',
-                    tipo: isPsico ? 'Consulta Psicológica' : 'Consulta Médica',
+                    tipo: isPsico ? 'Consulta Psicopedagógica' : 'Consulta Médica',
                     detalle: d.motivo || d.motivoConsulta || 'Consulta general',
                     diagnostico: d.diagnostico || null,
                     status: d.estado || 'Pendiente',

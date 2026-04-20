@@ -1,0 +1,5 @@
+2026/04/10-10:15:58.897 6dac Creating DB C:\Users\larr_\Documents\SIA-tecnm-main\.tmp-edge-profile\Default\EdgeCoupons/coupons_data.db since it was missing.
+2026/04/10-10:15:58.906 6dac Reusing MANIFEST C:\Users\larr_\Documents\SIA-tecnm-main\.tmp-edge-profile\Default\EdgeCoupons/coupons_data.db/MANIFEST-000001
+2026/04/10-10:15:59.150 6ce0 Level-0 table #5: started
+2026/04/10-10:15:59.159 6ce0 Level-0 table #5: 682116 bytes OK
+2026/04/10-10:15:59.161 6ce0 Delete type=0 #3

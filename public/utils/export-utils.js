@@ -22,6 +22,7 @@ window.ExportUtils = (function () {
     const AREA_NAMES = {
         BIBLIO: 'Biblioteca',
         MEDICO: 'Servicios Médicos',
+        PSICOPEDAGOGICO: 'Atención Psicopedagógica',
         POBLACION: 'Población SIA',
         VOCACIONAL: 'Test Vocacional'
     };
@@ -51,6 +52,15 @@ window.ExportUtils = (function () {
             danger: [220, 38, 38],
             light: [238, 242, 255],
             dark: [49, 46, 129]
+        },
+        PSICOPEDAGOGICO: {
+            primary: [2, 132, 199],
+            accent: [14, 165, 233],
+            success: [5, 150, 105],
+            warning: [3, 105, 161],
+            danger: [220, 38, 38],
+            light: [240, 249, 255],
+            dark: [12, 74, 110]
         },
         POBLACION: {
             primary: [15, 118, 110],
@@ -284,7 +294,7 @@ window.ExportUtils = (function () {
         }
 
         // ===== DIAGNÓSTICOS (solo Médico) =====
-        if (area === 'MEDICO' && Object.keys(stats.byDiagnostico).length > 0) {
+        if ((area === 'MEDICO' || area === 'PSICOPEDAGOGICO') && Object.keys(stats.byDiagnostico).length > 0) {
             ensureSpace(50);
             _sectionLabel(doc, 'Diagnósticos Frecuentes', y);
             y += 5;
@@ -398,6 +408,8 @@ window.ExportUtils = (function () {
         } else if (area === 'MEDICO') {
             resumen.push(['Consultas Médicas', stats.medicas]);
             resumen.push(['Consultas Psicológicas', stats.psicologicas]);
+        } else if (area === 'PSICOPEDAGOGICO') {
+            resumen.push(['Atenciones psicopedagógicas', stats.psicologicas || stats.total]);
         } else {
             resumen.push(['Estudiantes', stats.estudiantes]);
             resumen.push(['Docentes', stats.docentes]);
@@ -471,7 +483,7 @@ window.ExportUtils = (function () {
         XLSX.utils.book_append_sheet(wb, wsTemp, 'Temporal');
 
         // ===== HOJA 5 (MÉDICO): DIAGNÓSTICOS =====
-        if (area === 'MEDICO' && Object.keys(stats.byDiagnostico).length > 0) {
+        if ((area === 'MEDICO' || area === 'PSICOPEDAGOGICO') && Object.keys(stats.byDiagnostico).length > 0) {
             var diag = [['DIAGNÓSTICOS FRECUENTES'], [''], ['Diagnóstico', 'Cantidad', 'Porcentaje']];
             Object.entries(stats.byDiagnostico).sort(function (a, b) { return b[1] - a[1]; }).forEach(function (e) {
                 diag.push([e[0], e[1], _pct(e[1], stats.total)]);
@@ -1665,7 +1677,7 @@ window.ExportUtils = (function () {
     }
 
     function _captureMainChart(area) {
-        var ids = { BIBLIO: 'biblio-visit-line', MEDICO: 'medico-consult-line', POBLACION: 'pob-demo-carrera-bar' };
+        var ids = { BIBLIO: 'biblio-visit-line', MEDICO: 'medico-consult-line', PSICOPEDAGOGICO: 'medico-consult-line', POBLACION: 'pob-demo-carrera-bar' };
         var canvas = document.getElementById(ids[area]);
         if (!canvas) return null;
         try { return canvas.toDataURL('image/png', 1.0); } catch (e) { return null; }
@@ -1684,6 +1696,11 @@ window.ExportUtils = (function () {
             { label: 'Médicas', value: (stats.medicas || 0).toLocaleString('es-MX'), color: '#6366f1' },
             { label: 'Psicológicas', value: (stats.psicologicas || 0).toLocaleString('es-MX'), color: '#0ea5e9' }
         ];
+        if (area === 'PSICOPEDAGOGICO') return [
+            { label: 'Total Atenciones', value: stats.total.toLocaleString('es-MX'), color: '#0ea5e9' },
+            { label: 'Promedio/Día', value: stats.avgDaily.toFixed(1), color: '#10b981' },
+            { label: 'Psicopedagógicas', value: (stats.psicologicas || stats.total || 0).toLocaleString('es-MX'), color: '#0284c7' }
+        ];
         return [
             { label: 'Total Usuarios', value: stats.total.toLocaleString('es-MX'), color: '#10b981' },
             { label: 'Estudiantes', value: (stats.estudiantes || 0).toLocaleString('es-MX'), color: '#3b82f6' },
@@ -1695,14 +1712,14 @@ window.ExportUtils = (function () {
 
     function _getDetailColumns(area) {
         if (area === 'BIBLIO') return ['Fecha', 'Usuario', 'Matrícula', 'Tipo', 'Detalle', 'Estado'];
-        if (area === 'MEDICO') return ['Fecha', 'Paciente', 'Tipo', 'Motivo', 'Profesional'];
+        if (area === 'MEDICO' || area === 'PSICOPEDAGOGICO') return ['Fecha', 'Paciente', 'Tipo', 'Motivo', 'Profesional'];
         return ['Nombre', 'Matrícula', 'Carrera', 'Género', 'Turno'];
     }
 
     function _getDetailRow(d, area) {
         var f = d.fecha instanceof Date ? d.fecha.toLocaleDateString('es-MX') : '';
         if (area === 'BIBLIO') return [f, d.usuario || '', d.matricula || '', d.tipo || '', (d.detalle || '').substring(0, 35), d.status || ''];
-        if (area === 'MEDICO') return [f, d.usuario || '', d.tipo || '', (d.detalle || '').substring(0, 30), d.profesional || ''];
+        if (area === 'MEDICO' || area === 'PSICOPEDAGOGICO') return [f, d.usuario || '', d.tipo || '', (d.detalle || '').substring(0, 30), d.profesional || ''];
         return [d.usuario || '', d.matricula || '', d.carrera || '', d.genero || '', d.turno || ''];
     }
 
@@ -1710,20 +1727,20 @@ window.ExportUtils = (function () {
 
     function _getExcelHeaders(area) {
         if (area === 'BIBLIO') return ['Fecha', 'Usuario', 'Matrícula', 'Tipo', 'Detalle', 'Estado', 'Carrera', 'Género', 'Turno'];
-        if (area === 'MEDICO') return ['Fecha', 'Paciente', 'Tipo', 'Motivo', 'Diagnóstico', 'Profesional', 'Carrera', 'Género'];
+        if (area === 'MEDICO' || area === 'PSICOPEDAGOGICO') return ['Fecha', 'Paciente', 'Tipo', 'Motivo', 'Diagnóstico', 'Profesional', 'Carrera', 'Género'];
         return ['Nombre', 'Matrícula', 'Carrera', 'Género', 'Turno', 'Generación', 'Estado Civil', 'Beca'];
     }
 
     function _getExcelRow(d, area) {
         var f = d.fecha instanceof Date ? d.fecha.toLocaleDateString('es-MX') : '';
         if (area === 'BIBLIO') return [f, d.usuario || '', d.matricula || '', d.tipo || '', d.detalle || '', d.status || '', d.carrera || '', d.genero || '', d.turno || ''];
-        if (area === 'MEDICO') return [f, d.usuario || '', d.tipo || '', d.detalle || '', d.diagnostico || '', d.profesional || '', d.carrera || '', d.genero || ''];
+        if (area === 'MEDICO' || area === 'PSICOPEDAGOGICO') return [f, d.usuario || '', d.tipo || '', d.detalle || '', d.diagnostico || '', d.profesional || '', d.carrera || '', d.genero || ''];
         return [d.usuario || '', d.matricula || '', d.carrera || '', d.genero || '', d.turno || '', d.generacion || '', d.estadoCivil || '', d.beca || ''];
     }
 
     function _getExcelWidths(area) {
         if (area === 'BIBLIO') return [{ wch: 12 }, { wch: 25 }, { wch: 14 }, { wch: 18 }, { wch: 30 }, { wch: 12 }, { wch: 25 }, { wch: 10 }, { wch: 12 }];
-        if (area === 'MEDICO') return [{ wch: 12 }, { wch: 25 }, { wch: 20 }, { wch: 30 }, { wch: 30 }, { wch: 22 }, { wch: 25 }, { wch: 10 }];
+        if (area === 'MEDICO' || area === 'PSICOPEDAGOGICO') return [{ wch: 12 }, { wch: 25 }, { wch: 20 }, { wch: 30 }, { wch: 30 }, { wch: 22 }, { wch: 25 }, { wch: 10 }];
         return [{ wch: 25 }, { wch: 14 }, { wch: 28 }, { wch: 10 }, { wch: 12 }, { wch: 10 }, { wch: 14 }, { wch: 12 }];
     }
 
@@ -1780,7 +1797,7 @@ window.ExportUtils = (function () {
             if (item.subarea === 'Visitas') stats.visitas++;
             if (item.subarea === 'Préstamos') stats.prestamos++;
             if (item.tipo === 'Consulta Médica') stats.medicas++;
-            if (item.tipo === 'Consulta Psicológica') stats.psicologicas++;
+            if (item.tipo === 'Consulta Psicopedagógica' || item.tipo === 'Consulta Psicológica') stats.psicologicas++;
             if (item.subarea === 'ESTUDIANTE') stats.estudiantes++;
             if (item.subarea === 'DOCENTE') stats.docentes++;
             if (item.subarea === 'ADMINISTRATIVO') stats.administrativos++;

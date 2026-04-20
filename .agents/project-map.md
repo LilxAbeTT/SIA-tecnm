@@ -16,7 +16,7 @@ SIA-tecnm-main/
 |   |-- main.js                     <- Core bootstrap: UiManager + Router + Breadcrumbs + support modal wiring
 |   |-- index.html                  <- App shell, modals, public views, dashboard shells
 |   |-- styles.css                  <- Legacy global CSS
-|   |-- styles/                     <- Modular CSS (16 themed files)
+|   |-- styles/                     <- Modular CSS (17 themed files)
 |   |-- sw.js                       <- Offline service worker
 |   |-- firebase-messaging-sw.js    <- FCM service worker
 |   |-- manifest.json               <- PWA manifest
@@ -157,6 +157,7 @@ The repo is now mixed-mode:
 |---|---|---|
 | `/` | landing or default home | `router.js` + `app.js` |
 | `/register` | Reserved route, real DOM shell is `view-register-wizard` | `router.js` route exists, UI handled by `UiManager`/`app.js` |
+| `/admisiones` | `view-admisiones-public` | `router.js` + `modules/admisiones-public.js` |
 | `/encuesta-publica` | `view-encuesta-publica` | `router.js` + `modules/encuestas.js` |
 | `/mapa-campus` | `view-campus-map` or `view-campus-map-public` | `router.js` + `modules/campus-map.js` |
 | `/test-vocacional` | `view-test-vocacional` | public component |
@@ -203,6 +204,7 @@ Do not assume every `view-*` container in `index.html` is part of the active rou
 | Route | View ID | Student/runtime controller | Admin/runtime controller | Notes |
 |---|---|---|---|---|
 | `/dashboard` | `view-dashboard` | `sia-student-dashboard` + `app.js` | department/superadmin surfaces toggled by `app.js` | Dashboard surface is not a classic JS module |
+| `/admisiones` | `view-admisiones-public` | `window.AdmisionesPublic` | n/a | Public study + practice center for aspirantes with local progress |
 | `/aula` | `view-aula` | `AulaStudent` via `aula.js` | `AdminAula` via `aula.js` | Loads `config/aula-subject-catalog.js` and `aula-class-form.js` first |
 | `/aula/curso/:id` | `view-aula-course` | `AulaClase` | `AulaClase` | Deep course route |
 | `/comunidad` | `view-comunidad` | `window.Comunidad` | `window.AdminComunidad` | New module |
@@ -304,6 +306,7 @@ public/modules/
     |-- prestamos.js
     |-- devoluciones.js
     |-- historial.js
+    |-- inventario.js
     `-- reportes.js
 ```
 
@@ -314,6 +317,7 @@ public/modules/
   - `prestamos.js`: loan flow
   - `devoluciones.js`: returns/forgiveness/satisfaction survey triggers
   - `historial.js`: search and timeline
+  - `inventario.js`: mobile-first inventory session flow with pause/resume, barcode scan fallback, and missing-book capture
   - `reportes.js`: metrics, active assets, service reservations
 - `admin.biblio.js` is the runtime state/orchestration layer.
 
@@ -509,6 +513,7 @@ public/modules/
 |---|---|---|
 | `public/modules/profile.js` | `window.Profile` | Personal center: account, health, context, preferences, activity |
 | `public/modules/register.js` | `window.SIA_Register` | Full registration wizard with student/docente/administrativo/operativo paths and staff presets |
+| `public/modules/admisiones-public.js` | `window.AdmisionesPublic` | Public admissions 2026 study center with local guest progress and practice engine |
 | `public/modules/superadmin.js` | `window.SuperAdmin` | Users, logs, support tickets, config, dashboards |
 | `public/modules/vocacional-admin.js` | `window.AdminVocacional` | CRM for aspirantes and stats |
 | `public/modules/notifications.js` | `window.Notifications` | Dedicated notification center |
@@ -533,7 +538,7 @@ public/modules/
 | `public/services/aula-service.js` | `window.AulaService` | `aula-clases`, `aula-miembros`, `aula-publicaciones`, `aula-entregas`, `aula-comentarios`, `aula-votos`, `aula-reacciones`, `aula-grupos`, `aula-plantillas`, `usuarios` | Classes, members, publications, deliveries, portfolio, groups |
 | `public/services/comunidad-service.js` | `window.ComunidadService` | `comunidad_posts`, `comunidad_comments`, `comunidad_reactions`, `comunidad_reports`, `comunidad_user_states`, storage `users/{uid}/comunidad/posts/*` | Post/comment/report/moderation service |
 | `public/services/comunidad-chat-service.js` | `window.ComunidadChatService` | `comunidad_conversations/{id}/messages`, `comunidad_user_states` | Private messages for Comunidad |
-| `public/services/biblio-service.js` | `window.BiblioService` | `biblio-catalogo`, `prestamos-biblio`, `biblio-visitas`, `biblio-visitas-activos`, `biblio-solicitudes`, `biblio-wishlist`, `biblio-reservas`, `biblio-activos`, `biblio-config`, `usuarios`, collection group `waitlist` | Student + admin library data surface, including holiday calendar / business-day loan rules |
+| `public/services/biblio-service.js` | `window.BiblioService` | `biblio-catalogo`, `prestamos-biblio`, `biblio-visitas`, `biblio-visitas-activos`, `biblio-solicitudes`, `biblio-wishlist`, `biblio-reservas`, `biblio-activos`, `biblio-config`, `biblio-inventarios`, `usuarios`, collection group `waitlist` | Student + admin library data surface, including holiday calendar / business-day loan rules and resumable inventory sessions |
 | `public/services/biblio-assets-service.js` | `window.BiblioAssetsService` | `biblio-activos`, `biblio-reservas`, `usuarios` | PCs/salas/mesas/reservations/auto-release |
 | `public/services/medi-service.js` | `window.MediService` | `citas-medi`, `expedientes-clinicos/{uid}/consultas`, `expedientes-clinicos/{uid}/consultas-privadas`, `medi-config`, `medi-slots` (legacy), `medi-shift-profiles`, `usuarios/{uid}/profiles`, `usuarios` | Current medico data layer |
 | `public/services/medi-chat-service.js` | `window.MediChatService` | `medi-conversations/{id}/messages` | Medico/paciente chat |
@@ -614,6 +619,7 @@ public/modules/
 | `14-superadmin.css` | Superadmin panel |
 | `15-comunidad-module.css` | Comunidad module styling |
 | `16-campus-map.css` | Interactive campus map layout, hotspots, quick nav, and detail panel |
+| `17-admisiones-public.css` | Public admissions 2026 layout, cards, topic study surface, and practice UI |
 
 ### Styling note
 
@@ -850,6 +856,7 @@ Known QA presets in `firebase.js`:
 | Reportes data aggregation | `public/modules/reportes/*`, `public/services/reportes-service.js` |
 | Notifications center / feed / push | `public/modules/notifications.js`, `public/services/notify.js`, `public/services/push-service.js`, `functions/index.js` |
 | Campus map module | `public/modules/campus-map.js`, `public/modules/campus-map/data.js`, `public/images/campus-map/mapa-ites.png`, `public/core/router.js`, `public/index.html` |
+| Public admissions center | `public/modules/admisiones-public.js`, `public/data/admisiones-2026.json`, `public/data/evaluatec-2026-content.json`, `public/styles/17-admisiones-public.css`, `public/core/router.js`, `public/index.html` |
 | Vocacional CRM and public test | `public/modules/vocacional-admin.js`, `public/services/vocacional-service.js`, `public/components/vocacional-*`, `public/data/vocacional-preguntas-v2.json` |
 
 ---
@@ -866,6 +873,7 @@ The old map is no longer accurate in these areas:
 - `aula` added `aula-class-form.js` and the subject catalog in `config/aula-subject-catalog.js`.
 - `core/breadcrumbs.js`, `shell-breadcrumbs`, and `superadmin-switcher` are new.
 - `mapa-campus` is now a native SIA module and no longer depends on the removed standalone app under `news/edificios` or the removed `public/campus-map/` iframe bundle.
+- `admisiones` now exists as a first-class public module for aspirantes, separate from the vocational test and backed by static 2026 content plus local guest progress.
 - QA secret login and QA actor/context switching are now first-class runtime features.
 - Support tickets (`tickets-soporte`) and the report-problem modal are now part of the app shell.
 - Cloud Functions are now broader than push: notices analytics, survey aggregations, forum workflows, reminders, and event messaging.

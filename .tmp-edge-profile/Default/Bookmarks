@@ -1,0 +1,161 @@
+{
+   "checksum": "021f97f14870d3f8332142ad82dfff17",
+   "roots": {
+      "bookmark_bar": {
+         "children": [ {
+            "date_added": "13240601146792982",
+            "date_last_used": "0",
+            "guid": "9ba93df1-825f-478e-9961-a991dd400bdb",
+            "id": "7",
+            "name": "Instagram",
+            "show_icon": false,
+            "source": "sync",
+            "type": "url",
+            "url": "https://www.instagram.com/?hl=es-la",
+            "visit_count": 0
+         }, {
+            "date_added": "13252924109665210",
+            "date_last_used": "0",
+            "guid": "0ac313b3-4388-4eae-a4ce-6ccbadb14f99",
+            "id": "8",
+            "name": "Lil x Abe",
+            "show_icon": false,
+            "source": "sync",
+            "type": "url",
+            "url": "https://www.tiktok.com/@lilxabeyt?lang=es",
+            "visit_count": 0
+         }, {
+            "date_added": "13189659628328497",
+            "date_last_used": "13408062752009390",
+            "guid": "97cc2327-2dfe-4818-9f30-14ad2814c490",
+            "id": "9",
+            "name": "YouTube",
+            "show_icon": false,
+            "source": "sync",
+            "type": "url",
+            "url": "https://www.youtube.com/",
+            "visit_count": 21
+         }, {
+            "date_added": "13233565193990633",
+            "date_last_used": "0",
+            "guid": "f7210c37-0375-45ca-ba45-3eb60c3ebd63",
+            "id": "10",
+            "name": "Convertidor Youtube Mp3",
+            "show_icon": false,
+            "source": "sync",
+            "type": "url",
+            "url": "https://mp3-youtube.download/es/online-youtube-converter",
+            "visit_count": 0
+         }, {
+            "date_added": "13252875276896532",
+            "date_last_used": "0",
+            "guid": "06ab35c1-0f84-49ac-b826-ddb790cc32f4",
+            "id": "11",
+            "name": "Descargar Tiktoks",
+            "show_icon": false,
+            "source": "sync",
+            "type": "url",
+            "url": "https://ttdownloader.com/es/?url=https://www.tiktok.com/@duhvinedeeko/video/6904002202814156033?lang=es&sender_device=pc&sender_web_id=6873716574579590662&is_from_webapp=v1",
+            "visit_count": 0
+         }, {
+            "date_added": "13261682005541971",
+            "date_last_used": "0",
+            "guid": "8fed39a6-7978-4ec0-9df5-dce4fd07801f",
+            "id": "12",
+            "name": "GamesFull | Juegos por googledrive y torrent",
+            "show_icon": false,
+            "source": "sync",
+            "type": "url",
+            "url": "https://www.gamesfull.org/",
+            "visit_count": 0
+         }, {
+            "date_added": "13266789551672431",
+            "date_last_used": "13380596699372195",
+            "guid": "dadb7b39-2630-48f8-943b-01a7c8211b77",
+            "id": "13",
+            "name": "ML",
+            "show_icon": false,
+            "source": "sync",
+            "type": "url",
+            "url": "https://www.mercadolibre.com.mx/",
+            "visit_count": 1
+         }, {
+            "date_added": "13272004714182611",
+            "date_last_used": "0",
+            "guid": "dfd8887c-b905-4c60-8c41-115f5a67ac2b",
+            "id": "14",
+            "name": "Placceit",
+            "show_icon": false,
+            "source": "sync",
+            "type": "url",
+            "url": "https://placeit.net/",
+            "visit_count": 0
+         }, {
+            "date_added": "13273054034556968",
+            "date_last_used": "0",
+            "guid": "7a387bdb-d8fd-498b-a6fb-59f03d0023d8",
+            "id": "15",
+            "name": "Google Drive",
+            "show_icon": false,
+            "source": "sync",
+            "type": "url",
+            "url": "https://drive.google.com/drive/u/0/my-drive",
+            "visit_count": 0
+         }, {
+            "date_added": "13273776930435069",
+            "date_last_used": "0",
+            "guid": "5c46ef8e-ce85-4e5d-be5b-e1f9248d77f2",
+            "id": "16",
+            "name": "StreamElements",
+            "show_icon": false,
+            "source": "sync",
+            "type": "url",
+            "url": "https://streamelements.com/dashboard/welcome-back",
+            "visit_count": 0
+         } ],
+         "date_added": "13420314956174011",
+         "date_last_used": "0",
+         "date_modified": "13273776930435069",
+         "guid": "0bc5d13f-2cba-5d74-951f-3f233fe6c908",
+         "id": "1",
+         "name": "Barra de favoritos",
+         "source": "unknown",
+         "type": "folder"
+      },
+      "other": {
+         "children": [  ],
+         "date_added": "13420314956174011",
+         "date_last_used": "0",
+         "date_modified": "0",
+         "guid": "82b081ec-3dd3-529c-8475-ab6c344590dd",
+         "id": "2",
+         "name": "Otros favoritos",
+         "source": "unknown",
+         "type": "folder"
+      },
+      "synced": {
+         "children": [  ],
+         "date_added": "13420314956174011",
+         "date_last_used": "0",
+         "date_modified": "0",
+         "guid": "4cf2e351-0e85-532b-bb37-df045d8f8d0f",
+         "id": "3",
+         "name": "Favoritos móviles",
+         "source": "unknown",
+         "type": "folder"
+      },
+      "workspaces_v2": {
+         "children": [  ],
+         "date_added": "13420314956174011",
+         "date_last_used": "0",
+         "date_modified": "0",
+         "guid": "75aa6670-344f-549d-b742-660f029506ab",
+         "id": "5",
+         "name": "Áreas de trabajo",
+         "source": "unknown",
+         "type": "folder"
+      }
+   },
+   "sync_metadata": "CkEKHgiIgQISCNmXX3idAQAAKg4QABgBIAAoBjAAOABAABIAKhhyUkVkMmJSSVVXRGY0R2RPQi81TFBRPT1IA6AGDBKOAQgDEokBChxuamdEdTg4ZUNydlhwODZwRDdmSEdjcUZwODg9EiRmZTEwNDc1NS01YmJmLTViNmUtODk1ZC00MGY4NWQyOTA5NDcYACAAKAAwwtW70qEuOMLr3KTuL0DC69yk7i9KHHl6TkIwMWNuNTRBN2NSVTB1VCsvUGdtVHRVbz1aAGUAAAAAwj4CYAASrgEIEBKpAQoceFY0OGxFQ05lTlB1MHVvRmszOEptbU51aU1rPRIkNWM0NmVmOGUtY2U4NS00ZTVkLWJlNWItZTFmOTI0OGQ3N2YyGAAgACgAMKXlo5PbMDj++N2k7i9A/vjdpO4vShwwNVlXMUlWT2l0UGNMWjV0Z2hZNVAxUDJZS0U9WiAiHv/rcTdLSEZKdmdLK1VNMFd3bk9mMWRCaUFZOUhVPWVRWT9fwj4CYAUSrgEIDxKpAQocRHRjbEtJVkh1bmRCSGp6SVFCc256V1JxZTB3PRIkN2EzODdiZGItZDhmZC00OThiLWE2ZmItNTlmMDNkMDAyM2Q4GAAgACgAMKblo5PbMDi/+N2k7i9Av/jdpO4vShxiNGJBN1hmM1gycFNCOXpIeDZMYzFWS2dDVDg9WiAiHv/WTU9NNEpyWEUycHZyTVNZNGo1NjJxK2Z1TXQ0PWW6CixRwj4CYAUSrQEIDBKoAQocOVp0NUo1SVNWYkttSmRnOVhCUzduVHZXSFhnPRIkOGZlZDM5YTYtNzk3OC00ZWMwLTlkZjUtZGNlNGZkMDc4MDFmGAAgACgAMKTlo5PbMDjo9d2k7i9A6PXdpO4vShxraEhqSmhyVDNHOEN1ZEFBemZwbUpOenZobjg9Wh8iHf5GSVNSQ29ZVm5UWVF2UnNJSWVNYjQxVm9hVEU9ZVADU2zCPgJgBRKtAQgLEqgBChxhSjJPMWI3NXIxZEhvQmV2UE9FTVU3WlVSeEE9EiQzMmE0ZTNjMy05MWYyLTQ4MjUtODgxMC0xNGU4YjdlMjEzMWYYACAAKAAwo+Wjk9swOP3z3aTuL0D9892k7i9KHElFaUNUaS94RjczQ2wzbWplRWRzSjBMTWtOOD1aHyId+jFXc2lxYWxTSDhJSkdNMkQ5cDR1MGlRTTN1MD1lcreQh8I+AmAFEo4BCAISiQEKHFljU1RvbnZFU1B3cUNzNEwyY3JWaHY2OEw5OD0SJDkyY2RiNWNhLWI5MGEtNWNhOS05ZTM2LTNiZDA2NTliY2UxYhgAIAAoADC+1bvSoS449OrcpO4vQPTq3KTuL0ocb1BWa2h3QlJiVjY1S0NXUjIrSU9OSFdvT3U4PVoAZQAAAADCPgJgABKsAQgJEqcBChwxZ0pKWnBjTXN5QWF6S00xcitSampOZXhUazA9EiQwZjNkNDkzNS1hZGMzLTQzZDktYmEwZS05YjM0MGI1ZDkxMzQYACAAKAAww8vr8KkzONX23aTuL0DV9t2k7i9KHDVUa3NOUThGSmRRa293U3NHYisxU25sME4zaz1aHiIceldXbCt5Z0pGeHFTc0J3bms2UHovTnVOOG9FPWVD+G2Awj4CYAUSrgEIDhKpAQocMEdsd04yVUFUNXhJeDZ3aXgzUWFHeFVxQXlvPRIkZGZkODg4N2MtYjkwNS00YzYwLThjNDEtMTE1ZjVhNjdhYzJiGAAgACgAMKDlo5PbMDij992k7i9Ao/fdpO4vShxSVlZTbm1tUkJDdHJMVjR5RHE2RDdiQVhqelE9WiAiHv+sQ3ZncVBkOUpKRCtvUDYzVzhMYnEveHMraytjPWXVN8qJwj4CYAUSrgEICBKpAQocUTlUeSttVGY0NVdWbWdPYUExdnBMR0pPRUw4PRIkOWQ3OTRlMGItMzUyYS00YjE3LWIzYzQtODFmMTdjYzQyZTg3GAAgACgAMKLlo5PbMDi/892k7i9Av/PdpO4vShxhQnBPZkFvKzVyMmFkNCs3YzlTRXAvL05NWlE9WiAiHnnfaHJxb3laeHIzNlk0SURIMXFxdFliR0JIK1BBPWXZteXywj4CYAUSjgEIARKJAQoceXhKLzZmdmtlY3I3a3A1RVF6QjR0V0xwZGJFPRIkMGJiZTczM2UtZTQwZC01OWIxLWJhZDUtNTUzM2E2ZGNkNmY4GAAgACgAML3Vu9KhLjjU6tyk7i9A1OrcpO4vShxhUkNXTGdoRjliNUlucUtJRHZ1Si9qdlFrRmM9WgBlAAAAAMI+AmAAEo4BCAUSiQEKHHdSQnJaTCs2UEE5YXZLZ2pOUDdKWERMY2Z2cz0SJGI3NDlhMjQzLThiYTgtNWJhNy1hMzRjLTBmYmFkNDJjNjJhNxgAIAAoADDOl6X/nTM4vZil/50zQL2Ypf+dM0ocbm14NjVzUUR2eEk4VGdFZXYrQStudHRvU240PVoAZQAAAADCPgJgABKuAQgHEqkBChw0RTB6d0tRQVJtN1ZNMTZaSG1nYy9lRU8rTUk9EiQ0N2VlODM2OC0zNzYwLTRkODYtYWJkNS1jMTBjYjgwYjc1ZjAYACAAKAAwn+Wjk9swON7z3aTuL0De892k7i9KHDE0OUdzKzd0QjVwRHE5Y1MrZXZ5dnczZ1lxYz1aICIeeb4rOURhWjFSUzBkc2tZVk5wOHN6cDU5NXB2eFU9ZUiUW+LCPgJgBRKtAQgKEqgBChwwZXRvbnB5WFo2QlViOUVYdXpTL3NDZlFjTGM9EiRkZjkzMzBjZi0zNzFmLTRiMjktOThhNi0zMjRkMWVhOTM2YjcYACAAKAAwnuWjk9swONWo3aTuL0DVqN2k7i9KHFo3RU01RzNrdnBRc05uT3B0M2VKekl1YzBmcz1aHyId9HY1WmRiZnJQK0hJNEJKaloraGY2RjJCMTkvST1lwItRqsI+AmAFEq0BCA0SqAEKHEZ1TDRwbjlTVnhrV1BQTFpoZ0Y5ZXVpVjZJcz0SJGRhZGI3YjM5LTI2MzAtNDhmOC05NDNiLTAxYTdjODIxMWI3NxgAIAAoADDq7f/HwzI42MPepO4vQNjD3qTuL0ocU0JReGc4UHZnVzltbEpKU0RvbTIveWZyY1lRPVofIh3/SUFrdGlkRy9wWG4waXRZamI0VzhJTVU3MGU4PWXep0UVwj4CYAUwADgA",
+   "version": 1
+}

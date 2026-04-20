@@ -623,7 +623,7 @@ window.AdminBiblio.Reportes = (function () {
                         </div>
                     </div>
 
-                    <!-- 6. GESTION LIBROS (NEW) -->
+                    <!-- 6. GESTION LIBROS -->
                     <div class="col">
                         <div class="card border-0 shadow-lg h-100 hover-scale cursor-pointer bg-white" onclick="AdminBiblio.abrirModalGestionLibros()">
                             <div class="card-body p-4 text-center d-flex flex-column align-items-center justify-content-center">
@@ -631,10 +631,11 @@ window.AdminBiblio.Reportes = (function () {
                                     <i class="bi bi-journal-album display-4"></i>
                                 </div>
                                 <h4 class="fw-bold text-dark">Gestión Libros</h4>
-                                <p class="text-muted small mb-0">Altas y Edición</p>
+                                <p class="text-muted small mb-0">Registro y actualizacion</p>
                             </div>
                         </div>
                     </div>
+
                 </div>
                 
                  <!-- CONFIG BUTTON ROW -->
@@ -763,7 +764,7 @@ window.AdminBiblio.Reportes = (function () {
 
             <!-- MODAL GENERICO ADMIN -->
             <div class="modal fade" id="modal-admin-action" tabindex="-1">
-                <div class="modal-dialog modal-dialog-centered modal-lg">
+                <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-xl">
                     <div class="modal-content border-0 shadow-lg rounded-5 overflow-hidden" id="modal-admin-body">
                         <!-- Content Injected -->
                     </div>

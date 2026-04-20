@@ -5,6 +5,17 @@ if (!window.CampusMap) {
     let _rootClickHandler = null;
     let _currentViewId = null;
     let _selectedBuildingId = window.CampusMapData?.defaultBuildingId || 'D';
+    let _viewportEl = null;
+    let _canvasEl = null;
+    let _dragState = null;
+    let _touchState = null;
+    let _windowHandlersBound = false;
+
+    const _viewportState = {
+      scale: 1,
+      initialized: false,
+      manual: false,
+    };
 
     function getData() {
       return window.CampusMapData || { buildings: [], byId: {}, image: {}, defaultBuildingId: 'D' };
@@ -19,8 +30,24 @@ if (!window.CampusMap) {
         .replace(/'/g, '&#39;');
     }
 
+    function clamp(value, min, max) {
+      return Math.min(Math.max(value, min), max);
+    }
+
     function isPublicView(viewId) {
       return viewId === 'view-campus-map-public';
+    }
+
+    function isCompactViewport() {
+      return window.matchMedia('(max-width: 767.98px)').matches;
+    }
+
+    function getDefaultScale() {
+      return isCompactViewport() ? 1.28 : 1;
+    }
+
+    function getMaxScale() {
+      return isCompactViewport() ? 3.8 : 3.2;
     }
 
     function getRootForView(viewId) {
@@ -42,17 +69,41 @@ if (!window.CampusMap) {
       return isPublicView(_currentViewId) ? 'Volver al inicio' : 'Volver al dashboard';
     }
 
-    function setSelectedBuilding(buildingId, shouldScroll) {
+    function getBackShortLabel() {
+      return 'Volver';
+    }
+
+    function getScrollLimits(viewport) {
+      return {
+        left: Math.max(0, viewport.scrollWidth - viewport.clientWidth),
+        top: Math.max(0, viewport.scrollHeight - viewport.clientHeight),
+      };
+    }
+
+    function getViewportPoint(clientX, clientY, viewport) {
+      const rect = viewport.getBoundingClientRect();
+      return {
+        x: clientX - rect.left,
+        y: clientY - rect.top,
+      };
+    }
+
+    function getTouchDistance(touchA, touchB) {
+      return Math.hypot(touchA.clientX - touchB.clientX, touchA.clientY - touchB.clientY);
+    }
+
+    function getTouchMidpoint(touchA, touchB, viewport) {
+      const rect = viewport.getBoundingClientRect();
+      return {
+        x: (touchA.clientX + touchB.clientX) / 2 - rect.left,
+        y: (touchA.clientY + touchB.clientY) / 2 - rect.top,
+      };
+    }
+
+    function setSelectedBuilding(buildingId) {
       if (!getData().byId[buildingId]) return;
       _selectedBuildingId = buildingId;
       render();
-
-      if (!shouldScroll || window.innerWidth >= 992 || !_root) return;
-      const panel = _root.querySelector('[data-campus-detail]');
-      if (!panel) return;
-      window.setTimeout(function () {
-        panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }, 90);
     }
 
     function navigateBack() {
@@ -76,11 +127,187 @@ if (!window.CampusMap) {
       window.SIA?.setBreadcrumbSection?.('view-campus-map', label, { moduleClickable: false });
     }
 
+    function setViewportScale(scale) {
+      if (!_viewportEl || !_canvasEl) return;
+      _canvasEl.style.setProperty('--campus-map-scale', String(scale));
+      _viewportEl.classList.toggle('is-zoomed', scale > 1.01);
+    }
+
+    function clampViewportScroll() {
+      if (!_viewportEl) return;
+      const limits = getScrollLimits(_viewportEl);
+      _viewportEl.scrollLeft = clamp(_viewportEl.scrollLeft, 0, limits.left);
+      _viewportEl.scrollTop = clamp(_viewportEl.scrollTop, 0, limits.top);
+    }
+
+    function captureViewportSnapshot() {
+      if (!_viewportEl || !_viewportState.initialized) return null;
+
+      return {
+        centerX: (_viewportEl.scrollLeft + _viewportEl.clientWidth / 2) / (_viewportState.scale || 1),
+        centerY: (_viewportEl.scrollTop + _viewportEl.clientHeight / 2) / (_viewportState.scale || 1),
+        scale: _viewportState.scale,
+      };
+    }
+
+    function restoreViewportSnapshot(snapshot) {
+      if (!_viewportEl || !_canvasEl || !snapshot) return;
+
+      _viewportState.scale = clamp(snapshot.scale || getDefaultScale(), 1, getMaxScale());
+      setViewportScale(_viewportState.scale);
+
+      window.requestAnimationFrame(function () {
+        _viewportEl.scrollLeft = snapshot.centerX * _viewportState.scale - _viewportEl.clientWidth / 2;
+        _viewportEl.scrollTop = snapshot.centerY * _viewportState.scale - _viewportEl.clientHeight / 2;
+        clampViewportScroll();
+      });
+    }
+
+    function focusSelectedBuilding(behavior) {
+      if (!_viewportEl) return;
+
+      const building = getSelectedBuilding();
+      if (!building?.hotspot) {
+        clampViewportScroll();
+        return;
+      }
+
+      const nextLeft = (_viewportEl.clientWidth * (Number(building.hotspot.x) / 100)) * _viewportState.scale - _viewportEl.clientWidth / 2;
+      const nextTop = (_viewportEl.clientHeight * (Number(building.hotspot.y) / 100)) * _viewportState.scale - _viewportEl.clientHeight / 2;
+      const limits = getScrollLimits(_viewportEl);
+      const left = clamp(nextLeft, 0, limits.left);
+      const top = clamp(nextTop, 0, limits.top);
+
+      if (behavior === 'smooth') {
+        _viewportEl.scrollTo({ left: left, top: top, behavior: 'smooth' });
+        return;
+      }
+
+      _viewportEl.scrollLeft = left;
+      _viewportEl.scrollTop = top;
+    }
+
+    function syncViewportState() {
+      if (!_viewportEl || !_canvasEl) return;
+
+      if (!_viewportState.initialized) {
+        _viewportState.scale = getDefaultScale();
+        _viewportState.initialized = true;
+      } else if (!_viewportState.manual) {
+        _viewportState.scale = getDefaultScale();
+      }
+
+      setViewportScale(_viewportState.scale);
+
+      window.requestAnimationFrame(function () {
+        if (_viewportState.scale > 1.01) {
+          focusSelectedBuilding();
+          return;
+        }
+
+        clampViewportScroll();
+      });
+    }
+
+    function zoomTo(nextScale, focalPoint) {
+      if (!_viewportEl || !_canvasEl) return;
+
+      const oldScale = _viewportState.scale || 1;
+      const clampedScale = clamp(nextScale, 1, getMaxScale());
+      if (Math.abs(clampedScale - oldScale) < 0.001) return;
+
+      const focusPoint = focalPoint || {
+        x: _viewportEl.clientWidth / 2,
+        y: _viewportEl.clientHeight / 2,
+      };
+
+      const baseX = (_viewportEl.scrollLeft + focusPoint.x) / oldScale;
+      const baseY = (_viewportEl.scrollTop + focusPoint.y) / oldScale;
+
+      _viewportState.scale = clampedScale;
+      _viewportState.manual = true;
+      setViewportScale(clampedScale);
+
+      window.requestAnimationFrame(function () {
+        _viewportEl.scrollLeft = baseX * clampedScale - focusPoint.x;
+        _viewportEl.scrollTop = baseY * clampedScale - focusPoint.y;
+        clampViewportScroll();
+      });
+    }
+
+    function resetZoom() {
+      _viewportState.manual = false;
+      _viewportState.scale = getDefaultScale();
+      setViewportScale(_viewportState.scale);
+
+      window.requestAnimationFrame(function () {
+        if (_viewportState.scale > 1.01) {
+          focusSelectedBuilding();
+          return;
+        }
+
+        _viewportEl.scrollLeft = 0;
+        _viewportEl.scrollTop = 0;
+        clampViewportScroll();
+      });
+    }
+
+    function clearDragState() {
+      if (_dragState?.viewport?.isConnected) {
+        _dragState.viewport.classList.remove('is-dragging');
+      }
+      _dragState = null;
+    }
+
+    function handleWindowMouseMove(event) {
+      if (!_dragState || !_dragState.viewport?.isConnected) {
+        clearDragState();
+        return;
+      }
+
+      const viewport = _dragState.viewport;
+      viewport.scrollLeft = _dragState.scrollLeft - (event.clientX - _dragState.startX);
+      viewport.scrollTop = _dragState.scrollTop - (event.clientY - _dragState.startY);
+    }
+
+    function handleWindowMouseUp() {
+      clearDragState();
+    }
+
+    function handleWindowResize() {
+      if (!_root?.isConnected || !_viewportEl || !_canvasEl) return;
+
+      if (!_viewportState.manual) {
+        _viewportState.scale = getDefaultScale();
+        setViewportScale(_viewportState.scale);
+        window.requestAnimationFrame(function () {
+          if (_viewportState.scale > 1.01) {
+            focusSelectedBuilding();
+            return;
+          }
+
+          clampViewportScroll();
+        });
+        return;
+      }
+
+      clampViewportScroll();
+    }
+
+    function bindWindowHandlers() {
+      if (_windowHandlersBound) return;
+
+      window.addEventListener('mousemove', handleWindowMouseMove);
+      window.addEventListener('mouseup', handleWindowMouseUp);
+      window.addEventListener('resize', handleWindowResize);
+      _windowHandlersBound = true;
+    }
+
     function renderHotspots(selectedBuilding) {
       return getBuildingsWithHotspot()
         .map(function (building) {
           const active = building.id === selectedBuilding.id;
-          const color = building.color || '#1b396a';
+          const color = building.color || '#1f364d';
           const textColor = building.textColor || '#ffffff';
           const label = building.shortLabel || building.code || '';
           const isWide = String(label).length > 2;
@@ -141,7 +368,7 @@ if (!window.CampusMap) {
 
       return (
         '<section class="campus-map__detail-card campus-map__detail-card--accent">' +
-        '<h3>Servicios destacados</h3>' +
+        '<h3>Servicios disponibles</h3>' +
         '<ul>' +
         selectedBuilding.featuredServices
           .map(function (item) {
@@ -161,6 +388,149 @@ if (!window.CampusMap) {
         .join('');
     }
 
+    function bindViewportInteractions(snapshot) {
+      _viewportEl = _root?.querySelector('[data-map-viewport]') || null;
+      _canvasEl = _root?.querySelector('[data-map-canvas]') || null;
+      if (!_viewportEl || !_canvasEl) return;
+
+      _viewportEl.addEventListener(
+        'wheel',
+        function (event) {
+          event.preventDefault();
+          const point = getViewportPoint(event.clientX, event.clientY, _viewportEl);
+          zoomTo(_viewportState.scale + (event.deltaY < 0 ? 0.2 : -0.2), point);
+        },
+        { passive: false },
+      );
+
+      _viewportEl.addEventListener('dblclick', function (event) {
+        event.preventDefault();
+        const point = getViewportPoint(event.clientX, event.clientY, _viewportEl);
+        if (_viewportState.scale >= getMaxScale() - 0.15) {
+          resetZoom();
+          return;
+        }
+
+        zoomTo(_viewportState.scale + 0.35, point);
+      });
+
+      _viewportEl.addEventListener('mousedown', function (event) {
+        if (event.button !== 0 || _viewportState.scale <= 1.01 || event.target.closest('[data-action="select-building"]')) {
+          return;
+        }
+
+        _dragState = {
+          viewport: _viewportEl,
+          startX: event.clientX,
+          startY: event.clientY,
+          scrollLeft: _viewportEl.scrollLeft,
+          scrollTop: _viewportEl.scrollTop,
+        };
+
+        _viewportEl.classList.add('is-dragging');
+        event.preventDefault();
+      });
+
+      _viewportEl.addEventListener(
+        'touchstart',
+        function (event) {
+          if (event.target.closest('[data-action="select-building"]')) return;
+
+          if (event.touches.length >= 2) {
+            _touchState = {
+              mode: 'pinch',
+              viewport: _viewportEl,
+              startDistance: getTouchDistance(event.touches[0], event.touches[1]),
+              startScale: _viewportState.scale,
+            };
+            event.preventDefault();
+            return;
+          }
+
+          if (event.touches.length === 1 && _viewportState.scale > 1.01) {
+            _touchState = {
+              mode: 'drag',
+              viewport: _viewportEl,
+              startX: event.touches[0].clientX,
+              startY: event.touches[0].clientY,
+              scrollLeft: _viewportEl.scrollLeft,
+              scrollTop: _viewportEl.scrollTop,
+            };
+            event.preventDefault();
+          }
+        },
+        { passive: false },
+      );
+
+      _viewportEl.addEventListener(
+        'touchmove',
+        function (event) {
+          if (!_touchState || !_touchState.viewport?.isConnected) {
+            _touchState = null;
+            return;
+          }
+
+          if (_touchState.mode === 'pinch' && event.touches.length >= 2) {
+            const midpoint = getTouchMidpoint(event.touches[0], event.touches[1], _touchState.viewport);
+            const nextScale =
+              (_touchState.startScale || _viewportState.scale) *
+              (getTouchDistance(event.touches[0], event.touches[1]) / (_touchState.startDistance || 1));
+            zoomTo(nextScale, midpoint);
+            event.preventDefault();
+            return;
+          }
+
+          if (_touchState.mode === 'drag' && event.touches.length === 1 && _viewportState.scale > 1.01) {
+            _touchState.viewport.scrollLeft = _touchState.scrollLeft - (event.touches[0].clientX - _touchState.startX);
+            _touchState.viewport.scrollTop = _touchState.scrollTop - (event.touches[0].clientY - _touchState.startY);
+            event.preventDefault();
+          }
+        },
+        { passive: false },
+      );
+
+      _viewportEl.addEventListener(
+        'touchend',
+        function (event) {
+          if (event.touches.length >= 2) {
+            _touchState = {
+              mode: 'pinch',
+              viewport: _viewportEl,
+              startDistance: getTouchDistance(event.touches[0], event.touches[1]),
+              startScale: _viewportState.scale,
+            };
+            return;
+          }
+
+          if (event.touches.length === 1 && _viewportState.scale > 1.01) {
+            _touchState = {
+              mode: 'drag',
+              viewport: _viewportEl,
+              startX: event.touches[0].clientX,
+              startY: event.touches[0].clientY,
+              scrollLeft: _viewportEl.scrollLeft,
+              scrollTop: _viewportEl.scrollTop,
+            };
+            return;
+          }
+
+          _touchState = null;
+        },
+        { passive: true },
+      );
+
+      _viewportEl.addEventListener('touchcancel', function () {
+        _touchState = null;
+      });
+
+      if (snapshot && _viewportState.manual) {
+        restoreViewportSnapshot(snapshot);
+        return;
+      }
+
+      syncViewportState();
+    }
+
     function render() {
       if (!_root) return;
 
@@ -168,62 +538,69 @@ if (!window.CampusMap) {
       const selectedBuilding = getSelectedBuilding();
       if (!selectedBuilding) return;
 
+      const viewportSnapshot = captureViewportSnapshot();
+
       _root.innerHTML =
         '<section class="campus-map-page ' +
         (isPublicView(_currentViewId) ? 'campus-map-page--public' : 'campus-map-page--app') +
         '">' +
-        '<div class="campus-map-page__hero">' +
-        '<h1>Mapa del campus</h1>' +
-        '<div class="campus-map-page__actions">' +
-        '<button type="button" class="btn btn-outline-primary rounded-pill px-4 fw-semibold" data-action="go-back">' +
-        '<i class="bi bi-arrow-left me-2"></i>' +
+        '<div class="campus-map-page__masthead">' +
+        '<div class="campus-map-page__banner-wrap">' +
+        '<img src="/images/campus-map/banner map.png" alt="Banner institucional del mapa del campus" class="campus-map-page__banner">' +
+        '</div>' +
+        '<button type="button" class="campus-map-page__back" data-action="go-back">' +
+        '<i class="bi bi-arrow-left"></i>' +
+        '<span class="campus-map-page__back-text campus-map-page__back-text--full">' +
         esc(getBackLabel()) +
+        '</span>' +
+        '<span class="campus-map-page__back-text campus-map-page__back-text--short">' +
+        esc(getBackShortLabel()) +
+        '</span>' +
         '</button>' +
         '</div>' +
-        '</div>' +
+        '<h1 class="campus-map-page__title">Mapa del campus</h1>' +
         '<div class="campus-map-layout">' +
         '<article class="campus-map-stage">' +
         '<div class="campus-map-figure-card">' +
-        '<div class="campus-map-figure">' +
+        '<div class="campus-map-figure__viewport" data-map-viewport>' +
+        '<div class="campus-map-figure__canvas" data-map-canvas>' +
         '<img src="' +
         esc(data.image.src || '') +
         '" alt="' +
         esc(data.image.alt || '') +
-        '" class="campus-map-figure__image">' +
+        '" class="campus-map-figure__image" draggable="false">' +
         '<div class="campus-map-figure__overlay">' +
         renderHotspots(selectedBuilding) +
         '</div>' +
+        '</div>' +
+        '</div>' +
+        '<div class="campus-map-figure__controls" aria-label="Controles de zoom del mapa">' +
+        '<button type="button" class="campus-map-figure__control" data-action="zoom-in" aria-label="Acercar mapa">+</button>' +
+        '<button type="button" class="campus-map-figure__control" data-action="zoom-out" aria-label="Alejar mapa">-</button>' +
+        '<button type="button" class="campus-map-figure__control campus-map-figure__control--fit" data-action="zoom-reset" aria-label="Restablecer zoom">Ajustar</button>' +
         '</div>' +
         '</div>' +
         '</article>' +
         '<aside class="campus-map-detail" data-campus-detail>' +
         '<div class="campus-map-detail__body">' +
         '<section class="campus-map-detail__hero">' +
-        '<p class="campus-map-detail__eyebrow filter-white">' +
-        esc(selectedBuilding.stripLabel || selectedBuilding.title) +
-        '</p>' +
-        '<h2>' +
+        '<h2 class="filter-white">' +
         esc(selectedBuilding.title) +
         '</h2>' +
-        '<p class="campus-map-detail__zone">' +
-        esc(selectedBuilding.zone || 'Campus ITES Los Cabos') +
-        '</p>' +
-        '<p class="campus-map-detail__summary">' +
-        esc(selectedBuilding.summary || '') +
-        '</p>' +
         '<div class="campus-map-detail__badges">' +
         renderBadges(selectedBuilding) +
         '</div>' +
         '</section>' +
         '<div class="campus-map-detail__grid">' +
         renderCards(selectedBuilding) +
-        '</div>' +
         renderServices(selectedBuilding) +
+        '</div>' +
         '</div>' +
         '</aside>' +
         '</div>' +
         '</section>';
 
+      bindViewportInteractions(viewportSnapshot);
       syncBreadcrumb();
     }
 
@@ -242,12 +619,27 @@ if (!window.CampusMap) {
         const action = trigger.dataset.action;
 
         if (action === 'select-building') {
-          setSelectedBuilding(trigger.dataset.buildingId, true);
+          setSelectedBuilding(trigger.dataset.buildingId);
           return;
         }
 
         if (action === 'go-back') {
           navigateBack();
+          return;
+        }
+
+        if (action === 'zoom-in') {
+          zoomTo(_viewportState.scale + 0.24);
+          return;
+        }
+
+        if (action === 'zoom-out') {
+          zoomTo(_viewportState.scale - 0.24);
+          return;
+        }
+
+        if (action === 'zoom-reset') {
+          resetZoom();
         }
       };
 
@@ -265,6 +657,7 @@ if (!window.CampusMap) {
         _selectedBuildingId = getData().defaultBuildingId;
       }
 
+      bindWindowHandlers();
       bindRoot(root);
       render();
     }
@@ -272,7 +665,7 @@ if (!window.CampusMap) {
     return {
       init: init,
       selectBuilding: function (buildingId) {
-        setSelectedBuilding(buildingId, false);
+        setSelectedBuilding(buildingId);
       },
       getSelectedBuildingId: function () {
         return _selectedBuildingId;

@@ -482,9 +482,22 @@
         font-size: 0.98rem;
     }
 
+    #landing-view .landing-hero {
+        min-height: 76vh !important;
+    }
+
+    #landing-view .landing-brand-copy {
+        display: none;
+    }
+
     #landing-view .landing-hero-actions,
     #landing-view .landing-vocational-actions {
         flex-direction: column;
+    }
+
+    #landing-view .landing-hero-actions .btn,
+    #landing-view .landing-vocational-actions .btn {
+        width: 100%;
     }
 
     #landing-view .landing-dashboard-preview {
@@ -493,7 +506,8 @@
     }
 
     #landing-view .landing-process-grid,
-    #landing-view .landing-value-grid {
+    #landing-view .landing-value-grid,
+    #landing-view .landing-step-grid {
         grid-template-columns: 1fr;
     }
 
@@ -508,7 +522,8 @@
     #landing-view .landing-vocational-copy,
     #landing-view .landing-vocational-card,
     #landing-view .landing-process-card,
-    #landing-view .landing-value-card {
+    #landing-view .landing-value-card,
+    #landing-view .landing-step-card {
         padding: 1.2rem;
     }
 
@@ -522,5 +537,13 @@
 
     #landing-view .landing-preview-badge {
         width: fit-content;
+    }
+
+    #landing-view .landing-process-footer {
+        align-items: stretch;
+    }
+
+    #landing-view .landing-process-title {
+        max-width: none;
     }
 }

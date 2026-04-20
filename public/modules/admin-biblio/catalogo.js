@@ -168,6 +168,190 @@ window.AdminBiblio.Catalogo = (function () {
             minute: '2-digit'
         });
     }
+
+    function formatInventoryStatusSummary(summary = {}) {
+        const systemTotal = Number(summary.systemTotal) || 0;
+        const registeredCatalog = Number(summary.registeredCatalog) || 0;
+        const outsideCatalog = Number(summary.outsideCatalog) || 0;
+        const estimatedMissing = Number(summary.estimatedMissing) || 0;
+
+        return `
+            <div class="d-flex flex-wrap gap-2 mb-3">
+                <span class="badge text-bg-light border">${systemTotal} en sistema</span>
+                <span class="badge text-bg-light border">${registeredCatalog} registrados</span>
+                <span class="badge text-bg-warning border">${estimatedMissing} faltantes</span>
+                ${outsideCatalog > 0 ? `<span class="badge text-bg-light border">${outsideCatalog} fuera de sistema</span>` : ''}
+            </div>
+        `;
+    }
+
+    function sumInventoryStatusObserved(entries = []) {
+        return (entries || []).reduce((total, entry) => total + (Number(entry?.totalObserved || entry?.cantidad || entry?.lastQuantity || 0) || 0), 0);
+    }
+
+    function buildGestionLibrosInventoryStatusHtml(currentState, catalogSummary, latestFinished) {
+        const session = currentState?.session || null;
+        if (session) {
+            const statusLabel = session.status === 'paused'
+                ? 'Pausado'
+                : session.status === 'active'
+                    ? 'En curso'
+                    : 'Sin iniciar';
+
+            return `
+                <div class="fw-semibold text-dark">${escapeHtml(session.name || 'Sesion actual')}</div>
+                <div class="small text-muted mb-2">Estado: ${escapeHtml(statusLabel)}</div>
+                <div class="d-flex flex-wrap gap-2">
+                    <span class="badge text-bg-light border">${Number(catalogSummary?.totalCopies) || 0} en sistema</span>
+                    <span class="badge text-bg-light border">${Number(session.totalObserved) || 0} registrados</span>
+                </div>
+                <div class="d-grid gap-2 mt-3">
+                    <button class="btn btn-outline-dark rounded-pill fw-bold" type="button" onclick="AdminBiblio.confirmFinalizeInventoryFromGestion()">
+                        <i class="bi bi-flag me-2"></i>Cerrar inventario
+                    </button>
+                </div>
+            `;
+        }
+
+        const finishedSession = latestFinished?.session || null;
+        const summary = finishedSession?.summary || (finishedSession ? {
+            systemTotal: Number(catalogSummary?.totalCopies) || 0,
+            registeredCatalog: sumInventoryStatusObserved(latestFinished?.foundEntries),
+            outsideCatalog: sumInventoryStatusObserved(latestFinished?.missingEntries),
+            estimatedMissing: Math.max((Number(catalogSummary?.totalCopies) || 0) - sumInventoryStatusObserved(latestFinished?.foundEntries), 0),
+            totalCaptured: sumInventoryStatusObserved(latestFinished?.foundEntries) + sumInventoryStatusObserved(latestFinished?.missingEntries)
+        } : null);
+        if (finishedSession && summary) {
+            return `
+                <div class="fw-semibold text-dark">Ultimo inventario cerrado</div>
+                <div class="small text-muted mb-2">${escapeHtml(finishedSession.name || 'Resumen final listo')}</div>
+                ${formatInventoryStatusSummary(summary)}
+                <div class="d-grid gap-2">
+                    <button class="btn btn-dark rounded-pill fw-bold" type="button" onclick="AdminBiblio.downloadInventorySummaryPdf('${escapeJsString(finishedSession.id || '')}')">
+                        <i class="bi bi-file-earmark-pdf me-2"></i>Descargar PDF
+                    </button>
+                    <button class="btn btn-outline-warning rounded-pill fw-bold" type="button" onclick="AdminBiblio.confirmAdjustFinishedInventoryFromGestion('${escapeJsString(finishedSession.id || '')}')">
+                        <i class="bi bi-arrow-repeat me-2"></i>Ajustar inventario
+                    </button>
+                </div>
+                ${finishedSession.catalogAdjustedAt ? `
+                    <div class="small text-success mt-2">Catalogo ajustado con este inventario.</div>
+                ` : ''}
+            `;
+        }
+
+        return 'No hay una sesion abierta. Al entrar podras iniciar una nueva.';
+    }
+
+    async function refreshGestionLibrosInventoryStatus() {
+        const inventoryEl = document.getElementById('gestion-libros-inventory-status');
+        if (!inventoryEl || !_ctx) return;
+
+        inventoryEl.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Revisando estado...';
+        try {
+            const [currentState, catalogSummary, latestFinished] = await Promise.all([
+                BiblioService.getCurrentInventorySession(_ctx),
+                BiblioService.getInventoryCatalogSummary(_ctx),
+                BiblioService.getLatestFinishedInventorySession(_ctx, { includeLists: true })
+            ]);
+
+            inventoryEl.innerHTML = buildGestionLibrosInventoryStatusHtml(currentState, catalogSummary, latestFinished);
+        } catch (error) {
+            console.error(error);
+            inventoryEl.innerHTML = 'No se pudo cargar el estado del inventario.';
+        }
+    }
+
+    async function confirmFinalizeInventoryFromGestion() {
+        if (!_ctx) return;
+
+        try {
+            const currentState = await BiblioService.getCurrentInventorySession(_ctx);
+            const session = currentState?.session || null;
+            if (!session?.id) {
+                showToast('No hay un inventario abierto para cerrar.', 'warning');
+                await refreshGestionLibrosInventoryStatus();
+                return;
+            }
+
+            const preview = await BiblioService.getInventoryClosurePreview(_ctx, session.id);
+            const summary = preview?.summary || {};
+            showConfirmModal({
+                icon: 'flag-fill',
+                iconColor: '#212529',
+                title: 'Cerrar inventario',
+                message: `
+                    <div class="text-start">
+                        <div class="small text-muted mb-3">Se cerrara oficialmente esta sesion.</div>
+                        ${formatInventoryStatusSummary(summary)}
+                        <div class="small text-muted">Si confirmas, se guardara el resumen final y quedara listo el PDF.</div>
+                    </div>
+                `,
+                confirmText: 'Cerrar oficialmente',
+                confirmClass: 'btn-dark',
+                onConfirm: async () => {
+                    await BiblioService.finalizeInventorySession(_ctx, session.id);
+                    state.inventorySession = null;
+                    state.inventoryFoundEntries = [];
+                    state.inventoryMissingEntries = [];
+                    await refreshGestionLibrosInventoryStatus();
+                    showToast('Inventario cerrado oficialmente.', 'success');
+                }
+            });
+        } catch (error) {
+            showToast(error.message || 'No se pudo cerrar el inventario.', 'danger');
+        }
+    }
+
+    async function confirmAdjustFinishedInventoryFromGestion(sessionId = '') {
+        if (!_ctx) return;
+
+        try {
+            const details = sessionId
+                ? await BiblioService.getInventorySessionDetails(_ctx, sessionId, { includeLists: true })
+                : await BiblioService.getLatestFinishedInventorySession(_ctx, { includeLists: true });
+            const session = details?.session || null;
+            if (!session?.id) {
+                showToast('No hay un inventario cerrado para ajustar.', 'warning');
+                return;
+            }
+
+            const summary = session.summary || {
+                systemTotal: 0,
+                registeredCatalog: sumInventoryStatusObserved(details?.foundEntries),
+                outsideCatalog: sumInventoryStatusObserved(details?.missingEntries),
+                estimatedMissing: 0,
+                totalCaptured: sumInventoryStatusObserved(details?.foundEntries) + sumInventoryStatusObserved(details?.missingEntries)
+            };
+
+            showConfirmModal({
+                icon: 'exclamation-triangle-fill',
+                iconColor: '#d97706',
+                title: 'Ajustar catalogo al inventario',
+                message: `
+                    <div class="text-start">
+                        <div class="fw-semibold text-dark mb-2">Total inventariado real: ${Number(summary.totalCaptured || summary.registeredCatalog || 0)}</div>
+                        ${formatInventoryStatusSummary(summary)}
+                        <div class="small text-muted mb-2">Este ajuste tomara el inventario cerrado como referencia real para actualizar el catalogo.</div>
+                        <div class="small text-muted mb-2">Se activaran solo los ejemplares inventariados y el excedente quedara fuera del catalogo activo.</div>
+                        <div class="small text-muted">Si hay ejemplares con prestamos activos, se conservaran temporalmente para no romper el stock.</div>
+                        ${Number(summary.outsideCatalog) > 0 ? `<div class="small text-warning mt-2">Hay ${Number(summary.outsideCatalog) || 0} captura(s) fuera de sistema. Solo se ajustaran automaticamente los libros catalogados o ya asociados.</div>` : ''}
+                    </div>
+                `,
+                confirmText: 'Confirmar ajuste',
+                confirmClass: 'btn-warning',
+                onConfirm: async () => {
+                    await BiblioService.applyFinishedInventoryToCatalog(_ctx, session.id);
+                    state.inventoryCatalogSummary = null;
+                    await refreshGestionLibrosInventoryStatus();
+                    showToast('Catalogo ajustado al inventario real.', 'success');
+                }
+            });
+        } catch (error) {
+            showToast(error.message || 'No se pudo ajustar el catalogo.', 'danger');
+        }
+    }
+
     function clearLiveAssetStreams() {
         if (state.pcGridUnsub) {
             try { state.pcGridUnsub(); } catch (error) { console.warn('[BiblioAdmin] Error clearing PC stream:', error); }
@@ -226,55 +410,103 @@ window.AdminBiblio.Catalogo = (function () {
     function abrirModalGestionLibros() {
         clearLiveAssetStreams();
         const body = document.getElementById('modal-admin-body');
-
-        // [FIX] Ensure unique modal handling
-        // We are using the MAIN admin modal (modal-admin-action)
-        // If we are replacing content, we don't need to re-show if it's already shown.
-        // But if we come from another 'modal' (which are just replaced content), it's fine.
-        // The issue 'keeps dark' usually implies multiple backdrops.
-        // We will force remove backdrops if we are re-initializing, BUT
-        // the best way with Bootstrap is to use the existing instance.
-
         const modalEl = document.getElementById('modal-admin-action');
         const modal = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
 
         body.innerHTML = `
             <div class="modal-header border-0 bg-primary text-white p-4">
-                <h3 class="fw-bold mb-0"><i class="bi bi-book-half me-3"></i>Gestion de Libros</h3>
+                <div>
+                    <h3 class="fw-bold mb-1"><i class="bi bi-book-half me-3"></i>Gestion de Libros</h3>
+                    <div class="small text-white-50">Elige primero el flujo que necesitas.</div>
+                </div>
                 <button class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body p-5  text-center">
-                <div class="row g-4 justify-content-center">
-                    <div class="col-md-5">
-                        <button class="btn btn-white w-100 p-4 shadow-sm rounded-4 border hover-lift" onclick="AdminBiblio.renderBookForm()">
-                            <div class="bg-success bg-opacity-10 rounded-circle p-3 d-inline-block mb-3">
-                                <i class="bi bi-plus-lg fs-1 text-success"></i>
+            <div class="modal-body p-3 p-md-4 pb-5" style="padding-bottom:calc(5rem + env(safe-area-inset-bottom));">
+                
+                <div class="row g-4">
+                    <div class="col-12 col-lg-6">
+                        <div class="card border-0 shadow-sm rounded-4 h-100">
+                            <div class="card-body p-3 p-md-4">
+                                <div class="d-flex align-items-center gap-3 mb-3">
+                                    <div class="bg-success bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center" style="width:56px;height:56px;">
+                                        <i class="bi bi-journal-plus fs-4 text-success"></i>
+                                    </div>
+                                    <div>
+                                        <div class="small text-uppercase fw-bold text-muted">Agregar / editar</div>
+                                        <h5 class="mb-0 text-dark">Catalogo de libros</h5>
+                                    </div>
+                                </div>
+                                <div class="d-grid gap-2 mb-3">
+                                    <button class="btn btn-success rounded-pill fw-bold" type="button" onclick="AdminBiblio.renderBookForm()">
+                                        <i class="bi bi-plus-circle me-2"></i>Agregar nuevo libro
+                                    </button>
+                                    <button class="btn btn-outline-warning rounded-pill fw-bold" type="button" onclick="AdminBiblio.renderBookEditSearch()">
+                                        <i class="bi bi-pencil-square me-2"></i>Editar libro existente
+                                    </button>
+                                </div>
+                                <div class="small fw-bold text-muted text-uppercase mb-2">Ultimo agregado</div>
+                                <div id="gestion-libros-last-book" class="rounded-4 border bg-light p-3 text-muted small">
+                                    <span class="spinner-border spinner-border-sm me-2"></span>Cargando referencia...
+                                </div>
                             </div>
-                            <h5 class="fw-bold text-dark">Agregar Nuevo</h5>
-                        <p class="text-muted small mb-0">Registrar un nuevo libro en el catalogo.</p>
-                        </button>
+                        </div>
                     </div>
-                    <div class="col-md-5">
-                        <button class="btn btn-white w-100 p-4 shadow-sm rounded-4 border hover-lift" onclick="AdminBiblio.renderBookEditSearch()">
-                            <div class="bg-warning bg-opacity-10 rounded-circle p-3 d-inline-block mb-3">
-                                <i class="bi bi-pencil-fill fs-1 text-warning"></i>
+                    <div class="col-12 col-lg-6">
+                        <div class="card border-0 shadow-sm rounded-4 h-100 bg-danger-subtle">
+                            <div class="card-body p-3 p-md-4">
+                                <div class="d-flex align-items-center gap-3 mb-3">
+                                    <div class="bg-white rounded-circle d-flex align-items-center justify-content-center text-danger shadow-sm" style="width:56px;height:56px;">
+                                        <i class="bi bi-clipboard2-data fs-4"></i>
+                                    </div>
+                                    <div>
+                                        <div class="small text-uppercase fw-bold text-danger-emphasis">Inventario</div>
+                                        <h5 class="mb-0 text-dark">Conteo y faltantes</h5>
+                                    </div>
+                                </div>
+                                <div class="d-grid gap-2 mb-3">
+                                    <button class="btn btn-danger rounded-pill fw-bold" type="button" onclick="AdminBiblio.abrirModalInventario()">
+                                        <i class="bi bi-play-circle me-2"></i>Abrir inventario
+                                    </button>
+                                </div>
+                                <div class="small fw-bold text-muted text-uppercase mb-2">Sesion actual</div>
+                                <div id="gestion-libros-inventory-status" class="rounded-4 border bg-white p-3 text-muted small">
+                                    <span class="spinner-border spinner-border-sm me-2"></span>Revisando estado...
+                                </div>
                             </div>
-                            <h5 class="fw-bold text-dark">Modificar Existente</h5>
-                            <p class="text-muted small mb-0">Buscar y actualizar datos de un libro.</p>
-                        </button>
+                        </div>
                     </div>
                 </div>
             </div>
          `;
 
-        // Show if not shown
         if (!modalEl.classList.contains('show')) {
             modal.show();
         }
 
-        // Listen for hidden to cleanup backdrop just in case
-        modalEl.removeEventListener('hidden.bs.modal', _cleanupBackdrop); // Avoid dups
+        modalEl.removeEventListener('hidden.bs.modal', _cleanupBackdrop);
         modalEl.addEventListener('hidden.bs.modal', _cleanupBackdrop);
+
+        void (async () => {
+            try {
+                const lastBook = await BiblioService.getLastAddedBook(_ctx);
+                const lastBookEl = document.getElementById('gestion-libros-last-book');
+                if (lastBookEl) {
+                    if (!lastBook) {
+                        lastBookEl.innerHTML = 'Aun no hay libros registrados manualmente.';
+                    } else {
+                        lastBookEl.innerHTML = `
+                            <div class="fw-semibold text-dark text-truncate">${escapeHtml(lastBook.titulo || 'Sin titulo')}</div>
+                            <div class="small text-muted text-truncate">${escapeHtml(lastBook.autor || 'Autor no registrado')}</div>
+                            <div class="mt-2"><span class="badge bg-dark text-white">${escapeHtml(lastBook.adquisicion || 'S/N')}</span></div>
+                        `;
+                    }
+                }
+            } catch (error) {
+                console.error(error);
+            }
+        })();
+
+        void refreshGestionLibrosInventoryStatus();
     }
 
 
@@ -297,27 +529,33 @@ window.AdminBiblio.Catalogo = (function () {
         const body = document.getElementById('modal-admin-body');
         body.innerHTML = `
             <div class="modal-header border-0 ${isEdit ? 'bg-warning' : 'bg-success'} text-white px-4 py-3">
-                <h5 class="fw-bold mb-0"><i class="bi ${isEdit ? 'bi-pencil-square' : 'bi-plus-circle'} me-2"></i>${title}</h5>
+                <div>
+                    <h5 class="fw-bold mb-1"><i class="bi ${isEdit ? 'bi-pencil-square' : 'bi-plus-circle'} me-2"></i>${title}</h5>
+                    <div class="small ${isEdit ? 'text-dark-emphasis' : 'text-white-50'}">${isEdit ? 'Ajusta el registro localizado antes de guardar.' : 'Captura los datos base para darlo de alta en el catalogo.'}</div>
+                </div>
                 <button class="btn-close btn-close-white" onclick="AdminBiblio.abrirModalGestionLibros()"></button>
             </div>
-            <div class="modal-body p-4 ">
+            <div class="modal-body p-4 pb-5" style="padding-bottom:calc(5rem + env(safe-area-inset-bottom));">
+                <div class="alert alert-light border rounded-4 shadow-sm mb-4">
+                    <div class="small text-muted mb-0">${isEdit ? 'El numero de adquisicion permanece fijo para evitar cambiar la referencia del ejemplar.' : 'Si despues necesitas corregir datos, podras ubicarlo desde el panel lateral de actualizacion.'}</div>
+                </div>
                 <form id="book-form" onsubmit="event.preventDefault(); AdminBiblio.saveBook('${bookToEdit?.id || ''}')">
                     <div class="row g-3">
                         <div class="col-md-4">
                             <label class="form-label small fw-bold text-muted">No. Adquisicion *</label>
-                            <input type="text" class="form-control rounded-3" id="bf-adq" required value="${escapeHtml(bookToEdit?.adquisicion || '')}" ${isEdit ? 'readonly' : ''}>
+                            <input type="text" class="form-control rounded-3" id="bf-adq" required placeholder="Ej. 000123" value="${escapeHtml(bookToEdit?.adquisicion || '')}" ${isEdit ? 'readonly' : ''}>
                         </div>
                         <div class="col-md-8">
                             <label class="form-label small fw-bold text-muted">Titulo del Libro *</label>
-                            <input type="text" class="form-control rounded-3" id="bf-titulo" required value="${escapeHtml(bookToEdit?.titulo || '')}">
+                            <input type="text" class="form-control rounded-3" id="bf-titulo" required placeholder="Nombre del libro" value="${escapeHtml(bookToEdit?.titulo || '')}">
                         </div>
                         <div class="col-md-6">
                             <label class="form-label small fw-bold text-muted">Autor *</label>
-                            <input type="text" class="form-control rounded-3" id="bf-autor" required value="${escapeHtml(bookToEdit?.autor || '')}">
+                            <input type="text" class="form-control rounded-3" id="bf-autor" required placeholder="Autor principal" value="${escapeHtml(bookToEdit?.autor || '')}">
                         </div>
                         <div class="col-md-3">
                             <label class="form-label small fw-bold text-muted">Anio</label>
-                            <input type="text" class="form-control rounded-3" id="bf-anio" value="${escapeHtml(bookToEdit?.anio ?? bookToEdit?.['año'] ?? '')}">
+                            <input type="text" class="form-control rounded-3" id="bf-anio" placeholder="2024" value="${escapeHtml(bookToEdit?.anio ?? bookToEdit?.['año'] ?? '')}">
                         </div>
                         <div class="col-md-3">
                             <label class="form-label small fw-bold text-muted">Copias Totales *</label>
@@ -396,7 +634,7 @@ window.AdminBiblio.Catalogo = (function () {
                 <h5 class="fw-bold mb-0"><i class="bi bi-search me-2"></i>Buscar para Modificar</h5>
                 <button class="btn-close" onclick="AdminBiblio.abrirModalGestionLibros()"></button>
             </div>
-            <div class="modal-body p-4 ">
+            <div class="modal-body p-4 pb-5" style="padding-bottom:calc(5rem + env(safe-area-inset-bottom));">
                 <div class="input-group mb-4 shadow-sm">
                     <input type="text" class="form-control border-0 p-3" id="edit-search-input" placeholder="Ingresa No. Adquisicion (Ej: 00001)">
                     <button class="btn btn-warning px-4 fw-bold" onclick="AdminBiblio.handleEditSearch()">
@@ -1013,6 +1251,9 @@ window.AdminBiblio.Catalogo = (function () {
 
     return {
         abrirModalGestionLibros: withState(abrirModalGestionLibros),
+        refreshGestionLibrosInventoryStatus: withState(refreshGestionLibrosInventoryStatus),
+        confirmFinalizeInventoryFromGestion: withState(confirmFinalizeInventoryFromGestion),
+        confirmAdjustFinishedInventoryFromGestion: withState(confirmAdjustFinishedInventoryFromGestion),
         _cleanupBackdrop: withState(_cleanupBackdrop),
         renderBookForm: withState(renderBookForm),
         saveBook: withState(saveBook),

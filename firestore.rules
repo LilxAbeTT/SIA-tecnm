@@ -486,6 +486,14 @@ service cloud.firestore {
       allow write: if isBiblio() || isSuperAdmin();
     }
 
+    match /biblio-inventarios/{sessionId} {
+      allow read, write: if isBiblio() || isSuperAdmin();
+
+      match /{document=**} {
+        allow read, write: if isBiblio() || isSuperAdmin();
+      }
+    }
+
     // ==== MEDI ====
     match /citas-medi/{id} {
       function isStudentAppointmentOwner() {

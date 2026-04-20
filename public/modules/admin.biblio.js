@@ -26,6 +26,39 @@ window.AdminBiblio = Object.assign(window.AdminBiblio || {}, (function () {
     if (state.holidayBlockedDates === undefined) state.holidayBlockedDates = [];
     if (state.holidaySelectionAnchor === undefined) state.holidaySelectionAnchor = null;
     if (state.holidayCalendarMeta === undefined) state.holidayCalendarMeta = null;
+    if (state.inventorySession === undefined) state.inventorySession = null;
+    if (state.inventoryCatalogSummary === undefined) state.inventoryCatalogSummary = null;
+    if (state.inventoryFoundEntries === undefined) state.inventoryFoundEntries = [];
+    if (state.inventoryMissingEntries === undefined) state.inventoryMissingEntries = [];
+    if (state.inventoryLookupResults === undefined) state.inventoryLookupResults = [];
+    if (state.inventorySelectedBook === undefined) state.inventorySelectedBook = null;
+    if (state.inventoryAssociateMode === undefined) state.inventoryAssociateMode = false;
+    if (state.inventoryCopyLookupResults === undefined) state.inventoryCopyLookupResults = [];
+    if (state.inventorySelectedCopyBase === undefined) state.inventorySelectedCopyBase = null;
+    if (state.inventoryMoreCopiesMode === undefined) state.inventoryMoreCopiesMode = false;
+    if (state.inventoryPendingCopyCodes === undefined) state.inventoryPendingCopyCodes = [];
+    if (state.inventoryDraftQuantity === undefined) state.inventoryDraftQuantity = null;
+    if (state.inventorySearchDebounce === undefined) state.inventorySearchDebounce = null;
+    if (state.inventoryScannerActive === undefined) state.inventoryScannerActive = false;
+    if (state.inventoryScannerStream === undefined) state.inventoryScannerStream = null;
+    if (state.inventoryScannerLoopId === undefined) state.inventoryScannerLoopId = null;
+    if (state.inventoryScannerSupported === undefined) state.inventoryScannerSupported = false;
+    if (state.inventoryDetector === undefined) state.inventoryDetector = null;
+    if (state.inventoryModalHiddenBound === undefined) state.inventoryModalHiddenBound = false;
+    if (state.inventorySaving === undefined) state.inventorySaving = false;
+    if (state.inventoryDuplicateSearch === undefined) state.inventoryDuplicateSearch = false;
+    if (state.inventoryUnregisteredMode === undefined) state.inventoryUnregisteredMode = 'new';
+    if (state.inventoryUnregisteredCopyBase === undefined) state.inventoryUnregisteredCopyBase = null;
+    if (state.inventoryReviewPage === undefined) state.inventoryReviewPage = 1;
+    if (state.inventoryReviewEditingId === undefined) state.inventoryReviewEditingId = '';
+    if (state.inventoryReviewDraftQuantity === undefined) state.inventoryReviewDraftQuantity = 0;
+    if (state.inventoryReviewPendingCopyCodes === undefined) state.inventoryReviewPendingCopyCodes = [];
+    if (state.inventoryReviewAdjusting === undefined) state.inventoryReviewAdjusting = false;
+    if (state.inventoryReviewAdjustInterval === undefined) state.inventoryReviewAdjustInterval = null;
+    if (state.inventoryReviewSearchTerm === undefined) state.inventoryReviewSearchTerm = '';
+    if (state.inventoryReviewKnownCopies === undefined) state.inventoryReviewKnownCopies = [];
+    if (state.inventoryReviewCopiesLoading === undefined) state.inventoryReviewCopiesLoading = false;
+    if (state.inventorySearchQuery === undefined) state.inventorySearchQuery = '';
 
     function clearLiveAssetStreams() {
         if (state.pcGridUnsub) {
@@ -58,6 +91,10 @@ window.AdminBiblio = Object.assign(window.AdminBiblio || {}, (function () {
         if (state.clockInterval) {
             clearInterval(state.clockInterval);
             state.clockInterval = null;
+        }
+
+        if (window.AdminBiblio.stopInventoryScanner) {
+            try { window.AdminBiblio.stopInventoryScanner(); } catch (error) { console.warn('[BiblioAdmin] Error clearing inventory scanner:', error); }
         }
     }
 
@@ -106,6 +143,7 @@ window.AdminBiblio = Object.assign(window.AdminBiblio || {}, (function () {
     if (window.AdminBiblio.Prestamos) Object.assign(modExports, window.AdminBiblio.Prestamos);
     if (window.AdminBiblio.Devoluciones) Object.assign(modExports, window.AdminBiblio.Devoluciones);
     if (window.AdminBiblio.Historial) Object.assign(modExports, window.AdminBiblio.Historial);
+    if (window.AdminBiblio.Inventario) Object.assign(modExports, window.AdminBiblio.Inventario);
     if (window.AdminBiblio.Reportes) Object.assign(modExports, window.AdminBiblio.Reportes);
 
     return Object.assign(window.AdminBiblio || {}, modExports);

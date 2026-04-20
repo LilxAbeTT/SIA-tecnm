@@ -238,60 +238,36 @@ class SiaLandingView extends HTMLElement {
   getStudentProcesses() {
     return [
       {
-        module: 'Aula Virtual',
-        title: 'Entrar a clases y revisar pendientes',
-        desc: 'Consulta materias, actividades, materiales y seguimiento academico desde un solo lugar.',
+        module: 'Academico',
+        title: 'Clases y seguimiento',
+        desc: 'Entra a materias, revisa actividades y consulta lo pendiente sin salir de SIA.',
         icon: 'bi-mortarboard-fill',
         tone: 'is-blue',
-        tags: ['Materias', 'Tareas', 'Cursos']
+        tags: ['Aula', 'Tareas', 'Cursos']
       },
       {
-        module: 'Biblioteca',
-        title: 'Pedir libros y usar recursos digitales',
-        desc: 'Encuentra acervo, consulta disponibilidad y aprovecha recursos para estudio e investigacion.',
-        icon: 'bi-book-half',
+        module: 'Servicios',
+        title: 'Servicios del campus',
+        desc: 'Usa biblioteca, cafeteria y mapa del campus desde el mismo acceso institucional.',
+        icon: 'bi-grid-1x2-fill',
         tone: 'is-amber',
-        tags: ['Catalogo', 'Prestamos', 'Recursos']
+        tags: ['Biblioteca', 'Cafeteria', 'Mapa']
       },
       {
-        module: 'Salud Integral',
-        title: 'Agendar atencion medica o psicologica',
-        desc: 'Organiza citas, da seguimiento a tu bienestar y mantente conectado con los servicios del campus.',
+        module: 'Bienestar',
+        title: 'Salud y acompanamiento',
+        desc: 'Agenda atencion medica o psicologica y da seguimiento a tu bienestar desde el celular.',
         icon: 'bi-heart-pulse-fill',
         tone: 'is-red',
-        tags: ['Citas', 'Bienestar', 'Seguimiento']
+        tags: ['Citas', 'Salud', 'Seguimiento']
       },
       {
-        module: 'Comunidad',
-        title: 'Consultar avisos, eventos y novedades',
-        desc: 'Mantente al dia con actividades, comunicados y movimiento estudiantil dentro del campus.',
+        module: 'Campus',
+        title: 'Avisos, perfil y credencial',
+        desc: 'Consulta novedades, abre tu perfil y mantén a la mano tu identidad institucional.',
         icon: 'bi-megaphone-fill',
         tone: 'is-cyan',
-        tags: ['Avisos', 'Eventos', 'Foro']
-      },
-      {
-        module: 'Cafeteria',
-        title: 'Resolver servicios cotidianos desde el celular',
-        desc: 'Accede rapido a procesos del dia a dia sin depender de varias herramientas separadas.',
-        icon: 'bi-cup-hot-fill',
-        tone: 'is-orange',
-        tags: ['Servicios', 'Consumo', 'Campus']
-      },
-      {
-        module: 'Perfil y Credencial',
-        title: 'Abrir tu perfil y tu acceso institucional',
-        desc: 'Ten a la mano tu informacion, identidad digital y acceso rapido a lo que mas usas en SIA.',
-        icon: 'bi-person-badge-fill',
-        tone: 'is-emerald',
-        tags: ['Perfil', 'Credencial', 'Acceso']
-      },
-      {
-        module: 'Mapa del Campus',
-        title: 'Ubicar edificios, talleres y puntos de reunion',
-        desc: 'Consulta el mapa fijo del campus y la informacion corregida de cada edificio antes de moverte.',
-        icon: 'bi-geo-alt-fill',
-        tone: 'is-cyan',
-        tags: ['Croquis', 'Edificios', 'Ubicacion']
+        tags: ['Avisos', 'Perfil', 'Credencial']
       }
     ];
   }
@@ -319,13 +295,15 @@ class SiaLandingView extends HTMLElement {
       <div class="fixed-top d-flex justify-content-center mt-3" style="z-index: 1030;">
         <nav class="navbar navbar-expand-lg landing-nav-pill rounded-pill py-2 px-3 position-relative" style="max-width: 95%; width: auto;">
           <div class="container-fluid gap-3">
-            <a class="navbar-brand d-flex align-items-center gap-2 m-0" href="#landing-hero">
+            <a class="navbar-brand landing-brand-lockup d-flex align-items-center gap-2 m-0" href="#landing-hero">
               <div class="landing-brand-logos">
-                <img src="/images/tecnm-logo-oscuro.png" alt="TecNM" class="logo-tecnm">
+                <img src="/images/logo-ites.png" alt="TecNM" class="logo-tecnm">
                 <div class="brand-divider"></div>
-                <img src="/images/logo-ites.png" alt="ITES Los Cabos" class="logo-ites">
-                <div class="brand-divider"></div>
-                <img src="/images/logo-sia.png" alt="ITES Los Cabos" class="logo-ites">
+                <img src="/images/logo-sia.png" alt="SIA" class="logo-ites">
+              </div>
+              <div class="landing-brand-copy">
+                <strong>SIA</strong>
+                <span>ITES Los Cabos</span>
               </div>
             </a>
 
@@ -336,7 +314,7 @@ class SiaLandingView extends HTMLElement {
             <div class="collapse navbar-collapse landing-nav-collapse" id="landingNavContent">
               <ul class="navbar-nav mx-3 gap-1">
                 <li class="nav-item"><a href="#landing-hero" class="nav-link">Inicio</a></li>
-                <li class="nav-item"><a href="#landing-procesos" class="nav-link">Procesos</a></li>
+                <li class="nav-item"><a href="#landing-procesos" class="nav-link">Que puedes hacer</a></li>
                 <li class="nav-item"><a href="#landing-vocacional" class="nav-link">Aspirantes</a></li>
                 <li class="nav-item"><a href="#landing-contacto" class="nav-link">Contacto</a></li>
               </ul>
@@ -365,59 +343,49 @@ class SiaLandingView extends HTMLElement {
         </div>
 
         <div class="container position-relative pt-5" style="z-index: 2;">
-          <div class="row align-items-center gy-5">
-            <div class="col-lg-6 order-2 order-lg-1">
+          <div class="row align-items-center gy-5 landing-hero-layout">
+            <div class="col-lg-6 order-1">
               <div class="landing-section-label mb-4 landing-fade-up landing-fade-up-1">Plataforma Oficial ITES Los Cabos</div>
 
               <h1 class="landing-hero-title display-3 fw-bold lh-sm mb-4 landing-fade-up landing-fade-up-2">
-                Tu vida en campus,<br>
+                Todo tu campus,<br>
                 <span class="landing-gradient-text">en un solo acceso.</span>
               </h1>
 
               <p class="landing-hero-subtitle mb-4 landing-fade-up landing-fade-up-3">
-                SIA concentra clases, biblioteca, salud, cafeteria, credencial y avisos del <strong>TecNM Campus Los Cabos</strong>. Si ya formas parte del campus, entra con tu cuenta institucional. Si aun estas eligiendo carrera, comienza con el test vocacional publico.
+                SIA es la plataforma institucional del <strong>TecNM Campus Los Cabos</strong>. Desde aqui puedes entrar a clases, servicios, credencial y avisos con tu cuenta institucional. Si aun eres aspirante, ya puedes estudiar y practicar para admision sin crear cuenta.
               </p>
 
               <div class="landing-hero-actions landing-fade-up landing-fade-up-4">
                 <button id="btn-hero-cta-login" data-landing-login class="btn btn-acceso-institucional d-flex align-items-center justify-content-center gap-2">
                   <i class="bi bi-microsoft"></i>
-                  <span>Acceso Institucional</span>
+                  <span>Entrar con cuenta institucional</span>
                 </button>
-                <a href="#/test-vocacional" class="btn btn-outline-light landing-secondary-cta rounded-pill px-4 py-3 fw-semibold d-flex align-items-center justify-content-center gap-2">
-                  <i class="bi bi-compass-fill"></i>
-                  <span>Hacer Test Vocacional</span>
+                <a href="#/admisiones" class="btn btn-outline-light landing-secondary-cta rounded-pill px-4 py-3 fw-semibold d-flex align-items-center justify-content-center gap-2">
+                  <i class="bi bi-journal-richtext"></i>
+                  <span>Prepararme para admision</span>
                 </a>
                 <a href="#/mapa-campus" class="btn landing-campus-cta rounded-pill px-4 py-3 fw-semibold d-flex align-items-center justify-content-center gap-2">
                   <i class="bi bi-geo-alt-fill"></i>
-                  <span>Ver mapa del campus</span>
+                  <span>Mapa del campus</span>
                 </a>
               </div>
 
               <div class="landing-trust-list landing-fade-up landing-fade-up-5">
-                <span class="landing-trust-chip"><i class="bi bi-mortarboard-fill"></i>Aula</span>
-                <span class="landing-trust-chip"><i class="bi bi-book-half"></i>Biblioteca</span>
-                <span class="landing-trust-chip"><i class="bi bi-heart-pulse-fill"></i>Salud</span>
-                <span class="landing-trust-chip"><i class="bi bi-person-badge-fill"></i>Credencial</span>
+                <span class="landing-trust-chip"><i class="bi bi-shield-check"></i>Acceso oficial</span>
+                <span class="landing-trust-chip"><i class="bi bi-phone"></i>Listo para celular</span>
+                <span class="landing-trust-chip"><i class="bi bi-grid-1x2-fill"></i>Servicios en un solo lugar</span>
               </div>
 
               <div class="landing-hero-note landing-fade-up landing-fade-up-5">
-                Alumnos, docentes y personal usan acceso institucional. Aspirantes pueden entrar al test sin iniciar sesion.
-              </div>
-
-              <div class="d-flex align-items-center gap-3 landing-fade-up landing-fade-up-5" style="opacity: 0.5;">
-                <div class="landing-brand-logos">
-                  <img src="/images/tecnm-logo-oscuro.png" alt="TecNM" class="logo-tecnm" style="height: 36px;">
-                  <div class="brand-divider" style="height: 28px;"></div>
-                  <img src="/images/logo-ites.png" alt="ITES Los Cabos" class="logo-ites" style="height: 22px; filter: brightness(0) invert(1); opacity: 0.8;">
-                </div>
-                <span style="color: rgba(255,255,255,0.5); font-size: 0.75rem; font-weight: 600;">Plataforma Institucional</span>
+                Alumnos, docentes y personal entran con su correo institucional. Aspirantes pueden iniciar por admisiones y guardar progreso local sin iniciar sesion.
               </div>
             </div>
 
-            <div class="col-lg-6 order-1 order-lg-2 text-center position-relative">
+            <div class="col-lg-6 order-2 text-center position-relative">
               <div class="position-relative d-inline-block landing-float">
                 <div class="position-absolute top-50 start-50 translate-middle rounded-circle" style="width: 280px; height: 280px; background: rgba(27,57,106,0.3); filter: blur(60px);"></div>
-                <div class="card landing-mockup-card landing-dashboard-preview rounded-4 overflow-hidden ms-auto me-auto">
+                <div class="card landing-mockup-card landing-dashboard-preview landing-hero-surface rounded-4 overflow-hidden ms-auto me-auto">
                   <div class="p-3 d-flex align-items-center gap-2" style="border-bottom: 1px solid rgba(255,255,255,0.06);">
                     <div class="d-flex gap-1">
                       <div class="rounded-circle" style="width:9px; height:9px; background:#ff5f56;"></div>
@@ -429,31 +397,30 @@ class SiaLandingView extends HTMLElement {
                   <div class="p-4 text-start">
                     <div class="d-flex justify-content-between mb-4">
                       <div>
-                        <h5 class="fw-bold mb-1" style="color: #fff; font-size: 1.1rem;">Hoy en SIA</h5>
-                        <small style="color: rgba(255,255,255,0.45); font-size: 0.8rem;">Acceso rapido a lo que mas usa un estudiante</small>
+                        <h5 class="fw-bold mb-1" style="color: #fff; font-size: 1.1rem;">Accesos mas usados</h5>
+                        <small style="color: rgba(255,255,255,0.45); font-size: 0.8rem;">Lo esencial de SIA en una sola entrada</small>
                       </div>
                       <div class="rounded-circle d-flex align-items-center justify-content-center fw-bold landing-preview-mark">SIA</div>
                     </div>
                     <div class="landing-preview-list">
                       <div class="landing-preview-item is-priority">
                         <div>
-                          <div class="landing-preview-label">Aula Virtual</div>
-                          <div class="landing-preview-text">Materias, actividades y cursos en progreso</div>
+                          <div class="landing-preview-label">Entrar a clases</div>
+                          <div class="landing-preview-text">Materias, actividades y seguimiento academico.</div>
                         </div>
                       </div>
                       <div class="landing-preview-item">
                         <div>
-                          <div class="landing-preview-label">Biblioteca</div>
-                          <div class="landing-preview-text">Prestamos, busqueda y recursos digitales</div>
+                          <div class="landing-preview-label">Resolver servicios</div>
+                          <div class="landing-preview-text">Biblioteca, cafeteria y recursos de campus.</div>
                         </div>
                       </div>
                       <div class="landing-preview-item">
                         <div>
-                          <div class="landing-preview-label">Salud Integral</div>
-                          <div class="landing-preview-text">Agenda tu atencion y da seguimiento</div>
+                          <div class="landing-preview-label">Mantenerte al dia</div>
+                          <div class="landing-preview-text">Avisos, perfil, credencial y acceso rapido.</div>
                         </div>
                       </div>
-                      
                     </div>
                   </div>
                 </div>
@@ -472,38 +439,25 @@ class SiaLandingView extends HTMLElement {
           <div class="landing-vocational-spotlight">
             <div class="landing-vocational-copy">
               <div class="landing-section-label mb-3">Ruta publica para aspirantes</div>
-              <h2 class="fw-bold mb-3">Descubre que carrera va contigo antes de entrar al campus.</h2>
+              <h2 class="fw-bold mb-3">Si aun no eres parte del campus, empieza por admisiones.</h2>
               <p class="landing-vocational-lead mb-4">
-                El test vocacional de SIA esta pensado para nuevo ingreso. No necesitas cuenta institucional para comenzar y puedes recuperar tu avance mas tarde.
+                El nuevo centro de admision de SIA convierte la guia EVALUATEC 2026 en una ruta de estudio por carrera, con practica por areas, fechas oficiales y progreso local sin cuenta institucional.
               </p>
+              <div class="landing-trust-list mb-4">
+                <span class="landing-trust-chip"><i class="bi bi-stars"></i>Nuevo ingreso</span>
+                <span class="landing-trust-chip"><i class="bi bi-journal-check"></i>Estudio + practica</span>
+                <span class="landing-trust-chip"><i class="bi bi-arrow-repeat"></i>Progreso local</span>
+              </div>
               <div class="landing-vocational-actions">
-                <a href="#/test-vocacional" class="btn btn-acceso-institucional d-inline-flex align-items-center justify-content-center gap-2">
-                  <i class="bi bi-compass-fill"></i>
-                  <span>Hacer test gratis</span>
+                <a href="#/admisiones" class="btn btn-acceso-institucional d-inline-flex align-items-center justify-content-center gap-2">
+                  <i class="bi bi-journal-richtext"></i>
+                  <span>Entrar a admisiones</span>
                 </a>
-                <a href="#landing-procesos" class="btn btn-outline-light landing-secondary-cta rounded-pill px-4 py-3 fw-semibold d-inline-flex align-items-center justify-content-center gap-2">
-                  <i class="bi bi-arrow-down-short"></i>
-                  <span>Ver SIA para estudiantes</span>
+                <a href="#/test-vocacional" class="btn btn-outline-light landing-secondary-cta rounded-pill px-4 py-3 fw-semibold d-inline-flex align-items-center justify-content-center gap-2">
+                  <i class="bi bi-compass-fill"></i>
+                  <span>Test vocacional</span>
                 </a>
               </div>
-            </div>
-
-            <div class="landing-vocational-grid">
-              <article class="landing-card landing-vocational-card rounded-4">
-                <div class="landing-route-pill"><i class="bi bi-stars"></i>Nuevo ingreso</div>
-                <h3>8 carreras para explorar</h3>
-                <p>Conoce opciones clave del ITES Los Cabos antes de tomar una decision.</p>
-              </article>
-              <article class="landing-card landing-vocational-card rounded-4">
-                <div class="landing-route-pill"><i class="bi bi-stopwatch-fill"></i>Rapido y claro</div>
-                <h3>Test de alrededor de 15 minutos</h3>
-                <p>Recibe orientacion sin llenar un formulario eterno ni salirte de la experiencia.</p>
-              </article>
-              <article class="landing-card landing-vocational-card rounded-4">
-                <div class="landing-route-pill"><i class="bi bi-arrow-repeat"></i>Continuidad</div>
-                <h3>Resultados y recuperacion de sesion</h3>
-                <p>Si pausas el proceso, puedes retomarlo con tus datos y seguir desde donde ibas.</p>
-              </article>
             </div>
           </div>
         </div>
@@ -516,10 +470,10 @@ class SiaLandingView extends HTMLElement {
       <section id="landing-procesos" class="py-5">
         <div class="container py-4">
           <div class="text-center mb-5">
-            <div class="landing-section-label justify-content-center mb-3">Procesos de mayor valor</div>
-            <h2 class="fw-bold mb-3" style="font-size: 2.25rem;">Lo que mas resuelve SIA para estudiantes.</h2>
+            <div class="landing-section-label justify-content-center mb-3">Que puedes hacer aqui</div>
+            <h2 class="fw-bold mb-3" style="font-size: 2.25rem;">Lo esencial de SIA, sin vueltas.</h2>
             <p class="mx-auto" style="max-width: 640px; color: rgba(255,255,255,0.55); font-size: 0.98rem;">
-              En lugar de mostrar todos los modulos, aqui se resumen los procesos estudiantiles que realmente concentran valor y uso diario dentro del campus.
+              SIA no necesita explicarse por decenas de modulos. Estas son las acciones que concentran el uso diario dentro del campus.
             </p>
           </div>
 
@@ -528,7 +482,7 @@ class SiaLandingView extends HTMLElement {
           </div>
 
           <div class="landing-process-footer">
-            <p class="mb-0">Cada proceso vive dentro de una sola plataforma institucional, con mejor continuidad entre servicios.</p>
+            <p class="mb-0">Todo parte del mismo acceso institucional para evitar brincar entre herramientas separadas.</p>
             <button data-landing-login class="btn btn-landing-cta d-inline-flex align-items-center justify-content-center gap-2">
               <i class="bi bi-box-arrow-in-right"></i>
               <span>Entrar a SIA</span>
@@ -539,35 +493,30 @@ class SiaLandingView extends HTMLElement {
     `;
   }
 
-  getBenefitsHtml() {
+  getHowItWorksHtml() {
     return `
       <section id="landing-beneficios" class="landing-section-alt py-5">
         <div class="container py-4">
           <div class="text-center mb-5">
-            <div class="landing-section-label justify-content-center mb-3">Por que SIA importa</div>
-            <h2 class="fw-bold mb-3" style="font-size: 2.25rem;">Menos vueltas, mas continuidad para el estudiante.</h2>
+            <div class="landing-section-label justify-content-center mb-3">Como funciona</div>
+            <h2 class="fw-bold mb-3" style="font-size: 2.25rem;">Un acceso, tres pasos.</h2>
           </div>
 
-          <div class="landing-value-grid">
-            <article class="landing-card landing-value-card rounded-4">
-              <div class="landing-value-icon is-blue"><i class="bi bi-box-arrow-in-right"></i></div>
-              <h3>Un solo acceso institucional</h3>
-              <p>Evita brincar entre herramientas separadas para atender tu vida academica y de campus.</p>
+          <div class="landing-step-grid">
+            <article class="landing-card landing-step-card rounded-4">
+              <div class="landing-step-number">1</div>
+              <h3>Entra con tu cuenta institucional</h3>
+              <p>Alumnos, docentes y personal usan el mismo acceso oficial del campus.</p>
             </article>
-            <article class="landing-card landing-value-card rounded-4">
-              <div class="landing-value-icon is-emerald"><i class="bi bi-phone-fill"></i></div>
-              <h3>Listo para usar desde el celular</h3>
-              <p>La experiencia esta pensada para que SIA se vuelva un acceso practico en tu dia a dia.</p>
+            <article class="landing-card landing-step-card rounded-4">
+              <div class="landing-step-number">2</div>
+              <h3>Abre el modulo que necesitas</h3>
+              <p>Clases, servicios, bienestar, credencial y avisos viven dentro de la misma plataforma.</p>
             </article>
-            <article class="landing-card landing-value-card rounded-4">
-              <div class="landing-value-icon is-red"><i class="bi bi-grid-1x2-fill"></i></div>
-              <h3>Academico, bienestar y comunidad</h3>
-              <p>Clases, salud, credencial, cafeteria y avisos conviven en el mismo entorno.</p>
-            </article>
-            <article class="landing-card landing-value-card rounded-4">
-              <div class="landing-value-icon is-cyan"><i class="bi bi-compass-fill"></i></div>
-              <h3>Tambien sirve antes de ingresar</h3>
-              <p>El test vocacional abre una puerta publica para aspirantes sin mezclarla con el login institucional.</p>
+            <article class="landing-card landing-step-card rounded-4">
+              <div class="landing-step-number">3</div>
+              <h3>Resuelve el proceso desde tu celular</h3>
+              <p>La interfaz prioriza consulta rapida, continuidad y acceso diario desde movil.</p>
             </article>
           </div>
         </div>
@@ -582,9 +531,9 @@ class SiaLandingView extends HTMLElement {
           <div id="landing-app-banner" class="landing-app-banner landing-app-banner-compact" data-landing-app-card>
             <div class="landing-app-copy">
               <div class="landing-app-kicker mb-2">App SIA</div>
-              <h3 class="landing-app-title mb-2">Instalala si usas SIA todos los dias.</h3>
+              <h3 class="landing-app-title mb-2">Instalala si entras seguido.</h3>
               <p class="mb-0">
-                Deja el acceso al campus digital en tu pantalla de inicio. Si tu navegador no permite instalarla directo, te guiamos paso a paso.
+                Deja SIA en tu pantalla de inicio para entrar mas rapido a tus procesos de campus.
               </p>
             </div>
             <div class="landing-app-actions">
@@ -608,15 +557,15 @@ class SiaLandingView extends HTMLElement {
     return `
       <footer id="landing-contacto" class="pt-5 pb-4" style="border-top: 1px solid rgba(255,255,255,0.06) !important;">
         <div class="container">
-          <div class="row g-4 justify-content-between">
-            <div class="col-lg-4">
+          <div class="row g-4 justify-content-between align-items-start">
+            <div class="col-lg-5">
               <div class="landing-brand-logos mb-3">
                 <img src="/images/tecnm-logo-oscuro.png" alt="TecNM" class="logo-tecnm" style="height: 40px;">
                 <div class="brand-divider" style="height: 32px;"></div>
-                <img src="/images/logo-ites.png" alt="ITES Los Cabos" class="logo-ites">
+                <img src="/images/logo-sia.png" alt="SIA" class="logo-ites">
               </div>
               <p style="color: rgba(255,255,255,0.4); font-size: 0.85rem; line-height: 1.7; max-width: 320px;">
-                Sistema de Integracion Academica. Plataforma oficial del Tecnologico Nacional de Mexico, Campus Los Cabos.
+                SIA es la plataforma institucional del Tecnologico Nacional de Mexico, Campus Los Cabos.
               </p>
               <div class="d-flex gap-3 mt-3">
                 <a class="landing-social-link" href="https://www.facebook.com/itesloscabos.oficial" target="_blank" rel="noopener" aria-label="Facebook ITES Los Cabos">
@@ -628,34 +577,24 @@ class SiaLandingView extends HTMLElement {
               </div>
             </div>
 
-            <div class="col-6 col-lg-2">
-              <h6 class="fw-bold mb-3" style="font-size: 0.85rem; color: rgba(255,255,255,0.7);">Recorridos</h6>
+            <div class="col-6 col-lg-3">
+              <h6 class="fw-bold mb-3" style="font-size: 0.85rem; color: rgba(255,255,255,0.7);">Acceso rapido</h6>
               <ul class="list-unstyled" style="font-size: 0.85rem;">
-                <li class="mb-2"><a href="#landing-hero">Inicio</a></li>
-                <li class="mb-2"><a href="#landing-procesos">Procesos</a></li>
-                <li class="mb-2"><a href="#landing-vocacional">Aspirantes</a></li>
+                <li class="mb-2"><button data-landing-login class="btn p-0 border-0 bg-transparent text-start">Acceso institucional</button></li>
+                <li class="mb-2"><a href="#/admisiones">Admisiones</a></li>
+                <li class="mb-2"><a href="#/test-vocacional">Test vocacional</a></li>
+                <li class="mb-2"><a href="#/mapa-campus">Mapa del campus</a></li>
+                <li class="mb-2"><a href="#landing-contacto">Soporte</a></li>
               </ul>
             </div>
 
-            <div class="col-6 col-lg-3">
+            <div class="col-6 col-lg-4">
               <h6 class="fw-bold mb-3" style="font-size: 0.85rem; color: rgba(255,255,255,0.7);">Soporte</h6>
               <ul class="list-unstyled" style="font-size: 0.85rem;">
                 <li class="mb-2" style="color: rgba(255,255,255,0.4);"><i class="bi bi-telephone me-2"></i>+52 (624) 142 5939</li>
                 <li class="mb-2"><a href="mailto:soporte.sia@loscabos.tecnm.mx"><i class="bi bi-envelope me-2"></i>soporte.sia@loscabos.tecnm.mx</a></li>
                 <li class="mb-2" style="color: rgba(255,255,255,0.4);"><i class="bi bi-geo-alt me-2"></i>C. Gandhi, Guaymitas, San Jose del Cabo, B.C.S.</li>
               </ul>
-            </div>
-
-            <div class="col-lg-3">
-              <div class="p-3 rounded-3 text-center" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06);">
-                <div class="d-flex justify-content-center align-items-center gap-2 mb-2">
-                  <i class="bi bi-shield-check" style="font-size: 1.5rem; color: #34d399;"></i>
-                  <div style="font-size: 0.8rem; font-weight: 700; line-height: 1.2; text-align: start; color: rgba(255,255,255,0.7);">Plataforma<br>Institucional</div>
-                </div>
-                <p class="mb-0" style="font-size: 0.7rem; color: rgba(255,255,255,0.3);">
-                  Desarrollado por Abraham Rios, Ingeniero en Sistemas Computacionales.
-                </p>
-              </div>
             </div>
           </div>
 
@@ -730,9 +669,9 @@ class SiaLandingView extends HTMLElement {
     this.innerHTML = `
       ${this.getNavHtml()}
       ${this.getHeroHtml()}
-      ${this.getVocacionalHtml()}
       ${this.getProcessesHtml()}
-      ${this.getBenefitsHtml()}
+      ${this.getHowItWorksHtml()}
+      ${this.getVocacionalHtml()}
       ${this.getAppPromoHtml()}
       ${this.getFooterHtml()}
       <button id="btn-login-microsoft" class="d-none"></button>
