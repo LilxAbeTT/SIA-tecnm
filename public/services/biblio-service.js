@@ -1579,7 +1579,12 @@ const BiblioService = (function () {
         foundEntries.forEach((entry) => {
             const groupKey = String(entry?.groupKey || '').trim();
             if (groupKey) {
-                foundByGroup.set(groupKey, Number(entry?.totalObserved) || 0);
+                foundByGroup.set(groupKey, {
+                    totalObserved: Number(entry?.totalObserved) || 0,
+                    observedAcquisitions: Array.isArray(entry?.observedAcquisitions)
+                        ? entry.observedAcquisitions.map((value) => String(value || '').trim().toUpperCase()).filter(Boolean)
+                        : []
+                });
             }
         });
 
@@ -1606,14 +1611,25 @@ const BiblioService = (function () {
         };
 
         for (const [groupKey, members] of groups.entries()) {
+            const foundMeta = foundByGroup.get(groupKey) || { totalObserved: 0, observedAcquisitions: [] };
+            const observedOrder = new Map(
+                (foundMeta.observedAcquisitions || []).map((value, index) => [String(value || '').trim().toUpperCase(), index])
+            );
             const sortedMembers = [...members].sort((left, right) => {
+                const leftObservedIndex = observedOrder.has(String(left?.adquisicion || '').trim().toUpperCase())
+                    ? observedOrder.get(String(left?.adquisicion || '').trim().toUpperCase())
+                    : Number.MAX_SAFE_INTEGER;
+                const rightObservedIndex = observedOrder.has(String(right?.adquisicion || '').trim().toUpperCase())
+                    ? observedOrder.get(String(right?.adquisicion || '').trim().toUpperCase())
+                    : Number.MAX_SAFE_INTEGER;
+                if (leftObservedIndex !== rightObservedIndex) return leftObservedIndex - rightObservedIndex;
                 const leftParent = left?.isCatalogCopy === true ? 1 : 0;
                 const rightParent = right?.isCatalogCopy === true ? 1 : 0;
                 if (leftParent !== rightParent) return leftParent - rightParent;
                 return String(left?.adquisicion || left?.id || '').localeCompare(String(right?.adquisicion || right?.id || ''));
             });
 
-            const targetCount = Math.max(0, Number(foundByGroup.get(groupKey)) || 0);
+            const targetCount = Math.max(0, Number(foundMeta.totalObserved) || 0);
             let remainingActive = targetCount;
             adjustedGroups += 1;
 
@@ -3683,6 +3699,14 @@ const BiblioService = (function () {
             };
 
             transaction.set(newBookRef, cleanData);
+            const previousObservedAcquisitions = Array.isArray(previousEntry?.observedAcquisitions)
+                ? previousEntry.observedAcquisitions
+                : [];
+            const nextObservedAcquisitions = [...new Set([
+                ...previousObservedAcquisitions,
+                baseBookData.adquisicion || '',
+                acquisition
+            ].map((value) => String(value || '').trim().toUpperCase()).filter(Boolean))];
             transaction.set(foundRef, {
                 bookId: previousEntry?.bookId || baseBookId,
                 representativeId: previousEntry?.representativeId || baseBookId,
@@ -3697,6 +3721,7 @@ const BiblioService = (function () {
                 systemTotal: Math.max(Number(previousEntry?.systemTotal) || 0, 1),
                 groupSize: Math.max(Number(previousEntry?.groupSize) || 0, 1),
                 totalObserved: (Number(previousEntry?.totalObserved) || 0) + quantity,
+                observedAcquisitions: nextObservedAcquisitions,
                 lastQuantity: quantity,
                 lastQuery: acquisition,
                 updatedBy: actorId,
@@ -3959,6 +3984,14 @@ const BiblioService = (function () {
             const nextTotal = (Number(previousEntry?.totalObserved) || 0) + quantity;
             const resolvedGroupKey = groupKey || buildInventoryGroupKey({ id: bookId, ...bookData });
             const displayAdquisicion = matchedAcquisition || bookData.adquisicion || query;
+            const previousObservedAcquisitions = Array.isArray(previousEntry?.observedAcquisitions)
+                ? previousEntry.observedAcquisitions
+                : [];
+            const nextObservedAcquisitions = [...new Set([
+                ...previousObservedAcquisitions,
+                displayAdquisicion || '',
+                bookData.adquisicion || ''
+            ].map((value) => String(value || '').trim().toUpperCase()).filter(Boolean))];
 
             transaction.set(foundRef, {
                 bookId,
@@ -3974,6 +4007,7 @@ const BiblioService = (function () {
                 systemTotal,
                 groupSize,
                 totalObserved: nextTotal,
+                observedAcquisitions: nextObservedAcquisitions,
                 lastQuantity: quantity,
                 lastQuery: query,
                 updatedBy: actorId,
@@ -4024,6 +4058,9 @@ const BiblioService = (function () {
         const addedAcquisitions = Array.isArray(data.addedAcquisitions)
             ? [...new Set(data.addedAcquisitions.map((value) => String(value || '').trim().toUpperCase()).filter(Boolean))]
             : [];
+        const observedAcquisitions = Array.isArray(data.observedAcquisitions)
+            ? [...new Set(data.observedAcquisitions.map((value) => String(value || '').trim().toUpperCase()).filter(Boolean))]
+            : [];
 
         if (!sessionId) throw new Error('No hay una sesion de inventario activa.');
         if (!entryId) throw new Error('Selecciona un registro para revisar.');
@@ -4046,7 +4083,11 @@ const BiblioService = (function () {
 
         const previousEntry = foundSnap.data() || {};
         const baseBookId = String(previousEntry.representativeId || previousEntry.bookId || '').trim();
+        const baseAcquisition = String(previousEntry.catalogAdquisicion || previousEntry.adquisicion || '').trim().toUpperCase();
         let syncResult = { created: 0, linked: 0, skipped: 0 };
+        let resultSession = null;
+        let resultEntry = null;
+        let deleted = false;
         if (addedAcquisitions.length > 0) {
             syncResult = await syncInventoryCopyAcquisitions(ctx, {
                 baseBookId,
@@ -4067,41 +4108,79 @@ const BiblioService = (function () {
             const liveEntry = liveFoundSnap.data() || {};
             const previousTotal = Number(liveEntry.totalObserved) || 0;
             const delta = nextQuantity - previousTotal;
+            const nextSystemTotal = Math.max(Number(liveEntry.systemTotal) || 0, 1) + Number(syncResult.created || 0) + Number(syncResult.linked || 0);
+            const nextGroupSize = Math.max(Number(liveEntry.groupSize) || 0, 1) + Number(syncResult.created || 0) + Number(syncResult.linked || 0);
+            const nextSessionTotal = Math.max(0, (Number(sessionData.totalObserved) || 0) + delta);
+            const nextMatchedItems = Math.max(0, (Number(sessionData.matchedItems) || 0) + (nextQuantity <= 0 ? -1 : 0));
+            const nextObservedAcquisitions = nextQuantity <= 0
+                ? []
+                : [...new Set([
+                    ...(observedAcquisitions.length ? observedAcquisitions : (Array.isArray(liveEntry.observedAcquisitions) ? liveEntry.observedAcquisitions : [])),
+                    baseAcquisition || ''
+                ].map((value) => String(value || '').trim().toUpperCase()).filter(Boolean))];
+            const nextLastEntry = {
+                type: 'catalogo',
+                bookId: String(liveEntry.bookId || baseBookId || ''),
+                titulo: liveEntry.titulo || 'Sin titulo',
+                adquisicion: liveEntry.adquisicion || liveEntry.catalogAdquisicion || '',
+                cantidad: nextQuantity,
+                systemTotal: nextSystemTotal,
+                query: liveEntry.lastQuery || liveEntry.adquisicion || '',
+                atMs: nowMs
+            };
 
             if (nextQuantity <= 0) {
                 transaction.delete(foundRef);
+                deleted = true;
+                resultEntry = null;
             } else {
                 transaction.set(foundRef, {
                     totalObserved: nextQuantity,
+                    observedAcquisitions: nextObservedAcquisitions,
                     lastQuantity: delta !== 0 ? Math.abs(delta) : Number(liveEntry.lastQuantity) || nextQuantity,
-                    systemTotal: Math.max(Number(liveEntry.systemTotal) || 0, 1) + Number(syncResult.created || 0) + Number(syncResult.linked || 0),
-                    groupSize: Math.max(Number(liveEntry.groupSize) || 0, 1) + Number(syncResult.created || 0) + Number(syncResult.linked || 0),
+                    systemTotal: nextSystemTotal,
+                    groupSize: nextGroupSize,
                     updatedBy: actorId,
                     updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
                     updatedAtMs: nowMs
                 }, { merge: true });
+                resultEntry = {
+                    id: entryId,
+                    ...liveEntry,
+                    totalObserved: nextQuantity,
+                    observedAcquisitions: nextObservedAcquisitions,
+                    lastQuantity: delta !== 0 ? Math.abs(delta) : Number(liveEntry.lastQuantity) || nextQuantity,
+                    systemTotal: nextSystemTotal,
+                    groupSize: nextGroupSize,
+                    updatedAtMs: nowMs
+                };
             }
 
             transaction.set(sessionRef, {
-                totalObserved: Math.max(0, (Number(sessionData.totalObserved) || 0) + delta),
-                matchedItems: Math.max(0, (Number(sessionData.matchedItems) || 0) + (nextQuantity <= 0 ? -1 : 0)),
+                totalObserved: nextSessionTotal,
+                matchedItems: nextMatchedItems,
                 updatedBy: actorId,
                 updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
                 updatedAtMs: nowMs,
-                lastEntry: {
-                    type: 'catalogo',
-                    bookId: String(liveEntry.bookId || baseBookId || ''),
-                    titulo: liveEntry.titulo || 'Sin titulo',
-                    adquisicion: liveEntry.adquisicion || liveEntry.catalogAdquisicion || '',
-                    cantidad: nextQuantity,
-                    systemTotal: Math.max(Number(liveEntry.systemTotal) || 0, 1) + Number(syncResult.created || 0) + Number(syncResult.linked || 0),
-                    query: liveEntry.lastQuery || liveEntry.adquisicion || '',
-                    atMs: nowMs
-                }
+                lastEntry: nextLastEntry
             }, { merge: true });
+
+            resultSession = {
+                id: sessionId,
+                ...sessionData,
+                totalObserved: nextSessionTotal,
+                matchedItems: nextMatchedItems,
+                updatedAtMs: nowMs,
+                lastEntry: nextLastEntry
+            };
         });
 
-        return getInventorySessionDetails(ctx, sessionId, { includeLists: true });
+        return {
+            session: resultSession,
+            entry: resultEntry,
+            entryId,
+            deleted
+        };
     }
 
     async function registerInventoryMissing(ctx, data = {}) {

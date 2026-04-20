@@ -529,23 +529,55 @@ window.AdminBiblio.Inventario = (function () {
         const baseCode = getInventoryReviewEntryBaseCode(entry);
         const knownCodes = getInventoryReviewKnownCopyCodes(entry);
         const copyCodes = knownCodes.filter((code) => code !== baseCode);
-        const lastKnownCode = getInventoryReviewLastKnownCopy(entry) || baseCode;
-        const visibleCopyCodes = copyCodes.slice(-6);
-        const hiddenCopyCount = Math.max(0, copyCodes.length - visibleCopyCodes.length);
+        const suggestedCode = getSuggestedNextAcquisitionCode(getInventoryReviewSeedCode(entry));
 
         return `
-            <div class="rounded-4 border bg-white p-2 d-grid gap-2">
-                <div class="d-flex flex-wrap gap-2">
-                    <span class="badge text-bg-light border">Original ${escapeHtml(baseCode || 'S/N')}</span>
-                    <span class="badge text-bg-light border">Ultima ${escapeHtml(lastKnownCode || 'S/N')}</span>
-                </div>
+            <div class="rounded-4 border bg-white p-3 d-grid gap-2">
+                ${baseCode && (Number(_inventoryReviewDraftQuantity) || 0) > 0
+                    ? `<div class="small text-muted">Base</div><div><span class="badge text-bg-light border">${escapeHtml(baseCode)}</span></div>`
+                    : ''}
                 ${_inventoryReviewCopiesLoading
                     ? '<div class="small text-muted">Cargando copias...</div>'
                     : copyCodes.length
-                        ? `<div class="d-flex flex-wrap gap-2">${visibleCopyCodes.map((code) => `<span class="badge text-bg-light border">${escapeHtml(code)}</span>`).join('')}${hiddenCopyCount > 0 ? `<span class="small text-muted align-self-center">+${hiddenCopyCount} mas</span>` : ''}</div>`
-                        : '<div class="small text-muted">Sin copias extra registradas.</div>'}
+                        ? `
+                            <div class="small text-muted">Copias contempladas</div>
+                            <div class="d-flex flex-wrap gap-2">
+                                ${copyCodes.map((code) => `
+                                    <button type="button" class="btn btn-sm btn-light border rounded-pill" onclick="AdminBiblio.removeInventoryReviewKnownCopyCode('${escapeHtml(code)}')">
+                                        ${escapeHtml(code)} <span class="ms-1">x</span>
+                                    </button>
+                                `).join('')}
+                            </div>
+                        `
+                        : '<div class="small text-muted">Sin copias extra contempladas en este registro.</div>'}
+                ${suggestedCode ? `<div class="small text-muted">Siguiente sugerido: <span class="fw-semibold">${escapeHtml(suggestedCode)}</span></div>` : ''}
             </div>
         `;
+    }
+
+    function getInventoryReviewExplicitCount(entry = null) {
+        const baseCount = (Number(_inventoryReviewDraftQuantity) || 0) > 0 ? 1 : 0;
+        return baseCount + _inventoryReviewKnownCopies.length + _inventoryReviewPendingCopyCodes.length;
+    }
+
+    function getInventoryReviewMissingCodes(entry = null) {
+        return Math.max(0, (Number(_inventoryReviewDraftQuantity) || 0) - getInventoryReviewExplicitCount(entry));
+    }
+
+    function canSaveInventoryReviewEdit(entry = null) {
+        if ((Number(_inventoryReviewDraftQuantity) || 0) <= 0) return true;
+        return getInventoryReviewMissingCodes(entry) === 0;
+    }
+
+    function renderInventoryReviewEditStatus(entry = null) {
+        const missingCodes = getInventoryReviewMissingCodes(entry);
+        if ((Number(_inventoryReviewDraftQuantity) || 0) <= 0) {
+            return '<div class="small text-muted">Se eliminara este registro del inventario.</div>';
+        }
+        if (missingCodes > 0) {
+            return `<div class="small text-danger">Faltan ${missingCodes} codigo(s) por capturar antes de guardar.</div>`;
+        }
+        return '<div class="small text-success">Cantidad y codigos listos para guardar.</div>';
     }
 
     function getInventoryReviewSeedCode(entry = null) {
@@ -586,7 +618,7 @@ window.AdminBiblio.Inventario = (function () {
                         <div class="modal-header border-0">
                             <div class="d-flex align-items-center gap-2 flex-wrap min-w-0">
                                 <h5 class="mb-0">Revision</h5>
-                                <span class="badge text-bg-light border">${Number(_inventorySession?.totalObserved) || 0} registrados</span>
+                                <span class="badge text-bg-light border" id="inventory-review-total-badge">${Number(_inventorySession?.totalObserved) || 0} registrados</span>
                             </div>
                             <div class="d-flex align-items-center gap-2">
                                 <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill" onclick="AdminBiblio.focusInventoryReviewSearch()">
@@ -647,15 +679,16 @@ window.AdminBiblio.Inventario = (function () {
         const resultsEl = document.getElementById('inventory-review-results');
         const countEl = document.getElementById('inventory-review-results-count');
         const paginationEl = document.getElementById('inventory-review-pagination');
+        const totalBadgeEl = document.getElementById('inventory-review-total-badge');
         if (!resultsEl || !countEl || !paginationEl) return;
 
         const entries = getInventoryReviewPageEntries();
         const totalPages = getInventoryReviewTotalPages();
         const totalFiltered = getFilteredInventoryReviewEntries().length;
+        if (totalBadgeEl) totalBadgeEl.textContent = `${Number(_inventorySession?.totalObserved) || 0} registrados`;
         countEl.textContent = `${totalFiltered} resultado(s)`;
         resultsEl.innerHTML = entries.length ? entries.map((entry) => {
             const entryId = String(entry.id || '');
-            const isEditing = _inventoryReviewEditingId === entryId;
             return `
                 <div class="rounded-4 border p-3">
                     <div class="d-flex align-items-start justify-content-between gap-3">
@@ -668,27 +701,6 @@ window.AdminBiblio.Inventario = (function () {
                             <button type="button" class="btn btn-sm btn-outline-primary rounded-pill" onclick="AdminBiblio.startInventoryReviewEdit('${entryId}')">Editar</button>
                         </div>
                     </div>
-                    ${isEditing ? `
-                        <div class="border-top mt-3 pt-3 d-grid gap-3">
-                            <div class="d-flex align-items-center gap-2">
-                                <button type="button" class="btn btn-outline-secondary rounded-circle" style="width:38px;height:38px;" onpointerdown="AdminBiblio.startInventoryReviewAdjust(-1)" onpointerup="AdminBiblio.stopInventoryReviewAdjust()" onpointerleave="AdminBiblio.stopInventoryReviewAdjust()">-</button>
-                                <div class="fw-bold px-3" id="inventory-review-draft-quantity">${Math.max(0, Number(_inventoryReviewDraftQuantity) || 0)}</div>
-                                <div class="small text-muted">Para aumentar agrega nuevas copias abajo.</div>
-                            </div>
-                            ${renderInventoryReviewKnownCopies(entry)}
-                            <div class="rounded-4 border bg-light p-2">
-                                <div class="input-group mb-2">
-                                    <input type="search" class="form-control" id="inventory-review-copy-input" placeholder="No. adquisicion nueva copia" onkeydown="if(event.key === 'Enter'){ event.preventDefault(); AdminBiblio.addInventoryReviewCopyCode(); }">
-                                    <button type="button" class="btn btn-primary" style="min-width:48px;" onclick="AdminBiblio.addInventoryReviewCopyCode()">+</button>
-                                </div>
-                                ${renderInventoryReviewPendingCopyCodes()}
-                            </div>
-                            <div class="d-flex gap-2 justify-content-end">
-                                <button type="button" class="btn btn-light rounded-pill" onclick="AdminBiblio.cancelInventoryReviewEdit()">Cancelar</button>
-                                <button type="button" class="btn btn-primary rounded-pill fw-bold" onclick="AdminBiblio.saveInventoryReviewEntry()" ${_inventorySaving ? 'disabled' : ''}>${_inventorySaving ? 'Guardando...' : 'Guardar'}</button>
-                            </div>
-                        </div>
-                    ` : ''}
                 </div>
             `;
         }).join('') : '<div class="text-muted small">No hay registros para esa busqueda.</div>';
@@ -699,10 +711,6 @@ window.AdminBiblio.Inventario = (function () {
                 <button type="button" class="btn btn-light rounded-pill" onclick="AdminBiblio.setInventoryReviewPage(${Math.min(totalPages, _inventoryReviewPage + 1)})" ${_inventoryReviewPage >= totalPages ? 'disabled' : ''}>Siguiente</button>
             </div>
         `;
-
-        if (_inventoryReviewEditingId) {
-            focusInventoryReviewCopyInput(getInventoryReviewEntryById(_inventoryReviewEditingId));
-        }
     }
 
     function setInventoryReviewSearch(value = '') {
@@ -727,6 +735,105 @@ window.AdminBiblio.Inventario = (function () {
         renderInventoryReviewModalBody();
     }
 
+    function renderInventoryReviewEditModal() {
+        const entry = getInventoryReviewEntryById(_inventoryReviewEditingId);
+        const body = document.getElementById('inventory-review-edit-modal-body');
+        if (!entry || !body) return;
+
+        body.innerHTML = `
+            <div class="d-grid gap-3">
+                <div>
+                    <div class="fw-semibold text-dark">${escapeHtml(entry.adquisicion || entry.catalogAdquisicion || 'S/N')}</div>
+                    <div class="small text-muted text-break">${escapeHtml(entry.titulo || 'Sin titulo')}</div>
+                </div>
+                <div class="rounded-4 border p-3 d-grid gap-2">
+                    <div class="small text-muted">Total del registro</div>
+                    <div class="d-flex align-items-center justify-content-center gap-3">
+                        <button type="button" class="btn btn-outline-secondary rounded-circle" style="width:44px;height:44px;" onpointerdown="AdminBiblio.startInventoryReviewAdjust(-1)" onpointerup="AdminBiblio.stopInventoryReviewAdjust()" onpointerleave="AdminBiblio.stopInventoryReviewAdjust()" onpointercancel="AdminBiblio.stopInventoryReviewAdjust()">-</button>
+                        <div class="fw-bold fs-4 text-center" id="inventory-review-draft-quantity">${Math.max(0, Number(_inventoryReviewDraftQuantity) || 0)}</div>
+                        <button type="button" class="btn btn-outline-secondary rounded-circle" style="width:44px;height:44px;" onpointerdown="AdminBiblio.startInventoryReviewAdjust(1)" onpointerup="AdminBiblio.stopInventoryReviewAdjust()" onpointerleave="AdminBiblio.stopInventoryReviewAdjust()" onpointercancel="AdminBiblio.stopInventoryReviewAdjust()">+</button>
+                    </div>
+                    <div id="inventory-review-edit-status">${renderInventoryReviewEditStatus(entry)}</div>
+                </div>
+                ${renderInventoryReviewKnownCopies(entry)}
+                <div class="rounded-4 border bg-light p-3 d-grid gap-2">
+                    <div class="small text-muted">Agregar copia nueva</div>
+                    <div class="input-group">
+                        <input type="search" class="form-control" id="inventory-review-copy-input" placeholder="No. adquisicion nueva copia" onkeydown="if(event.key === 'Enter'){ event.preventDefault(); AdminBiblio.addInventoryReviewCopyCode(); }">
+                        <button type="button" class="btn btn-primary fw-bold px-4" onclick="AdminBiblio.addInventoryReviewCopyCode()">+</button>
+                    </div>
+                    ${renderInventoryReviewPendingCopyCodes()}
+                </div>
+            </div>
+        `;
+
+        const saveBtn = document.getElementById('inventory-review-edit-save-btn');
+        if (saveBtn) {
+            saveBtn.disabled = _inventorySaving || !canSaveInventoryReviewEdit(entry);
+            saveBtn.textContent = _inventorySaving ? 'Guardando...' : 'Guardar';
+        }
+    }
+
+    function openInventoryReviewEditModal() {
+        const entry = getInventoryReviewEntryById(_inventoryReviewEditingId);
+        if (!entry) return;
+
+        document.getElementById('inventory-review-edit-modal')?.remove();
+        const modalHtml = `
+            <div class="modal fade" id="inventory-review-edit-modal" tabindex="-1" data-bs-backdrop="static">
+                <div class="modal-dialog modal-dialog-centered" style="max-width:min(560px,calc(100vw - 1rem));margin:.5rem auto;">
+                    <div class="modal-content border-0 shadow-lg rounded-4">
+                        <div class="modal-header border-0 pb-2">
+                            <h5 class="mb-0">Editar registro</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body pt-0 px-3 px-md-4" id="inventory-review-edit-modal-body"></div>
+                        <div class="modal-footer border-0">
+                            <button type="button" class="btn btn-light rounded-pill" data-bs-dismiss="modal">Cancelar</button>
+                            <button type="button" class="btn btn-primary rounded-pill fw-bold" id="inventory-review-edit-save-btn" onclick="AdminBiblio.saveInventoryReviewEntry()">Guardar</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+        const modalEl = document.getElementById('inventory-review-edit-modal');
+        const modal = new bootstrap.Modal(modalEl);
+        modalEl.addEventListener('shown.bs.modal', () => {
+            syncModalScrollLock();
+            renderInventoryReviewEditModal();
+        }, { once: true });
+        modalEl.addEventListener('hidden.bs.modal', () => {
+            stopInventoryReviewAdjust();
+            modalEl.remove();
+            syncModalScrollLock();
+            if (!_inventorySaving) {
+                resetInventoryReviewEditor();
+                renderInventoryReviewModalBody();
+            }
+        }, { once: true });
+        syncModalScrollLock();
+        modal.show();
+    }
+
+    function closeInventoryReviewEditModal({ preserveState = false } = {}) {
+        const modalEl = document.getElementById('inventory-review-edit-modal');
+        if (!modalEl) {
+            if (!preserveState) {
+                resetInventoryReviewEditor();
+                renderInventoryReviewModalBody();
+            }
+            return;
+        }
+        const modal = bootstrap.Modal.getInstance(modalEl);
+        if (!preserveState) {
+            resetInventoryReviewEditor();
+            renderInventoryReviewModalBody();
+        }
+        modal?.hide();
+    }
+
     async function startInventoryReviewEdit(entryId = '') {
         const entry = getInventoryReviewEntryById(entryId);
         if (!entry) return;
@@ -735,17 +842,33 @@ window.AdminBiblio.Inventario = (function () {
         _inventoryReviewPendingCopyCodes = [];
         _inventoryReviewKnownCopies = [];
         _inventoryReviewCopiesLoading = true;
-        renderInventoryReviewModalBody();
+        openInventoryReviewEditModal();
 
         try {
             const lookup = await BiblioService.findInventoryBookByCode(_ctx, {
                 code: entry.catalogAdquisicion || entry.adquisicion || '',
                 sessionId: _inventorySession?.id || ''
             });
-            const relatedCodes = Array.isArray(lookup?.relatedAdquisiciones) ? lookup.relatedAdquisiciones : [];
-            _inventoryReviewKnownCopies = [...new Set(relatedCodes
+            const baseCode = getInventoryReviewEntryBaseCode(entry);
+            const relatedCodes = [...new Set((Array.isArray(lookup?.relatedAdquisiciones) ? lookup.relatedAdquisiciones : [])
                 .map((code) => normalizeInventoryAcquisitionCode(code))
                 .filter(Boolean))]
+                .sort(compareInventoryAcquisitionCodes);
+            const observedCodes = [...new Set((Array.isArray(entry?.observedAcquisitions) ? entry.observedAcquisitions : [])
+                .map((code) => normalizeInventoryAcquisitionCode(code))
+                .filter(Boolean))];
+
+            let initialCodes = observedCodes;
+            if (!initialCodes.length) {
+                const maxCodes = Math.max(1, Number(entry.totalObserved) || 0);
+                const fallbackCodes = [baseCode, ...relatedCodes.filter((code) => code !== baseCode)]
+                    .filter(Boolean)
+                    .slice(0, maxCodes);
+                initialCodes = fallbackCodes;
+            }
+
+            _inventoryReviewKnownCopies = initialCodes
+                .filter((code) => code && code !== baseCode)
                 .sort(compareInventoryAcquisitionCodes);
         } catch (error) {
             console.warn('[BiblioAdmin] No se pudieron cargar las copias del registro en revision:', error);
@@ -753,21 +876,48 @@ window.AdminBiblio.Inventario = (function () {
         } finally {
             _inventoryReviewCopiesLoading = false;
             if (_inventoryReviewEditingId === String(entryId || '')) {
-                renderInventoryReviewModalBody();
+                renderInventoryReviewEditModal();
             }
         }
     }
 
     function cancelInventoryReviewEdit() {
-        resetInventoryReviewEditor();
-        renderInventoryReviewModalBody();
+        closeInventoryReviewEditModal();
     }
 
     function adjustInventoryReviewQuantity(step = 0) {
-        const nextValue = Math.max(0, (Number(_inventoryReviewDraftQuantity) || 0) + Number(step || 0));
-        _inventoryReviewDraftQuantity = nextValue;
+        const numericStep = Math.trunc(Number(step) || 0);
+        if (numericStep < 0) {
+            for (let index = 0; index < Math.abs(numericStep); index += 1) {
+                const currentValue = Math.max(0, Number(_inventoryReviewDraftQuantity) || 0);
+                if (currentValue <= 0) break;
+                const explicitCount = 1 + _inventoryReviewKnownCopies.length + _inventoryReviewPendingCopyCodes.length;
+                if (currentValue > explicitCount) {
+                    _inventoryReviewDraftQuantity = currentValue - 1;
+                    continue;
+                }
+                if (_inventoryReviewPendingCopyCodes.length > 0) {
+                    _inventoryReviewPendingCopyCodes = _inventoryReviewPendingCopyCodes.slice(0, -1);
+                    _inventoryReviewDraftQuantity = currentValue - 1;
+                    continue;
+                }
+                if (_inventoryReviewKnownCopies.length > 0) {
+                    _inventoryReviewKnownCopies = _inventoryReviewKnownCopies.slice(0, -1);
+                    _inventoryReviewDraftQuantity = currentValue - 1;
+                    continue;
+                }
+                _inventoryReviewDraftQuantity = currentValue - 1;
+            }
+        } else if (numericStep > 0) {
+            _inventoryReviewDraftQuantity = Math.max(0, Number(_inventoryReviewDraftQuantity) || 0) + numericStep;
+        }
         const label = document.getElementById('inventory-review-draft-quantity');
-        if (label) label.textContent = String(nextValue);
+        if (label) label.textContent = String(Math.max(0, Number(_inventoryReviewDraftQuantity) || 0));
+        const entry = getInventoryReviewEntryById(_inventoryReviewEditingId);
+        const statusEl = document.getElementById('inventory-review-edit-status');
+        if (statusEl) statusEl.innerHTML = renderInventoryReviewEditStatus(entry);
+        const saveBtn = document.getElementById('inventory-review-edit-save-btn');
+        if (saveBtn) saveBtn.disabled = _inventorySaving || !canSaveInventoryReviewEdit(entry);
     }
 
     function startInventoryReviewAdjust(step = -1) {
@@ -806,36 +956,120 @@ window.AdminBiblio.Inventario = (function () {
 
         _inventoryReviewPendingCopyCodes = [..._inventoryReviewPendingCopyCodes, rawCode];
         _inventoryReviewDraftQuantity = Math.max(0, Number(_inventoryReviewDraftQuantity) || 0) + 1;
-        renderInventoryReviewModalBody();
+        renderInventoryReviewEditModal();
         focusInventoryReviewCopyInput(entry);
     }
 
     function removeInventoryReviewCopyCode(code = '') {
         _inventoryReviewPendingCopyCodes = _inventoryReviewPendingCopyCodes.filter((item) => item !== code);
         _inventoryReviewDraftQuantity = Math.max(0, (Number(_inventoryReviewDraftQuantity) || 0) - 1);
-        renderInventoryReviewModalBody();
+        renderInventoryReviewEditModal();
+    }
+
+    function removeInventoryReviewKnownCopyCode(code = '') {
+        const normalized = normalizeInventoryAcquisitionCode(code);
+        if (!normalized) return;
+        _inventoryReviewKnownCopies = _inventoryReviewKnownCopies.filter((item) => item !== normalized);
+        _inventoryReviewDraftQuantity = Math.max(0, (Number(_inventoryReviewDraftQuantity) || 0) - 1);
+        renderInventoryReviewEditModal();
     }
 
     async function saveInventoryReviewEntry() {
         if (_inventorySaving || !_inventorySession?.id || !_inventoryReviewEditingId) return;
 
+        const entry = getInventoryReviewEntryById(_inventoryReviewEditingId);
+        const baseCode = getInventoryReviewEntryBaseCode(entry);
+        const explicitCodes = [...new Set([
+            (Number(_inventoryReviewDraftQuantity) || 0) > 0 ? baseCode : '',
+            ..._inventoryReviewKnownCopies,
+            ..._inventoryReviewPendingCopyCodes
+        ].map((code) => normalizeInventoryAcquisitionCode(code)).filter(Boolean))];
+        const missingCodes = Math.max(0, (Number(_inventoryReviewDraftQuantity) || 0) - explicitCodes.length);
+        if (missingCodes > 0) {
+            showToast(`Faltan ${missingCodes} codigo(s) por capturar para guardar.`, 'warning');
+            renderInventoryReviewEditModal();
+            return;
+        }
+
+        const previousEntries = _inventoryFoundEntries.slice();
+        const previousSession = _inventorySession ? { ..._inventorySession } : null;
+        const nextQuantity = Math.max(0, Number(_inventoryReviewDraftQuantity) || 0);
+        const previousTotal = Number(entry?.totalObserved) || 0;
+        const delta = nextQuantity - previousTotal;
+
         try {
             _inventorySaving = true;
+            renderInventoryReviewEditModal();
+
+            if (nextQuantity <= 0) {
+                _inventoryFoundEntries = _inventoryFoundEntries.filter((item) => String(item?.id || '') !== String(_inventoryReviewEditingId || ''));
+            } else {
+                _inventoryFoundEntries = _inventoryFoundEntries.map((item) => {
+                    if (String(item?.id || '') !== String(_inventoryReviewEditingId || '')) return item;
+                    return {
+                        ...item,
+                        totalObserved: nextQuantity,
+                        observedAcquisitions: explicitCodes,
+                        updatedAtMs: Date.now()
+                    };
+                });
+            }
+
+            if (_inventorySession) {
+                _inventorySession = {
+                    ..._inventorySession,
+                    totalObserved: Math.max(0, (Number(_inventorySession.totalObserved) || 0) + delta),
+                    matchedItems: Math.max(0, (Number(_inventorySession.matchedItems) || 0) + (nextQuantity <= 0 ? -1 : 0)),
+                    lastEntry: {
+                        type: 'catalogo',
+                        adquisicion: baseCode || entry?.adquisicion || '',
+                        cantidad: nextQuantity,
+                        atMs: Date.now()
+                    }
+                };
+            }
+
+            closeInventoryReviewEditModal({ preserveState: true });
+            renderInventorySessionContent();
             renderInventoryReviewModalBody();
-            const details = await BiblioService.reviewInventoryFoundEntry(_ctx, {
+
+            const result = await BiblioService.reviewInventoryFoundEntry(_ctx, {
                 sessionId: _inventorySession.id,
                 entryId: _inventoryReviewEditingId,
-                quantity: _inventoryReviewDraftQuantity,
-                addedAcquisitions: _inventoryReviewPendingCopyCodes
+                quantity: nextQuantity,
+                addedAcquisitions: _inventoryReviewPendingCopyCodes,
+                observedAcquisitions: explicitCodes
             });
-            _inventorySession = details?.session || _inventorySession;
-            _inventoryFoundEntries = Array.isArray(details?.foundEntries) ? details.foundEntries : _inventoryFoundEntries;
-            await ensureInventoryCatalogSummary(true);
+
+            if (result?.deleted) {
+                _inventoryFoundEntries = _inventoryFoundEntries.filter((item) => String(item?.id || '') !== String(_inventoryReviewEditingId || ''));
+            } else if (result?.entry) {
+                let replaced = false;
+                _inventoryFoundEntries = _inventoryFoundEntries.map((item) => {
+                    if (String(item?.id || '') !== String(result.entryId || _inventoryReviewEditingId || '')) return item;
+                    replaced = true;
+                    return { ...item, ...result.entry };
+                });
+                if (!replaced) {
+                    _inventoryFoundEntries.unshift(result.entry);
+                }
+            }
+            if (result?.session) {
+                _inventorySession = { ...(_inventorySession || {}), ...result.session };
+            }
+
             resetInventoryReviewEditor();
             renderInventorySessionContent();
             renderInventoryReviewModalBody();
+            void ensureInventoryCatalogSummary(true)
+                .then(() => renderInventorySessionContent())
+                .catch((error) => console.warn('[BiblioAdmin] No se pudo refrescar el resumen del catalogo tras editar revision:', error));
             showToast('Registro actualizado.', 'success');
         } catch (error) {
+            _inventoryFoundEntries = previousEntries;
+            _inventorySession = previousSession;
+            renderInventorySessionContent();
+            renderInventoryReviewModalBody();
             showToast(error.message || 'No se pudo actualizar el registro.', 'danger');
         } finally {
             _inventorySaving = false;
@@ -1954,6 +2188,7 @@ window.AdminBiblio.Inventario = (function () {
         startInventoryReviewAdjust: withState(startInventoryReviewAdjust),
         stopInventoryReviewAdjust: withState(stopInventoryReviewAdjust),
         addInventoryReviewCopyCode: withState(addInventoryReviewCopyCode),
+        removeInventoryReviewKnownCopyCode: withState(removeInventoryReviewKnownCopyCode),
         removeInventoryReviewCopyCode: withState(removeInventoryReviewCopyCode),
         saveInventoryReviewEntry: withState(saveInventoryReviewEntry),
         setInventorySearchQuery: withState(setInventorySearchQuery),
