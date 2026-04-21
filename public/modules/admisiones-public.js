@@ -404,10 +404,10 @@
       if (!scopeResult) return '';
       if (scopeResult.scope === 'career') {
         const career = CareerPlanner.getCareer(scopeResult.careerId);
-        return career ? `Practica mixta: ${career.shortName}` : 'Practica mixta por carrera';
+        return career ? `Práctica mixta: ${career.shortName}` : 'Práctica mixta por carrera';
       }
       const area = getArea(scopeResult.areaId);
-      return area ? `Practica de ${area.title}` : 'Practica por area';
+      return area ? `Práctica de ${area.title}` : 'Práctica por área';
     }
 
     function computeMetrics() {
@@ -487,7 +487,7 @@
 
     function confirmDiscardPracticeIfNeeded() {
       if (!hasUnsubmittedPractice()) return true;
-      return window.confirm('La practica actual aun no se ha calificado. Si sales ahora, perderas tus respuestas. Deseas continuar?');
+      return window.confirm('La práctica actual aún no se ha calificado. Si sales ahora, perderás tus respuestas. ¿Deseas continuar?');
     }
 
     function goToScreen(screen, patch = {}) {
@@ -514,23 +514,23 @@
         <section class="adm-hero">
           <div class="adm-hero-top">
             <div class="adm-hero-copy">
-              <span class="adm-eyebrow">${escapeHtml(_resources.admissions.hero.eyebrow)}</span>
-              <h1 class="adm-title-xl">${escapeHtml(_resources.admissions.hero.title)}</h1>
-              <p class="adm-lead">${escapeHtml(_resources.admissions.hero.summary)}</p>
+              <span class="adm-eyebrow">Nuevo ingreso · ITES Los Cabos</span>
+              <h1 class="adm-title-xl">Prepárate para EVALUATEC 2026</h1>
+              <p class="adm-lead">Elige tu carrera, estudia por bloque y guarda tu avance sin crear cuenta.</p>
               <div class="adm-action-row">
-                <button class="adm-button is-primary" data-action="continue-progress">${_guest.lastVisited ? 'Continuar donde me quede' : 'Empezar a estudiar'}</button>
-                <button class="adm-button is-secondary" data-action="go-screen" data-screen="info">Ver proceso 2026</button>
+                <button class="adm-button is-primary" data-action="continue-progress">${_guest.lastVisited ? 'Continuar' : 'Comenzar'}</button>
+                <button class="adm-button is-secondary" data-action="scroll-careers">${selectedCareer ? 'Cambiar carrera' : 'Ver carreras'}</button>
                 <a class="adm-button is-ghost-light" href="#/test-vocacional">Test vocacional</a>
               </div>
             </div>
             <div class="adm-hero-summary">
               <div class="adm-hero-focus">
-                <div class="adm-section-label is-light">Ruta actual</div>
-                <h2>${selectedCareer ? escapeHtml(selectedCareer.name) : 'Aun no eliges carrera'}</h2>
-                <p class="adm-copy is-light">${selectedCareer ? 'Tu temario y la practica mixta ya se ordenan segun esta carrera.' : 'Selecciona una carrera para priorizar areas y mostrar una ruta mas clara.'}</p>
+                <div class="adm-section-label is-light">Ruta activa</div>
+                <h2>${selectedCareer ? escapeHtml(selectedCareer.name) : 'Aún sin carrera'}</h2>
+                <p class="adm-copy is-light">${selectedCareer ? 'Tus áreas clave y tus prácticas ya están ordenadas.' : 'Elige una carrera para ver solo lo que más te conviene estudiar.'}</p>
                 <div class="adm-inline-list">
-                  <span class="adm-chip is-light">${escapeHtml(`${metrics.routeStudiedCount} de ${metrics.routeTopicCount} temas de ruta`)}</span>
-                  <span class="adm-chip is-light">Ingles obligatorio / no pondera</span>
+                  <span class="adm-chip is-light">${escapeHtml(`${metrics.routeStudiedCount}/${metrics.routeTopicCount} temas`)}</span>
+                  <span class="adm-chip is-light">Inglés diagnóstico</span>
                 </div>
               </div>
             </div>
@@ -538,18 +538,18 @@
           <div class="adm-hero-stats">
             <article class="adm-stat-card is-hero">
               <div class="adm-stat-value">${escapeHtml(exam.reactives)}</div>
-              <div class="adm-stat-label is-light">reactivos oficiales</div>
+              <div class="adm-stat-label is-light">reactivos</div>
             </article>
             <article class="adm-stat-card is-hero">
               <div class="adm-stat-value">${escapeHtml(exam.duration)}</div>
-              <div class="adm-stat-label is-light">duracion total</div>
+              <div class="adm-stat-label is-light">duración</div>
             </article>
             <article class="adm-stat-card is-hero">
               <div class="adm-stat-value">${metrics.studiedPercent}%</div>
-              <div class="adm-stat-label is-light">avance general</div>
+              <div class="adm-stat-label is-light">avance</div>
             </article>
             <article class="adm-stat-card is-hero is-wide">
-              <div class="adm-stat-label is-light">Lo importante del examen</div>
+              <div class="adm-stat-label is-light">Toma en cuenta</div>
               <p class="adm-copy is-light">${escapeHtml(exam.englishPolicy)}</p>
             </article>
           </div>
@@ -560,10 +560,10 @@
     function renderTopNav() {
       const activeScreen = getNavScreen();
       const items = [
-        { id: 'home', label: 'Inicio', helper: 'Tablero general' },
-        { id: 'study', label: 'Estudiar', helper: 'Temario por areas' },
-        { id: 'practice', label: 'Practicar', helper: 'Mini evaluaciones' },
-        { id: 'info', label: 'Admisiones', helper: 'Fechas y registro' }
+        { id: 'home', label: 'Inicio' },
+        { id: 'study', label: 'Temario' },
+        { id: 'practice', label: 'Práctica' },
+        { id: 'info', label: 'Admisión' }
       ];
 
       return `
@@ -571,7 +571,6 @@
           ${items.map((item) => `
             <button class="adm-nav-button ${activeScreen === item.id ? 'is-active' : ''}" data-action="go-screen" data-screen="${escapeHtml(item.id)}">
               <strong>${escapeHtml(item.label)}</strong>
-              <span>${escapeHtml(item.helper)}</span>
             </button>
           `).join('')}
         </nav>
@@ -585,12 +584,12 @@
         <aside class="adm-sidebar">
           <article class="adm-panel">
             <div class="adm-section-label">Tu ruta</div>
-            <h3 class="adm-panel-title">${selectedCareer ? escapeHtml(selectedCareer.shortName) : 'Configura tu ruta'}</h3>
-            <p class="adm-meta">${selectedCareer ? 'Tus areas recomendadas aparecen primero en estudiar y practicar.' : 'Elige una carrera para ordenar el modulo segun el examen que te corresponde.'}</p>
+            <h3 class="adm-panel-title">${selectedCareer ? escapeHtml(selectedCareer.shortName) : 'Sin carrera'}</h3>
+            <p class="adm-meta">${selectedCareer ? 'Tus bloques recomendados aparecen primero.' : 'Elige una carrera para ordenar mejor este módulo.'}</p>
             ${selectedCareer ? `<div class="adm-pill-row">${routeAreaIds.map((areaId) => `<span class="adm-pill">${escapeHtml(getArea(areaId)?.title || areaId)}</span>`).join('')}</div>` : ''}
             <div class="adm-action-row">
-              <button class="adm-button is-ghost" data-action="go-screen" data-screen="home">${selectedCareer ? 'Cambiar carrera' : 'Elegir carrera'}</button>
-              ${selectedCareer ? '<button class="adm-button is-ghost" data-action="clear-career">Ver todo el temario</button>' : ''}
+              <button class="adm-button is-ghost" data-action="scroll-careers">${selectedCareer ? 'Cambiar carrera' : 'Elegir carrera'}</button>
+              ${selectedCareer ? '<button class="adm-button is-ghost" data-action="clear-career">Ver todas las áreas</button>' : ''}
             </div>
           </article>
 
@@ -606,17 +605,17 @@
                 <div class="adm-note">${metrics.routeStudiedCount} de ${metrics.routeTopicCount} temas de tu ruta revisados</div>
               </div>
               <div class="adm-mini-metrics">
-                <div><strong>${metrics.averageScore}%</strong><span>promedio en practica</span></div>
-                <div><strong>${metrics.bookmarkedCount}</strong><span>temas guardados</span></div>
+                <div><strong>${metrics.averageScore}%</strong><span>promedio</span></div>
+                <div><strong>${metrics.bookmarkedCount}</strong><span>guardados</span></div>
               </div>
               <div class="adm-action-row">
-                <button class="adm-button is-ghost" data-action="reset-progress">Reiniciar progreso local</button>
+                <button class="adm-button is-ghost" data-action="reset-progress">Borrar avance</button>
               </div>
             </div>
           </article>
 
           <article class="adm-panel">
-            <div class="adm-section-label">Siguiente paso</div>
+            <div class="adm-section-label">Sigue con</div>
             ${metrics.nextTopic ? `
               <div class="adm-sidebar-focus">
                 <strong>${escapeHtml(metrics.nextTopic.title)}</strong>
@@ -626,7 +625,7 @@
                   <button class="adm-button is-primary" data-action="open-topic" data-area-id="${escapeHtml(metrics.nextTopic.areaId)}" data-topic-id="${escapeHtml(metrics.nextTopic.id)}">Abrir tema</button>
                 </div>
               </div>
-            ` : '<div class="adm-empty-state compact">Tu siguiente recomendacion aparecera aqui conforme avances.</div>'}
+            ` : '<div class="adm-empty-state compact">Aún no hay sugerencia.</div>'}
           </article>
 
           <article class="adm-panel">
@@ -640,14 +639,14 @@
                   </button>
                 `).join('')}
               </div>
-            ` : '<div class="adm-empty-state compact">Todavia no guardas temas.</div>'}
+            ` : '<div class="adm-empty-state compact">No has guardado temas.</div>'}
           </article>
 
           <article class="adm-panel is-accent">
-            <div class="adm-section-label">Recurso extra</div>
+            <div class="adm-section-label">Extra</div>
             <h3 class="adm-panel-title">Test vocacional</h3>
-            <p class="adm-meta">Si aun no decides carrera, puedes tomar el test vocacional sin salir de SIA.</p>
-            <a class="adm-button is-secondary-solid" href="#/test-vocacional">Ir al test</a>
+            <p class="adm-meta">Si aún dudas de carrera, puedes tomar el test vocacional.</p>
+            <a class="adm-button is-secondary-solid" href="#/test-vocacional">Abrir test</a>
           </article>
         </aside>
       `;
@@ -655,7 +654,6 @@
 
     function renderHomeScreen(metrics) {
       const selectedCareer = CareerPlanner.getCareer(_guest.selectedCareer);
-      const timeline = _resources.admissions.timeline;
       const weakTopicsHtml = metrics.weakTopics.length
         ? metrics.weakTopics.map((topic) => `
             <article class="adm-soft-card">
@@ -665,64 +663,61 @@
               <button class="adm-button is-ghost" data-action="open-topic" data-area-id="${escapeHtml(topic.areaId)}" data-topic-id="${escapeHtml(topic.topicId)}">Reforzar tema</button>
             </article>
           `).join('')
-        : '<div class="adm-empty-state">Tus temas debiles apareceran cuando completes practicas por area o por carrera.</div>';
+        : '<div class="adm-empty-state">Tus temas débiles aparecerán cuando completes prácticas por área o por carrera.</div>';
 
       return `
         <section class="adm-screen">
           <div class="adm-screen-grid is-home">
             <article class="adm-panel">
-              <div class="adm-section-label">Como usar este modulo</div>
-              <h2 class="adm-panel-title">Empieza sin perderte</h2>
+              <div class="adm-section-label">Empieza rápido</div>
+              <h2 class="adm-panel-title">Tu ruta en 3 pasos</h2>
               <ol class="adm-steps-list">
-                <li><strong>1.</strong><span>Elige tu carrera para activar una ruta recomendada.</span></li>
-                <li><strong>2.</strong><span>Estudia un tema a la vez y marca tu avance solo cuando lo entiendas.</span></li>
-                <li><strong>3.</strong><span>Haz practicas cortas por area y una practica mixta por carrera.</span></li>
-                <li><strong>4.</strong><span>Regresa a tus temas debiles y guardados hasta sentirte seguro.</span></li>
+                <li><strong>1.</strong><span>Elige tu carrera.</span></li>
+                <li><strong>2.</strong><span>Estudia un bloque a la vez.</span></li>
+                <li><strong>3.</strong><span>Practica y vuelve a tus temas débiles.</span></li>
               </ol>
               <div class="adm-action-row">
-                <button class="adm-button is-primary" data-action="go-screen" data-screen="study">Ir a estudiar</button>
-                <button class="adm-button is-ghost" data-action="go-screen" data-screen="practice">Ir a practicar</button>
+                <button class="adm-button is-primary" data-action="go-screen" data-screen="study">Abrir temario</button>
+                <button class="adm-button is-ghost" data-action="go-screen" data-screen="practice">Abrir práctica</button>
               </div>
             </article>
 
             <article class="adm-panel">
-              <div class="adm-section-label">Fechas clave</div>
-              <h2 class="adm-panel-title">Proceso de admision 2026</h2>
-              <div class="adm-compact-list">
-                ${timeline.map((item) => `
-                  <div class="adm-compact-item">
-                    <strong>${escapeHtml(item.label)}</strong>
-                    <span>${escapeHtml(item.date)}</span>
-                  </div>
-                `).join('')}
+              <div class="adm-section-label">Tu avance</div>
+              <h2 class="adm-panel-title">${metrics.studiedPercent}% completado</h2>
+              <p class="adm-meta">${metrics.routeStudiedCount} de ${metrics.routeTopicCount} temas revisados en tu ruta actual.</p>
+              <div class="adm-progress-bar"><div class="adm-progress-fill" style="width:${metrics.routeStudiedPercent}%"></div></div>
+              <div class="adm-mini-metrics">
+                <div><strong>${metrics.averageScore}%</strong><span>promedio reciente</span></div>
+                <div><strong>${metrics.bookmarkedCount}</strong><span>temas guardados</span></div>
               </div>
               <div class="adm-action-row">
-                <button class="adm-button is-ghost" data-action="go-screen" data-screen="info">Ver detalles del proceso</button>
+                <button class="adm-button is-ghost" data-action="go-screen" data-screen="study">Ver temario</button>
               </div>
             </article>
 
             <article class="adm-panel">
-              <div class="adm-section-label">Recomendado hoy</div>
-              <h2 class="adm-panel-title">${metrics.nextTopic ? escapeHtml(metrics.nextTopic.title) : 'Configura tu ruta'}</h2>
-              <p class="adm-meta">${metrics.nextTopic ? escapeHtml(metrics.nextTopic.summary) : 'Selecciona una carrera para que el sistema te sugiera por donde empezar.'}</p>
+              <div class="adm-section-label">Sigue aquí</div>
+              <h2 class="adm-panel-title">${metrics.nextTopic ? escapeHtml(metrics.nextTopic.title) : 'Elige tu carrera'}</h2>
+              <p class="adm-meta">${metrics.nextTopic ? escapeHtml(metrics.nextTopic.summary) : 'Activa una ruta para recibir una sugerencia inmediata.'}</p>
               ${metrics.nextTopic ? `<div class="adm-pill-row"><span class="adm-pill">${escapeHtml(metrics.nextTopic.areaTitle)}</span><span class="adm-pill">${escapeHtml(metrics.nextTopic.estimatedMinutes)} min</span></div>` : ''}
               <div class="adm-mini-metrics">
-                <div><strong>${metrics.lastScore ? `${metrics.lastScore.percent}%` : '--'}</strong><span>ultimo resultado</span></div>
-                <div><strong>${metrics.averageScore}%</strong><span>promedio reciente</span></div>
+                <div><strong>${metrics.lastScore ? `${metrics.lastScore.percent}%` : '--'}</strong><span>último resultado</span></div>
+                <div><strong>${metrics.averageScore}%</strong><span>promedio</span></div>
               </div>
               <div class="adm-action-row">
-                ${metrics.nextTopic ? `<button class="adm-button is-primary" data-action="open-topic" data-area-id="${escapeHtml(metrics.nextTopic.areaId)}" data-topic-id="${escapeHtml(metrics.nextTopic.id)}">Seguir recomendacion</button>` : '<button class="adm-button is-primary" data-action="go-screen" data-screen="home">Elegir carrera</button>'}
+                ${metrics.nextTopic ? `<button class="adm-button is-primary" data-action="open-topic" data-area-id="${escapeHtml(metrics.nextTopic.areaId)}" data-topic-id="${escapeHtml(metrics.nextTopic.id)}">Abrir tema</button>` : '<button class="adm-button is-primary" data-action="scroll-careers">Elegir carrera</button>'}
               </div>
             </article>
           </div>
 
-          <section class="adm-subsection">
+          <section class="adm-subsection" id="adm-careers">
             <div class="adm-section-header">
               <div>
                 <div class="adm-kicker">Elige tu carrera</div>
-                <h2>Activa una ruta clara desde el inicio</h2>
+                <h2>Activa tu ruta</h2>
               </div>
-              <div class="adm-note">${selectedCareer ? `Ruta activa: ${escapeHtml(selectedCareer.name)}` : 'Puedes estudiar todo el temario, pero la ruta por carrera te lo organiza mejor.'}</div>
+              <div class="adm-note">${selectedCareer ? `Ruta activa: ${escapeHtml(selectedCareer.name)}` : 'La ruta por carrera te ordena mejor el temario.'}</div>
             </div>
             <div class="adm-career-grid">
               ${_resources.content.careers.map((career) => {
@@ -741,8 +736,8 @@
             </div>
             ${selectedCareer ? `
               <div class="adm-action-row top-gap">
-                <button class="adm-button is-ghost" data-action="clear-career">Quitar filtro de carrera</button>
-                <button class="adm-button is-primary" data-action="go-screen" data-screen="study">Abrir mi ruta</button>
+                <button class="adm-button is-ghost" data-action="clear-career">Quitar ruta</button>
+                <button class="adm-button is-primary" data-action="go-screen" data-screen="study">Abrir ruta</button>
               </div>
             ` : ''}
           </section>
@@ -752,9 +747,9 @@
               <div class="adm-section-header">
                 <div>
                   <div class="adm-kicker">Ruta recomendada</div>
-                  <h2>Estas areas deberias priorizar primero</h2>
+                  <h2>Empieza por estas áreas</h2>
                 </div>
-                <button class="adm-button is-ghost" data-action="go-screen" data-screen="practice">Practicar esta ruta</button>
+                <button class="adm-button is-ghost" data-action="go-screen" data-screen="practice">Practicar ruta</button>
               </div>
               <div class="adm-route-grid">
                 ${getRouteAreaIds().map((areaId) => {
@@ -769,7 +764,7 @@
                       <div class="adm-progress-bar"><div class="adm-progress-fill" style="width:${stats.studiedPercent}%"></div></div>
                       <div class="adm-note">${stats.studiedCount} de ${stats.totalTopics} temas revisados</div>
                       <div class="adm-action-row">
-                        <button class="adm-button is-ghost" data-action="focus-area" data-area-id="${escapeHtml(area.id)}">Abrir area</button>
+                        <button class="adm-button is-ghost" data-action="focus-area" data-area-id="${escapeHtml(area.id)}">Abrir área</button>
                       </div>
                     </article>
                   `;
@@ -778,17 +773,19 @@
             </section>
           ` : ''}
 
-          <section class="adm-subsection">
-            <div class="adm-section-header">
-              <div>
-                <div class="adm-kicker">Temas a reforzar</div>
-                <h2>Vuelve primero a lo que mas te cuesta</h2>
+          ${metrics.weakTopics.length ? `
+            <section class="adm-subsection">
+              <div class="adm-section-header">
+                <div>
+                  <div class="adm-kicker">Temas a reforzar</div>
+                  <h2>Refuerza esto primero</h2>
+                </div>
               </div>
-            </div>
-            <div class="adm-card-grid">
-              ${weakTopicsHtml}
-            </div>
-          </section>
+              <div class="adm-card-grid">
+                ${weakTopicsHtml}
+              </div>
+            </section>
+          ` : ''}
         </section>
       `;
     }
@@ -817,11 +814,11 @@
           <div class="adm-section-header">
             <div>
               <div class="adm-kicker">Estudiar</div>
-              <h2>Temario adaptado por areas</h2>
-              <p class="adm-note">Abre un area, estudia un tema a la vez y marca tu avance cuando de verdad lo domines.</p>
+              <h2 class="adm-panel-title">Temario por áreas</h2>
+              <p class="adm-note">Selecciona un bloque y abre un tema.</p>
             </div>
             <div class="adm-search-field">
-              <input class="adm-search-input" type="search" placeholder="Buscar tema o palabra clave" data-action="study-search" value="${escapeHtml(_ui.search || '')}">
+              <input class="adm-search-input" type="search" placeholder="Buscar tema..." data-action="study-search" value="${escapeHtml(_ui.search || '')}">
               ${_ui.search ? '<button class="adm-button is-ghost" data-action="clear-search">Limpiar</button>' : ''}
             </div>
           </div>
@@ -848,13 +845,13 @@
                 <div class="adm-progress-bar"><div class="adm-progress-fill" style="width:${areaStats.studiedPercent}%"></div></div>
                 <div class="adm-note">${areaStats.studiedCount} de ${areaStats.totalTopics} temas revisados</div>
                 <div class="adm-info-list top-gap">
-                  <div><strong>Estrategia recomendada</strong><span>${escapeHtml(activeArea.strategy)}</span></div>
-                  <div><strong>Cobertura oficial</strong><span>${escapeHtml(activeArea.officialCoverage.join(' | '))}</span></div>
-                  ${activeArea.id === 'ingles' ? '<div><strong>Nota importante</strong><span>Es obligatorio y diagnostico, pero no suma al puntaje global.</span></div>' : ''}
+                  <div><strong>Enfoque</strong><span>${escapeHtml(activeArea.strategy)}</span></div>
+                  <div><strong>Temas oficiales</strong><span>${escapeHtml(activeArea.officialCoverage.join(' | '))}</span></div>
+                  ${activeArea.id === 'ingles' ? '<div><strong>Nota</strong><span>Es obligatorio y diagnóstico, pero no suma al puntaje global.</span></div>' : ''}
                 </div>
                 <div class="adm-action-row top-gap">
-                  ${firstPending ? `<button class="adm-button is-primary" data-action="open-topic" data-area-id="${escapeHtml(activeArea.id)}" data-topic-id="${escapeHtml(firstPending.id)}">Continuar en esta area</button>` : ''}
-                  <button class="adm-button is-ghost" data-action="start-area-practice" data-area-id="${escapeHtml(activeArea.id)}">Practicar esta area</button>
+                  ${firstPending ? `<button class="adm-button is-primary" data-action="open-topic" data-area-id="${escapeHtml(activeArea.id)}" data-topic-id="${escapeHtml(firstPending.id)}">Continuar bloque</button>` : ''}
+                  <button class="adm-button is-ghost" data-action="start-area-practice" data-area-id="${escapeHtml(activeArea.id)}">Practicar área</button>
                 </div>
               </article>
 
@@ -879,12 +876,12 @@
                         ${renderPills((topic.officialCoverage || []).slice(0, 4))}
                       </div>
                       <div class="adm-action-row">
-                        <button class="adm-button is-primary" data-action="open-topic" data-area-id="${escapeHtml(activeArea.id)}" data-topic-id="${escapeHtml(topic.id)}">Estudiar tema</button>
+                        <button class="adm-button is-primary" data-action="open-topic" data-area-id="${escapeHtml(activeArea.id)}" data-topic-id="${escapeHtml(topic.id)}">Abrir tema</button>
                         <button class="adm-button is-ghost" data-action="toggle-bookmark" data-area-id="${escapeHtml(activeArea.id)}" data-topic-id="${escapeHtml(topic.id)}">${bookmarked ? 'Quitar guardado' : 'Guardar tema'}</button>
                       </div>
                     </article>
                   `;
-                }).join('') : '<div class="adm-empty-state">No hay temas que coincidan con esa busqueda dentro de esta area.</div>'}
+                }).join('') : '<div class="adm-empty-state">No hay temas que coincidan con esa búsqueda dentro de esta área.</div>'}
               </div>
             </div>
           ` : ''}
@@ -916,13 +913,13 @@
 
           <div class="adm-section-header">
             <div>
-              <div class="adm-kicker">Tema activo</div>
+              <div class="adm-kicker">Tema</div>
               <h2>${escapeHtml(topic.title)}</h2>
               <p class="adm-note">${escapeHtml(topic.summary)}</p>
             </div>
             <div class="adm-toolbar">
-              <button class="adm-button is-ghost" data-action="toggle-bookmark" data-area-id="${escapeHtml(area.id)}" data-topic-id="${escapeHtml(topic.id)}">${(_guest.bookmarks || []).includes(topicKey) ? 'Quitar guardado' : 'Guardar tema'}</button>
-              <button class="adm-button is-primary" data-action="mark-topic-studied" data-area-id="${escapeHtml(area.id)}" data-topic-id="${escapeHtml(topic.id)}">${progress.studied ? 'Mantener como revisado' : 'Marcar como revisado'}</button>
+              <button class="adm-button is-ghost" data-action="toggle-bookmark" data-area-id="${escapeHtml(area.id)}" data-topic-id="${escapeHtml(topic.id)}">${(_guest.bookmarks || []).includes(topicKey) ? 'Quitar guardado' : 'Guardar'}</button>
+              <button class="adm-button is-primary" data-action="mark-topic-studied" data-area-id="${escapeHtml(area.id)}" data-topic-id="${escapeHtml(topic.id)}">${progress.studied ? 'Listo' : 'Marcar listo'}</button>
             </div>
           </div>
 
@@ -936,12 +933,12 @@
               </div>
 
               <div class="adm-topic-block">
-                <div class="adm-section-label">Lo esencial</div>
+                <div class="adm-section-label">Resumen</div>
                 <p>${escapeHtml(topic.explanation)}</p>
               </div>
 
               <div class="adm-topic-block">
-                <div class="adm-section-label">Lo que si entra de este tema</div>
+                <div class="adm-section-label">Puntos clave</div>
                 <div class="adm-pill-row">
                   ${renderPills(topic.officialCoverage || [])}
                 </div>
@@ -965,7 +962,7 @@
             </article>
 
             <aside class="adm-panel">
-              <div class="adm-section-label">Micropractica</div>
+              <div class="adm-section-label">Prueba rápida</div>
               <h3 class="adm-panel-title">${escapeHtml(topic.microPractice.question)}</h3>
               <div class="adm-option-list">
                 ${topic.microPractice.options.map((option, index) => {
@@ -985,7 +982,7 @@
               ${microEvaluated ? `<div class="adm-alert ${microCorrect ? 'is-success' : 'is-warning'}">${escapeHtml(topic.microPractice.explanation)}</div>` : ''}
 
               <div class="adm-topic-block">
-                <div class="adm-section-label">Checkpoint</div>
+                <div class="adm-section-label">Checklist</div>
                 <p>${escapeHtml(topic.checkpoint.prompt)}</p>
                 <ul class="adm-checklist">
                   ${topic.checkpoint.items.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}
@@ -993,15 +990,15 @@
               </div>
 
               <div class="adm-action-row">
-                <button class="adm-button is-ghost" data-action="start-area-practice" data-area-id="${escapeHtml(area.id)}">Practicar ${escapeHtml(area.title)}</button>
-                <button class="adm-button is-ghost" data-action="focus-area" data-area-id="${escapeHtml(area.id)}">Volver al area</button>
+                <button class="adm-button is-ghost" data-action="start-area-practice" data-area-id="${escapeHtml(area.id)}">Practicar área</button>
+                <button class="adm-button is-ghost" data-action="focus-area" data-area-id="${escapeHtml(area.id)}">Volver</button>
               </div>
             </aside>
           </div>
 
           <div class="adm-pagination-row">
-            ${previous ? `<button class="adm-button is-ghost" data-action="open-topic" data-area-id="${escapeHtml(area.id)}" data-topic-id="${escapeHtml(previous.id)}">Tema anterior: ${escapeHtml(previous.title)}</button>` : '<span></span>'}
-            ${next ? `<button class="adm-button is-primary" data-action="open-topic" data-area-id="${escapeHtml(area.id)}" data-topic-id="${escapeHtml(next.id)}">Siguiente tema: ${escapeHtml(next.title)}</button>` : `<button class="adm-button is-primary" data-action="start-area-practice" data-area-id="${escapeHtml(area.id)}">Practicar esta area</button>`}
+            ${previous ? `<button class="adm-button is-ghost" data-action="open-topic" data-area-id="${escapeHtml(area.id)}" data-topic-id="${escapeHtml(previous.id)}">Anterior: ${escapeHtml(previous.title)}</button>` : '<span></span>'}
+            ${next ? `<button class="adm-button is-primary" data-action="open-topic" data-area-id="${escapeHtml(area.id)}" data-topic-id="${escapeHtml(next.id)}">Siguiente: ${escapeHtml(next.title)}</button>` : `<button class="adm-button is-primary" data-action="start-area-practice" data-area-id="${escapeHtml(area.id)}">Practicar área</button>`}
           </div>
         </section>
       `;
@@ -1015,20 +1012,20 @@
           <div class="adm-section-header">
             <div>
               <div class="adm-kicker">Practicar</div>
-              <h2>Mini evaluaciones y practica mixta</h2>
-              <p class="adm-note">Aqui practicas una pregunta a la vez. La meta es detectar huecos y reforzar temas, no copiar el examen oficial.</p>
+              <h2>Práctica por área o por ruta</h2>
+              <p class="adm-note">Responde, revisa y vuelve al tema si hace falta.</p>
             </div>
-            ${selectedCareer ? '<button class="adm-button is-primary" data-action="start-career-practice">Practica mixta de mi ruta</button>' : '<button class="adm-button is-ghost" data-action="go-screen" data-screen="home">Elegir carrera primero</button>'}
+            ${selectedCareer ? '<button class="adm-button is-primary" data-action="start-career-practice">Práctica mixta</button>' : '<button class="adm-button is-ghost" data-action="scroll-careers">Elegir carrera</button>'}
           </div>
 
           <div class="adm-screen-grid">
             <article class="adm-panel">
-              <div class="adm-section-label">Como se recomienda usar</div>
-              <h3 class="adm-panel-title">Haz practica corta, corrige y vuelve al tema</h3>
+              <div class="adm-section-label">Cómo usarla</div>
+              <h3 class="adm-panel-title">Haz práctica corta y corrige</h3>
               <ol class="adm-steps-list simple">
-                <li><strong>1.</strong><span>Practica una sola area cuando estes estudiando ese bloque.</span></li>
-                <li><strong>2.</strong><span>Usa la practica mixta cuando ya tengas una carrera seleccionada.</span></li>
-                <li><strong>3.</strong><span>Si fallas, abre el tema asociado y repasa antes de volver a intentar.</span></li>
+                <li><strong>1.</strong><span>Practica un bloque a la vez.</span></li>
+                <li><strong>2.</strong><span>Usa la práctica mixta cuando ya tengas carrera.</span></li>
+                <li><strong>3.</strong><span>Si fallas, vuelve al tema y repite.</span></li>
               </ol>
             </article>
 
@@ -1043,7 +1040,7 @@
                     </div>
                   `).join('')}
                 </div>
-              ` : '<div class="adm-empty-state compact">Aun no has calificado practicas.</div>'}
+              ` : '<div class="adm-empty-state compact">Aún no has calificado prácticas.</div>'}
             </article>
           </div>
 
@@ -1061,10 +1058,10 @@
                   <p class="adm-meta">${escapeHtml(area.strategy)}</p>
                   <div class="adm-mini-metrics">
                     <div><strong>${area.topics.length}</strong><span>reactivos base</span></div>
-                    <div><strong>${stats.averageScore}%</strong><span>acierto por area</span></div>
+                    <div><strong>${stats.averageScore}%</strong><span>acierto del área</span></div>
                   </div>
                   <div class="adm-action-row">
-                    <button class="adm-button is-primary" data-action="start-area-practice" data-area-id="${escapeHtml(area.id)}">Practicar area</button>
+                    <button class="adm-button is-primary" data-action="start-area-practice" data-area-id="${escapeHtml(area.id)}">Practicar área</button>
                     <button class="adm-button is-ghost" data-action="focus-area" data-area-id="${escapeHtml(area.id)}">Ver temario</button>
                   </div>
                 </article>
@@ -1088,12 +1085,12 @@
         <section class="adm-screen">
           <div class="adm-section-header">
             <div>
-              <div class="adm-kicker">Practica activa</div>
-              <h2>${escapeHtml(_ui.practiceScope === 'career' ? 'Practica mixta por carrera' : `Practica de ${currentQuestion.areaTitle}`)}</h2>
-              <p class="adm-note">Avanza pregunta por pregunta y califica cuando completes todos los reactivos.</p>
+              <div class="adm-kicker">Práctica activa</div>
+              <h2>${escapeHtml(_ui.practiceScope === 'career' ? 'Práctica mixta por carrera' : `Práctica de ${currentQuestion.areaTitle}`)}</h2>
+              <p class="adm-note">Responde y avanza. Califica al final.</p>
             </div>
             <div class="adm-toolbar">
-              <button class="adm-button is-ghost" data-action="go-screen" data-screen="practice">Volver a practicas</button>
+              <button class="adm-button is-ghost" data-action="go-screen" data-screen="practice">Volver</button>
               <button class="adm-button is-ghost" data-action="restart-practice">Reiniciar</button>
             </div>
           </div>
@@ -1113,11 +1110,11 @@
                 <div class="adm-result-card">
                   <div class="adm-score-pill">Resultado: ${_ui.quizResult.percent}%</div>
                   <p class="adm-note">${_ui.quizResult.correct} de ${_ui.quizResult.total} reactivos correctos.</p>
-                  <button class="adm-button is-primary" data-action="open-topic" data-area-id="${escapeHtml(currentQuestion.areaId)}" data-topic-id="${escapeHtml(currentQuestion.topicId)}">Repasar este tema</button>
+                  <button class="adm-button is-primary" data-action="open-topic" data-area-id="${escapeHtml(currentQuestion.areaId)}" data-topic-id="${escapeHtml(currentQuestion.topicId)}">Abrir tema</button>
                 </div>
               ` : `
                 <div class="adm-note-box">
-                  ${allAnswered ? 'Ya puedes calificar la practica.' : 'Te faltan respuestas antes de calificar.'}
+                  ${allAnswered ? 'Ya puedes calificar la práctica.' : 'Te faltan respuestas antes de calificar.'}
                 </div>
               `}
             </aside>
@@ -1126,7 +1123,7 @@
               <div class="adm-pill-row">
                 <span class="adm-pill">Pregunta ${_ui.quizIndex + 1} de ${_ui.quizQuestions.length}</span>
                 <span class="adm-pill">${escapeHtml(currentQuestion.areaTitle)}</span>
-                ${currentArea?.id === 'ingles' ? '<span class="adm-pill">Diagnostico</span>' : ''}
+                ${currentArea?.id === 'ingles' ? '<span class="adm-pill">Diagnóstico</span>' : ''}
               </div>
               <h3 class="adm-panel-title">${escapeHtml(currentQuestion.topicTitle)}</h3>
               <p>${escapeHtml(currentQuestion.question)}</p>
@@ -1154,12 +1151,12 @@
               ` : ''}
 
               <div class="adm-toolbar top-gap">
-                <button class="adm-button is-ghost" data-action="prev-question" ${_ui.quizIndex === 0 ? 'disabled' : ''}>Pregunta anterior</button>
+                <button class="adm-button is-ghost" data-action="prev-question" ${_ui.quizIndex === 0 ? 'disabled' : ''}>Anterior</button>
                 ${_ui.quizSubmitted
-                  ? `<button class="adm-button is-primary" data-action="next-question" ${_ui.quizIndex === _ui.quizQuestions.length - 1 ? 'disabled' : ''}>Siguiente pregunta</button>`
+                  ? `<button class="adm-button is-primary" data-action="next-question" ${_ui.quizIndex === _ui.quizQuestions.length - 1 ? 'disabled' : ''}>Siguiente</button>`
                   : _ui.quizIndex === _ui.quizQuestions.length - 1
-                    ? `<button class="adm-button is-primary" data-action="submit-practice">Calificar practica</button>`
-                    : `<button class="adm-button is-primary" data-action="next-question">Siguiente pregunta</button>`}
+                    ? `<button class="adm-button is-primary" data-action="submit-practice">Calificar</button>`
+                    : `<button class="adm-button is-primary" data-action="next-question">Siguiente</button>`}
               </div>
             </article>
           </div>
@@ -1174,38 +1171,38 @@
           <div class="adm-section-header">
             <div>
               <div class="adm-kicker">Admisiones 2026</div>
-              <h2>Lo oficial que si necesitas para tu tramite</h2>
-              <p class="adm-note">Aqui esta la parte informativa del proceso: fechas, registro, pago, requisitos y contacto.</p>
+              <h2>Proceso de admisión 2026</h2>
+              <p class="adm-note">Fechas, pago, registro y contacto.</p>
             </div>
-            <a class="adm-button is-primary" href="${escapeHtml(admissions.platform.registrationUrl)}" target="_blank" rel="noopener">Ir al portal de registro</a>
+            <a class="adm-button is-primary" href="${escapeHtml(admissions.platform.registrationUrl)}" target="_blank" rel="noopener">Portal de registro</a>
           </div>
 
           <div class="adm-card-grid">
             <article class="adm-soft-card">
               <div class="adm-section-label">Fichas</div>
               <h3>09 febrero al 30 abril 2026</h3>
-              <p class="adm-meta">Registro y pago del derecho de admision.</p>
+              <p class="adm-meta">Registro y pago del derecho de admisión.</p>
             </article>
             <article class="adm-soft-card">
               <div class="adm-section-label">Examen</div>
-              <h3>Sabado 16 mayo 2026</h3>
-              <p class="adm-meta">Modalidad en linea. Duracion total: 3 horas.</p>
+              <h3>Sábado 16 mayo 2026</h3>
+              <p class="adm-meta">Modalidad en línea. Duración total: 3 horas.</p>
             </article>
             <article class="adm-soft-card">
-              <div class="adm-section-label">Propedeutico</div>
+              <div class="adm-section-label">Propedéutico</div>
               <h3>06 al 17 julio 2026</h3>
               <p class="adm-meta">Curso presencial para quienes sigan en el proceso.</p>
             </article>
             <article class="adm-soft-card">
               <div class="adm-section-label">Costo</div>
               <h3>${escapeHtml(admissions.payment.amount)}</h3>
-              <p class="adm-meta">Incluye ficha, examen de admision y curso propedeutico.</p>
+              <p class="adm-meta">Incluye ficha, examen de admisión y curso propedéutico.</p>
             </article>
           </div>
 
           <div class="adm-info-layout">
             <article class="adm-panel">
-              <div class="adm-section-label">Pasos del proceso</div>
+              <div class="adm-section-label">Pasos</div>
               <div class="adm-timeline">
                 ${admissions.processSteps.map((step) => `
                   <div class="adm-timeline-item">
@@ -1221,17 +1218,17 @@
             </article>
 
             <article class="adm-panel">
-              <div class="adm-section-label">Registro y soporte</div>
+              <div class="adm-section-label">Soporte</div>
               <div class="adm-info-list">
                 <div><strong>Pago</strong><span>${escapeHtml(admissions.payment.flow)}</span></div>
                 <div><strong>Banco</strong><span>${escapeHtml(admissions.payment.bank)}</span></div>
                 <div><strong>Correo</strong><span><a href="mailto:${escapeHtml(admissions.support.email)}">${escapeHtml(admissions.support.email)}</a></span></div>
-                <div><strong>Telefonos</strong><span>${admissions.support.phones.map((phone) => escapeHtml(phone)).join('<br>')}</span></div>
+                <div><strong>Teléfonos</strong><span>${admissions.support.phones.map((phone) => escapeHtml(phone)).join('<br>')}</span></div>
                 <div><strong>Horario</strong><span>${escapeHtml(admissions.support.hours)}</span></div>
               </div>
               <div class="adm-action-row top-gap">
                 <a class="adm-button is-ghost" href="${escapeHtml(admissions.support.officialSite)}" target="_blank" rel="noopener">Sitio oficial</a>
-                <a class="adm-button is-ghost" href="${escapeHtml(admissions.support.videoGuide)}" target="_blank" rel="noopener">Video guia</a>
+                <a class="adm-button is-ghost" href="${escapeHtml(admissions.support.videoGuide)}" target="_blank" rel="noopener">Video guía</a>
               </div>
             </article>
           </div>
@@ -1250,7 +1247,7 @@
               </ul>
             </article>
             <article class="adm-soft-card">
-              <div class="adm-section-label">Preguntas frecuentes</div>
+              <div class="adm-section-label">Dudas comunes</div>
               <div class="adm-compact-list">
                 ${admissions.faq.map((item) => `
                   <div class="adm-compact-item is-text">
@@ -1279,18 +1276,21 @@
       if (!_root) return;
       ensureFocusArea();
       const metrics = computeMetrics();
+      const navScreen = getNavScreen();
+      const showHero = navScreen === 'home';
+      const showSidebar = navScreen === 'home';
       _root.classList.add('admisiones-public-page');
       _root.innerHTML = `
         <div class="adm-shell">
-          ${renderHeader(metrics)}
-          <div class="adm-app-layout">
+          ${renderTopNav()}
+          ${showHero ? renderHeader(metrics) : ''}
+          <div class="adm-app-layout ${showSidebar ? '' : 'is-single'}">
             <main class="adm-content">
-              ${renderTopNav()}
               ${renderActiveScreen(metrics)}
             </main>
-            ${renderSidebar(metrics)}
+            ${showSidebar ? renderSidebar(metrics) : ''}
           </div>
-          <p class="adm-footer-note">El contenido de estudio se basa en la guia oficial EVALUATEC 2026 y se organiza aqui para que puedas avanzar con una ruta mas clara dentro de SIA.</p>
+          <p class="adm-footer-note">Este espacio adapta la guía oficial EVALUATEC 2026 para que estudies con una ruta más clara dentro de SIA.</p>
         </div>
       `;
     }
@@ -1315,6 +1315,17 @@
           return;
         }
         goToScreen(screen || 'home', { areaId: _ui.areaId || getPreferredAreaId() });
+        return;
+      }
+
+      if (action === 'scroll-careers') {
+        if (getNavScreen() !== 'home') {
+          goToScreen('home', { areaId: _ui.areaId || getPreferredAreaId() });
+          if (getNavScreen() !== 'home') return;
+        }
+        window.requestAnimationFrame(() => {
+          document.getElementById('adm-careers')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
         return;
       }
 
@@ -1405,7 +1416,7 @@
 
       if (action === 'start-career-practice') {
         if (!_guest.selectedCareer) {
-          window.showToast?.('Selecciona una carrera primero para armar una practica mixta.', 'warning');
+          window.showToast?.('Selecciona una carrera primero para armar una práctica mixta.', 'warning');
           return;
         }
         if (_ui.screen === 'practice' && !confirmDiscardPracticeIfNeeded()) return;
@@ -1446,7 +1457,7 @@
       if (action === 'submit-practice') {
         const missing = _ui.quizQuestions.find((question) => !Object.prototype.hasOwnProperty.call(_ui.quizAnswers, question.id));
         if (missing) {
-          window.showToast?.('Contesta todos los reactivos antes de calificar la practica.', 'warning');
+          window.showToast?.('Contesta todos los reactivos antes de calificar la práctica.', 'warning');
           return;
         }
         _ui.quizSubmitted = true;
@@ -1482,12 +1493,16 @@
       }
 
       if (action === 'continue-progress') {
+        if (!_guest.lastVisited && !_guest.selectedCareer) {
+          document.getElementById('adm-careers')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          return;
+        }
         window.AdmisionesPublic.resumeGuestProgress();
         return;
       }
 
       if (action === 'reset-progress') {
-        const confirmed = window.confirm('Se reiniciara el progreso local del invitado. Deseas continuar?');
+        const confirmed = window.confirm('Se reiniciará el progreso local del invitado. ¿Deseas continuar?');
         if (confirmed) window.AdmisionesPublic.resetGuestProgress();
       }
     }
@@ -1601,7 +1616,7 @@
       if (_guest.lastVisited) {
         applyLastVisited();
       } else {
-        const nextTopic = getNextRecommendedTopic(getRouteAreaIds());
+        const nextTopic = _guest.selectedCareer ? getNextRecommendedTopic(getRouteAreaIds()) : null;
         if (nextTopic) {
           _ui = {
             ...defaultUiState(),
