@@ -1,0 +1,945 @@
+/* --- MEDI ANIMATIONS (E4) --- */
+@keyframes medi-pulse-green {
+    0% {
+        box-shadow: 0 0 0 0 rgba(25, 135, 84, 0.7);
+        transform: scale(1);
+    }
+
+    50% {
+        box-shadow: 0 0 0 10px rgba(25, 135, 84, 0);
+        transform: scale(1.02);
+    }
+
+    100% {
+        box-shadow: 0 0 0 0 rgba(25, 135, 84, 0);
+        transform: scale(1);
+    }
+}
+
+.medi-card-confirmada {
+    animation: medi-pulse-green 2s ease-out infinite;
+    border-color: #198754 !important;
+    border-width: 2px;
+}
+
+/* --- WEB COMPONENTS DEFAULT STYLES --- */
+sia-student-dashboard,
+sia-landing-view,
+sia-register-wizard {
+    display: block;
+    width: 100%;
+}
+
+.nav-custom-pills .nav-item {
+    margin-right: 90px;
+}
+
+.nav-custom-pills-2 .nav-item {
+    margin-right: 40px;
+}
+
+/* =========================================
+   PROFILE MODULE - Tab Navigation
+   ========================================= */
+
+/* Contenedor principal de pestañas (Scrollable en móvil) */
+.profile-tabs-container {
+    backdrop-filter: blur(5px);
+    scrollbar-width: none;
+}
+
+.profile-tabs-container::-webkit-scrollbar {
+    display: none;
+}
+
+.profile-tabs-wrapper {
+    display: flex;
+    gap: 0.5rem;
+}
+
+/* Diseño del botón individual (AISLADO DE ESTILOS GLOBALES .nav-link) */
+.profile-tabs-wrapper .nav-item .prof-tab-btn.nav-link {
+    flex: 0 0 auto;
+    white-space: nowrap;
+    transition: all 0.3s ease;
+    /* Forzamos reset de variables que otros bloques nav-link puedan estar ensuciando */
+    background-color: transparent;
+    color: rgba(255, 255, 255, 0.7) !important;
+    border: none;
+    margin: 0;
+}
+
+.profile-tabs-wrapper .nav-item .prof-tab-btn.nav-link.active {
+    background-color: var(--bs-primary) !important;
+    color: #fff !important;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+}
+
+.profile-tabs-wrapper .nav-item .prof-tab-btn.nav-link:hover:not(.active) {
+    background-color: rgba(255, 255, 255, 0.1);
+    color: #fff !important;
+}
+
+/* Ajustes de espaciado y tamaño para móvil */
+@media (max-width: 991.98px) {
+    .profile-tabs-wrapper .nav-item .prof-tab-btn.nav-link {
+        font-size: 0.85rem !important;
+        padding: 0.6rem 0.9rem !important;
+        min-width: auto;
+        width: auto;
+    }
+}
+
+/* =========================================
+   DASHBOARD AVANZADO — 21 Mejoras
+   ========================================= */
+
+/* ── C1-06: Story Rings por tipo ── */
+.story-ring-survey.active {
+    background: linear-gradient(45deg, #f59e0b, #ef4444, #f59e0b) !important;
+    border: none !important;
+}
+
+.story-ring-event.active {
+    background: linear-gradient(45deg, #8b5cf6, #3b82f6, #8b5cf6) !important;
+    border: none !important;
+}
+
+.story-ring-urgent {
+    animation: pulse-ring 1.5s ease-in-out infinite !important;
+}
+
+@keyframes pulse-ring {
+
+    0%,
+    100% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(1.08);
+    }
+}
+
+.story-item-seen {
+    opacity: 0.5;
+    transition: opacity 0.3s ease;
+}
+
+.story-item-seen:hover {
+    opacity: 0.8;
+}
+
+/* ── C1-07: Avatar Dropdown ── */
+#dash-avatar-dropdown {
+    position: relative;
+}
+
+#dash-avatar-dropdown .dropdown-menu {
+    z-index: 1060 !important;
+}
+
+.dash-avatar-menu {
+    background: var(--bg-card) !important;
+    border: 1px solid var(--border-color) !important;
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35) !important;
+}
+
+html[data-bs-theme="light"] .dash-avatar-menu {
+    background: #fff !important;
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.12) !important;
+}
+
+/* Prevent dashboard header from clipping the dropdown */
+.sia-dash-header {
+    overflow: visible !important;
+    position: relative;
+    z-index: 10;
+}
+
+/* ── C1-08: Summary Banner ── */
+.sia-summary-banner .row .col-3 {
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.sia-summary-banner .row .col-3:last-child {
+    border-right: none;
+}
+
+.dash-scope-group .btn {
+    min-width: 74px;
+    border-radius: 999px !important;
+    font-weight: 700;
+}
+
+.dash-quick-module {
+    border-color: rgba(148, 163, 184, 0.35);
+    background: rgba(255, 255, 255, 0.72);
+}
+
+.dash-header-academic {
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
+}
+
+.dash-header-kicker,
+.dash-header-subtitle {
+    font-size: 0.68rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--accent);
+}
+
+.dash-header-subtitle {
+    color: #64748b;
+    letter-spacing: 0.05em;
+}
+
+.dash-header-meta-grid {
+    display: grid;
+    gap: 0.7rem;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.dash-header-info-card {
+    min-width: 0;
+    padding: 0.85rem 0.95rem;
+    border-radius: 1rem;
+    border: 1px solid rgba(148, 163, 184, 0.18);
+    background: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(10px);
+}
+
+.dash-header-info-label {
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #64748b;
+    margin-bottom: 0.3rem;
+}
+
+.dash-header-info-value {
+    font-size: 0.95rem;
+    font-weight: 700;
+    line-height: 1.25;
+    color: var(--text-heading);
+    word-break: break-word;
+}
+
+.dash-header-favorites {
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+}
+
+.dash-goal-helper,
+.dash-goal-meta-preview {
+    background: rgba(14, 165, 233, 0.07);
+    border: 1px solid rgba(14, 165, 233, 0.12);
+}
+
+.dash-goal-editor-card {
+    background: rgba(255, 255, 255, 0.95);
+    border-color: rgba(148, 163, 184, 0.24) !important;
+}
+
+html[data-bs-theme="dark"] .dash-header-info-card,
+html[data-bs-theme="dark"] .dash-goal-editor-card,
+html[data-bs-theme="dark"] .dash-goal-helper,
+html[data-bs-theme="dark"] .dash-goal-meta-preview {
+    background: rgba(15, 23, 42, 0.82);
+}
+
+.dash-header-actions {
+    flex-shrink: 0;
+}
+
+.dash-task-card,
+.dash-history-card,
+.dash-task-empty {
+    transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.dash-task-card:hover,
+.dash-history-card:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 12px 28px rgba(15, 23, 42, 0.08);
+}
+
+.dash-task-card--urgent {
+    border-left: 4px solid #ef4444 !important;
+}
+
+.dash-task-card--high {
+    border-left: 4px solid #f59e0b !important;
+}
+
+.dash-task-card--medium {
+    border-left: 4px solid #0ea5e9 !important;
+}
+
+.dash-task-card--low {
+    border-left: 4px solid #94a3b8 !important;
+}
+
+.dash-task-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 12px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(14, 165, 233, 0.1);
+    color: var(--accent);
+    flex-shrink: 0;
+}
+
+.dash-task-icon--muted {
+    background: rgba(148, 163, 184, 0.12);
+    color: #64748b;
+}
+
+/* ── C1-09: Skeleton retry ── */
+#dash-name-retry {
+    font-size: 0.8rem;
+}
+
+/* ── C1-10: Card Reorder ── */
+.smart-card-col.drag-over .smart-card {
+    border: 2px dashed var(--accent) !important;
+    transform: scale(0.98);
+}
+
+.smart-card-col.drag-active .smart-card {
+    box-shadow: 0 0 0 3px var(--accent) !important;
+    transform: scale(1.03);
+    z-index: 10;
+}
+
+.smart-card-col[draggable="true"] {
+    cursor: grab;
+}
+
+.smart-card-col[draggable="true"]:active {
+    cursor: grabbing;
+}
+
+/* ── C2-02: Breadcrumb Pill ── */
+.nav-context-pill {
+    font-size: 0.65rem !important;
+    padding: 3px 10px !important;
+    transition: all 0.25s ease;
+    letter-spacing: 0.02em;
+}
+
+/* ── C2-04: Bottom Nav Module Colors ── */
+.bottom-nav .nav-item.active i {
+    color: var(--mobile-nav-active-color, var(--primary)) !important;
+    text-shadow: 0 0 12px var(--mobile-nav-active-color, var(--primary));
+}
+
+.bottom-nav .nav-item.active span {
+    color: var(--mobile-nav-active-color, var(--primary)) !important;
+}
+
+/* ── C3-01: Activity Strip ── */
+
+.activity-today-dot {
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: var(--accent);
+    margin: 3px auto 0;
+}
+
+/* ── C3-02: Events Strip ── */
+.dash-events-scroll {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+.dash-events-scroll::-webkit-scrollbar {
+    display: none;
+}
+
+.event-countdown-card {
+    min-width: 220px;
+    max-width: 280px;
+    flex-shrink: 0;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.event-countdown-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
+}
+
+.event-countdown-card:active {
+    transform: scale(0.98);
+}
+
+.event-date-circle {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    background: rgba(0, 208, 255, 0.1);
+    color: var(--accent);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+.event-cal-btn {
+    opacity: 0.5;
+    transition: opacity 0.2s;
+}
+
+.event-interest-btn {
+    opacity: 0.8;
+}
+
+.event-interest-btn.is-active {
+    opacity: 1;
+}
+
+.event-cal-btn:hover {
+    opacity: 1;
+}
+
+@media (max-width: 576px) {
+    .sia-dash-header {
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .sia-dash-header>.flex-grow-1 {
+        width: 100%;
+        min-width: 0;
+    }
+
+    .dash-header-actions {
+        width: 100%;
+        justify-content: space-between;
+        gap: 0.6rem !important;
+    }
+
+    .dash-header-meta-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .dash-quick-module {
+        flex: 1 1 calc(50% - 0.5rem);
+        justify-content: center;
+    }
+
+    .event-countdown-card {
+        min-width: 180px;
+    }
+
+    .dash-scope-group .btn {
+        min-width: 66px;
+        padding-left: 0.6rem;
+        padding-right: 0.6rem;
+    }
+}
+
+/* ── C3-03: SOS Panel & Bug Report ── */
+.dash-sos-fab {
+    position: fixed;
+    bottom: 148px;
+    right: 16px;
+    z-index: 900;
+}
+
+.dash-sos-fab.dash-sos-alone {
+    bottom: 90px;
+}
+
+.btn-bug-fab {
+    position: fixed;
+    bottom: 90px;
+    right: 16px;
+    width: 48px;
+    height: 48px;
+    z-index: 900;
+    font-size: 1.2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    background: #f97316 !important;
+    border-color: #f97316 !important;
+    color: #fff !important;
+}
+
+.btn-bug-fab:hover {
+    transform: scale(1.1);
+}
+
+.support-modal {
+    overflow: hidden;
+}
+
+.support-modal-tabs {
+    background: linear-gradient(180deg, rgba(249, 115, 22, 0.08), rgba(249, 115, 22, 0));
+}
+
+.support-tab-btn {
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    background: #fff;
+    color: #475569;
+}
+
+.support-tab-btn.active {
+    background: #111827;
+    color: #fff;
+    border-color: #111827;
+}
+
+.support-evidence-card,
+.support-context-card,
+.support-ticket-user-card,
+.support-ticket-user-detail {
+    background: #fff;
+}
+
+.support-evidence-card,
+.support-context-card {
+    border-color: rgba(148, 163, 184, 0.25) !important;
+}
+
+.support-evidence-preview img {
+    width: 100%;
+    max-height: 260px;
+    object-fit: cover;
+}
+
+.support-context-list {
+    display: grid;
+    gap: 0.85rem;
+}
+
+.support-context-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+
+.support-context-item strong {
+    font-size: 0.95rem;
+    color: #111827;
+    word-break: break-word;
+}
+
+.support-ticket-user-card {
+    border: 1px solid rgba(148, 163, 184, 0.22);
+    transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+    cursor: pointer;
+}
+
+.support-ticket-user-card:hover,
+.support-ticket-user-card.is-active {
+    border-color: rgba(249, 115, 22, 0.5);
+    transform: translateY(-1px);
+    box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
+}
+
+.support-ticket-user-detail {
+    border: 1px solid rgba(148, 163, 184, 0.22);
+}
+
+.support-ticket-history {
+    max-height: 320px;
+    overflow-y: auto;
+}
+
+.support-history-entry {
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    border-radius: 1rem;
+    padding: 0.9rem 1rem;
+    background: #fff;
+}
+
+.support-history-entry.support-history-entry-admin {
+    background: rgba(37, 99, 235, 0.08);
+    border-color: rgba(37, 99, 235, 0.12);
+}
+
+.support-history-entry.support-history-entry-status {
+    background: rgba(250, 204, 21, 0.12);
+    border-color: rgba(234, 179, 8, 0.18);
+}
+
+@media (min-width: 768px) {
+    .dash-sos-fab {
+        bottom: 85px;
+        right: 24px;
+    }
+
+    .dash-sos-fab.dash-sos-alone {
+        bottom: 85px;
+    }
+
+    .btn-bug-fab {
+        bottom: 24px;
+        right: 24px;
+    }
+}
+
+@media (max-width: 767.98px) {
+    .support-modal .modal-body {
+        max-height: calc(100vh - 130px);
+        overflow-y: auto;
+    }
+
+    .support-tab-btn {
+        flex: 1 1 calc(50% - 0.5rem);
+    }
+}
+
+.dash-sos-btn {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #a855f7, #7c3aed) !important;
+    color: #fff !important;
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    animation: sos-pulse 3s ease-in-out infinite;
+}
+
+.dash-sos-btn:hover {
+    transform: scale(1.1);
+    box-shadow: 0 0 20px rgba(168, 85, 247, 0.42);
+}
+
+.dash-sos-btn.dash-sos-btn-active {
+    background: linear-gradient(135deg, #8b5cf6, #5b21b6) !important;
+}
+
+.dash-sos-btn.dash-sos-btn-error {
+    background: linear-gradient(135deg, #c084fc, #7e22ce) !important;
+}
+
+@keyframes sos-pulse {
+
+    0%,
+    100% {
+        box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.3);
+    }
+
+    50% {
+        box-shadow: 0 0 0 8px rgba(239, 68, 68, 0);
+    }
+}
+
+.dash-sos-panel {
+    position: absolute;
+    bottom: 56px;
+    right: 0;
+    width: min(360px, calc(100vw - 32px));
+    max-height: 70vh;
+    overflow-y: auto;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    animation: fadeIn 0.2s ease;
+}
+
+html[data-bs-theme="light"] .dash-sos-panel {
+    background: #fff;
+}
+
+.dash-panic-card {
+    background: var(--surface, rgba(255, 255, 255, 0.04));
+    border: 1px solid var(--border-color);
+}
+
+html[data-bs-theme="light"] .dash-panic-card {
+    background: #fff;
+    border-color: #e2e8f0;
+}
+
+.dash-panic-card .form-control,
+.dash-panic-card .form-select {
+    font-size: 0.82rem;
+}
+
+/* ── C3-04: Scorecard ── */
+.scorecard-body {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.4s cubic-bezier(0.25, 0.8, 0.25, 1), opacity 0.3s ease;
+    opacity: 0;
+}
+
+.scorecard-body.open {
+    max-height: 500px;
+    opacity: 1;
+}
+
+.scorecard-toggle {
+    transition: background 0.2s ease;
+}
+
+.scorecard-toggle:hover {
+    background: var(--surface, rgba(255, 255, 255, 0.03));
+}
+
+#dash-scorecard-chevron {
+    transition: transform 0.3s ease;
+}
+
+/* ── C3-05: Tip of the Day ── */
+.dash-tip-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-left: 3px solid var(--accent);
+    transition: transform 0.2s ease;
+}
+
+.dash-tip-card:hover {
+    transform: translateX(3px);
+}
+
+html[data-bs-theme="light"] .dash-tip-card {
+    background: #fff;
+    border-color: #e2e8f0;
+    border-left-color: var(--accent);
+}
+
+/* ── C3-06: Offline Banner ── */
+.dash-offline-banner .rounded-3 {
+    animation: offline-slide-in 0.3s ease;
+}
+
+@keyframes offline-slide-in {
+    from {
+        transform: translateY(-10px);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.dash-freshness {
+    font-size: 0.65rem;
+    opacity: 0.6;
+    transition: opacity 0.2s;
+}
+
+.dash-freshness:hover {
+    opacity: 1;
+}
+
+/* ── Notif items ── */
+.notif-item {
+    transition: background 0.15s ease;
+}
+
+.notif-item:hover {
+    background: var(--surface, rgba(255, 255, 255, 0.05));
+}
+
+.opacity-60 {
+    opacity: 0.6;
+}
+
+/* ── Drawer recents ── */
+.drawer-recent-item {
+    transition: background 0.15s ease;
+}
+
+.drawer-recent-item:hover {
+    background: var(--surface, rgba(255, 255, 255, 0.05));
+}
+
+/* ── Progress bar aula color ── */
+.progress-bar[style*="--aula"],
+.bg-aula {
+    background: var(--aula, #4e1bda) !important;
+}
+
+/* =========================================
+   MEDI MODULE - RESPONSIVE / ADMIN LAYOUT
+   ========================================= */
+
+@media (min-width: 992px) {
+    .medi-admin-col {
+        height: calc(100vh - 140px);
+        overflow: hidden;
+    }
+
+    .medi-admin-col .card-body {
+        min-height: 0;
+    }
+}
+
+@media (min-width: 768px) and (max-width: 991.98px) {
+    .medi-admin-col {
+        height: calc(50vh - 60px);
+    }
+}
+
+@media (max-width: 767.98px) {
+    .medi-admin-col {
+        max-height: 60vh;
+    }
+}
+
+#medi-workarea-tabs .nav-link,
+#medi-context-tabs .nav-link {
+    color: #6c757d;
+    font-weight: 600;
+    transition: all 0.2s ease;
+}
+
+#medi-workarea-tabs .nav-link.active,
+#medi-context-tabs .nav-link.active {
+    background-color: var(--bs-primary);
+    color: #fff !important;
+}
+
+#medi-workarea-tabs .nav-link:not(.active):hover,
+#medi-context-tabs .nav-link:not(.active):hover {
+    background-color: rgba(13, 110, 253, 0.08);
+    color: var(--bs-primary);
+}
+
+html[data-bs-theme="dark"] #medi-workarea-tabs .nav-link:not(.active),
+html[data-bs-theme="dark"] #medi-context-tabs .nav-link:not(.active) {
+    color: #94a3b8 !important;
+}
+
+html[data-bs-theme="dark"] .medi-wait-card:hover {
+    background-color: rgba(13, 110, 253, 0.08) !important;
+}
+
+html[data-bs-theme="dark"] .medi-wait-card.selected {
+    background-color: rgba(13, 110, 253, 0.12) !important;
+}
+
+.medi-wait-card {
+    transition: all 0.2s ease;
+    cursor: pointer;
+}
+
+.medi-wait-card:hover {
+    background-color: rgba(13, 110, 253, 0.04) !important;
+}
+
+.medi-wait-card.selected {
+    border-left: 3px solid var(--bs-primary) !important;
+    background-color: rgba(13, 110, 253, 0.06) !important;
+}
+
+.medi-date-scroll {
+    position: relative;
+}
+
+.medi-date-scroll::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: 40px;
+    background: linear-gradient(to right, transparent, var(--bs-body-bg, #fff));
+    pointer-events: none;
+    z-index: 1;
+}
+
+.medi-next-appt {
+    background: linear-gradient(135deg, rgba(13, 110, 253, 0.06), rgba(13, 202, 240, 0.06));
+    border-left: 4px solid #0d6efd;
+    border-radius: 1rem;
+}
+
+html[data-bs-theme="dark"] .medi-next-appt {
+    background: linear-gradient(135deg, rgba(13, 110, 253, 0.12), rgba(13, 202, 240, 0.08));
+}
+
+.medi-booking-success {
+    animation: medi-slideUpFade 0.4s ease-out;
+}
+
+@keyframes medi-slideUpFade {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.medi-cita-carousel {
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+}
+
+.medi-cita-carousel>* {
+    scroll-snap-align: start;
+}
+
+@media (max-width: 575.98px) {
+    #medi-time-grid {
+        flex-wrap: wrap !important;
+        justify-content: center !important;
+        overflow-x: visible !important;
+    }
+
+    #medi-time-grid .time-slot-card {
+        width: 75px !important;
+        min-width: 75px !important;
+    }
+
+    .medi-emergency-row {
+        flex-wrap: wrap !important;
+    }
+
+    .medi-emergency-row>.col-auto {
+        flex: 0 0 50% !important;
+        max-width: 50% !important;
+        border-right: none !important;
+    }
+
+    .medi-emergency-row>.col {
+        flex: 0 0 100% !important;
+        max-width: 100% !important;
+        padding-top: 0.5rem;
+        border-top: 1px solid rgba(255, 255, 255, 0.15);
+    }
+
+    .medi-service-btns {
+        flex-direction: column !important;
+    }
+
+    .medi-date-scroll .date-option {
+        min-width: 70px !important;
+        padding: 0.5rem !important;
+    }
+
+    .medi-date-scroll .date-option .fs-4 {
+        font-size: 1.1rem !important;
+    }
+
+    .medi-resched-dates .date-option {
+        min-width: 65px !important;
+    }
+}

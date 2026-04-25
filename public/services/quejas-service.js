@@ -112,17 +112,18 @@ if (!window.QuejasService) {
 
         async function createTicket(ctx, data) {
             if (!ctx.user) throw new Error('Usuario no identificado');
+            const isAnonymous = !!data.isAnonymous;
 
             const ticket = {
                 userId: ctx.user.uid,
-                userEmail: ctx.user.email || '',
-                userName: ctx.profile?.displayName || 'Estudiante',
-                matricula: ctx.profile?.matricula || '',
+                userEmail: isAnonymous ? '' : (ctx.user.email || ''),
+                userName: isAnonymous ? 'Usuario anónimo' : (ctx.profile?.displayName || 'Estudiante'),
+                matricula: isAnonymous ? '' : (ctx.profile?.matricula || ''),
                 tipo: data.tipo,
                 categoria: data.categoria,
                 descripcion: data.descripcion,
                 evidenciaUrl: data.evidenciaUrl || '',
-                isAnonymous: !!data.isAnonymous,
+                isAnonymous,
                 status: 'pendiente',
                 publicResponseCount: 0,
                 internalNoteCount: 0,

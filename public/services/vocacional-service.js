@@ -127,27 +127,25 @@ const VocacionalService = (function () {
     }
 
     async function findAspiranteByContact(phone, email) {
-        try {
-            // Utilizamos el teléfono como ID principal para evitar problemas de permisos
-            // de 'list' en Firestore para usuarios no autenticados.
-            if (phone) {
-                const docRef = await getDb().collection(COLLECTION_NAME).doc(phone).get();
-                if (docRef.exists) {
-                    return docRef.id;
-                }
-            }
-            return null;
-        } catch (e) {
-            console.error("Error finding aspirante:", e);
-            return null;
+        const normalizedPhone = String(phone || '').trim();
+        const normalizedEmail = String(email || '').trim().toLowerCase();
+        if (!normalizedPhone || !normalizedEmail) return null;
+
+        const functions = window.SIA?.functions || firebase.functions();
+        if (!functions?.httpsCallable) {
+            throw new Error('Servicio de recuperacion no disponible.');
         }
+
+        const recoverAspirante = functions.httpsCallable('vocacionalRecoverAspirante');
+        const result = await recoverAspirante({
+            phone: normalizedPhone,
+            email: normalizedEmail
+        });
+        return result.data?.aspiranteId || null;
     }
 
     async function registerAspirante(personalInfo) {
         try {
-            const existingId = await findAspiranteByContact(personalInfo.phone, personalInfo.email);
-            if (existingId) return existingId; // Return existing ID to resume session
-
             const data = {
                 personalInfo: {
                     name: personalInfo.name || '',
@@ -163,14 +161,8 @@ const VocacionalService = (function () {
                 updatedAt: firebase.firestore.FieldValue.serverTimestamp()
             };
 
-            // Usamos el teléfono como ID del documento para que la recuperación por 'get' funcione sin permisos 'list'
-            if (personalInfo.phone) {
-                await getDb().collection(COLLECTION_NAME).doc(personalInfo.phone).set(data);
-                return personalInfo.phone;
-            } else {
-                const docRef = await getDb().collection(COLLECTION_NAME).add(data);
-                return docRef.id;
-            }
+            const docRef = await getDb().collection(COLLECTION_NAME).add(data);
+            return docRef.id;
         } catch (error) {
             console.error("Error registering aspirante:", error);
             throw error;

@@ -5,7 +5,8 @@ export class Router {
     constructor(uiManager) {
         this.ui = uiManager;
         this._activeSubscriptions = []; // Initialize array
-        this.qaSecretRoute = window.SIA?.getQaSecretLoginConfig?.()?.route || '/qa-portal-k9m2x7c4';
+        const qaSecretConfig = window.SIA?.getQaSecretLoginConfig?.() || {};
+        this.qaSecretRoute = qaSecretConfig.enabled ? qaSecretConfig.route : '';
         this.routes = {
             'view-dashboard': '/dashboard',
             'view-aula': '/aula',
@@ -112,6 +113,7 @@ export class Router {
             else if (path.startsWith('/lactario')) viewId = 'view-lactario';
             else if (path.startsWith('/quejas')) viewId = 'view-quejas';
             else if (path.startsWith('/reportes')) viewId = 'view-reportes';
+            else if (path.startsWith('/encuesta-publica/')) viewId = 'view-encuesta-publica';
             else if (path.startsWith('/encuestas')) viewId = 'view-encuestas';
             else if (path.startsWith('/admisiones')) viewId = 'view-admisiones-public';
             else if (path.startsWith('/superadmin')) viewId = 'view-superadmin-dashboard';
@@ -531,7 +533,12 @@ export class Router {
 
         const promise = new Promise((resolve, reject) => {
             // Check if script already exists dynamically
-            const existing = document.querySelector(`script[src^="${src}"]`);
+            const expectedPath = new URL(src, window.location.origin).pathname;
+            const existing = Array.from(document.scripts).find((script) => {
+                const rawSrc = script.getAttribute('src');
+                if (!rawSrc) return false;
+                return new URL(rawSrc, window.location.origin).pathname === expectedPath;
+            });
             if (existing) {
                 // If script exists and has finished loading, its global should be ready
                 const isMedi = src.includes('/modules/medi.js');
@@ -716,8 +723,8 @@ export class Router {
         }
 
         if (viewId === 'view-encuesta-publica') {
-            const hash = window.location.hash || '';
-            const surveyId = hash.replace('#/encuesta-publica/', '').split('?')[0];
+            const routePath = this._getCurrentPath();
+            const surveyId = decodeURIComponent(routePath.replace('/encuesta-publica/', '').split('?')[0] || '');
             if (window.Encuestas && window.Encuestas.initPublic) {
                 window.Encuestas.initPublic(surveyId);
             }

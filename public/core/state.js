@@ -34,6 +34,5 @@ export const Store = {
         this.userProfile = null;
         this.cache = {};
         this.emit('cleared');
-        this._listeners = {};
     }
 };

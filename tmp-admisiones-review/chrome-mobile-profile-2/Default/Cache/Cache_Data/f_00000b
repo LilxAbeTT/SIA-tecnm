@@ -1,0 +1,848 @@
+/* =========================================
+   DASHBOARD V3 (MOBILE-FIRST) STYLES
+   ========================================= */
+
+/* --- HEADER & AVATAR --- */
+.dashboard-avatar {
+    width: 48px;
+    height: 48px;
+    min-width: 48px;
+    min-height: 48px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    color: var(--accent);
+    font-size: 1.2rem;
+    cursor: pointer;
+    overflow: hidden;
+    border: 2px solid rgba(255, 255, 255, 0.28);
+    box-shadow: 0 12px 30px rgba(15, 23, 42, 0.22);
+    position: relative;
+    flex-shrink: 0;
+}
+
+.dashboard-avatar span {
+    width: 100%;
+    height: 100%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: radial-gradient(circle at top, rgba(14, 165, 233, 0.28), rgba(15, 23, 42, 0.18));
+}
+
+.dashboard-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+@media (max-width: 576px) {
+    .dashboard-avatar {
+        width: 52px;
+        height: 52px;
+        min-width: 52px;
+        min-height: 52px;
+        border-width: 3px;
+    }
+}
+
+/* --- STORIES SECTION --- */
+.stories-container {
+    padding-left: 4px;
+    /* Margen ligero izquierdo */
+    scrollbar-width: none;
+}
+
+.stories-container::-webkit-scrollbar {
+    display: none;
+}
+
+.story-item {
+    cursor: pointer;
+    transition: transform 0.2s ease;
+    position: relative;
+}
+
+.story-item:active {
+    transform: scale(0.95);
+}
+
+.story-ring {
+    width: 68px;
+    height: 68px;
+    border-radius: 50%;
+    padding: 3px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: 2px solid #e2e8f0;
+}
+
+.story-ring.active {
+    background: linear-gradient(45deg, #f09433, #e6683c, #dc2743, #cc2366, #bc1888);
+    /* Instagram-like gradient */
+    border: none;
+}
+
+.story-circle {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    background: var(--bg-card);
+    border: 2px solid var(--bg-card);
+    overflow: hidden;
+    font-size: 1.5rem;
+}
+
+/* --- AVISO STORY RING (Green/Teal gradient) --- */
+.story-ring.aviso-ring.active {
+    background: linear-gradient(45deg, #10b981, #06b6d4, #3b82f6, #10b981);
+    border: none;
+}
+
+/* --- STORY: Imagen thumbnail dentro del circulo --- */
+.story-circle--has-img {
+    overflow: hidden;
+    padding: 0;
+}
+
+.story-thumb-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 50%;
+}
+
+/* --- STORY: Label con 2 lineas visible --- */
+.story-label {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 0.68rem;
+    font-weight: 600;
+    color: var(--text-muted, #64748b);
+    max-width: 76px;
+    line-height: 1.25;
+    word-break: break-word;
+    min-height: 1.7em;
+}
+
+/* Ajuste del story-item para acomodar label de 2 lineas */
+.story-item {
+    flex-shrink: 0;
+    width: 76px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.story-meta-chip {
+    margin-top: 6px;
+    font-size: 0.58rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    border-radius: 999px;
+    padding: 3px 8px;
+    line-height: 1;
+}
+
+.story-meta-chip--info {
+    background: rgba(14, 165, 233, 0.14);
+    color: #0284c7;
+}
+
+.story-meta-chip--ok {
+    background: rgba(16, 185, 129, 0.14);
+    color: #059669;
+}
+
+.story-meta-chip--warn {
+    background: rgba(245, 158, 11, 0.14);
+    color: #d97706;
+}
+
+.story-meta-chip--danger {
+    background: rgba(239, 68, 68, 0.14);
+    color: #dc2626;
+}
+
+.story-meta-chip--success,
+.story-meta-chip--primary {
+    background: rgba(59, 130, 246, 0.12);
+    color: #2563eb;
+}
+
+.story-save-btn {
+    position: absolute;
+    top: -4px;
+    right: 0;
+    width: 24px;
+    height: 24px;
+    border: 0;
+    border-radius: 999px;
+    background: rgba(15, 23, 42, 0.82);
+    color: #fff;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.72rem;
+    box-shadow: 0 8px 18px rgba(15, 23, 42, 0.22);
+}
+
+.story-save-btn.is-saved {
+    background: #f59e0b;
+    color: #111827;
+}
+
+/* --- DASHBOARD: Secciones con animacion staggered --- */
+.dash-section {
+    opacity: 0;
+    transform: translateY(14px);
+    animation: dash-section-in 0.5s ease forwards;
+}
+
+@keyframes dash-section-in {
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* --- DASHBOARD: Smart cards con animacion individual --- */
+.smart-card-anim {
+    opacity: 0;
+    transform: scale(0.96);
+    animation: smart-card-pop 0.35s ease forwards;
+}
+
+@keyframes smart-card-pop {
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* --- DASHBOARD: Botones del header (QR + Tutorial) --- */
+.sia-btn-qr,
+.sia-btn-tutorial {
+    display: inline-flex;
+    align-items: center;
+    padding: 7px 14px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    line-height: 1;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.sia-btn-qr {
+    background: rgba(0, 208, 255, 0.12);
+    color: var(--accent, #00D0FF);
+    border: 1.5px solid rgba(0, 208, 255, 0.3);
+}
+
+.sia-btn-qr:hover {
+    background: rgba(0, 208, 255, 0.22);
+    color: var(--accent, #00D0FF);
+    border-color: rgba(0, 208, 255, 0.5);
+}
+
+.sia-btn-qr:active,
+.sia-btn-tutorial:active {
+    transform: scale(0.95);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   ONBOARDING TOUR (Tutorial interactivo)
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* Overlay base: transparente cuando hay spotlight */
+.sia-tour-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 9998;
+    pointer-events: auto;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.sia-tour-overlay--visible {
+    opacity: 1;
+}
+
+.sia-tour-overlay--exiting {
+    opacity: 0;
+    pointer-events: none;
+}
+
+/* Overlay con fondo completo: cuando no hay spotlight (bienvenida / fin) */
+.sia-tour-overlay--center {
+    background: rgba(0, 0, 0, 0.82);
+}
+
+/* Spotlight: el box-shadow crea el efecto de "recorte oscuro" */
+.sia-tour-spotlight {
+    position: absolute;
+    border-radius: 12px;
+    box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.78);
+    border: 2px solid var(--accent, #00D0FF);
+    transition: top 0.45s cubic-bezier(0.4, 0, 0.2, 1),
+        left 0.45s cubic-bezier(0.4, 0, 0.2, 1),
+        width 0.45s cubic-bezier(0.4, 0, 0.2, 1),
+        height 0.45s cubic-bezier(0.4, 0, 0.2, 1),
+        opacity 0.25s ease;
+    z-index: 9999;
+    pointer-events: none;
+    opacity: 0;
+}
+
+.sia-tour-spotlight--visible {
+    opacity: 1;
+}
+
+/* Pulso en el borde del spotlight */
+.sia-tour-spotlight::after {
+    content: '';
+    position: absolute;
+    inset: -6px;
+    border-radius: 15px;
+    border: 2px solid var(--accent, #00D0FF);
+    animation: tour-pulse 2s ease-in-out infinite;
+    pointer-events: none;
+}
+
+@keyframes tour-pulse {
+
+    0%,
+    100% {
+        opacity: 0.2;
+        transform: scale(1);
+    }
+
+    50% {
+        opacity: 0.6;
+        transform: scale(1.015);
+    }
+}
+
+/* ── Tooltip: fondo BLANCO para maxima legibilidad ── */
+.sia-tour-tooltip {
+    position: absolute;
+    z-index: 10000;
+    background: #ffffff;
+    border: none;
+    border-radius: 16px;
+    padding: 20px 22px;
+    max-width: 320px;
+    min-width: 260px;
+    box-shadow: 0 8px 40px rgba(0, 0, 0, 0.35), 0 2px 8px rgba(0, 0, 0, 0.2);
+    pointer-events: auto;
+    opacity: 0;
+    transform: translateY(10px);
+    transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.sia-tour-tooltip--visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.sia-tour-tooltip--transitioning {
+    opacity: 0;
+    transform: translateY(8px);
+}
+
+/* Progreso */
+.tour-step-label {
+    font-size: 0.7rem;
+    color: #94a3b8;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+}
+
+.tour-progress-bar {
+    width: 100%;
+    height: 4px;
+    background: #e2e8f0;
+    border-radius: 4px;
+    margin: 6px 0 16px;
+    overflow: hidden;
+}
+
+.tour-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent, #00D0FF), #1B396A);
+    border-radius: 4px;
+    transition: width 0.5s ease;
+}
+
+/* Titulo y descripcion */
+.tour-title {
+    font-weight: 700;
+    color: #0f172a;
+    margin-bottom: 8px;
+    font-size: 1.05rem;
+    line-height: 1.3;
+}
+
+.tour-desc {
+    font-size: 0.875rem;
+    color: #475569;
+    line-height: 1.55;
+    margin-bottom: 20px;
+}
+
+/* Botones */
+.tour-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.tour-actions-nav {
+    display: flex;
+    gap: 8px;
+}
+
+.tour-btn-next {
+    background: #1B396A;
+    color: #ffffff;
+    border: none;
+    border-radius: 10px;
+    padding: 9px 20px;
+    font-weight: 600;
+    font-size: 0.83rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.tour-btn-next:hover {
+    background: #142d54;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(27, 57, 106, 0.3);
+}
+
+.tour-btn-next:active {
+    transform: scale(0.97);
+}
+
+.tour-btn-prev {
+    background: transparent;
+    color: #64748b;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 9px 16px;
+    font-size: 0.83rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.tour-btn-prev:hover {
+    background: #f8fafc;
+    color: #334155;
+    border-color: #cbd5e1;
+}
+
+.tour-btn-skip {
+    background: none;
+    border: none;
+    color: #94a3b8;
+    font-size: 0.78rem;
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    text-decoration-color: #cbd5e1;
+    transition: color 0.2s;
+    padding: 4px 0;
+    flex-shrink: 0;
+}
+
+.tour-btn-skip:hover {
+    color: #64748b;
+}
+
+/* Mobile */
+@media (max-width: 480px) {
+    .sia-tour-tooltip {
+        max-width: calc(100vw - 32px);
+        min-width: auto;
+        padding: 18px;
+    }
+
+    .sia-btn-qr span,
+    .sia-btn-tutorial span {
+        display: none !important;
+    }
+
+    .sia-btn-qr,
+    .sia-btn-tutorial {
+        padding: 8px 10px;
+    }
+}
+
+/* --- FULLSCREEN GLASS AVISO MODAL --- */
+.modal-aviso-glass .modal-content {
+    background: rgba(15, 15, 15, 0.75) !important;
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 40px 80px rgba(0, 0, 0, 0.6);
+    border-radius: 24px;
+    height: 90vh;
+    /* Fixed height for consistency */
+    max-height: 800px;
+}
+
+/* Background "frame" effect: dim the backdrop slightly more */
+.modal-backdrop.show {
+    opacity: 0.7;
+}
+
+/* Progress bar track logic */
+
+#modalAvisoFullscreen .aviso-fullscreen-img {
+    animation: avisoFadeIn 0.4s ease-out;
+}
+
+.aviso-text-card {
+    animation: avisoSlideUp 0.5s ease-out;
+}
+
+.aviso-mixed-card {
+    animation: avisoFadeIn 0.4s ease-out;
+}
+
+@keyframes avisoFadeIn {
+    from {
+        opacity: 0;
+        transform: scale(0.95);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+@keyframes avisoSlideUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Progress bars */
+.aviso-progress-fill {
+    transition: width 0.3s ease;
+}
+
+/* Navigation arrows hover */
+#aviso-nav-prev:hover,
+#aviso-nav-next:hover {
+    opacity: 1 !important;
+    transform: translateY(-50%) scale(1.2);
+    transition: all 0.2s;
+}
+
+/* Responsive: text aviso on mobile */
+@media (max-width: 576px) {
+    .aviso-text-card h1 {
+        font-size: 1.75rem !important;
+    }
+
+    .aviso-text-card .lead {
+        font-size: 1rem !important;
+    }
+}
+
+/* --- SMART CARDS --- */
+.smart-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+.smart-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3) !important;
+}
+
+.smart-card:active {
+    transform: scale(0.98);
+}
+
+.icon-box-sm {
+    width: 42px;
+    height: 42px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+}
+
+.status-dot {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    box-shadow: 0 0 0 4px rgba(0, 0, 0, 0.4);
+}
+
+/* --- BOTTOM NAVIGATION BAR --- */
+.bottom-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    background: rgba(15, 17, 20, 0.95);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    height: 65px;
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    z-index: 9999;
+    padding-bottom: env(safe-area-inset-bottom);
+    box-shadow: 0 -5px 20px rgba(0, 0, 0, 0.3);
+}
+
+.nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: #94a3b8;
+    text-decoration: none;
+    font-size: 0.7rem;
+    font-weight: 500;
+    gap: 4px;
+    width: 60px;
+    height: 100%;
+    transition: color 0.2s;
+    background: transparent;
+    border: none;
+}
+
+.nav-item i {
+    font-size: 1.35rem;
+    transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.nav-item.active {
+    color: var(--primary);
+}
+
+.nav-item.active i {
+    transform: translateY(-2px);
+}
+
+/* FAB central flotante estilo "Scan" o "Accion" */
+.nav-item-fab {
+    transform: translateY(-28px);
+    z-index: 1051;
+}
+
+.nav-item-fab button {
+    width: 56px;
+    height: 56px;
+    border: 4px solid #0f1114;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+}
+
+/* --- LIGHT MODE MOBILE NAV OVERRIDES --- */
+html[data-bs-theme="light"] .bottom-nav {
+    background: rgba(255, 255, 255, 0.90) !important;
+    border-top: 1px solid rgba(0, 0, 0, 0.05);
+    box-shadow: 0 -5px 20px rgba(0, 0, 0, 0.05);
+}
+
+html[data-bs-theme="light"] .nav-item {
+    color: var(--text-muted) !important;
+}
+
+html[data-bs-theme="light"] .nav-item.active {
+    color: var(--text-heading) !important;
+    /* Darker than primary for text visibility */
+    font-weight: 700;
+}
+
+html[data-bs-theme="light"] .nav-item.active i {
+    text-shadow: none !important;
+}
+
+html[data-bs-theme="light"] .nav-item-fab button {
+    border-color: var(--bg-body) !important;
+    background-color: var(--primary);
+    color: white !important;
+    box-shadow: 0 4px 12px rgba(27, 57, 106, 0.3);
+}
+
+html[data-bs-theme="light"] .nav-item-fab button i {
+    color: white !important;
+}
+
+/* En escritorio, ocultar el bottom nav y ajustar el contenedor del dashboard */
+@media (min-width: 768px) {
+    .bottom-nav {
+        display: none !important;
+    }
+
+    /* Centrar dashboard en escritorio tipo App Shell */
+    #view-dashboard {
+        max-width: 900px;
+    }
+}
+
+/* --- MODULES DRAWER --- */
+.modules-drawer-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(4px);
+    z-index: 10000;
+    /* Above Bottom Nav */
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    animation: fadeIn 0.3s forwards;
+}
+
+.modules-drawer-content {
+    background: var(--bg-card);
+    background: rgba(26, 29, 35, 0.95);
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    transform: translateY(100%);
+    animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* --- LIGHT MODE DRAWER & DROPDOWN OVERRIDES --- */
+html[data-bs-theme="light"] .modules-drawer-content {
+    background: rgba(255, 255, 255, 0.95);
+    border-top: 1px solid rgba(0, 0, 0, 0.1);
+    color: var(--text-body);
+}
+
+html[data-bs-theme="light"] .dropdown-menu,
+html[data-bs-theme="light"] .app-drawer-dropdown {
+    background-color: var(--bg-card);
+    color: var(--text-body);
+    border: 1px solid var(--border-color);
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1) !important;
+}
+
+html[data-bs-theme="light"] .dropdown-item {
+    color: var(--text-body);
+}
+
+html[data-bs-theme="light"] .dropdown-item:hover {
+    background-color: var(--surface-muted);
+    color: var(--primary);
+}
+
+@keyframes slideUp {
+    from {
+        transform: translateY(100%);
+    }
+
+    to {
+        transform: translateY(0);
+    }
+}
+
+/* FAB FIX */
+.nav-item-fab button i {
+    color: white;
+}
+
+/* Module Trigger Button Animation (Desktop) */
+.module-trigger-btn {
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.module-trigger-btn:hover {
+    transform: scale(1.1);
+    background-color: var(--surface-hover);
+    box-shadow: 0 4px 12px rgba(13, 110, 253, 0.15);
+}
+
+.module-trigger-btn:active {
+    transform: scale(0.95);
+}
+
+/* =========================================
+   DARK DEFAULT REFINEMENTS
+   ========================================= */
+
+/* Force text colors in smart cards (Dark Mode Only) */
+html[data-bs-theme="dark"] .smart-card h6,
+html[data-bs-theme="dark"] .smart-card .fw-bold {
+    color: #f8f9fa !important;
+}
+
+html[data-bs-theme="dark"] .smart-card .text-muted {
+    color: rgba(255, 255, 255, 0.65) !important;
+}
+
+/* Bottom Nav (already dark by default now) */
+
+.nav-item {
+    color: rgba(255, 255, 255, 0.5);
+}
+
+html[data-bs-theme="dark"] .nav-item.active {
+    color: #fff;
+}
+
+html[data-bs-theme="dark"] .nav-item.active i {
+    color: #fff !important;
+    text-shadow: 0 0 12px var(--bs-primary);
+}
+
+html[data-bs-theme="dark"] .nav-item.active span {
+    color: #fff !important;
+    font-weight: 700;
+}
+
+/* Light Mode Overrides for Active Nav */
+html[data-bs-theme="light"] .nav-item.active i {
+    color: var(--text-heading) !important;
+    text-shadow: none !important;
+    transform: translateY(-2px);
+}
+
+html[data-bs-theme="light"] .nav-item.active span {
+    color: var(--text-heading) !important;
+    font-weight: 800 !important;
+}

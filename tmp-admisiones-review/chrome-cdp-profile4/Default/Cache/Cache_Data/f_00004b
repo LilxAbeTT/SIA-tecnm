@@ -1,0 +1,1134 @@
+﻿.admisiones-public-page {
+  --adm-bg: #f8fafc;
+  --adm-surface: #ffffff;
+  --adm-surface-soft: #f8fafc;
+  --adm-border: rgba(15, 23, 42, 0.1);
+  --adm-border-strong: rgba(15, 23, 42, 0.16);
+  --adm-ink: #0f172a;
+  --adm-muted: #0f172a;
+  --adm-brand: #0f766e;
+  --adm-brand-strong: #115e59;
+  --adm-accent: #f59e0b;
+  --adm-accent-ink: #92400e;
+  --adm-success: #2d7a51;
+  --adm-danger: #a5472f;
+  --adm-shadow: 0 18px 42px rgba(15, 23, 42, 0.06);
+  background:
+    radial-gradient(circle at top left, rgba(37, 99, 235, 0.08), transparent 24%),
+    radial-gradient(circle at bottom right, rgba(20, 184, 166, 0.08), transparent 20%),
+    linear-gradient(180deg, #f8fafc 0%, #eef5ff 100%);
+  color: var(--adm-ink);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+.admisiones-public-page *,
+.admisiones-public-page *::before,
+.admisiones-public-page *::after {
+  box-sizing: border-box;
+}
+
+.admisiones-public-page a {
+  color: var(--adm-brand);
+}
+
+.adm-shell {
+  width: min(100%, 1320px);
+  max-width: 1320px;
+  margin: 0 auto;
+  padding: 24px 18px 56px;
+  display: grid;
+  gap: 18px;
+}
+
+.adm-shell > *,
+.adm-hero,
+.adm-screen,
+.adm-context-strip,
+.adm-hero-summary,
+.adm-hero-focus,
+.adm-panel,
+.adm-soft-card,
+.adm-route-card,
+.adm-practice-card,
+.adm-topic-entry {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.adm-hero {
+  background:
+    radial-gradient(circle at top right, rgba(96, 165, 250, 0.34), transparent 30%),
+    radial-gradient(circle at bottom left, rgba(45, 212, 191, 0.18), transparent 34%),
+    linear-gradient(135deg, rgba(239, 246, 255, 0.98), rgba(224, 242, 254, 0.94) 48%, rgba(255, 255, 255, 0.98));
+  border: 1px solid rgba(37, 99, 235, 0.14);
+  border-radius: 32px;
+  padding: 28px;
+  color: var(--adm-ink);
+  box-shadow: 0 24px 56px rgba(15, 23, 42, 0.08);
+}
+
+.adm-hero-top,
+.adm-app-layout,
+.adm-home-actions,
+.adm-screen-grid,
+.adm-card-grid,
+.adm-route-grid,
+.adm-career-grid,
+.adm-practice-grid,
+.adm-study-layout,
+.adm-topic-detail-grid,
+.adm-practice-run,
+.adm-info-layout {
+  display: grid;
+  gap: 18px;
+}
+
+.adm-hero-top {
+  grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.9fr);
+  align-items: start;
+}
+
+.adm-hero-summary,
+.adm-hero-focus,
+.adm-stat-card,
+.adm-context-strip,
+.adm-panel,
+.adm-soft-card,
+.adm-route-card,
+.adm-practice-card,
+.adm-topic-entry {
+  background: var(--adm-surface);
+  border: 1px solid var(--adm-border-strong);
+  border-radius: 24px;
+  box-shadow: var(--adm-shadow);
+}
+
+.adm-hero-summary,
+.adm-stat-card.is-hero {
+  background: rgba(255, 255, 255, 0.76);
+  border-color: rgba(37, 99, 235, 0.14);
+}
+
+.adm-hero-summary {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  padding: 0;
+}
+
+.adm-hero-focus,
+.adm-context-strip,
+.adm-panel,
+.adm-soft-card,
+.adm-route-card,
+.adm-practice-card,
+.adm-topic-entry,
+.adm-stat-card,
+.adm-screen,
+.adm-nav {
+  padding: 20px;
+}
+
+.adm-hero-focus {
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(248, 250, 252, 0.92));
+}
+
+.adm-title-xl {
+  font-size: clamp(2.2rem, 4.6vw, 4rem);
+  line-height: 1;
+  margin: 16px 0 10px;
+  letter-spacing: -0.04em;
+  color: var(--adm-ink);
+  font-family: "Source Serif 4", serif;
+  overflow-wrap: anywhere;
+}
+
+.adm-lead,
+.adm-copy.is-light {
+  color: var(--adm-muted);
+}
+
+.adm-lead {
+  font-size: 1.03rem;
+  line-height: 1.7;
+  max-width: 62ch;
+  font-weight: 500;
+}
+
+.adm-copy,
+.adm-meta,
+.adm-note,
+.adm-stat-label {
+  color: var(--adm-muted);
+  line-height: 1.6;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.adm-copy.is-light,
+.adm-stat-label.is-light {
+  color: var(--adm-muted);
+}
+
+.adm-hero .adm-title-xl,
+.adm-hero h1,
+.adm-hero h2,
+.adm-hero h3,
+.adm-hero .adm-panel-title {
+  color: var(--adm-ink) !important;
+}
+
+.adm-hero .adm-lead,
+.adm-hero .adm-copy,
+.adm-hero .adm-note,
+.adm-hero .adm-meta,
+.adm-hero .adm-stat-label {
+  color: var(--adm-ink) !important;
+}
+
+.adm-eyebrow,
+.adm-section-label,
+.adm-chip,
+.adm-pill,
+.adm-score-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 999px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+}
+
+.adm-eyebrow,
+.adm-section-label,
+.adm-chip {
+  padding: 8px 14px;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+}
+
+.adm-eyebrow {
+  background: rgba(255, 255, 255, 0.82);
+  color: #1d4ed8;
+  border: 1px solid rgba(37, 99, 235, 0.1);
+}
+
+.adm-section-label,
+.adm-chip,
+.adm-pill,
+.adm-score-pill {
+  background: rgba(15, 118, 110, 0.08);
+  color: var(--adm-brand);
+}
+
+.adm-section-label.is-light,
+.adm-chip.is-light {
+  background: rgba(255, 255, 255, 0.88);
+  color: #1d4ed8;
+  border: 1px solid rgba(37, 99, 235, 0.1);
+}
+
+.adm-chip.is-accent,
+.adm-score-pill {
+  background: rgba(200, 146, 40, 0.16);
+  color: var(--adm-accent-ink);
+}
+
+.adm-pill {
+  padding: 7px 11px;
+  font-size: 0.82rem;
+}
+
+.adm-pill.is-success {
+  background: rgba(45, 122, 81, 0.12);
+  color: var(--adm-success);
+}
+
+.adm-button {
+  appearance: none;
+  border: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 18px;
+  border-radius: 999px;
+  text-decoration: none;
+  cursor: pointer;
+  font-weight: 800;
+  line-height: 1.2;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease, color 0.18s ease;
+  min-height: 44px;
+  white-space: normal;
+}
+
+.adm-button,
+.adm-button:link,
+.adm-button:visited {
+  color: inherit;
+}
+
+.adm-button:hover {
+  transform: translateY(-1px);
+}
+
+.adm-button.is-primary {
+  background: linear-gradient(135deg, #0f766e 0%, #14b8a6 100%);
+  color: #ffffff;
+  box-shadow: 0 14px 28px rgba(20, 184, 166, 0.22);
+}
+
+.adm-button.is-secondary {
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--adm-ink);
+  border: 1px solid rgba(15, 23, 42, 0.1);
+}
+
+.adm-button.is-secondary-solid {
+  background: #2563eb;
+  color: #f8fbff;
+}
+
+.adm-button.is-ghost {
+  background: transparent;
+  color: var(--adm-ink);
+  border: 1px solid rgba(15, 23, 42, 0.12);
+}
+
+.adm-button.is-ghost-light {
+  background: rgba(255, 255, 255, 0.76);
+  color: var(--adm-ink);
+  border: 1px solid rgba(15, 23, 42, 0.1);
+}
+
+.adm-button[disabled] {
+  opacity: 0.46;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.adm-action-row,
+.adm-inline-list,
+.adm-toolbar,
+.adm-pill-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.adm-top-gap,
+.top-gap {
+  margin-top: 16px;
+}
+
+.adm-hero-stats,
+.adm-home-actions,
+.adm-screen-grid,
+.adm-card-grid,
+.adm-route-grid,
+.adm-career-grid,
+.adm-practice-grid {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.adm-hero-stats {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-top: 18px;
+}
+
+.adm-stat-card.is-wide {
+  grid-column: span 2;
+}
+
+.adm-stat-value {
+  font-size: 2rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.adm-app-layout {
+  grid-template-columns: minmax(0, 1fr) 320px;
+  align-items: start;
+  margin-top: 22px;
+}
+
+.adm-content,
+.adm-sidebar {
+  display: grid;
+  gap: 16px;
+}
+
+.adm-sidebar {
+  position: sticky;
+  top: 16px;
+}
+
+.adm-nav,
+.adm-screen {
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 24px;
+  box-shadow: var(--adm-shadow);
+}
+
+.adm-nav {
+  display: flex;
+  gap: 10px;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  align-items: stretch;
+  border-radius: 24px;
+  position: sticky;
+  top: 12px;
+  z-index: 12;
+  backdrop-filter: blur(14px);
+  scrollbar-width: thin;
+  scroll-padding: 12px;
+  scroll-snap-type: x proximity;
+  -webkit-overflow-scrolling: touch;
+}
+
+.adm-context-strip {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.88);
+  border-color: rgba(15, 118, 110, 0.18);
+  padding: 16px 20px;
+}
+
+.adm-context-strip > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.adm-context-strip strong {
+  display: block;
+  font-size: 1.06rem;
+  line-height: 1.3;
+  margin-top: 3px;
+}
+
+.adm-context-strip .adm-note {
+  margin: 4px 0 0;
+}
+
+.adm-context-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+  min-width: max-content;
+}
+
+.adm-context-metrics span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 7px 11px;
+  border-radius: 999px;
+  background: rgba(37, 99, 235, 0.08);
+  color: #1d4ed8;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.adm-screen {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  padding: 0;
+  display: grid;
+  gap: 16px;
+}
+
+.adm-nav-button {
+  appearance: none;
+  border: 1px solid rgba(15, 23, 42, 0.06);
+  background: rgba(255, 255, 255, 0.72);
+  border-radius: 18px;
+  padding: 14px 16px;
+  text-align: center;
+  cursor: pointer;
+  color: var(--adm-ink);
+  flex: 0 0 auto;
+  min-width: 136px;
+  white-space: nowrap;
+  scroll-snap-align: start;
+}
+
+.adm-nav-button strong,
+.adm-nav-button span {
+  display: block;
+}
+
+.adm-nav-button span {
+  color: var(--adm-ink);
+  font-size: 0.88rem;
+  margin-top: 3px;
+  font-weight: 500;
+}
+
+.adm-nav-button strong {
+  font-size: 0.96rem;
+}
+
+.adm-nav-button.is-active {
+  background: linear-gradient(135deg, rgba(15, 118, 110, 0.12), rgba(37, 99, 235, 0.08));
+  border-color: rgba(15, 118, 110, 0.16);
+  box-shadow: inset 0 0 0 1px rgba(15, 118, 110, 0.08);
+}
+
+.adm-app-layout.is-single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.adm-panel.is-accent {
+  background: linear-gradient(180deg, #fffaf0 0%, #fef3c7 100%);
+}
+
+.adm-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.adm-screen h2,
+.adm-screen h3,
+.adm-screen h4,
+.adm-panel h2,
+.adm-panel h3,
+.adm-panel h4,
+.adm-soft-card h3,
+.adm-soft-card h4,
+.adm-route-card h3,
+.adm-practice-card h3,
+.adm-topic-entry h3 {
+  margin: 10px 0 8px;
+}
+
+.adm-panel-title {
+  margin: 10px 0 8px;
+  font-size: 1.32rem;
+}
+
+.adm-home-action {
+  min-height: 100%;
+}
+
+.adm-panel,
+.adm-soft-card,
+.adm-route-card,
+.adm-practice-card,
+.adm-topic-entry,
+.adm-context-strip,
+.adm-subsection,
+.adm-screen > .adm-section-header,
+.adm-screen > .adm-breadcrumbs,
+.adm-screen > .adm-pagination-row,
+.adm-area-tabs {
+  position: relative;
+  overflow: hidden;
+}
+
+.adm-panel::before,
+.adm-soft-card::before,
+.adm-route-card::before,
+.adm-practice-card::before,
+.adm-topic-entry::before,
+.adm-context-strip::before,
+.adm-subsection::before,
+.adm-screen > .adm-section-header::before,
+.adm-screen > .adm-breadcrumbs::before,
+.adm-screen > .adm-pagination-row::before,
+.adm-area-tabs::before {
+  content: "";
+  position: absolute;
+  left: 18px;
+  right: 18px;
+  top: 0;
+  height: 3px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(15, 118, 110, 0.95), rgba(37, 99, 235, 0.72));
+}
+
+.adm-subsection,
+.adm-context-strip,
+.adm-screen > .adm-section-header,
+.adm-screen > .adm-breadcrumbs,
+.adm-screen > .adm-pagination-row,
+.adm-area-tabs {
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 24px;
+  box-shadow: var(--adm-shadow);
+  padding: 18px 20px;
+}
+
+.adm-subsection {
+  display: grid;
+  gap: 16px;
+}
+
+.adm-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.adm-screen > .adm-section-header {
+  margin-bottom: 0;
+}
+
+.adm-kicker {
+  color: var(--adm-accent);
+  font-size: 0.8rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.adm-progress-bar {
+  height: 12px;
+  width: 100%;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.08);
+}
+
+.adm-progress-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--adm-brand) 0%, #2563eb 100%);
+}
+
+.adm-steps-list,
+.adm-checklist {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 10px;
+}
+
+.adm-steps-list li,
+.adm-info-list > div,
+.adm-mini-metrics > div,
+.adm-compact-item,
+.adm-note-box,
+.adm-result-card {
+  background: var(--adm-surface-soft);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 18px;
+  padding: 14px 15px;
+}
+
+.adm-steps-list li {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 12px;
+  align-items: start;
+}
+
+.adm-steps-list.simple li {
+  padding: 0;
+  background: transparent;
+  border: 0;
+}
+
+.adm-mini-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.adm-mini-metrics strong,
+.adm-compact-item strong,
+.adm-info-list strong {
+  display: block;
+}
+
+.adm-compact-item.is-text span,
+.adm-info-list span {
+  display: block;
+  margin-top: 4px;
+}
+
+.adm-info-list,
+.adm-compact-list,
+.adm-topic-stack {
+  display: grid;
+  gap: 12px;
+}
+
+.adm-compact-link,
+.adm-career-choice,
+.adm-area-tab,
+.adm-breadcrumb-button,
+.adm-question-dot {
+  appearance: none;
+  border: 1px solid var(--adm-border);
+  background: var(--adm-surface);
+  color: var(--adm-ink);
+  cursor: pointer;
+}
+
+.adm-compact-link,
+.adm-career-choice,
+.adm-breadcrumb-button {
+  text-align: left;
+}
+
+.adm-compact-link {
+  border-radius: 18px;
+  padding: 13px 14px;
+  display: grid;
+  gap: 4px;
+}
+
+.adm-compact-link span,
+.adm-career-choice p,
+.adm-compact-item span,
+.adm-info-list span,
+.adm-option span {
+  color: var(--adm-ink);
+}
+
+.adm-career-choice {
+  border-radius: 22px;
+  padding: 18px;
+  min-height: 150px;
+  display: grid;
+  gap: 10px;
+}
+
+.adm-career-choice.is-active,
+.adm-route-card,
+.adm-practice-card.is-route,
+.adm-topic-entry.is-bookmarked,
+.adm-area-tab.is-active {
+  border-color: rgba(15, 118, 110, 0.26);
+  box-shadow: 0 14px 28px rgba(15, 23, 42, 0.08);
+}
+
+.adm-career-choice-top,
+.adm-practice-card-top,
+.adm-topic-entry-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.adm-area-tabs {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.adm-lesson-stepper {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.adm-step-pill {
+  appearance: none;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 18px;
+  padding: 12px 14px;
+  display: grid;
+  gap: 4px;
+  text-align: left;
+  cursor: pointer;
+  color: var(--adm-ink);
+  min-width: 132px;
+}
+
+.adm-step-pill strong,
+.adm-step-pill span {
+  display: block;
+}
+
+.adm-step-pill span {
+  font-size: 0.88rem;
+}
+
+.adm-step-pill.is-active {
+  border-color: rgba(15, 118, 110, 0.22);
+  background: linear-gradient(135deg, rgba(15, 118, 110, 0.1), rgba(37, 99, 235, 0.08));
+  box-shadow: inset 0 0 0 1px rgba(15, 118, 110, 0.08);
+}
+
+.adm-area-tab {
+  border-radius: 18px;
+  padding: 12px 14px;
+}
+
+.adm-area-tab strong,
+.adm-area-tab span {
+  display: block;
+}
+
+.adm-area-tab span {
+  color: var(--adm-ink);
+  font-size: 0.86rem;
+  margin-top: 3px;
+  font-weight: 500;
+}
+
+.adm-area-tab.is-route {
+  background: rgba(240, 253, 250, 0.9);
+}
+
+.adm-topic-entry,
+.adm-route-card,
+.adm-practice-card,
+.adm-soft-card {
+  display: grid;
+  gap: 12px;
+}
+
+.adm-study-layout {
+  grid-template-columns: minmax(290px, 0.92fr) minmax(0, 1.4fr);
+  align-items: start;
+}
+
+.adm-topic-detail-grid,
+.adm-info-layout,
+.adm-practice-run {
+  grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.85fr);
+  align-items: start;
+}
+
+.adm-topic-block {
+  margin-top: 18px;
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: var(--adm-surface-soft);
+}
+
+.adm-checklist {
+  padding-left: 18px;
+  list-style: disc;
+}
+
+.adm-checklist li {
+  margin-bottom: 8px;
+}
+
+.adm-option-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.adm-option {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 13px 14px;
+  border-radius: 18px;
+  border: 1px solid var(--adm-border-strong);
+  background: #ffffff;
+}
+
+.adm-option input {
+  margin-top: 3px;
+}
+
+.adm-option.is-correct {
+  border-color: rgba(45, 122, 81, 0.36);
+  background: rgba(45, 122, 81, 0.08);
+}
+
+.adm-option.is-wrong {
+  border-color: rgba(165, 71, 47, 0.34);
+  background: rgba(165, 71, 47, 0.08);
+}
+
+.adm-alert {
+  border-radius: 18px;
+  padding: 14px 16px;
+  margin-top: 14px;
+}
+
+.adm-alert.is-success {
+  background: rgba(45, 122, 81, 0.1);
+  color: var(--adm-success);
+}
+
+.adm-alert.is-warning {
+  background: rgba(200, 146, 40, 0.14);
+  color: var(--adm-accent-ink);
+}
+
+.adm-breadcrumbs,
+.adm-pagination-row,
+.adm-question-nav {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.adm-breadcrumb-button {
+  border-radius: 999px;
+  padding: 8px 12px;
+}
+
+.adm-question-dot {
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  font-weight: 800;
+}
+
+.adm-question-dot.is-answered {
+  background: rgba(15, 118, 110, 0.08);
+}
+
+.adm-question-dot.is-active {
+  background: var(--adm-brand);
+  color: #f7f3ea;
+  border-color: transparent;
+}
+
+.adm-metric-stack {
+  display: grid;
+  gap: 14px;
+}
+
+.adm-sidebar-focus {
+  display: grid;
+  gap: 8px;
+}
+
+.adm-note-box {
+  color: var(--adm-ink);
+  background: rgba(15, 118, 110, 0.08);
+}
+
+.adm-search-field {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.adm-search-input {
+  width: min(340px, 100%);
+  min-width: 0;
+  border-radius: 16px;
+  border: 1px solid var(--adm-border-strong);
+  padding: 12px 14px;
+  background: #ffffff;
+  color: var(--adm-ink);
+}
+
+.adm-career-choice,
+.adm-topic-entry,
+.adm-practice-card,
+.adm-route-card,
+.adm-soft-card,
+.adm-panel {
+  overflow-wrap: anywhere;
+}
+
+.adm-timeline {
+  display: grid;
+  gap: 14px;
+}
+
+.adm-timeline-item {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  gap: 12px;
+}
+
+.adm-timeline-item > div:last-child {
+  background: var(--adm-surface-soft);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 18px;
+  padding: 14px 16px;
+}
+
+.adm-timeline-dot {
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, var(--adm-brand), #2563eb);
+  margin-top: 3px;
+}
+
+.adm-empty-state {
+  padding: 18px;
+  border-radius: 20px;
+  border: 1px dashed rgba(22, 58, 104, 0.24);
+  background: rgba(255, 255, 255, 0.54);
+  color: var(--adm-ink);
+}
+
+.adm-empty-state.compact {
+  padding: 14px;
+}
+
+.adm-footer-note {
+  text-align: center;
+  color: var(--adm-ink);
+  margin-top: 24px;
+  font-size: 0.92rem;
+  font-weight: 500;
+}
+
+@media (max-width: 1180px) {
+  .adm-app-layout,
+  .adm-study-layout,
+  .adm-topic-detail-grid,
+  .adm-practice-run,
+  .adm-info-layout,
+  .adm-hero-top {
+    grid-template-columns: 1fr;
+  }
+
+  .adm-sidebar {
+    position: static;
+    display: none;
+  }
+
+  .adm-hero-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 820px) {
+  .adm-shell {
+    padding: 16px 12px 40px;
+  }
+
+  .adm-nav {
+    top: 8px;
+    padding: 12px;
+    gap: 8px;
+  }
+
+  .adm-context-strip {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .adm-context-metrics {
+    justify-content: flex-start;
+    min-width: 0;
+    width: 100%;
+  }
+
+  .adm-section-header {
+    flex-direction: column;
+  }
+
+  .adm-search-field {
+    width: 100%;
+  }
+
+  .adm-search-input {
+    width: 100%;
+  }
+}
+
+@media (max-width: 640px) {
+  .adm-hero,
+  .adm-context-strip,
+  .adm-panel,
+  .adm-soft-card,
+  .adm-route-card,
+  .adm-practice-card,
+  .adm-topic-entry,
+  .adm-nav,
+  .adm-screen,
+  .adm-subsection,
+  .adm-area-tabs,
+  .adm-screen > .adm-section-header,
+  .adm-screen > .adm-breadcrumbs,
+  .adm-screen > .adm-pagination-row {
+    border-radius: 20px;
+    padding: 16px;
+  }
+
+  .adm-hero-stats,
+  .adm-home-actions,
+  .adm-screen-grid,
+  .adm-card-grid,
+  .adm-route-grid,
+  .adm-career-grid,
+  .adm-practice-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .adm-stat-card.is-wide {
+    grid-column: span 1;
+  }
+
+  .adm-title-xl {
+    font-size: 2rem;
+  }
+
+  .adm-nav {
+    padding: 10px;
+  }
+
+  .adm-nav-button {
+    min-width: 124px;
+    padding: 12px 14px;
+  }
+
+  .adm-area-tabs,
+  .adm-lesson-stepper {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scroll-padding: 10px;
+    scroll-snap-type: x proximity;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .adm-area-tab,
+  .adm-step-pill {
+    flex: 0 0 min(78vw, 230px);
+    min-width: 0;
+    scroll-snap-align: start;
+  }
+
+  .adm-topic-entry-head,
+  .adm-career-choice-top,
+  .adm-practice-card-top {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .adm-mini-metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .adm-action-row,
+  .adm-toolbar,
+  .adm-search-field,
+  .adm-pagination-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .adm-question-nav {
+    justify-content: center;
+  }
+}

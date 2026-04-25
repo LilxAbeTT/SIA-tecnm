@@ -159,7 +159,7 @@ window.AdminMedi.Ui = (function () {
 
   function renderStructure(container) {
     // Avoid re-rendering if complete structure exists
-    if (document.getElementById('medi-student') && document.getElementById('modalPinLogin')) return;
+    if (container?.querySelector('#medi-student') && container?.querySelector('#modalPinLogin')) return;
 
     // Explicit cleanup to avoid duplicates if partial state
     container.innerHTML = '';

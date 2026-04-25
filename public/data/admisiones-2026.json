@@ -1,49 +1,49 @@
 {
   "edition": "2026",
-  "institution": "Instituto Tecnol?gico de Estudios Superiores de Los Cabos",
+  "institution": "Instituto Tecnológico de Estudios Superiores de Los Cabos",
   "exam": {
     "name": "EVALUATEC 2026",
     "reactives": 110,
     "duration": "3 horas",
-    "format": "En l?nea",
-    "englishPolicy": "El m?dulo de ingl?s es obligatorio y diagn?stico, pero no suma al puntaje global del examen de admisi?n.",
-    "studyNote": "SIA convierte la guia oficial 2026 en un espacio de estudio y practica para nuevo ingreso."
+    "format": "En línea",
+    "englishPolicy": "El módulo de inglés es obligatorio y diagnóstico, pero no suma al puntaje global del examen de admisión.",
+    "studyNote": "SIA convierte la guía oficial 2026 en un espacio de estudio y práctica para nuevo ingreso."
   },
   "hero": {
     "eyebrow": "Nuevo ingreso ITES Los Cabos",
-    "title": "Prep?rate para tu admisi?n 2026 sin crear cuenta",
-    "summary": "Estudia por carrera, practica por ?reas y guarda tu avance localmente mientras te preparas para el examen oficial EVALUATEC."
+    "title": "Prepárate para tu admisión 2026 sin crear cuenta",
+    "summary": "Estudia por carrera, practica por áreas y guarda tu avance localmente mientras te preparas para el examen oficial EVALUATEC."
   },
   "processSteps": [
     {
       "id": "ficha",
       "title": "Solicita tu ficha",
       "dateLabel": "09 febrero al 30 abril 2026",
-      "description": "Haz tu registro en l?nea y ten listos CURP, nombre oficial de tu institucion de procedencia, promedio general de preparatoria, n?mero de seguridad social y tipo de sangre."
+      "description": "Haz tu registro en línea y ten listos CURP, nombre oficial de tu institución de procedencia, promedio general de preparatoria, número de seguridad social y tipo de sangre."
     },
     {
       "id": "pago",
-      "title": "Realiza el pago de admisi?n",
-      "dateLabel": "Durante tu tramite",
-      "description": "El derecho de admisi?n incluye ficha, examen de admisi?n y curso proped?utico. El pago se realiza en BANORTE con la ficha generada por el sistema."
+      "title": "Realiza el pago de admisión",
+      "dateLabel": "Durante tu trámite",
+      "description": "El derecho de admisión incluye ficha, examen de admisión y curso propedéutico. El pago se realiza en BANORTE con la ficha generada por el sistema."
     },
     {
       "id": "validacion",
       "title": "Vuelve a la plataforma y confirma",
-      "dateLabel": "Despues del pago",
-      "description": "Regresa al portal de aspirantes para concluir tu solicitud y obtener la ficha con la que presentaras el examen oficial."
+      "dateLabel": "Después del pago",
+      "description": "Regresa al portal de aspirantes para concluir tu solicitud y obtener la ficha con la que presentarás el examen oficial."
     },
     {
       "id": "examen",
       "title": "Presenta el examen EVALUATEC",
-      "dateLabel": "S?bado 16 mayo 2026",
-      "description": "El examen es totalmente en l?nea, dura 3 horas y evalua matem?ticas, comprensi?n lectora, dos m?dulos especificos y un m?dulo diagn?stico de ingl?s."
+      "dateLabel": "Sábado 16 mayo 2026",
+      "description": "El examen es totalmente en línea, dura 3 horas y evalúa matemáticas, comprensión lectora, dos módulos específicos y un módulo diagnóstico de inglés."
     },
     {
       "id": "propedeutico",
-      "title": "Acredita el curso proped?utico",
+      "title": "Acredita el curso propedéutico",
       "dateLabel": "06 al 17 julio 2026",
-      "description": "El curso proped?utico se llevara a cabo de forma presencial para quienes continúen en el proceso de nuevo ingreso."
+      "description": "El curso propedéutico se llevará a cabo de forma presencial para quienes continúen en el proceso de nuevo ingreso."
     }
   ],
   "timeline": [
@@ -53,72 +53,72 @@
       "status": "Registro"
     },
     {
-      "label": "Examen de admisi?n",
+      "label": "Examen de admisión",
       "date": "16 de mayo de 2026",
-      "status": "Evaluacion"
+      "status": "Evaluación"
     },
     {
-      "label": "Curso proped?utico",
+      "label": "Curso propedéutico",
       "date": "06 al 17 de julio de 2026",
-      "status": "Induccion"
+      "status": "Inducción"
     }
   ],
   "requirements": [
-    "Concluir el tramite de ficha de admisi?n de acuerdo con la convocatoria vigente.",
+    "Concluir el trámite de ficha de admisión de acuerdo con la convocatoria vigente.",
     "Verificar la fecha y hora asignadas para el examen; no hay aplicaciones posteriores ni reprogramaciones.",
-    "Preparar una computadora y una conexi?n a internet estable para presentar la prueba en l?nea.",
-    "Tener a la mano hojas blancas, l?piz, sacapuntas y borrador para c?lculos o anotaciones.",
+    "Preparar una computadora y una conexión a internet estable para presentar la prueba en línea.",
+    "Tener a la mano hojas blancas, lápiz, sacapuntas y borrador para cálculos o anotaciones.",
     "Revisar el correo TecNM desde 24 horas antes del examen para ubicar la liga de acceso oficial."
   ],
   "payment": {
     "amount": "$2,200.00 MXN",
     "includes": [
-      "Ficha de admisi?n",
-      "Examen de admisi?n",
-      "Curso proped?utico"
+      "Ficha de admisión",
+      "Examen de admisión",
+      "Curso propedéutico"
     ],
     "bank": "BANORTE",
-    "flow": "El sistema asigna la ficha de pago al concluir la solicitud de preficha y despues debes regresar a la plataforma para cerrar tu registro."
+    "flow": "El sistema asigna la ficha de pago al concluir la solicitud de preficha y después debes regresar a la plataforma para cerrar tu registro."
   },
   "platform": {
     "registrationUrl": "https://loscabos.sistemasie.app/loscabos/indexaspirante.html",
     "instructions": [
       "Completa la solicitud de preficha en la plataforma oficial.",
       "Descarga o anota la ficha de pago que emite el sistema.",
-      "Vuelve al portal para concluir tu registro despues del pago.",
+      "Vuelve al portal para concluir tu registro después del pago.",
       "Espera la liga del examen en tu correo TecNM."
     ]
   },
   "examDay": [
-    "Descansa bien la noche anterior y evita estudiar de forma desordenada a ?ltima hora.",
-    "Desayuna o come ligero antes del examen e hidrate durante la ma?ana.",
-    "Entra con tiempo para validar equipo, conexi?n y acceso a la plataforma.",
-    "No intentes copiar ni reproducir preguntas; esta prohibido.",
+    "Descansa bien la noche anterior y evita estudiar de forma desordenada a última hora.",
+    "Desayuna o come ligero antes del examen e hidrátate durante la mañana.",
+    "Entra con tiempo para validar equipo, conexión y acceso a la plataforma.",
+    "No intentes copiar ni reproducir preguntas; está prohibido.",
     "Recuerda que el tiempo corre desde la hora oficial de inicio."
   ],
   "recommendations": [
-    "Planea sesiones de estudio progresivas, de lo m?s sencillo a lo m?s complejo.",
-    "Apoyate en resúmenes, mapas conceptuales y cuadros sin?pticos para fijar ideas.",
+    "Planea sesiones de estudio progresivas, de lo más sencillo a lo más complejo.",
+    "Apóyate en resúmenes, mapas conceptuales y cuadros sinópticos para fijar ideas.",
     "Explica con tus palabras cada tema para verificar que de verdad lo entiendes.",
     "Programa al menos cinco sesiones de estudio por semana, de aproximadamente tres horas.",
-    "Busca espacios con buena iluminaci?n, ventilacion y pocas distracciones.",
-    "Estudia con otros aspirantes o con docentes cuando necesites retroalimentaci?n."
+    "Busca espacios con buena iluminación, ventilación y pocas distracciones.",
+    "Estudia con otros aspirantes o con docentes cuando necesites retroalimentación."
   ],
   "faq": [
     {
-      "question": "Cu?ndo es el examen oficial de admisi?n 2026?",
-      "answer": "El examen oficial esta programado para el s?bado 16 de mayo de 2026. La p?gina 16 de la guia muestra 11:00 horas para Ingenier?a en Administraci?n, Contador P?blico, Turismo, Gastronom?a e Ingenier?a en Sistemas Computacionales."
+      "question": "¿Cuándo es el examen oficial de admisión 2026?",
+      "answer": "El examen oficial está programado para el sábado 16 de mayo de 2026. La página 16 de la guía muestra 11:00 horas para Ingeniería en Administración, Contador Público, Turismo, Gastronomía e Ingeniería en Sistemas Computacionales."
     },
     {
-      "question": "Se puede presentar en otra fecha?",
-      "answer": "No. La guia indica que el examen solo se aplica en la fecha y hora asignadas, sin excepciones."
+      "question": "¿Se puede presentar en otra fecha?",
+      "answer": "No. La guía indica que el examen solo se aplica en la fecha y hora asignadas, sin excepciones."
     },
     {
-      "question": "D?nde llega la liga del examen?",
-      "answer": "La liga oficial de acceso se envia al correo TecNM aproximadamente 24 horas antes de la aplicacion."
+      "question": "¿Dónde llega la liga del examen?",
+      "answer": "La liga oficial de acceso se envía al correo TecNM aproximadamente 24 horas antes de la aplicación."
     },
     {
-      "question": "Qu? hago si tengo problemas para acceder?",
+      "question": "¿Qué hago si tengo problemas para acceder?",
       "answer": "Debes comunicarte a infoexamen@loscabos.tecnm.mx en horario de lunes a viernes de 08:00 a 14:00 y de 17:00 a 18:00 horas."
     }
   ],

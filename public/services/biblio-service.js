@@ -12,6 +12,11 @@ const BiblioService = (function () {
     const INVENTORY_META_DOC_ID = 'inventory-current';
     const INVENTORY_FOUND_SUBCOLL = 'encontrados';
     const INVENTORY_MISSING_SUBCOLL = 'faltantes';
+    const CATALOG_STATE_DOC_ID = 'catalog-state';
+    const CATALOG_STORAGE_KEY = 'sia_biblio_catalog';
+    const CATALOG_META_STORAGE_KEY = 'sia_biblio_catalog_meta';
+    const CATALOG_STATE_CHECK_TTL = 60 * 1000;
+    const CATALOG_CACHE_MAX_AGE = 12 * 60 * 60 * 1000;
 
     const ACTIVE_LOAN_STATES = new Set(['pendiente', 'pendiente_entrega', 'entregado']);
     const CACHE_SCHEMA_VERSION = 2;
@@ -1306,8 +1311,9 @@ const BiblioService = (function () {
         }
 
         _activeVisitCleanupPromise = (async () => {
-            const snap = await ctx.db.collection(VISITAS_COLL)
-                .where('status', '==', 'en_curso')
+            const snap = await ctx.db.collection(ACTIVE_VISITS_COLL)
+                .where('autoCloseAtMs', '<=', nowMs)
+                .limit(100)
                 .get();
 
             if (snap.empty) {
@@ -1317,31 +1323,32 @@ const BiblioService = (function () {
 
             const batch = ctx.db.batch();
             const closedVisits = [];
+            let hasWrites = false;
 
             snap.docs.forEach((doc) => {
                 const data = doc.data() || {};
                 if (!isVisitExpired(data, nowMs)) return;
 
-                batch.update(doc.ref, buildExpiredVisitUpdate(data, nowMs));
-
-                const lockKey = data.lockKey || buildVisitLockKey({
-                    uid: data.studentId,
-                    matricula: data.matricula
-                });
-                if (lockKey) {
-                    batch.delete(ctx.db.collection(ACTIVE_VISITS_COLL).doc(lockKey));
+                const visitId = String(data.visitId || '').trim();
+                if (visitId) {
+                    batch.update(ctx.db.collection(VISITAS_COLL).doc(visitId), buildExpiredVisitUpdate(data, nowMs));
+                    hasWrites = true;
+                    closedVisits.push({
+                        id: visitId,
+                        studentName: data.studentName || 'Visitante',
+                        matricula: data.matricula || 'S/N'
+                    });
                 }
 
-                closedVisits.push({
-                    id: doc.id,
-                    studentName: data.studentName || 'Visitante',
-                    matricula: data.matricula || 'S/N'
-                });
+                batch.delete(doc.ref);
+                hasWrites = true;
             });
 
-            if (closedVisits.length > 0) {
+            if (hasWrites) {
                 await batch.commit();
-                console.log(`[BIBLIO] Visitas auto-cerradas: ${closedVisits.map((item) => `${item.studentName} (${item.matricula})`).join(', ')}`);
+                if (closedVisits.length > 0) {
+                    console.log(`[BIBLIO] Visitas auto-cerradas: ${closedVisits.map((item) => `${item.studentName} (${item.matricula})`).join(', ')}`);
+                }
             }
 
             _activeVisitCleanupTime = Date.now();
@@ -1672,7 +1679,7 @@ const BiblioService = (function () {
         opCount += 1;
         await commitBatchIfNeeded(true);
 
-        invalidateCatalogCache();
+        await markCatalogStructureChanged(ctx);
 
         return {
             session: {
@@ -1910,35 +1917,152 @@ const BiblioService = (function () {
     // Cache local del catalogo para busqueda client-side
     let _catalogCache = null;
     let _catalogCacheTime = 0;
+    let _catalogCacheVersion = '';
     let _inventoryLookupCache = null;
     let _inventoryLookupCacheTime = 0;
+    let _catalogStateCache = null;
+    let _catalogStateCacheTime = 0;
     const CACHE_TTL = LOCAL_CACHE_TTL;
+
+    function getCatalogStateRef(ctx) {
+        return ctx.db.collection(BIBLIO_CONFIG_COLL).doc(CATALOG_STATE_DOC_ID);
+    }
+
+    function normalizeCatalogState(data = {}) {
+        const updatedAtMs = Number(data?.updatedAtMs) || 0;
+        const versionTag = String(data?.versionTag || updatedAtMs || '').trim();
+        return {
+            versionTag,
+            updatedAtMs,
+            updatedBy: String(data?.updatedBy || '').trim()
+        };
+    }
+
+    function readCatalogCacheFromStorage() {
+        if (typeof window === 'undefined' || !window.localStorage) {
+            return { books: null, meta: null };
+        }
+
+        try {
+            const rawBooks = window.localStorage.getItem(CATALOG_STORAGE_KEY);
+            const rawMeta = window.localStorage.getItem(CATALOG_META_STORAGE_KEY);
+            if (!rawBooks || !rawMeta) return { books: null, meta: null };
+
+            const meta = JSON.parse(rawMeta);
+            const schemaVersion = Number(meta?.schemaVersion ?? meta?.version ?? 0);
+            if (schemaVersion !== CACHE_SCHEMA_VERSION) {
+                return { books: null, meta: null };
+            }
+
+            const books = JSON.parse(rawBooks);
+            if (!Array.isArray(books)) {
+                return { books: null, meta: null };
+            }
+
+            return { books, meta };
+        } catch (error) {
+            console.warn('[BIBLIO] Error leyendo cache local del catálogo', error);
+            return { books: null, meta: null };
+        }
+    }
+
+    function persistCatalogCacheToStorage(books = [], meta = {}) {
+        if (typeof window === 'undefined' || !window.localStorage) return;
+
+        try {
+            window.localStorage.setItem(CATALOG_STORAGE_KEY, JSON.stringify(Array.isArray(books) ? books : []));
+            window.localStorage.setItem(CATALOG_META_STORAGE_KEY, JSON.stringify({
+                schemaVersion: CACHE_SCHEMA_VERSION,
+                version: CACHE_SCHEMA_VERSION,
+                fetchedAtMs: Number(meta?.fetchedAtMs) || Date.now(),
+                catalogVersion: String(meta?.catalogVersion || '').trim(),
+                stateUpdatedAtMs: Number(meta?.stateUpdatedAtMs) || 0
+            }));
+        } catch (error) {
+            console.warn('[BIBLIO] No se pudo guardar el catálogo en LocalStorage (posible exceso de cuota)', error);
+        }
+    }
+
+    async function getCatalogStateSnapshot(ctx, { force = false } = {}) {
+        const now = Date.now();
+        if (!force && _catalogStateCache && (now - _catalogStateCacheTime) < CATALOG_STATE_CHECK_TTL) {
+            return _catalogStateCache;
+        }
+        if (!ctx?.db) {
+            return _catalogStateCache;
+        }
+
+        try {
+            const snap = await getCatalogStateRef(ctx).get();
+            _catalogStateCache = snap.exists ? normalizeCatalogState(snap.data() || {}) : null;
+            _catalogStateCacheTime = now;
+            return _catalogStateCache;
+        } catch (error) {
+            console.warn('[BIBLIO] No se pudo leer el estado del catálogo:', error);
+            return _catalogStateCache;
+        }
+    }
+
+    async function markCatalogStructureChanged(ctx) {
+        invalidateCatalogCache();
+
+        if (!ctx?.db) return null;
+
+        const nowMs = Date.now();
+        const payload = {
+            versionTag: `${nowMs}:${Math.random().toString(36).slice(2, 8)}`,
+            updatedAtMs: nowMs,
+            updatedBy: ctx?.auth?.currentUser?.uid || '',
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        };
+
+        try {
+            await getCatalogStateRef(ctx).set(payload, { merge: true });
+            _catalogStateCache = normalizeCatalogState(payload);
+            _catalogStateCacheTime = nowMs;
+            return _catalogStateCache;
+        } catch (error) {
+            console.warn('[BIBLIO] No se pudo actualizar la versión del catálogo:', error);
+            return _catalogStateCache;
+        }
+    }
 
     async function _loadCatalogCache(ctx) {
         const now = Date.now();
         if (_catalogCache && (now - _catalogCacheTime) < CACHE_TTL) return _catalogCache;
 
-        // Intentar leer de LocalStorage primero
-        try {
-            const localCache = localStorage.getItem('sia_biblio_catalog');
-            const localMeta = localStorage.getItem('sia_biblio_catalog_meta');
-            if (localCache && localMeta) {
-                const meta = JSON.parse(localMeta);
-                if (meta.version === CACHE_SCHEMA_VERSION && now - meta.updatedAt < LOCAL_CACHE_TTL) {
-                    _catalogCache = JSON.parse(localCache);
-                    _catalogCacheTime = now;
-                    console.log(`[BIBLIO] Catálogo cargado desde caché local (${_catalogCache.length} libros). Cero lecturas facturadas.`);
-                    return _catalogCache;
-                }
+        const storageSnapshot = readCatalogCacheFromStorage();
+        if (!_catalogCache && Array.isArray(storageSnapshot.books) && storageSnapshot.books.length > 0) {
+            _catalogCache = storageSnapshot.books;
+            _catalogCacheVersion = String(storageSnapshot.meta?.catalogVersion || '').trim();
+        }
+
+        const cachedBooks = Array.isArray(_catalogCache) ? _catalogCache : [];
+        const cachedMeta = storageSnapshot.meta || {};
+        const cachedVersion = String(_catalogCacheVersion || cachedMeta?.catalogVersion || '').trim();
+        const cachedFetchedAt = Number(cachedMeta?.fetchedAtMs || 0);
+        const hasCachedCatalog = cachedBooks.length > 0;
+        const serverState = await getCatalogStateSnapshot(ctx, { force: !hasCachedCatalog });
+
+        if (hasCachedCatalog) {
+            const cacheIsFreshEnough = cachedFetchedAt > 0 && (now - cachedFetchedAt) < CATALOG_CACHE_MAX_AGE;
+            const serverVersion = String(serverState?.versionTag || '').trim();
+
+            if (serverVersion && cachedVersion && cachedVersion === serverVersion) {
+                _catalogCacheTime = now;
+                return cachedBooks;
             }
-        } catch (e) {
-            console.warn('[BIBLIO] Error leyendo cache local del catálogo', e);
+
+            if (!serverVersion && cacheIsFreshEnough) {
+                _catalogCacheTime = now;
+                return cachedBooks;
+            }
         }
 
         console.log('[BIBLIO] Descargando catálogo completo de Firebase (reads: N)...');
         const snap = await ctx.db.collection(CAT_COLL).get();
 
-        _catalogCache = snap.docs.map(d => {
+        _catalogCache = snap.docs.map((d) => {
             const data = d.data();
             // Retornar solo lo vital para búsqueda para no saturar LocalStorage (límite de 5MB)
             return {
@@ -1959,15 +2083,14 @@ const BiblioService = (function () {
                 autorSearch: data.autorSearch || ''
             };
         });
+        _catalogCacheVersion = String(serverState?.versionTag || `snapshot:${now}`).trim();
         _catalogCacheTime = now;
 
-        // Guardar en LocalStorage
-        try {
-            localStorage.setItem('sia_biblio_catalog', JSON.stringify(_catalogCache));
-            localStorage.setItem('sia_biblio_catalog_meta', JSON.stringify({ updatedAt: now, version: CACHE_SCHEMA_VERSION }));
-        } catch (e) {
-            console.warn('[BIBLIO] No se pudo guardar el catálogo en LocalStorage (posible exceso de cuota)', e);
-        }
+        persistCatalogCacheToStorage(_catalogCache, {
+            fetchedAtMs: now,
+            catalogVersion: _catalogCacheVersion,
+            stateUpdatedAtMs: Number(serverState?.updatedAtMs) || 0
+        });
 
         return _catalogCache;
     }
@@ -2114,11 +2237,12 @@ const BiblioService = (function () {
     function invalidateCatalogCache() {
         _catalogCache = null;
         _catalogCacheTime = 0;
+        _catalogCacheVersion = '';
         _inventoryLookupCache = null;
         _inventoryLookupCacheTime = 0;
         try {
-            localStorage.removeItem('sia_biblio_catalog_meta');
-            localStorage.removeItem('sia_biblio_catalog');
+            localStorage.removeItem(CATALOG_META_STORAGE_KEY);
+            localStorage.removeItem(CATALOG_STORAGE_KEY);
         } catch (e) {
             console.warn('[BIBLIO] No se pudo invalidar cachÃ© local del catÃ¡logo', e);
         }
@@ -3434,33 +3558,37 @@ const BiblioService = (function () {
         const manana = new Date(hoy);
         manana.setDate(manana.getDate() + 1);
 
+        const visitasHoyRef = ctx.db.collection(VISITAS_COLL)
+            .where('fecha', '>=', hoy)
+            .where('fecha', '<', manana);
+        const prestamosHoyRef = ctx.db.collection(PRES_COLL)
+            .where('estado', 'in', ['pendiente', 'pendiente_entrega', 'entregado'])
+            .where('fechaSolicitud', '>=', hoy)
+            .where('fechaSolicitud', '<', manana);
+
         // Consultas independientes (paralelizables en Promise.all)
         const activosRef = ctx.db.collection('biblio-activos').where('status', '==', 'ocupado');
         const activosCountPromise = activosRef.count
             ? activosRef.count().get().then((snap) => snap.data().count).catch(() => null)
             : Promise.resolve(null);
-        const [visitasSnap, prestamosHoySnap, prestamosSnap, devolucionesSnap, activosSnap, activosCount, retrasosSnap] = await Promise.all([
-            ctx.db.collection(VISITAS_COLL).where('fecha', '>=', hoy).where('fecha', '<', manana).orderBy('fecha', 'desc').get(),
-            ctx.db.collection(PRES_COLL)
-                .where('estado', 'in', ['pendiente', 'pendiente_entrega', 'entregado'])
-                .where('fechaSolicitud', '>=', hoy)
-                .where('fechaSolicitud', '<', manana)
-                .orderBy('fechaSolicitud', 'desc')
-                .limit(10)
-                .get(),
+        const [visitasSnap, visitasHoyCount, prestamosHoyCount, prestamosSnap, devolucionesSnap, activosSnap, activosCount, retrasosSnap] = await Promise.all([
+            visitasHoyRef.orderBy('fecha', 'desc').limit(3).get(),
+            getQueryCountSafe(visitasHoyRef),
+            getQueryCountSafe(prestamosHoyRef),
             ctx.db.collection(PRES_COLL)
                 .where('estado', 'in', ['pendiente', 'pendiente_entrega', 'entregado'])
                 .orderBy('fechaSolicitud', 'desc')
                 .limit(3)
                 .get(),
-            ctx.db.collection(PRES_COLL).where('estado', 'in', ['finalizado', 'cobro_pendiente']).orderBy('fechaDevolucionReal', 'desc').limit(10).get(),
+            ctx.db.collection(PRES_COLL)
+                .where('estado', 'in', ['finalizado', 'cobro_pendiente'])
+                .orderBy('fechaDevolucionReal', 'desc')
+                .limit(3)
+                .get(),
             activosRef.limit(3).get(),
             activosCountPromise,
             ctx.db.collection(PRES_COLL).where('estado', '==', 'entregado').where('fechaVencimiento', '<', new Date()).limit(20).get()
         ]);
-
-        // Filtrar préstamos de hoy para el conteo
-        const prestamosHoyDocs = prestamosHoySnap.docs;
 
         const ultimasVisitas = visitasSnap.docs.slice(0, 3).map(d => ({ id: d.id, ...d.data() }));
         const ultimosPrestamos = prestamosSnap.docs.slice(0, 3).map(d => ({ id: d.id, ...d.data() }));
@@ -3504,8 +3632,8 @@ const BiblioService = (function () {
         };
 
         return {
-            visitasHoy: visitasSnap.size,
-            prestamosHoy: prestamosHoyDocs.length,
+            visitasHoy: Number.isFinite(visitasHoyCount) ? visitasHoyCount : visitasSnap.size,
+            prestamosHoy: Number.isFinite(prestamosHoyCount) ? prestamosHoyCount : 0,
             activosOcupados: Number.isFinite(activosCount) ? activosCount : activosSnap.size,
             retrasos: retrasosSnap.docs.map(d => ({ id: d.id, ...d.data() })),
             ultimasVisitas: ultimasVisitas,
@@ -3567,8 +3695,9 @@ const BiblioService = (function () {
             autorSearch: norm(data.autor),
             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         };
-        invalidateCatalogCache();
-        return ref.update(cleanData);
+        await ref.update(cleanData);
+        await markCatalogStructureChanged(ctx);
+        return true;
     }
 
     async function addLibro(ctx, data) {
@@ -3585,8 +3714,9 @@ const BiblioService = (function () {
             updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
             ...stockPayload
         };
-        invalidateCatalogCache();
-        return ctx.db.collection(CAT_COLL).add(cleanData);
+        const ref = await ctx.db.collection(CAT_COLL).add(cleanData);
+        await markCatalogStructureChanged(ctx);
+        return ref;
     }
 
     async function registerInventoryManualBook(ctx, data = {}) {
@@ -3618,7 +3748,6 @@ const BiblioService = (function () {
             copiasDisponibles: 1
         });
 
-        invalidateCatalogCache();
         return {
             bookId: newBookRef.id,
             acquisition
@@ -3762,7 +3891,7 @@ const BiblioService = (function () {
             updatedAtMs: nowMs
         }, { merge: true });
 
-        invalidateCatalogCache();
+        await markCatalogStructureChanged(ctx);
         return {
             bookId: newBookRef.id,
             acquisition,
@@ -3844,13 +3973,16 @@ const BiblioService = (function () {
             created += 1;
         }
 
-        invalidateCatalogCache();
+        if (created > 0 || linked > 0) {
+            await markCatalogStructureChanged(ctx);
+        }
         return { created, linked, skipped };
     }
 
     async function toggleLibroStatus(ctx, id, isActive) {
-        invalidateCatalogCache();
-        return ctx.db.collection(CAT_COLL).doc(id).update({ active: isActive });
+        await ctx.db.collection(CAT_COLL).doc(id).update({ active: isActive });
+        await markCatalogStructureChanged(ctx);
+        return true;
     }
 
     async function startInventorySession(ctx, options = {}) {
@@ -3862,8 +3994,7 @@ const BiblioService = (function () {
         const sessionRef = ctx.db.collection(INVENTORY_COLL).doc();
         const name = String(options.name || '').trim() || `Inventario ${new Date(nowMs).toLocaleDateString('es-MX')}`;
         const batch = ctx.db.batch();
-
-        batch.set(sessionRef, {
+        const sessionData = {
             name,
             status: 'active',
             matchedItems: 0,
@@ -3877,7 +4008,9 @@ const BiblioService = (function () {
             updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
             startedAtMs: nowMs,
             updatedAtMs: nowMs
-        });
+        };
+
+        batch.set(sessionRef, sessionData);
 
         batch.set(getInventoryMetaRef(ctx), {
             sessionId: sessionRef.id,
@@ -3888,7 +4021,11 @@ const BiblioService = (function () {
         }, { merge: true });
 
         await batch.commit();
-        return getCurrentInventorySession(ctx);
+        return {
+            session: summarizeInventorySession(sessionRef.id, sessionData),
+            foundEntries: [],
+            missingEntries: []
+        };
     }
 
     async function pauseInventorySession(ctx, sessionId) {
@@ -3916,7 +4053,16 @@ const BiblioService = (function () {
             updatedAtMs: nowMs
         }, { merge: true });
 
-        return getCurrentInventorySession(ctx);
+        return {
+            session: summarizeInventorySession(rawSessionId, {
+                status: 'paused',
+                pausedAtMs: nowMs,
+                updatedBy: actorId,
+                updatedAtMs: nowMs
+            }),
+            foundEntries: [],
+            missingEntries: []
+        };
     }
 
     async function resumeInventorySession(ctx, sessionId) {
@@ -3942,7 +4088,15 @@ const BiblioService = (function () {
             updatedAtMs: nowMs
         }, { merge: true });
 
-        return getCurrentInventorySession(ctx);
+        return {
+            session: summarizeInventorySession(rawSessionId, {
+                status: 'active',
+                updatedBy: actorId,
+                updatedAtMs: nowMs
+            }),
+            foundEntries: [],
+            missingEntries: []
+        };
     }
 
     async function registerInventoryMatch(ctx, data = {}) {
@@ -3951,6 +4105,9 @@ const BiblioService = (function () {
         const query = String(data.query || '').trim();
         const groupKey = String(data.groupKey || '').trim();
         const matchedAcquisition = String(data.matchedAcquisition || query || '').trim();
+        const observedAcquisitionsInput = Array.isArray(data.observedAcquisitions)
+            ? [...new Set(data.observedAcquisitions.map((value) => String(value || '').trim().toUpperCase()).filter(Boolean))]
+            : [];
         const systemTotal = normalizeInventoryQuantity(data.systemTotal);
         const groupSize = normalizeInventoryQuantity(data.groupSize);
         const quantity = normalizeInventoryQuantity(data.quantity);
@@ -3963,6 +4120,8 @@ const BiblioService = (function () {
         const sessionRef = ctx.db.collection(INVENTORY_COLL).doc(sessionId);
         const foundRef = sessionRef.collection(INVENTORY_FOUND_SUBCOLL).doc(bookId);
         const bookRef = ctx.db.collection(CAT_COLL).doc(bookId);
+        let resultSession = null;
+        let resultEntry = null;
 
         await ctx.db.runTransaction(async (transaction) => {
             const [sessionSnap, foundSnap, bookSnap] = await Promise.all([
@@ -3989,9 +4148,22 @@ const BiblioService = (function () {
                 : [];
             const nextObservedAcquisitions = [...new Set([
                 ...previousObservedAcquisitions,
+                ...observedAcquisitionsInput,
                 displayAdquisicion || '',
                 bookData.adquisicion || ''
             ].map((value) => String(value || '').trim().toUpperCase()).filter(Boolean))];
+            const nextMatchedItems = (Number(sessionData.matchedItems) || 0) + (previousEntry ? 0 : 1);
+            const nextSessionTotal = (Number(sessionData.totalObserved) || 0) + quantity;
+            const nextLastEntry = {
+                type: 'catalogo',
+                bookId,
+                titulo: bookData.titulo || 'Sin titulo',
+                adquisicion: displayAdquisicion || '',
+                cantidad: quantity,
+                systemTotal,
+                query,
+                atMs: nowMs
+            };
 
             transaction.set(foundRef, {
                 bookId,
@@ -4022,22 +4194,45 @@ const BiblioService = (function () {
 
             transaction.set(sessionRef, {
                 status: 'active',
-                matchedItems: (Number(sessionData.matchedItems) || 0) + (previousEntry ? 0 : 1),
-                totalObserved: (Number(sessionData.totalObserved) || 0) + quantity,
+                matchedItems: nextMatchedItems,
+                totalObserved: nextSessionTotal,
                 updatedBy: actorId,
                 updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
                 updatedAtMs: nowMs,
-                lastEntry: {
-                    type: 'catalogo',
-                    bookId,
-                    titulo: bookData.titulo || 'Sin titulo',
-                    adquisicion: displayAdquisicion || '',
-                    cantidad: quantity,
-                    systemTotal,
-                    query,
-                    atMs: nowMs
-                }
+                lastEntry: nextLastEntry
             }, { merge: true });
+
+            resultEntry = {
+                id: bookId,
+                bookId,
+                representativeId: bookId,
+                groupKey: resolvedGroupKey,
+                titulo: bookData.titulo || 'Sin titulo',
+                autor: bookData.autor || '',
+                adquisicion: displayAdquisicion || '',
+                catalogAdquisicion: bookData.adquisicion || '',
+                categoria: bookData.categoria || '',
+                clasificacion: bookData.clasificacion || '',
+                active: bookData.active !== false,
+                systemTotal,
+                groupSize,
+                totalObserved: nextTotal,
+                observedAcquisitions: nextObservedAcquisitions,
+                lastQuantity: quantity,
+                lastQuery: query,
+                updatedBy: actorId,
+                updatedAtMs: nowMs
+            };
+            resultSession = {
+                id: sessionId,
+                ...sessionData,
+                status: 'active',
+                matchedItems: nextMatchedItems,
+                totalObserved: nextSessionTotal,
+                updatedBy: actorId,
+                updatedAtMs: nowMs,
+                lastEntry: nextLastEntry
+            };
         });
 
         await getInventoryMetaRef(ctx).set({
@@ -4048,7 +4243,12 @@ const BiblioService = (function () {
             updatedAtMs: nowMs
         }, { merge: true });
 
-        return getCurrentInventorySession(ctx);
+        return {
+            session: resultSession,
+            entry: resultEntry,
+            foundEntries: [],
+            missingEntries: []
+        };
     }
 
     async function reviewInventoryFoundEntry(ctx, data = {}) {
@@ -4198,6 +4398,8 @@ const BiblioService = (function () {
         const entryId = buildInventoryMissingKey(displayName);
         const sessionRef = ctx.db.collection(INVENTORY_COLL).doc(sessionId);
         const missingRef = sessionRef.collection(INVENTORY_MISSING_SUBCOLL).doc(entryId);
+        let resultSession = null;
+        let resultEntry = null;
 
         await ctx.db.runTransaction(async (transaction) => {
             const [sessionSnap, missingSnap] = await Promise.all([
@@ -4214,6 +4416,15 @@ const BiblioService = (function () {
 
             const previousEntry = missingSnap.exists ? (missingSnap.data() || {}) : null;
             const nextTotal = (Number(previousEntry?.totalObserved) || 0) + quantity;
+            const nextMissingItems = (Number(sessionData.missingItems) || 0) + (previousEntry ? 0 : 1);
+            const nextSessionTotal = (Number(sessionData.totalObserved) || 0) + quantity;
+            const nextLastEntry = {
+                type: 'faltante',
+                titulo: displayName,
+                cantidad: quantity,
+                query,
+                atMs: nowMs
+            };
 
             transaction.set(missingRef, {
                 displayName,
@@ -4233,19 +4444,34 @@ const BiblioService = (function () {
 
             transaction.set(sessionRef, {
                 status: 'active',
-                missingItems: (Number(sessionData.missingItems) || 0) + (previousEntry ? 0 : 1),
-                totalObserved: (Number(sessionData.totalObserved) || 0) + quantity,
+                missingItems: nextMissingItems,
+                totalObserved: nextSessionTotal,
                 updatedBy: actorId,
                 updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
                 updatedAtMs: nowMs,
-                lastEntry: {
-                    type: 'faltante',
-                    titulo: displayName,
-                    cantidad: quantity,
-                    query,
-                    atMs: nowMs
-                }
+                lastEntry: nextLastEntry
             }, { merge: true });
+
+            resultEntry = {
+                id: entryId,
+                displayName,
+                normalizedName: norm(displayName),
+                lastQuery: query,
+                totalObserved: nextTotal,
+                lastQuantity: quantity,
+                updatedBy: actorId,
+                updatedAtMs: nowMs
+            };
+            resultSession = {
+                id: sessionId,
+                ...sessionData,
+                status: 'active',
+                missingItems: nextMissingItems,
+                totalObserved: nextSessionTotal,
+                updatedBy: actorId,
+                updatedAtMs: nowMs,
+                lastEntry: nextLastEntry
+            };
         });
 
         await getInventoryMetaRef(ctx).set({
@@ -4256,7 +4482,12 @@ const BiblioService = (function () {
             updatedAtMs: nowMs
         }, { merge: true });
 
-        return getCurrentInventorySession(ctx);
+        return {
+            session: resultSession,
+            entry: resultEntry,
+            foundEntries: [],
+            missingEntries: []
+        };
     }
 
     async function finalizeInventorySession(ctx, sessionId) {
@@ -4339,7 +4570,6 @@ const BiblioService = (function () {
             });
         });
 
-        invalidateCatalogCache();
         await procesarRecompensa(ctx, ctx.auth.currentUser.uid, 'uso_activo');
     }
 
@@ -4556,7 +4786,6 @@ const BiblioService = (function () {
             }
         });
 
-        invalidateCatalogCache();
     }
 
     async function cancelarPrestamo(ctx, loanId, bookId) {
@@ -4612,61 +4841,64 @@ const BiblioService = (function () {
     async function recibirLibroAdmin(ctx, loanId, bookId, forgiveDebt = false, justification = '') {
         await ensureHolidayCalendarLoaded(ctx);
         const loanRef = ctx.db.collection(PRES_COLL).doc(loanId);
-        const loanDoc = await loanRef.get();
-        const loan = loanDoc.data();
+        let loan = null;
+        let lateInfo = null;
+        let multa = 0;
 
-        if (loan.estado !== 'entregado') throw new Error("El libro no está marcado como prestado físico.");
+        await ctx.db.runTransaction(async t => {
+            const loanDoc = await t.get(loanRef);
+            if (!loanDoc.exists) throw new Error("El préstamo ya no existe.");
 
-        const lateInfo = getLateInfo(loan);
-        let multa = lateInfo.fine;
-        let nuevoEstado = 'finalizado';
+            loan = loanDoc.data() || {};
+            if (loan.estado !== 'entregado') throw new Error("El libro no está marcado como préstamo físico activo.");
+            const effectiveBookId = loan.libroId || bookId;
+            if (!effectiveBookId) throw new Error("El préstamo no tiene libro asociado.");
 
-        // Lógica de Perdón
-        if (forgiveDebt && multa > 0) {
-            console.log(`[BIBLIO] Deuda de $${multa} perdonada. Motivo: ${justification}`);
-            multa = 0; // Force 0 debt
-        }
+            lateInfo = getLateInfo(loan);
+            multa = lateInfo.fine;
+            let nuevoEstado = 'finalizado';
 
-        const batch = ctx.db.batch();
+            if (forgiveDebt && multa > 0) {
+                console.log(`[BIBLIO] Deuda de $${multa} perdonada. Motivo: ${justification}`);
+                multa = 0;
+            }
 
-        if (multa > 0) {
-            nuevoEstado = 'cobro_pendiente';
-            batch.update(loanRef, {
-                estado: nuevoEstado,
-                montoDeuda: multa,
-                diasRetraso: lateInfo.daysLate,
-                multaReferencia: lateInfo.rawFine,
-                fechaDevolucionReal: firebase.firestore.FieldValue.serverTimestamp()
+            if (multa > 0) {
+                nuevoEstado = 'cobro_pendiente';
+                t.update(loanRef, {
+                    estado: nuevoEstado,
+                    montoDeuda: multa,
+                    diasRetraso: lateInfo.daysLate,
+                    multaReferencia: lateInfo.rawFine,
+                    fechaDevolucionReal: firebase.firestore.FieldValue.serverTimestamp()
+                });
+            } else {
+                const updateData = {
+                    estado: nuevoEstado,
+                    fechaDevolucionReal: firebase.firestore.FieldValue.serverTimestamp()
+                };
+
+                if (lateInfo.daysLate > 0) {
+                    updateData.retrasoRegistrado = true;
+                    updateData.diasRetraso = lateInfo.daysLate;
+                    updateData.multaReferencia = lateInfo.rawFine;
+                    updateData.sinCobroRetraso = lateInfo.loanPolicy.lateFeeExempt === true;
+                }
+
+                if (forgiveDebt) {
+                    updateData.perdonado = true;
+                    updateData.motivoPerdon = justification;
+                    updateData.perdonadoPor = ctx.auth.currentUser.uid;
+                    updateData.multaOriginal = calcularMulta(loan.fechaVencimiento);
+                }
+
+                t.update(loanRef, updateData);
+            }
+
+            t.update(ctx.db.collection(CAT_COLL).doc(effectiveBookId), {
+                copiasDisponibles: firebase.firestore.FieldValue.increment(1)
             });
-        } else {
-            // Sin multa o Perdonada
-            const updateData = {
-                estado: nuevoEstado,
-                fechaDevolucionReal: firebase.firestore.FieldValue.serverTimestamp()
-            };
-
-            if (lateInfo.daysLate > 0) {
-                updateData.retrasoRegistrado = true;
-                updateData.diasRetraso = lateInfo.daysLate;
-                updateData.multaReferencia = lateInfo.rawFine;
-                updateData.sinCobroRetraso = lateInfo.loanPolicy.lateFeeExempt === true;
-            }
-
-            if (forgiveDebt) {
-                updateData.perdonado = true;
-                updateData.motivoPerdon = justification;
-                updateData.perdonadoPor = ctx.auth.currentUser.uid;
-                // Guardamos cuanto debía originalmente para reportes
-                updateData.multaOriginal = calcularMulta(loan.fechaVencimiento);
-            }
-
-            batch.update(loanRef, updateData);
-        }
-
-        const bookRef = ctx.db.collection(CAT_COLL).doc(bookId);
-        batch.update(bookRef, { copiasDisponibles: firebase.firestore.FieldValue.increment(1) });
-
-        await batch.commit();
+        });
 
         if (multa === 0) {
             // Si fue perdonado, quizás no damos XP completa? O sí?
@@ -4686,7 +4918,6 @@ const BiblioService = (function () {
                     : (forgiveDebt ? 'Devolucion (Multa Perdonada)' : 'Libro Devuelto');
 
                 Notify.send(loan.studentId, {
-                    title: forgiveDebt ? 'Devolución (Multa Perdonada)' : 'Libro Devuelto',
                     title: notifyTitle,
                     message: msg,
                     type: 'biblio'
@@ -4782,7 +5013,6 @@ const BiblioService = (function () {
             });
         });
 
-        invalidateCatalogCache();
         return { loanId: createdLoanId };
     }
 
@@ -4890,7 +5120,6 @@ const BiblioService = (function () {
             procesarRecompensa(ctx, loanData.studentId, 'uso_activo');
         }
 
-        invalidateCatalogCache();
     }
 
     async function autoPrestarLibroSeguro(ctx, { uid, email, bookId, titulo }) {
@@ -4943,7 +5172,6 @@ const BiblioService = (function () {
             });
         });
 
-        invalidateCatalogCache();
     }
 
     async function checkInActivo(ctx, uid) {

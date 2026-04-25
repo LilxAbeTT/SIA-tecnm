@@ -1,0 +1,2408 @@
+<html lang="es" data-bs-theme="dark">
+
+<head>
+  <meta charset="utf-8">
+  <base href="/">
+
+  <!-- CACHE CONTROL: Evita que el navegador cachee recursos locales -->
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+
+  <meta name="theme-color" content="#1B396A">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="images/logo-icono.png">
+  <link rel="icon" type="image/x-icon" href="images/sia-logo.ico">
+  <meta name="viewport"
+    content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0, viewport-fit=cover">
+  <title>SIA | Sistema de Integración Académico</title>
+
+  <!-- CACHE BUSTER: Sistema automático de versionado -->
+  <script>
+    // Genera timestamp único para evitar cache del navegador
+    window.SIA_VERSION = Date.now();
+
+    // Bloquear menú contextual (mantener presionado) SOLO en dispositivos móviles/táctiles
+    document.addEventListener('contextmenu', function (e) {
+      // Si el dispositivo principal es táctil (coarse pointer)
+      if (window.matchMedia("(pointer: coarse)").matches) {
+        if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA' && e.target.isContentEditable !== true) {
+          e.preventDefault();
+        }
+      }
+    });
+
+    // Función helper para agregar versión automáticamente
+    window.loadScript = function (src) {
+      const script = document.createElement('script');
+      script.src = src.includes('?') ? src : `${src}?v=${window.SIA_VERSION}`;
+      document.currentScript.parentNode.insertBefore(script, document.currentScript.nextSibling);
+    };
+
+    // FORZAR DARK MODE PERMANENTE
+    // Limpiar cualquier preferencia de tema anterior
+    localStorage.removeItem('sia-theme');
+    localStorage.removeItem('theme');
+    // Forzar dark mode siempre
+    document.documentElement.setAttribute('data-bs-theme', 'dark');
+  </script>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+
+  <!-- Tipografías Oficiales TecNM -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Noto+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&family=Source+Serif+4:opsz,wght@8..60,700;8..60,800;8..60,900&display=swap"
+    rel="stylesheet">
+
+  <!-- CSS con cache-busting automático -->
+  <script>
+    document.write('<link rel="stylesheet" href="/styles.css?v=' + window.SIA_VERSION + '">');
+  </script>
+
+  <!-- UTILIDADES GLOBALES (Cargar antes que app.js) -->
+  <script>
+    document.write('<script src="utils/time-utils.js?v=' + window.SIA_VERSION + '"><\/script>');
+    document.write('<script src="utils/export-utils.js?v=' + window.SIA_VERSION + '"><\/script>');
+
+    // Servicios y Módulos
+    document.write('<script src="services/profile-service.js?v=' + window.SIA_VERSION + '"><\/script>');
+    document.write('<script src="services/encuestas-service.js?v=' + window.SIA_VERSION + '"><\/script>');
+    document.write('<script src="services/encuestas-servicio-service.js?v=' + window.SIA_VERSION + '"><\/script>');
+
+    document.write('<script src="services/reportes-service.js?v=' + window.SIA_VERSION + '"><\/script>');
+    document.write('<script src="services/avisos-service.js?v=' + window.SIA_VERSION + '"><\/script>');
+    document.write('<script src="modules/reportes.js?v=' + window.SIA_VERSION + '"><\/script>');
+    document.write('<script src="modules/reportes/reportes-filters.js?v=' + window.SIA_VERSION + '"><\/script>');
+    document.write('<script src="modules/reportes/reportes-charts.js?v=' + window.SIA_VERSION + '"><\/script>');
+    document.write('<script src="modules/reportes/reportes-biblio.js?v=' + window.SIA_VERSION + '"><\/script>');
+    document.write('<script src="modules/reportes/reportes-medico.js?v=' + window.SIA_VERSION + '"><\/script>');
+    document.write('<script src="modules/reportes/reportes-poblacion.js?v=' + window.SIA_VERSION + '"><\/script>');
+    document.write('<script src="modules/encuestas/encuestas-ui.js?v=' + window.SIA_VERSION + '"><\/script>');
+    document.write('<script src="modules/encuestas/encuestas-forms.js?v=' + window.SIA_VERSION + '"><\/script>');
+    document.write('<script src="modules/encuestas/encuestas-responses.js?v=' + window.SIA_VERSION + '"><\/script>');
+    document.write('<script src="modules/encuestas/encuestas-nav.js?v=' + window.SIA_VERSION + '"><\/script>');
+    document.write('<script src="modules/encuestas.js?v=' + window.SIA_VERSION + '"><\/script>');
+  </script>
+
+  <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+  <script type="text/javascript">
+    (function () {
+      emailjs.init("I0P7oEMcm9MD-EtCY");
+    })();
+  </script>
+  <style type="text/css"></style>
+</head>
+
+<body>
+  <div id="kiosk-overlay"
+    class="d-none position-fixed top-0 start-0 w-100 h-100 bg-dark text-white d-flex flex-column justify-content-center align-items-center text-center"
+    style="z-index: 99999;">
+    <div class="mb-4">
+      <img src="/images/logo-icono.png" width="80" class="mb-3 opacity-75">
+      <h1 class="display-4 fw-bold">Terminal Bloqueada</h1>
+      <p class="lead text-white-50" id="kiosk-id-label">ID: --</p>
+    </div>
+    <div class="p-4 bg-white bg-opacity-10 rounded-4 backdrop-blur border border-white border-opacity-10"
+      style="max-width: 400px;">
+      <i class="bi bi-pc-display-horizontal fs-1 mb-3 text-warning"></i>
+      <p class="mb-0">Esta computadora está gestionada por SIA.</p>
+      <p class="small text-white-50">Solicita su desbloqueo en el mostrador.</p>
+    </div>
+  </div>
+  <div id="app-loader"
+    class="d-flex flex-column justify-content-center align-items-center position-fixed top-0 start-0 w-100 h-100 bg-surface-muted"
+    style="z-index: 9999;">
+    <div class="logo-wave">
+      <img src="/images/cubo1.png" alt="Cubo 1" class="cube cube-1">
+      <img src="/images/cubo2.png" alt="Cubo 2" class="cube cube-2">
+      <img src="/images/cubo3.png" alt="Cubo 3" class="cube cube-3">
+
+    </div>
+    <span class="loader-text">SIA</span>
+  </div>
+
+
+  <sia-landing-view id="landing-view" class="d-none"></sia-landing-view>
+  <div id="view-admisiones-public" class="sia-public-view d-none"></div>
+  <div id="view-campus-map-public" class="sia-public-view d-none"></div>
+
+  <!-- ============================================== -->
+  <!-- NUEVO WIZARD DE REGISTRO & SELECCIÓN DE ROL    -->
+  <!-- ============================================== -->
+  <sia-register-wizard id="view-register-wizard" class="d-none"></sia-register-wizard>
+
+  <section id="view-qa-secret-login"
+    class="app-view sia-public-view d-none min-vh-100 position-relative overflow-hidden"
+    style="background:
+      radial-gradient(circle at top left, rgba(14, 165, 233, 0.22), transparent 34%),
+      radial-gradient(circle at top right, rgba(249, 115, 22, 0.2), transparent 28%),
+      linear-gradient(160deg, #020617 0%, #0f172a 52%, #172554 100%);">
+    <div class="position-absolute top-0 start-0 w-100 h-100 opacity-25"
+      style="background-image: linear-gradient(rgba(148,163,184,0.08) 1px, transparent 1px), linear-gradient(90deg, rgba(148,163,184,0.08) 1px, transparent 1px); background-size: 24px 24px; pointer-events: none;"></div>
+    <div class="container min-vh-100 d-flex align-items-center justify-content-center position-relative py-5">
+      <div class="row justify-content-center w-100">
+        <div class="col-12 col-md-8 col-lg-5">
+          <div class="rounded-5 border border-light border-opacity-10 shadow-lg overflow-hidden"
+            style="background: rgba(15, 23, 42, 0.86); backdrop-filter: blur(18px);">
+            <div class="p-4 p-md-5 text-white">
+              <div class="d-flex align-items-center justify-content-between gap-3 mb-4">
+                <div>
+                  <div class="text-uppercase small fw-bold text-info mb-2">Portal Interno QA</div>
+                  <h1 class="h3 fw-bold mb-1">Acceso SuperAdmin</h1>
+                  <p class="mb-0 text-white-50 small">Ruta privada para pruebas internas.</p>
+                </div>
+                <div class="rounded-circle d-flex align-items-center justify-content-center"
+                  style="width: 64px; height: 64px; background: linear-gradient(135deg, rgba(14,165,233,0.22), rgba(249,115,22,0.26)); border: 1px solid rgba(255,255,255,0.12);">
+                  <i class="bi bi-shield-lock-fill fs-2 text-warning"></i>
+                </div>
+              </div>
+
+              <div id="qa-secret-login-error" class="alert d-none"></div>
+              <p id="qa-secret-login-status" class="small text-white-50 mb-4">Acceso interno para SuperAdmin QA.</p>
+
+              <form id="form-qa-secret-login" class="d-grid gap-3" autocomplete="off">
+                <div>
+                  <label for="qa-secret-login-email" class="form-label text-white-50 fw-semibold small">Correo</label>
+                  <input id="qa-secret-login-email" type="email" class="form-control form-control-lg rounded-4"
+                    value="admin@super.com" readonly
+                    style="background: rgba(15,23,42,0.9); color: #e2e8f0; border-color: rgba(148,163,184,0.22);">
+                </div>
+                <div>
+                  <label for="qa-secret-login-password" class="form-label text-white-50 fw-semibold small">Contrasena</label>
+                  <input id="qa-secret-login-password" type="password" class="form-control form-control-lg rounded-4"
+                    placeholder="Ingresa la clave QA"
+                    style="background: rgba(15,23,42,0.9); color: #f8fafc; border-color: rgba(148,163,184,0.22);">
+                </div>
+                <button id="qa-secret-login-submit" type="submit" class="btn btn-lg rounded-4 fw-bold text-white"
+                  style="background: linear-gradient(135deg, #0ea5e9 0%, #2563eb 45%, #f97316 100%); border: 0;">
+                  Entrar como SuperAdmin
+                </button>
+              </form>
+
+              <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mt-4">
+                <button id="qa-secret-login-signout" type="button" class="btn btn-outline-light rounded-pill d-none">
+                  Cerrar sesion actual
+                </button>
+                <div class="small text-white-50">Firebase Auth por email/password.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================== -->
+  <!-- VISTA: SELECCIÓN DE DEPARTAMENTO (STAFF)       -->
+  <!-- ============================================== -->
+  <div id="reg-view-dept-selector"
+    class="d-none min-vh-100 bg-dark d-flex align-items-center justify-content-center position-fixed top-0 start-0 w-100"
+    style="z-index: 2000;">
+    <div class="container text-center text-white">
+      <div class="mb-5">
+        <p class="fw-bold display-5 mb-2">Selecciona tu Área</p>
+        <p class="lead opacity-75">Configuración de acceso administrativo simplificado</p>
+      </div>
+
+      <button onclick="SIA_Register.logout()"
+        class="btn btn-sm btn-outline-light position-absolute top-0 end-0 m-4 rounded-pill">
+        <i class="bi bi-box-arrow-right"></i> Salir
+      </button>
+
+      <!-- GRID PRINCIPAL -->
+      <div id="dept-options-main" class="row g-4 justify-content-center fade-in">
+        <div class="col-md-3 col-sm-6">
+          <div onclick="SIA_Register.selectDept('biblioteca')"
+            class="card bg-white bg-opacity-10 border border-white border-opacity-10 hover-scale cursor-pointer p-4 h-100 rounded-4">
+            <i class="bi bi-book-half display-4 mb-3 text-warning"></i>
+            <h5 class="fw-bold">Biblioteca</h5>
+            <p class="small opacity-50 mb-0">Gestión de acervo, préstamos y devoluciones.</p>
+          </div>
+        </div>
+        <div class="col-md-3 col-sm-6">
+          <div onclick="SIA_Register.selectDept('medico')"
+            class="card bg-white bg-opacity-10 border border-white border-opacity-10 hover-scale cursor-pointer p-4 h-100 rounded-4">
+            <i class="bi bi-heart-pulse-fill display-4 mb-3 text-danger"></i>
+            <h5 class="fw-bold">Servicios Médicos</h5>
+            <p class="small opacity-50 mb-0">Consultas, historial clúnico y urgencias.</p>
+          </div>
+        </div>
+        <div class="col-md-3 col-sm-6">
+          <div onclick="SIA_Register.selectDept('aula')"
+            class="card bg-white bg-opacity-10 border border-white border-opacity-10 hover-scale cursor-pointer p-4 h-100 rounded-4">
+            <i class="bi bi-mortarboard-fill display-4 mb-3 text-primary"></i>
+            <h5 class="fw-bold">Aula Virtual</h5>
+            <p class="small opacity-50 mb-0">Administración de cursos y certificaciones.</p>
+          </div>
+        </div>
+        <div class="col-md-3 col-sm-6">
+          <div onclick="SIA_Register.selectDept('foro')"
+            class="card bg-white bg-opacity-10 border border-white border-opacity-10 hover-scale cursor-pointer p-4 h-100 rounded-4">
+            <i class="bi bi-calendar-event-fill display-4 mb-3 text-info"></i>
+            <h5 class="fw-bold">Eventos</h5>
+            <p class="small opacity-50 mb-0">Agenda, asistencia y recursos del campus.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- SUB-OPCIONES MÉDICO -->
+      <div id="dept-options-medico" class="row g-4 justify-content-center d-none fade-in">
+        <div class="col-12 mb-3">
+          <button onclick="SIA_Register.backToDeptMain()" class="btn btn-link text-white text-decoration-none">
+            <i class="bi bi-arrow-left"></i> Volver
+          </button>
+          <p class="fw-bold">Especialidad Médica</p>
+        </div>
+        <div class="col-md-4">
+          <div onclick="SIA_Register.submitStaffRegistration('medico', 'medico')"
+            class="card bg-danger bg-opacity-75  hover-scale cursor-pointer p-4 rounded-4 border-0">
+            <i class="bi bi-hospital display-1 mb-2"></i>
+            <h3>Médico General</h3>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div onclick="SIA_Register.submitStaffRegistration('medico', 'psicologo')"
+            class="card bg-primary bg-opacity-75 hover-scale cursor-pointer p-4 rounded-4 border-0">
+            <i class="bi bi-emoji-smile display-1 mb-2"></i>
+            <h3>Psicología</h3>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- MODAL CHECK STAFF -->
+  <div class="modal fade" id="modal-register-staff-check" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content rounded-4 border-0 shadow-lg">
+        <div class="modal-body p-5 text-center">
+          <div class="mb-4 text-primary">
+            <i class="bi bi-building-check display-1"></i>
+          </div>
+          <h3 class="fw-bold mb-3">Perfil Institucional Detectado</h3>
+          <p class="text-muted mb-4">
+            Tu correo parece pertenecer a un departamento oficial (Biblioteca, Médico, etc).<br>
+            <strong>¿Deseas configurar esta cuenta como ADMINISTRADOR DE ÁREA?</strong>
+          </p>
+          <div class="d-grid gap-3">
+            <button id="btn-staff-yes" class="btn btn-primary btn-lg rounded-pill fw-bold shadow">
+              Sí, soy encargado de área
+            </button>
+            <button id="btn-staff-no" class="btn btn-outline-secondary rounded-pill">
+              No, quiero entrar como usuario normal
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="app-shell" class="">
+    <!-- Navbar (Web Component) - Desktop Only via CSS classes -->
+    <sia-navbar id="student-navbar-dt" class="d-none d-md-block"></sia-navbar>
+    <sia-admin-navbar id="admin-navbar-dt" class="d-none d-md-block"></sia-admin-navbar>
+    <sia-shell-breadcrumbs id="app-shell-breadcrumbs"></sia-shell-breadcrumbs>
+
+    <!-- BOTTOM NAV (MOBILE ONLY) - STUDENTS -->
+    <nav id="student-bottom-nav" class="bottom-nav d-md-none fade-up-entry delay-3"
+      style="--mobile-nav-active-color: var(--primary, #1B396A);">
+      <!-- 1. Inicio -->
+      <a href="javascript:void(0)" class="nav-item active" id="nav-mobile-home"
+        onclick="window.SIA.navigate('view-dashboard'); updateBottomNav(this);">
+        <img src="assets/icons/sia.ico" alt="Inicio" width="24" height="24" class="nav-icon-img"
+          style="filter: grayscale(1); opacity: 0.8; transition: all 0.2s;">
+        <span>Inicio</span>
+      </a>
+
+      <!-- 2. Modulos (Drawer) -->
+      <a href="javascript:void(0)" class="nav-item" id="nav-mobile-modules"
+        onclick="window.SIA.toggleModulesDrawer(); updateBottomNav(this);">
+        <img id="nav-mobile-modules-icon" src="assets/icons/aula.ico" alt="Modulos" width="24" height="24"
+          class="nav-icon-img" style="filter: grayscale(1); opacity: 0.8; transition: all 0.2s;">
+        <span>Modulos</span>
+      </a>
+
+      <!-- 3. ACCIONES (CENTRAL FAB - Speed Dial) -->
+      <div class="nav-item-fab">
+        <button class="btn btn-primary shadow rounded-circle d-flex align-items-center justify-content-center"
+          id="btn-speed-dial" onclick="window.SIA.toggleSpeedDial()">
+          <i class="bi bi-lightning-charge-fill" style="font-size: 1.4rem;"></i>
+        </button>
+      </div>
+
+      <!-- 4. Notificaciones -->
+      <a href="javascript:void(0)" class="nav-item position-relative" id="nav-mobile-notifications"
+        onclick="window.SIA.toggleNotificationsView(); updateBottomNav(this);">
+        <i class="bi bi-bell-fill"></i>
+        <span>Notif</span>
+        <span class="nav-badge d-none" id="mobile-notif-badge">0</span>
+      </a>
+
+      <!-- 5. Yo (Perfil) -->
+      <a href="javascript:void(0)" class="nav-item" id="nav-mobile-profile"
+        onclick="window.SIA.navigate('view-profile'); updateBottomNav(this);">
+        <i class="bi bi-person-circle"></i>
+        <span>Yo</span>
+      </a>
+    </nav>
+
+    <!-- BOTTOM NAV (MOBILE ONLY) - ADMINS -->
+    <nav id="admin-bottom-nav" class="bottom-nav d-md-none fade-up-entry delay-3 d-none"
+      style="--mobile-nav-active-color: var(--primary, #1B396A);">
+      <a href="javascript:void(0)" class="nav-item active"
+        onclick="window.SIA.navigate('view-dashboard'); updateBottomNav(this);">
+        <i class="bi bi-speedometer2"></i>
+        <span>Panel</span>
+      </a>
+      <!-- Quick Action defined by Module Context -->
+      <a href="javascript:void(0)" class="nav-item" id="admin-mob-quick-action"
+        onclick="window.SIA.navigate('view-reportes')">
+        <i class="bi bi-graph-up"></i>
+        <span>Reportes</span>
+      </a>
+      <div class="nav-item-fab">
+        <button class="btn btn-dark shadow rounded-circle border" id="btn-speed-dial-admin"
+          onclick="window.document.getElementById('btn-admin-theme-toggle')?.click()">
+          <i class="bi bi-moon-stars"></i>
+        </button>
+      </div>
+      <a href="javascript:void(0)" class="nav-item position-relative"
+        onclick="window.SIA.toggleNotificationsView(); updateBottomNav(this);">
+        <i class="bi bi-bell-fill"></i>
+        <span>Notif</span>
+        <span class="nav-badge d-none" id="admin-mobile-notif-badge">0</span>
+      </a>
+      <a href="javascript:void(0)" class="nav-item"
+        onclick="window.SIA.navigate('view-profile'); updateBottomNav(this);">
+        <i class="bi bi-person-badge"></i>
+        <span>Cuenta</span>
+      </a>
+    </nav>
+
+
+    <!-- MOVED GLOBAL MODALS (ACCESSIBLE EVERYWHERE) -->
+    <div class="modal fade" id="modalDigitalID" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content bg-transparent border-0 shadow-none">
+          <div class="modal-body d-flex justify-content-center">
+
+            <div class="digital-id-card p-4 text-start position-relative rounded-4 shadow-lg">
+
+              <button type="button" class="btn-close btn-close-white position-absolute top-0 end-0 m-3"
+                data-bs-dismiss="modal"></button>
+
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <img src="/images/logo-icono.png" width="30">
+                <div class="text-white-50 font-monospace small" id="prof-id-matricula">-------</div>
+              </div>
+
+              <!-- Avatar & QR Container -->
+              <div class="text-center my-3">
+                <!-- Avatar Circle -->
+                <div
+                  class="rounded-circle border border-2 border-white shadow-sm d-inline-flex align-items-center justify-content-center overflow-hidden mb-3 bg-white"
+                  style="width: 80px; height: 80px;">
+                  <span id="prof-id-avatar-init" class="fs-2 fw-bold text-primary">U</span>
+                  <img id="prof-id-avatar-img" src="" class="w-100 h-100 object-fit-cover d-none">
+                </div>
+
+                <!-- QR Code -->
+                <div class="bg-white p-2 d-inline-block rounded-3 shadow-sm mx-auto d-block"
+                  style="width: 140px; height: 140px;">
+                  <img id="prof-qr-full" src="" class="img-fluid w-100 h-100">
+                </div>
+              </div>
+
+              <div class="text-center">
+                <h5 class="fw-bold mb-0 text-white" id="prof-id-name">Estudiante</h5>
+                <span class="badge bg-success mt-1">VIGENTE 2025</span>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal fade" id="modalConsultaSuccess" tabindex="-1" data-bs-backdrop="static">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content rounded-4 border-0 shadow-lg">
+          <div class="modal-body p-5 text-center">
+            <div class="mb-4 text-success animate-bounce">
+              <i class="bi bi-check-circle-fill display-1"></i>
+            </div>
+            <h2 class="fw-bold mb-3">Consulta Guardada</h2>
+            <p class="text-muted mb-4">La consulta ha sido registrada exitosamente en el expediente del paciente.</p>
+
+            <div class="d-grid gap-3">
+              <button class="btn btn-primary rounded-pill py-2 fw-bold shadow-sm" onclick="Medi.printReceta()">
+                <i class="bi bi-printer-fill me-2"></i> Imprimir Receta
+              </button>
+              <button class="btn btn-outline-primary rounded-pill py-2 fw-bold" onclick="Medi.sendToPatient()">
+                <i class="bi bi-send-fill me-2"></i> Enviar Digital
+              </button>
+              <button class="btn btn-light rounded-pill py-2" data-bs-dismiss="modal">
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================== -->
+    <!-- MODAL: AVISO FULLSCREEN (Estudiantes)          -->
+    <!-- ============================================== -->
+    <div class="modal fade" id="modalAvisoFullscreen" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+      <div class="modal-dialog modal-xl modal-dialog-centered modal-aviso-glass">
+        <div class="modal-content border-0 position-relative overflow-hidden" style="background: transparent;">
+          <!-- Progress Bars (stories-style) -->
+          <div class="position-absolute top-0 start-0 w-100 d-flex gap-1 p-2" style="z-index:15;"
+            id="aviso-progress-bars"></div>
+          <!-- Close Button -->
+          <button class="btn-close btn-close-white position-absolute top-0 end-0 m-3"
+            style="z-index:20; filter: drop-shadow(0 0 4px rgba(12, 12, 12, 0.8));" id="aviso-fullscreen-close"></button>
+          <!-- Content Area -->
+          <div id="aviso-fullscreen-content"
+            class="h-100 w-100 d-flex align-items-center justify-content-center overflow-hidden">
+            <!-- Inyectado dinámicamente -->
+          </div>
+          <!-- Navigation Arrows -->
+          <button class="btn position-absolute start-0 top-50 translate-middle-y text-white fs-2 d-none"
+            id="aviso-nav-prev" style="z-index:15; background:none; border:none; opacity:0.7;">
+            <i class="bi bi-chevron-left"></i>
+          </button>
+          <button class="btn position-absolute end-0 top-50 translate-middle-y text-white fs-2 d-none"
+            id="aviso-nav-next" style="z-index:15; background:none; border:none; opacity:0.7;">
+            <i class="bi bi-chevron-right"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================== -->
+    <!-- MODAL: AVISOS ADMIN PANEL (Difusión)           -->
+    <!-- ============================================== -->
+    <div class="modal fade" id="modalAvisosAdmin" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content border-0 rounded-4 shadow-lg overflow-hidden">
+          <div class="modal-header border-0 bg-success bg-gradient text-white py-3 px-4">
+            <div>
+              <h5 class="modal-title fw-bold mb-0"><i class="bi bi-megaphone-fill me-2"></i>Avisos Institucionales</h5>
+              <small class="opacity-75">Gestiona los anuncios para toda la comunidad</small>
+            </div>
+            <button class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body p-4">
+
+            <!-- Pestaña: Crear / Lista -->
+            <ul class="nav nav-pills nav-fill gap-2 mb-4" id="avisos-admin-tabs">
+              <li class="nav-item">
+                <button class="nav-link active rounded-pill fw-bold" data-bs-toggle="pill"
+                  data-bs-target="#avisos-tab-list">
+                  <i class="bi bi-list-ul me-1"></i>Mis Avisos
+                </button>
+              </li>
+              <li class="nav-item">
+                <button class="nav-link rounded-pill fw-bold" data-bs-toggle="pill" data-bs-target="#avisos-tab-create">
+                  <i class="bi bi-plus-circle me-1"></i>Crear Aviso
+                </button>
+              </li>
+            </ul>
+
+            <div class="tab-content">
+              <!-- TAB: LISTA -->
+              <div class="tab-pane fade show active" id="avisos-tab-list">
+                <div id="avisos-admin-list" class="row g-3">
+                  <div class="text-center text-muted py-5">
+                    <i class="bi bi-megaphone fs-1 opacity-25"></i>
+                    <p class="mt-2">Cargando avisos...</p>
+                  </div>
+                </div>
+              </div>
+
+              <!-- TAB: CREAR -->
+              <div class="tab-pane fade" id="avisos-tab-create">
+                <form id="form-create-aviso" class="row g-3">
+                  <!-- Tipo de aviso -->
+                  <div class="col-md-6">
+                    <label class="form-label small fw-bold">Tipo de Aviso</label>
+                    <select id="aviso-type" class="form-select rounded-3" required>
+                      <option value="image">🖼️ Solo Imagen (Flyer/Poster)</option>
+                      <option value="text">📝 Solo Texto</option>
+                      <option value="mixed">🔀 Imagen + Texto</option>
+                    </select>
+                  </div>
+
+                  <!-- Prioridad -->
+                  <div class="col-md-6">
+                    <label class="form-label small fw-bold">Prioridad</label>
+                    <select id="aviso-priority" class="form-select rounded-3">
+                      <option value="normal">Normal</option>
+                      <option value="urgent">🔴 Urgente</option>
+                    </select>
+                  </div>
+
+                  <!-- Título -->
+                  <div class="col-12">
+                    <label class="form-label small fw-bold">Título del Aviso</label>
+                    <input type="text" id="aviso-title" class="form-control rounded-3"
+                      placeholder="Ej: Proceso de Admisión 2026" required>
+                  </div>
+
+                  <!-- Imagen (URL o Archivo) -->
+                  <div class="col-12" id="aviso-image-field">
+                    <label class="form-label small fw-bold">Imagen del Aviso</label>
+                    <div class="input-group mb-2">
+                      <input type="file" id="aviso-imageFile" class="form-control rounded-3" accept="image/*">
+                    </div>
+                    <div class="text-center small text-muted mb-2">- O -</div>
+                    <input type="url" id="aviso-imageUrl" class="form-control rounded-3"
+                      placeholder="https://ejemplo.com/flyer.jpg">
+                    <div class="form-text">Sube una imagen o pega una URL directa.</div>
+
+                    <!-- Preview -->
+                    <div id="aviso-image-preview" class="mt-2 d-none text-center  rounded-3 p-2 relative">
+                      <img src="" class="rounded-3 shadow-sm"
+                        style="max-height:200px; max-width:100%; object-fit:contain;">
+                      <button type="button"
+                        class="btn btn-sm btn-danger position-absolute top-0 end-0 m-2 rounded-circle"
+                        onclick="document.getElementById('aviso-imageFile').value=''; document.getElementById('aviso-imageUrl').value=''; this.parentElement.classList.add('d-none');">
+                        <i class="bi bi-x"></i>
+                      </button>
+                    </div>
+                  </div>
+
+                  <!-- Cuerpo de texto -->
+                  <div class="col-12" id="aviso-body-field">
+                    <label class="form-label small fw-bold">Contenido del Aviso</label>
+                    <textarea id="aviso-body" class="form-control rounded-3" rows="4"
+                      placeholder="Escribe el mensaje del aviso..."></textarea>
+                  </div>
+
+                  <!-- Configuración de Tiempos -->
+                  <div class="col-md-6">
+                    <label class="form-label small fw-bold">Duración en Pantalla (seg)</label>
+                    <input type="number" id="aviso-displayDuration" class="form-control rounded-3" value="8" min="3"
+                      max="60">
+                    <div class="form-text">Tiempo que dura el slide antes de cambiar.</div>
+                  </div>
+
+                  <div class="col-md-6">
+                    <label class="form-label small fw-bold">Vigencia del Aviso</label>
+                    <div class="d-flex flex-wrap gap-2" id="aviso-validity-presets">
+                      <input type="radio" class="btn-check" name="validity" id="val-24h" value="24h" autocomplete="off">
+                      <label class="btn btn-outline-secondary btn-sm rounded-pill" for="val-24h">24 Horas</label>
+
+                      <input type="radio" class="btn-check" name="validity" id="val-3d" value="3d" autocomplete="off"
+                        checked>
+                      <label class="btn btn-outline-secondary btn-sm rounded-pill" for="val-3d">3 Días</label>
+
+                      <input type="radio" class="btn-check" name="validity" id="val-1w" value="1w" autocomplete="off">
+                      <label class="btn btn-outline-secondary btn-sm rounded-pill" for="val-1w">1 Semana</label>
+
+                      <input type="radio" class="btn-check" name="validity" id="val-custom" value="custom"
+                        autocomplete="off">
+                      <label class="btn btn-outline-secondary btn-sm rounded-pill"
+                        for="val-custom">Personalizado</label>
+                    </div>
+                  </div>
+
+                  <!-- Fechas Personalizadas (Oculto por defecto) -->
+                  <div class="col-12 d-none animate-fade-in" id="aviso-custom-dates">
+                    <div class="row g-2">
+                      <div class="col-6">
+                        <label class="form-label small fw-bold">Inicio</label>
+                        <input type="datetime-local" id="aviso-startDate" class="form-control rounded-3">
+                      </div>
+                      <div class="col-6">
+                        <label class="form-label small fw-bold">Fin</label>
+                        <input type="datetime-local" id="aviso-endDate" class="form-control rounded-3">
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Botones de Acción -->
+                  <div class="col-12 d-flex gap-2">
+                    <button type="button" id="btn-cancel-edit"
+                      class="btn btn-light rounded-pill px-4 d-none">Cancelar</button>
+                    <button type="submit" id="btn-submit-aviso"
+                      class="btn btn-success rounded-pill fw-bold px-4 flex-grow-1 shadow-sm">
+                      <i class="bi bi-megaphone-fill me-2"></i>Publicar Aviso
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <section id="global-avisos-wrap" class="bg-transparent mb-3 d-none">
+      <div class="container">
+        <div class="alert alert-light border-0 shadow-sm rounded-4 d-flex align-items-center p-3 mb-0 gap-3"
+          role="alert">
+          <div class="bg-warning-subtle text-warning rounded-circle p-2 d-flex"><i class="bi bi-broadcast"></i></div>
+          <div class="flex-grow-1 small text-muted" id="global-avisos-container">No hay avisos activos.</div>
+          <button class="btn btn-sm btn-light rounded-pill border" id="btn-global-avisos-modal">Ver todo</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- VIEWS CONTAINER -->
+    <!-- ============================================== -->
+    <!-- DASHBOARD V3 (MOBILE-FIRST)                -->
+    <!-- ============================================== -->
+
+    <sia-student-dashboard id="view-dashboard" class="app-view container py-4 mb-5"></sia-student-dashboard>
+    <div id="view-campus-map" class="app-view d-none px-2 px-lg-3 py-4 mb-5"></div>
+    <div id="view-lactario" class="app-view d-none container py-4 mb-5"> <!-- Lactario Module populated by JS --> </div>
+    <div id="view-quejas" class="app-view d-none container py-4 mb-5"> <!-- Quejas Module populated by JS --> </div>
+    <div id="view-biblio" class="app-view d-none container py-4 mb-5"> <!-- Biblio Module populated by JS --> </div>
+    <div id="view-medi" class="app-view d-none container py-4 mb-5"> <!-- Medi Module populated by JS --> </div>
+    <div id="view-aula" class="app-view d-none container py-4 mb-5"><!-- Aula: inyectado por JS --></div>
+    <div id="view-comunidad" class="app-view d-none container py-4 mb-5"> <!-- Comunidad Module populated by JS --> </div>
+    <div id="view-foro" class="app-view d-none container py-4 mb-5"> <!-- Foro Module populated by JS --> </div>
+    <div id="view-profile" class="app-view d-none container py-4 mb-5"> <!-- Profile Module populated by JS --> </div>
+    <div id="view-reportes" class="app-view d-none container py-4 mb-5"> <!-- Reportes Module populated by JS --> </div>
+    <div id="view-encuestas" class="app-view d-none container py-4 mb-5"> <!-- Encuestas Module populated by JS -->
+    </div>
+    <div id="view-cafeteria" class="app-view d-none container py-4 mb-5"> <!-- Cafeteria Module populated by JS -->
+    </div>
+    <div id="view-avisos" class="app-view d-none container py-4 mb-5"> <!-- Avisos Module -->
+    </div>
+    <div id="view-encuesta-publica" class="app-view d-none container py-4 mb-5"> <!-- Public Survey View (no auth) -->
+    </div>
+    <div id="view-notificaciones" class="app-view d-none container py-4 mb-5"> <!-- Notification Center Module -->
+    </div>
+
+    <!-- ============================================== -->
+    <!-- DASHBOARD DEPARTAMENTAL (ADMINS)           -->
+    <!-- ============================================== -->
+    <div id="view-department-dashboard" class="app-view d-none container py-5">
+      <div class="row justify-content-center">
+        <div class="col-lg-10">
+
+          <!-- Header Departamental -->
+          <div class="d-flex align-items-center justify-content-between mb-5 fade-up-entry">
+            <div>
+              <span class="badge bg-primary-subtle text-primary mb-2 px-3 py-2 rounded-pill fw-bold ls-1">PANEL
+                ADMINISTRATIVO</span>
+              <h1 class="display-5 fw-bold text-dark mb-1" id="dept-dash-title">Departamento</h1>
+              <p class="text-muted lead mb-0" id="dept-dash-subtitle">Bienvenido al centro de control.</p>
+            </div>
+            <div class="text-end d-none d-md-block">
+              <div class="bg-white p-3 rounded-4 shadow-sm border">
+                <span class="d-block text-muted extra-small fw-bold text-uppercase">FECHA DOCTO</span>
+                <span class="fs-5 fw-bold text-dark" id="dept-dash-date">--</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Grid de Módulos (Se llena dinámicamente) -->
+          <div class="row g-4" id="dept-dash-grid">
+            <!-- Cards inyectadas por JS -->
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- SuperAdmin: todo el contenido se renderiza dinámicamente por superadmin.js -->
+    <div id="view-superadmin-dashboard" class="app-view d-none p-0">
+      <!-- Rendered dynamically by /modules/superadmin.js -->
+    </div>
+
+    <!-- Modal: Reportar Problema Técnico -->
+    <div class="modal fade" id="modalReportProblem" tabindex="-1">
+      <div class="modal-dialog modal-dialog-centered modal-xl modal-dialog-scrollable">
+        <div class="modal-content rounded-4 border-0 shadow-lg support-modal">
+          <div class="modal-header bg-danger text-white border-0 p-4">
+            <div>
+              <h5 class="fw-bold mb-0"><i class="bi bi-bug-fill me-2"></i>Centro de soporte técnico</h5>
+              <small class="opacity-75">Reporta problemas con más contexto y revisa el seguimiento de tus tickets</small>
+            </div>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body p-0">
+            <div class="support-modal-tabs border-bottom px-4 pt-3">
+              <div class="d-flex gap-2 flex-wrap">
+                <button type="button" class="btn btn-light rounded-pill px-4 fw-bold support-tab-btn active"
+                  data-support-tab="report">
+                  <i class="bi bi-send-fill me-2"></i>Nuevo reporte
+                </button>
+                <button type="button" class="btn btn-light rounded-pill px-4 fw-bold support-tab-btn"
+                  data-support-tab="tickets">
+                  <i class="bi bi-ticket-detailed me-2"></i>Mis tickets
+                </button>
+              </div>
+            </div>
+
+            <div class="p-4">
+              <section data-support-panel="report">
+                <form id="form-report-problem">
+                  <div class="row g-3">
+                    <div class="col-md-6">
+                      <label class="form-label small fw-bold">Tipo de problema</label>
+                      <select class="form-select" id="report-tipo" required>
+                        <option value="bug">Error / Bug</option>
+                        <option value="ui">Problema de interfaz</option>
+                        <option value="acceso">No puedo acceder</option>
+                        <option value="datos">Datos incorrectos</option>
+                        <option value="rendimiento">Lentitud / rendimiento</option>
+                        <option value="sugerencia">Sugerencia</option>
+                        <option value="otro">Otro</option>
+                      </select>
+                    </div>
+                    <div class="col-md-6">
+                      <label class="form-label small fw-bold">Modulo afectado</label>
+                      <select class="form-select" id="report-categoria" required>
+                        <option value="general">General</option>
+                        <option value="dashboard">Dashboard</option>
+                        <option value="aula">Aula Virtual</option>
+                        <option value="biblio">Biblioteca</option>
+                        <option value="medi">Servicio Médico</option>
+                        <option value="foro">Foro</option>
+                        <option value="cafeteria">Cafeteria</option>
+                        <option value="encuestas">Encuestas</option>
+                        <option value="quejas">Quejas</option>
+                        <option value="lactario">Lactario</option>
+                        <option value="perfil">Mi Perfil</option>
+                        <option value="reportes">Reportes</option>
+                        <option value="vocacional">Vocacional</option>
+                      </select>
+                    </div>
+                    <div class="col-md-8">
+                      <label class="form-label small fw-bold">Resumen corto</label>
+                      <input class="form-control" id="report-titulo" maxlength="90" required
+                        placeholder="Ej. No me deja guardar una entrega en Aula">
+                    </div>
+                    <div class="col-md-4">
+                      <label class="form-label small fw-bold">Impacto</label>
+                      <select class="form-select" id="report-priority" required>
+                        <option value="normal">Puedo continuar</option>
+                        <option value="alta">Afecta una tarea importante</option>
+                        <option value="critica">Bloquea por completo</option>
+                      </select>
+                    </div>
+                    <div class="col-12">
+                      <label class="form-label small fw-bold">Que paso</label>
+                      <textarea class="form-control" id="report-descripcion" rows="3" required
+                        placeholder="Describe el problema con el mayor detalle posible."></textarea>
+                    </div>
+                    <div class="col-lg-4">
+                      <label class="form-label small fw-bold">Pasos para reproducir</label>
+                      <textarea class="form-control" id="report-steps" rows="4"
+                        placeholder="1. Entre a...&#10;2. Di clic en...&#10;3. Ocurrio..."></textarea>
+                    </div>
+                    <div class="col-lg-4">
+                      <label class="form-label small fw-bold">Resultado esperado</label>
+                      <textarea class="form-control" id="report-expected" rows="4"
+                        placeholder="Que debio pasar normalmente."></textarea>
+                    </div>
+                    <div class="col-lg-4">
+                      <label class="form-label small fw-bold">Resultado actual</label>
+                      <textarea class="form-control" id="report-actual" rows="4"
+                        placeholder="Que paso en realidad o que mensaje viste."></textarea>
+                    </div>
+                    <div class="col-lg-7">
+                      <div class="support-evidence-card rounded-4 border p-3 h-100">
+                        <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
+                          <div>
+                            <h6 class="fw-bold mb-1">Adjuntar evidencia</h6>
+                            <p class="small text-muted mb-0">Puedes subir una captura desde tu galeria o camara.</p>
+                          </div>
+                          <span class="badge bg-light text-dark border">Imagen</span>
+                        </div>
+
+                        <input type="file" id="report-evidence" class="d-none" accept="image/*" capture="environment">
+
+                        <div class="d-flex flex-wrap gap-2 mb-3">
+                          <button type="button" class="btn btn-outline-dark rounded-pill px-3" id="btn-report-evidence">
+                            <i class="bi bi-image me-2"></i>Seleccionar imagen
+                          </button>
+                          <button type="button" class="btn btn-outline-danger rounded-pill px-3 d-none"
+                            id="btn-report-evidence-clear">
+                            <i class="bi bi-x-circle me-2"></i>Quitar adjunto
+                          </button>
+                        </div>
+
+                        <div class="support-evidence-preview d-none" id="report-evidence-preview">
+                          <img src="" alt="Vista previa de evidencia" id="report-evidence-preview-img"
+                            class="img-fluid rounded-4 border shadow-sm">
+                        </div>
+                      </div>
+                    </div>
+                    <div class="col-lg-5">
+                      <div class="support-context-card rounded-4 border p-3 h-100">
+                        <h6 class="fw-bold mb-3">Contexto técnico incluido</h6>
+                        <div class="support-context-list">
+                          <div class="support-context-item">
+                            <span class="text-muted">Modulo detectado</span>
+                            <strong id="support-context-module">General</strong>
+                          </div>
+                          <div class="support-context-item">
+                            <span class="text-muted">Vista actual</span>
+                            <strong id="support-context-view">-</strong>
+                          </div>
+                          <div class="support-context-item">
+                            <span class="text-muted">Ruta</span>
+                            <strong id="support-context-route">-</strong>
+                          </div>
+                          <div class="support-context-item">
+                            <span class="text-muted">Dispositivo</span>
+                            <strong id="support-context-device">-</strong>
+                          </div>
+                        </div>
+                        <p class="small text-muted mt-3 mb-0">
+                          Este contexto se agrega automaticamente para ayudar a reproducir el problema.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="d-flex justify-content-end gap-2 mt-4">
+                    <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">Cerrar</button>
+                    <button type="submit" class="btn btn-danger rounded-pill px-4 shadow-sm fw-bold">
+                      <i class="bi bi-send-fill me-1"></i>Enviar reporte
+                    </button>
+                  </div>
+                </form>
+              </section>
+
+              <section class="d-none" data-support-panel="tickets">
+                <div class="row g-4">
+                  <div class="col-lg-5">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                      <div>
+                        <h6 class="fw-bold mb-0">Mis tickets</h6>
+                        <small class="text-muted">Consulta el estado y las respuestas del equipo.</small>
+                      </div>
+                      <button type="button" class="btn btn-sm btn-light rounded-pill" id="btn-support-refresh">
+                        <i class="bi bi-arrow-clockwise"></i>
+                      </button>
+                    </div>
+                    <div id="support-my-tickets-list" class="d-flex flex-column gap-3">
+                      <div class="text-center py-5 text-muted">
+                        <span class="spinner-border spinner-border-sm"></span> Cargando...
+                      </div>
+                    </div>
+                    <div class="text-center pt-3" id="support-my-tickets-footer"></div>
+                  </div>
+                  <div class="col-lg-7">
+                    <div class="support-ticket-detail-empty rounded-4 border border-dashed p-4 text-center text-muted"
+                      id="support-ticket-detail-empty">
+                      <i class="bi bi-ticket-detailed fs-1 d-block mb-3 opacity-50"></i>
+                      <h6 class="fw-bold mb-2">Selecciona un ticket</h6>
+                      <p class="small mb-0">Aqui veras el historial, estado actual y las respuestas del soporte.</p>
+                    </div>
+                    <div class="d-none" id="support-my-ticket-detail"></div>
+                  </div>
+                </div>
+              </section>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+
+
+    <!-- Legacy profile block disabled; handled by public/modules/profile.js
+    <div id="view-profile" class="app-view d-none">
+      <div class="container-fluid px-0">
+        <div class="profile-cover-image rounded-bottom-4 shadow-sm d-flex align-items-end justify-content-end p-3">
+
+        </div>
+
+        <div class="container mt-n5" style="max-width: 1000px; margin-top: -60px;">
+          <div class="row">
+            <div class="col-lg-4 mb-4 position-relative z-2">
+              <div class="text-center">
+                <div class="position-relative d-inline-block mb-3">
+                  <div id="prof-avatar-container"
+                    class="rounded-circle border border-4 border-white shadow bg-primary text-white d-flex align-items-center justify-content-center overflow-hidden"
+                    style="width: 120px; height: 120px;">
+                    <span id="prof-avatar-initials" class="fs-1 fw-bold">U</span>
+                    <img id="prof-avatar-img" src="" class="w-100 h-100 object-fit-cover d-none">
+                  </div>
+                  <button
+                    class="btn btn-sm btn-dark rounded-circle position-absolute bottom-0 end-0 border border-white shadow-sm"
+                    onclick="document.getElementById('prof-pic-input').click()" title="Cambiar foto">
+                    <i class="bi bi-camera-fill text-white"></i>
+                  </button>
+                  <input type="file" id="prof-pic-input" accept="image/*">
+                </div>
+
+                <h3 class="fw-bold mb-1" id="prof-name">Usuario</h3>
+                <p class="text-muted mb-3 small text-uppercase fw-bold" id="prof-role">ESTUDIANTE</p>
+
+                <div
+                  class="card border-0 shadow-sm rounded-4 overflow-hidden mb-3 bg-dark text-white text-start p-3 position-relative">
+                  <div class="d-flex justify-content-between align-items-center position-relative z-1">
+                    <div>
+                      <div class="small text-white-50 text-uppercase fw-bold" style="font-size: 0.65rem;">Matrícula
+                      </div>
+                      <div class="font-monospace fs-5" id="prof-matricula">----</div>
+                    </div>
+                    <div class="bg-white p-1 rounded">
+                      <img id="prof-qr-mini" src="" width="40" height="40">
+                    </div>
+                  </div>
+                  <button
+                    class="btn btn-sm btn-outline-light w-100 mt-3 rounded-pill position-relative z-1 stretched-link"
+                    onclick="Profile.openDigitalID()">
+                    <i class="bi bi-qr-code me-2"></i>Ver Credencial
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div class="col-lg-8 mt-lg-5 pt-lg-3">
+              <div class="row g-3 mb-4">
+                <div class="col-4">
+                  <div class="kardex-stat-box">
+                    <div class="small text-muted fw-bold">PROMEDIO</div>
+                    <div class="h4 fw-bold text-primary mb-0">-.-</div>
+                  </div>
+                </div>
+                <div class="col-4">
+                  <div class="kardex-stat-box">
+                    <div class="small text-muted fw-bold">CRÉDITOS</div>
+                    <div class="h4 fw-bold text-success mb-0">-</div>
+                  </div>
+                </div>
+                <div class="col-4">
+                  <div class="kardex-stat-box">
+                    <div class="small text-muted fw-bold">SEMESTRE</div>
+                    <div class="h4 fw-bold text-dark mb-0">-</div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="card border-0 shadow-sm rounded-4">
+                <div class="card-body p-4">
+                  <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h6 class="fw-bold mb-0">Información Personal</h6>
+                    <button type="button" class="btn btn-sm btn-outline-primary rounded-pill"
+                      onclick="Profile.toggleEditMode()">
+                      <i class="bi bi-pencil-fill me-1"></i>
+                      <span class="d-none d-sm-inline">Editar datos</span>
+                    </button>
+                  </div>
+                  <form id="form-profile-edit">
+
+                    <div class="row g-3">
+                      <div class="col-md-6">
+                        <label class="form-label small fw-bold text-muted">Teléfono</label>
+                        <input type="tel" class="form-control" id="prof-phone" disabled="">
+                      </div>
+                      <div class="col-md-6">
+                        <label class="form-label small fw-bold text-muted">Tipo de Sangre</label>
+                        <select class="form-select" id="prof-blood" disabled="">
+                          <option value="">Seleccionar</option>
+                          <option value="O+">O+</option>
+                          <option value="A+">A+</option>
+                        </select>
+                      </div>
+                      <div class="col-md-12">
+                        <label class="form-label small fw-bold text-muted">Contacto de Emergencia</label>
+                        <input type="text" class="form-control" id="prof-emergency-name" disabled=""
+                          placeholder="Nombre">
+                      </div>
+                      <div class="col-md-12">
+                        <label class="form-label small fw-bold text-muted">Tel. Emergencia</label>
+                        <input type="tel" class="form-control" id="prof-emergency-tel" disabled="">
+                      </div>
+                    </div>
+                    <div id="prof-edit-actions" class="mt-4 d-none text-end">
+                      <button type="button" class="btn btn-light border rounded-pill me-2"
+                        onclick="Profile.cancelEdit()">Cancelar</button>
+                      <button type="submit" class="btn btn-primary rounded-pill px-4">Guardar Cambios</button>
+                    </div>
+                  </form>
+
+                  Configuracion de tema removida - Dark Mode permanente
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+
+
+    -->
+    <div id="view-biblio-legacy" class="app-view d-none container py-4">
+      <section id="biblio-student" class="d-none">
+        <div class="row g-4">
+          <div class="col-lg-8 order-2 order-lg-1">
+            <div class="card border-0 shadow-sm rounded-4 h-100">
+              <div class="card-header bg-surface border-0 pt-4 px-4">
+                <h2 class="h5 mb-1 text-primary fw-bold"><i class="bi bi-search me-2"
+                    style="color:var(--biblio)"></i>Catálogo</h2>
+                <form id="biblio-stu-search-form" class="mt-3">
+                  <div class="input-group">
+                    <span class="input-group-text bg-surface-muted border-end-0"><i class="bi bi-search"></i></span>
+                    <input type="search" id="biblio-stu-search-input"
+                      class="form-control bg-surface-muted border-start-0" placeholder="Título, autor o ISBN...">
+                  </div>
+                </form>
+              </div>
+              <div class="card-body p-0">
+                <div id="biblio-stu-search-results" class="list-group list-group-flush scroll-container p-3">
+                  <p class="text-muted p-3 text-center">Utiliza el buscador para encontrar material.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="col-lg-4 order-1 order-lg-2">
+            <div class="card border-0 shadow-sm rounded-4 bg-primary text-white mb-3">
+              <div class="card-body p-4 position-relative overflow-hidden">
+                <i class="bi bi-bookmark-star position-absolute top-0 end-0 opacity-25 m-3 display-1"></i>
+                <h5 class="fw-bold position-relative z-1">Mis Préstamos</h5>
+                <p class="small opacity-75 position-relative z-1">Revisa fechas de devolución para evitar multas.</p>
+              </div>
+            </div>
+            <div class="card border-0 shadow-sm rounded-4">
+              <div class="card-body p-0">
+                <div id="biblio-stu-prestamos" class="table-responsive">
+                  <p class="text-muted p-3">Cargando...</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="biblio-admin" class="d-none">
+        <div class="alert alert-info">Panel de Administración Bibliotecaria Cargado</div>
+        <ul class="nav nav-tabs mb-3" role="tablist">
+          <li class="nav-item" role="presentation"><button class="nav-link active" data-bs-toggle="tab"
+              data-bs-target="#tab-biblio-pend" aria-selected="true" role="tab">Pendientes</button></li>
+          <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="tab"
+              data-bs-target="#tab-biblio-aprob" aria-selected="false" tabindex="-1" role="tab">Aprobados</button>
+          </li>
+          <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="tab"
+              data-bs-target="#tab-biblio-entreg" aria-selected="false" tabindex="-1" role="tab">Entregados</button>
+          </li>
+          <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="tab"
+              data-bs-target="#tab-biblio-invent" aria-selected="false" tabindex="-1" role="tab">Inventario</button>
+          </li>
+          <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="tab"
+              data-bs-target="#tab-biblio-servicios" aria-selected="false" tabindex="-1" role="tab">Servicios &amp;
+              PCs</button></li>
+        </ul>
+        <div class="tab-content">
+          <div class="tab-pane fade show active" id="tab-biblio-pend" role="tabpanel">
+            <div id="biblio-adm-prestamos-pend" class="card p-3 border-0 shadow-sm"></div>
+          </div>
+          <div class="tab-pane fade" id="tab-biblio-aprob" role="tabpanel">
+            <div id="biblio-adm-prestamos-aprob" class="card p-3 border-0 shadow-sm"></div>
+          </div>
+          <div class="tab-pane fade" id="tab-biblio-entreg" role="tabpanel">
+            <div id="biblio-adm-prestamos-entreg" class="card p-3 border-0 shadow-sm"></div>
+          </div>
+          <div class="tab-pane fade" id="tab-biblio-invent" role="tabpanel">
+            <div class="row g-4">
+              <div class="col-lg-4">
+                <div class="card border-0 shadow-sm p-4">
+                  <h6>Nuevo Libro</h6>
+                  <form id="form-biblio-nuevo-libro">
+                    <input class="form-control mb-2" id="biblio-titulo" placeholder="Título" required="">
+                    <input class="form-control mb-2" id="biblio-autor" placeholder="Autor" required="">
+                    <input class="form-control mb-2" id="biblio-isbn" placeholder="ISBN">
+                    <input type="number" class="form-control mb-3" id="biblio-copias" value="1" min="1">
+                    <button class="btn btn-primary w-100">Guardar</button>
+                  </form>
+                </div>
+              </div>
+              <div class="col-lg-8">
+                <div id="biblio-adm-inventario" class="card p-3 border-0 shadow-sm scroll-container"></div>
+              </div>
+            </div>
+          </div>
+          <div class="tab-pane fade" id="tab-biblio-servicios" role="tabpanel">
+            <div class="row g-4">
+              <div class="col-lg-8">
+                <div class="card border-0 shadow-sm">
+                  <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                    <h6 class="fw-bold mb-0">Control de Activos</h6>
+                    <span class="badge bg-primary-subtle text-primary">Tiempo Real</span>
+                  </div>
+                  <div class="card-body p-0">
+                    <div id="biblio-assets-grid" class="row g-0">
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="col-lg-4">
+                <div class="card border-0 shadow-sm p-4 mb-3">
+                  <h6 class="fw-bold mb-3">Nuevo Activo</h6>
+                  <form id="form-biblio-asset">
+                    <div class="mb-2">
+                      <label class="small fw-bold text-muted">ID único (Ej. PC-01)</label>
+                      <input type="text" id="asset-id" class="form-control form-control-sm text-uppercase" required="">
+                    </div>
+                    <div class="mb-2">
+                      <label class="small fw-bold text-muted">Tipo</label>
+                      <select id="asset-type" class="form-select form-select-sm">
+                        <option value="pc">Computadora</option>
+                        <option value="sala">Sala de Estudio</option>
+                        <option value="mesa">Mesa de Trabajo</option>
+                      </select>
+                    </div>
+                    <div class="mb-3">
+                      <label class="small fw-bold text-muted">Nombre Visible</label>
+                      <input type="text" id="asset-name" class="form-control form-control-sm"
+                        placeholder="Ej. PC Diseño 1" required="">
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-sm w-100">Crear Activo</button>
+                  </form>
+                </div>
+
+                <div id="asset-control-panel" class="card border-0 shadow-sm p-4  d-none">
+                  <h6 class="fw-bold mb-2" id="ctrl-asset-name">--</h6>
+                  <p class="small text-muted mb-3" id="ctrl-asset-status">Selecciona un activo</p>
+
+                  <label class="small fw-bold">Asignar tiempo:</label>
+                  <div class="d-flex gap-2 mb-3">
+                    <button class="btn btn-white border btn-sm flex-fill" onclick="Biblio.quickUnlock(30)">30m</button>
+                    <button class="btn btn-white border btn-sm flex-fill" onclick="Biblio.quickUnlock(60)">1h</button>
+                    <button class="btn btn-white border btn-sm flex-fill" onclick="Biblio.quickUnlock(120)">2h</button>
+                  </div>
+                  <input type="text" id="ctrl-user-label" class="form-control form-control-sm mb-3"
+                    placeholder="Nombre/Matrícula (Opcional)">
+
+                  <div class="d-grid gap-2">
+                    <button class="btn btn-success btn-sm" id="btn-unlock-custom">Desbloquear</button>
+                    <button class="btn btn-danger btn-sm" id="btn-force-lock">Bloquear Ahora</button>
+                    <button class="btn btn-outline-danger btn-sm" id="btn-delete-asset">Eliminar</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="biblio-superadmin" class="d-none">
+
+        <div class="card border-0 shadow-sm rounded-4 mb-4 overflow-hidden text-white"
+          style="background: linear-gradient(135deg, #2563eb 0%, #1e3a8a 100%);">
+          <div class="card-body p-4 position-relative">
+            <div class="d-flex justify-content-between align-items-center position-relative z-1">
+              <div>
+                <div class="d-flex align-items-center gap-2 mb-1">
+                  <i class="bi bi-cpu-fill fs-4"></i>
+                  <h2 class="h4 fw-bold mb-0">BiBlop Control</h2>
+                </div>
+                <p class="mb-0 opacity-75 small">Monitor de acceso en tiempo real y telemetría de servicios.</p>
+              </div>
+              <div class="text-end">
+                <div class="badge bg-white bg-opacity-25 border border-white border-opacity-25 backdrop-blur mb-1">
+                  <span class="dot-indicator bg-success border border-white d-inline-block rounded-circle me-1"
+                    style="width:8px; height:8px;"></span>
+                  En línea
+                </div>
+                <div class="small opacity-75" id="biblop-last-update">Actualizando...</div>
+              </div>
+            </div>
+            <i class="bi bi-wifi position-absolute text-white opacity-10"
+              style="font-size: 8rem; right: -20px; bottom: -40px;"></i>
+          </div>
+        </div>
+
+        <div class="d-flex flex-wrap gap-3 align-items-center justify-content-between mb-4">
+          <div class="d-flex align-items-center gap-2">
+            <label class="small fw-bold text-muted">Rango:</label>
+            <select id="biblop-range" class="form-select form-select-sm rounded-pill shadow-sm border-0"
+              style="min-width: 150px;">
+              <option value="1h">Última hora</option>
+              <option value="6h">Últimas 6 horas</option>
+              <option value="24h" selected="">Últimas 24 horas</option>
+              <option value="7d">Últimos 7 días</option>
+              <option value="30d">Últimos 30 días</option>
+            </select>
+          </div>
+          <button class="btn btn-sm btn-outline-primary rounded-pill" id="biblop-refresh-btn">
+            <i class="bi bi-arrow-clockwise me-1"></i> Actualizar
+          </button>
+        </div>
+
+        <div class="row g-3 mb-4">
+          <div class="col-md-3">
+            <div class="card border-0 shadow-sm h-100 p-3 border-start border-4 border-primary">
+              <div class="small text-muted fw-bold text-uppercase">Entradas</div>
+              <div class="h2 mb-0 fw-bold text-primary" id="biblop-kpi-entro">-</div>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="card border-0 shadow-sm h-100 p-3 border-start border-4 border-success">
+              <div class="small text-muted fw-bold text-uppercase">Salidas</div>
+              <div class="h2 mb-0 fw-bold text-success" id="biblop-kpi-salio">-</div>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="card border-0 shadow-sm h-100 p-3 border-start border-4 border-warning">
+              <div class="small text-muted fw-bold text-uppercase">Aforo Actual</div>
+              <div class="h2 mb-0 fw-bold text-dark" id="biblop-kpi-inside">-</div>
+              <small class="text-muted" style="font-size: 0.7rem;">Estimado</small>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="card border-0 shadow-sm h-100 p-3">
+              <div class="small text-muted fw-bold text-uppercase">Ratio E/S</div>
+              <div class="h2 mb-0 fw-bold text-secondary" id="biblop-kpi-ratio">-</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="row g-4 mb-4">
+          <div class="col-12">
+            <div class="card border-0 shadow-sm rounded-4">
+              <div class="card-header bg-white py-3 border-0 d-flex justify-content-between align-items-center">
+                <h6 class="fw-bold mb-0"><i class="bi bi-bar-chart-line-fill me-2 text-primary"></i>Flujo de Entradas
+                  y
+                  Salidas</h6>
+                <small class="text-muted">Comparativa por intervalo</small>
+              </div>
+              <div class="card-body">
+                <div style="height: 300px; position: relative; width: 100%;">
+                  <canvas id="chart-biblop-flow"></canvas>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-lg-6">
+            <div class="card border-0 shadow-sm rounded-4 h-100">
+              <div class="card-header bg-white py-3 border-0">
+                <h6 class="fw-bold mb-0"><i class="bi bi-activity me-2 text-warning"></i>Tendencia de Ocupación</h6>
+              </div>
+              <div class="card-body">
+                <div style="height: 250px; position: relative; width: 100%;">
+                  <canvas id="chart-biblop-occupancy"></canvas>
+                </div>
+                <div class="text-center mt-3 small text-muted">
+                  Estimación de aforo a lo largo del tiempo.
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-lg-6">
+            <div class="card border-0 shadow-sm rounded-4 h-100">
+              <div class="card-header bg-white py-3 border-0">
+                <h6 class="fw-bold mb-0"><i class="bi bi-pie-chart-fill me-2 text-info"></i>Distribución de Servicios
+                </h6>
+              </div>
+              <div class="card-body">
+                <div class="row align-items-center h-100">
+                  <div class="col-md-6">
+                    <div style="height: 200px; position: relative; width: 100%;">
+                      <canvas id="chart-biblop-services"></canvas>
+                    </div>
+                  </div>
+                  <div class="col-md-6">
+                    <ul class="list-group list-group-flush small" id="biblop-services-legend">
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card border-0 shadow-sm rounded-4 mb-5">
+          <div class="card-header bg-white py-3 border-0 d-flex justify-content-between align-items-center">
+            <h6 class="fw-bold mb-0">Bitácora del Dispositivo</h6>
+            <span class="badge  text-dark">Últimos 12 eventos</span>
+          </div>
+          <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0 small">
+              <thead class="table-light">
+                <tr>
+                  <th>Hora</th>
+                  <th>Evento</th>
+                  <th>Servicio</th>
+                  <th>ID Credencial</th>
+                </tr>
+              </thead>
+              <tbody id="biblop-table-body">
+                <tr>
+                  <td colspan="4" class="text-center text-muted py-3">Cargando datos...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="d-flex justify-content-between align-items-center mb-3 mt-5">
+          <h4 class="h5 fw-bold text-muted">Gestión de Inventario</h4>
+        </div>
+        <div class="row g-3 mb-4">
+          <div class="col-md-4">
+            <div class="card border-0 shadow-sm p-3">
+              <div class="small text-muted fw-bold">INVENTARIO TOTAL</div>
+              <div class="h4 mb-0" id="biblio-sa-total">0</div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="card border-0 shadow-sm p-3">
+              <div class="small text-muted fw-bold">PRÉSTAMOS ACTIVOS</div>
+              <div class="h4 mb-0 text-warning" id="biblio-sa-activos">0</div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="card border-0 shadow-sm p-3">
+              <div class="small text-muted fw-bold">NO DEVUELTOS</div>
+              <div class="h4 mb-0 text-danger" id="biblio-sa-vencidos">0</div>
+            </div>
+          </div>
+        </div>
+        <div class="card border-0 shadow-sm rounded-4">
+          <div class="card-header bg-white py-3">
+            <h5 class="mb-0 fw-bold">Préstamos (Firebase)</h5>
+          </div>
+          <div class="card-body p-0">
+            <div id="biblio-sa-list" class="table-responsive scroll-container" style="max-height: 300px;"></div>
+          </div>
+        </div>
+
+      </section>
+    </div>
+
+    <div id="view-medi" class="app-view d-none container py-4">
+
+      <!-- ==================== VISTA ESTUDIANTE ==================== -->
+      <div id="medi-student" class="d-none">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+          <div>
+            <h1 class="h3 fw-bold text-primary mb-1">Mi Salud</h1>
+            <p class="text-muted mb-0 small">Gestiona tu bienestar y emergencias.</p>
+          </div>
+          <button class="btn btn-danger btn-sm rounded-pill shadow-sm animate-pulse"
+            onclick="if(window.Medi) Medi.toggleSOS()">
+            <i class="bi bi-exclamation-triangle-fill me-1"></i> SOS
+          </button>
+        </div>
+
+        <ul class="nav nav-pills mb-4 gap-2" role="tablist">
+          <li class="nav-item">
+            <button class="nav-link active rounded-pill px-4" data-bs-toggle="pill" data-bs-target="#tab-medi-resumen">
+              <i class="bi bi-heart-pulse me-2"></i>Resumen
+            </button>
+          </li>
+          <li class="nav-item">
+            <button class="nav-link rounded-pill px-4" data-bs-toggle="pill" data-bs-target="#tab-medi-citas">
+              <i class="bi bi-calendar-event me-2"></i>Citas
+            </button>
+          </li>
+          <li class="nav-item">
+            <button class="nav-link rounded-pill px-4" data-bs-toggle="pill" data-bs-target="#tab-medi-expediente">
+              <i class="bi bi-folder2-open me-2"></i>Expediente
+            </button>
+          </li>
+        </ul>
+
+        <div class="tab-content">
+          <!-- TAB 1: RESUMEN (Tarjeta + Feed) -->
+          <div class="tab-pane fade show active" id="tab-medi-resumen">
+            <div class="row g-4">
+              <div class="col-lg-5">
+                <div class="card border-0 shadow-sm rounded-4 mb-3 bg-white overflow-hidden">
+                  <div
+                    class="card-header bg-danger text-white border-0 py-3 d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0 fw-bold"><i class="bi bi-postcard-heart-fill me-2"></i>Tarjeta de Emergencia</h6>
+                    <button class="btn btn-sm btn-white text-danger py-0" style="font-size:0.7rem"
+                      onclick="Medi.editarTarjeta()">Editar</button>
+                  </div>
+                  <div class="card-body position-relative">
+                    <div id="medi-card-view">
+                      <div class="row g-2 text-center mb-3">
+                        <div class="col-6">
+                          <div class="p-2  rounded-3 border">
+                            <div class="extra-small text-muted text-uppercase fw-bold">Tipo Sangre</div>
+                            <div class="h4 mb-0 fw-bold text-dark" id="view-sangre">--</div>
+                          </div>
+                        </div>
+                        <div class="col-6">
+                          <div class="p-2  rounded-3 border">
+                            <div class="extra-small text-muted text-uppercase fw-bold">Alergias</div>
+                            <div class="small fw-semibold text-dark text-truncate" id="view-alergias">Ninguna</div>
+                          </div>
+                        </div>
+                      </div>
+                      <div class="p-3 bg-danger-subtle text-danger rounded-3 border border-danger-subtle">
+                        <div class="extra-small text-uppercase fw-bold opacity-75">Contacto de Emergencia</div>
+                        <div class="fw-bold" id="view-contacto-nombre">--</div>
+                        <div class="small"><i class="bi bi-telephone-fill me-1"></i> <span
+                            id="view-contacto-tel">--</span></div>
+                      </div>
+                    </div>
+
+                    <form id="medi-card-form" class="d-none">
+                      <div class="mb-2">
+                        <label class="form-label extra-small fw-bold">Tipo de Sangre</label>
+                        <select class="form-select form-select-sm" id="edit-sangre">
+                          <option value="">Seleccionar</option>
+                          <option value="A+">A+</option>
+                          <option value="A-">A-</option>
+                          <option value="B+">B+</option>
+                          <option value="B-">B-</option>
+                          <option value="AB+">AB+</option>
+                          <option value="AB-">AB-</option>
+                          <option value="O+">O+</option>
+                          <option value="O-">O-</option>
+                        </select>
+                      </div>
+                      <div class="mb-2">
+                        <label class="form-label extra-small fw-bold">Alergias</label>
+                        <input type="text" class="form-control form-control-sm" id="edit-alergias"
+                          placeholder="Ej. Penicilina">
+                      </div>
+                      <div class="mb-2">
+                        <label class="form-label extra-small fw-bold">Nombre Contacto</label>
+                        <input type="text" class="form-control form-control-sm" id="edit-contacto-nombre">
+                      </div>
+                      <div class="mb-3">
+                        <label class="form-label extra-small fw-bold">Teléfono Contacto</label>
+                        <input type="tel" class="form-control form-control-sm" id="edit-contacto-tel">
+                      </div>
+                      <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-light btn-sm w-50"
+                          onclick="Medi.cancelarEdicionTarjeta()">Cancelar</button>
+                        <button type="submit" class="btn btn-primary btn-sm w-50">Guardar</button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+
+                <div class="d-grid">
+                  <button class="btn btn-outline-primary py-3 rounded-4 fw-bold shadow-sm"
+                    onclick="document.querySelector('[data-bs-target=\'#tab-medi-citas\']').click()">
+                    <i class="bi bi-calendar-plus me-2"></i> Agendar Nueva Cita
+                  </button>
+                </div>
+              </div>
+
+              <div class="col-lg-7">
+                <h6 class="fw-bold text-muted mb-3"><i class="bi bi-stars me-2"></i>Tu Feed de Bienestar</h6>
+                <div id="medi-recos" class="row g-3"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- TAB 2: CITAS Y AGENDA -->
+          <div class="tab-pane fade" id="tab-medi-citas">
+            <div class="row g-4">
+              <div class="col-lg-5">
+                <div class="card border-0 shadow-sm rounded-4">
+                  <div class="card-body p-4">
+                    <div class="d-flex align-items-center gap-3 mb-4">
+                      <div class="bg-info-subtle text-info rounded-circle p-3"><i class="bi bi-calendar-plus fs-4"></i>
+                      </div>
+                      <h2 class="h5 mb-0 fw-bold">Agendar Cita</h2>
+                    </div>
+                    <form id="form-medi-nueva-cita">
+                      <div class="mb-3">
+                        <label class="form-label small fw-bold text-muted text-uppercase">1. Motivo de visita</label>
+                        <div class="input-group shadow-sm rounded-3 overflow-hidden">
+                          <span class="input-group-text bg-white border-end-0"><i
+                              class="bi bi-list-check text-primary"></i></span>
+                          <select id="medi-cita-categoria" class="form-select border-start-0 ps-0" required
+                            style="cursor: pointer;">
+                            <option value="" selected disabled>Selecciona una opción...</option>
+                            <option value="Malestar Físico">Me siento mal físicamente</option>
+                            <option value="Salud Mental">Apoyo emocional / Psicológico</option>
+                            <option value="Certificado">Trámite / Certificado</option>
+                            <option value="Consulta General">Consulta General</option>
+                          </select>
+                        </div>
+                      </div>
+                      <div class="mb-3">
+                        <label class="form-label small fw-bold text-muted text-uppercase">2. Fecha deseada</label>
+                        <div class="input-group shadow-sm rounded-3 overflow-hidden">
+                          <span class="input-group-text bg-white border-end-0"><i
+                              class="bi bi-calendar-event text-primary"></i></span>
+                          <input type="date" id="medi-cita-fecha" class="form-control border-start-0 ps-0" required>
+                        </div>
+                      </div>
+                      <div class="mb-4">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                          <label class="form-label small fw-bold text-muted text-uppercase mb-0">3. Horario
+                            disponible</label>
+                          <div id="medi-cita-disponibilidad" class="badge  text-secondary border">Selecciona
+                            fecha
+                          </div>
+                        </div>
+                        <div id="medi-time-grid" class="time-slot-grid p-2  rounded-3 border d-none"></div>
+                        <div id="medi-time-msg" class="text-center text-muted small py-3 border rounded-3 ">
+                          <i class="bi bi-arrow-up-circle me-1"></i> Elige una fecha arriba.
+                        </div>
+                        <input type="hidden" id="medi-cita-hora" required>
+                      </div>
+                      <input type="hidden" id="medi-cita-tipo" value="Médico">
+                      <div class="form-floating mb-4">
+                        <textarea id="medi-cita-motivo" class="form-control shadow-sm"
+                          style="height: 80px; border-radius: 1rem;" placeholder="Detalles" required></textarea>
+                        <label class="text-muted">Describe brevemente tus síntomas...</label>
+                      </div>
+                      <button type="submit" class="btn btn-primary w-100 py-3 rounded-pill fw-bold shadow hover-scale">
+                        <i class="bi bi-check-circle-fill me-2"></i> Confirmar Cita
+                      </button>
+                    </form>
+                  </div>
+                </div>
+              </div>
+              <div class="col-lg-7">
+                <div class="card border-0 shadow-sm rounded-4 h-100">
+                  <div class="card-header bg-white border-0 pt-4 px-4">
+                    <h6 class="fw-bold mb-0">Mis Citas Activas</h6>
+                  </div>
+                  <div class="card-body p-0">
+                    <div id="medi-stu-citas" class="table-responsive p-3"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- TAB 3: EXPEDIENTE -->
+          <div class="tab-pane fade" id="tab-medi-expediente">
+            <div class="card border-0 shadow-sm rounded-4">
+              <div class="card-header bg-white border-0 pt-4 px-4">
+                <h5 class="fw-bold mb-0">Mi Historial Clúnico</h5>
+                <small class="text-muted">Registro histórico de consultas y recetas.</small>
+              </div>
+              <div class="card-body">
+                <div id="medi-stu-consultas"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ==================== VISTA ADMIN (MÉDICO/PSICÓLOGO) ==================== -->
+      <section id="medi-admin" class="d-none">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+          <div>
+            <h2 class="h4 fw-bold text-primary mb-1">Estación Médica</h2>
+            <div class="d-flex gap-2 align-items-center">
+              <span id="medi-pro-name" class="fw-bold large">Profesional</span>
+              <span id="medi-pro-esp" class="badge bg-info text-dark">General</span>
+            </div>
+          </div>
+          <div class="d-flex gap-2">
+            <button class="btn btn-outline-primary btn-sm rounded-pill" onclick="Medi.refreshAdmin()">
+              <i class="bi bi-arrow-clockwise"></i>
+            </button>
+            <button class="btn btn-primary btn-sm shadow-sm rounded-pill px-3" onclick="Medi.nuevaConsultaWalkIn()">
+              <i class="bi bi-plus-lg me-1"></i> Consulta Express
+            </button>
+          </div>
+        </div>
+
+        <ul class="nav nav-pills mb-4 gap-2" role="tablist">
+          <li class="nav-item">
+            <button class="nav-link active rounded-pill px-4" data-bs-toggle="pill" data-bs-target="#adm-tab-sala">
+              <i class="bi bi-clipboard-data me-2"></i>Sala de Espera
+              <span class="badge bg-danger ms-2 rounded-pill" id="badge-sala-espera">0</span>
+            </button>
+          </li>
+          <li class="nav-item">
+            <button class="nav-link rounded-pill px-4" data-bs-toggle="pill" data-bs-target="#adm-tab-agenda">
+              <i class="bi bi-calendar-check me-2"></i>Mi Agenda
+            </button>
+          </li>
+          <li class="nav-item">
+            <button class="nav-link rounded-pill px-4" data-bs-toggle="pill" data-bs-target="#adm-tab-pacientes">
+              <i class="bi bi-people me-2"></i>Pacientes
+            </button>
+          </li>
+          <li class="nav-item ms-auto">
+            <button class="nav-link rounded-pill px-3  text-secondary" data-bs-toggle="pill"
+              data-bs-target="#adm-tab-config">
+              <i class="bi bi-gear-fill"></i>
+            </button>
+          </li>
+        </ul>
+
+        <div class="tab-content">
+          <!-- ADMIN TAB 1: SALA DE ESPERA -->
+          <div class="tab-pane fade show active" id="adm-tab-sala">
+            <div class="row g-4">
+              <div class="col-lg-8">
+                <div class="card border-0 shadow-sm rounded-4 h-100">
+                  <div class="card-header bg-white border-0 pt-4 px-4 d-flex justify-content-between">
+                    <div>
+                      <h5 class="fw-bold mb-0">Pacientes en Espera</h5>
+                      <small class="text-muted">Solicitudes en tiempo real</small>
+                    </div>
+                    <div class="form-check form-switch ps-0">
+                      <label class="form-check-label small fw-bold text-success me-5 pe-2"
+                        for="medi-switch-disponibilidad" style="cursor: pointer;">Recibir Citas</label>
+                      <input class="form-check-input ms-0" style="width: 3em; height: 1.5em; cursor: pointer;"
+                        type="checkbox" id="medi-switch-disponibilidad" checked
+                        onchange="Medi.toggleAvailability(this.checked)">
+                    </div>
+                  </div>
+                  <div class="card-body p-0">
+                    <div id="medi-muro-list" class="list-group list-group-flush p-3">
+                      <div class="text-center p-5 text-muted">No hay pacientes en espera.</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="col-lg-4">
+                <!-- KPI Rápido -->
+                <div class="row g-3 mb-3">
+                  <div class="col-6">
+                    <div class="p-3 bg-white rounded-4 shadow-sm border text-center">
+                      <div class="h4 fw-bold text-success mb-0" id="kpi-atendidos-hoy">0</div>
+                      <div class="extra-small text-uppercase text-muted fw-bold">Atendidos</div>
+                    </div>
+                  </div>
+                  <div class="col-6">
+                    <div class="p-3 bg-white rounded-4 shadow-sm border text-center">
+                      <div class="h4 fw-bold text-warning mb-0" id="kpi-pendientes-hoy">0</div>
+                      <div class="extra-small text-uppercase text-muted fw-bold">Pendientes</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="card border-0 shadow-sm rounded-4 bg-primary text-white mb-4">
+                  <div class="card-body p-4">
+                    <h5 class="fw-bold"><i class="bi bi-lightning-charge-fill me-2"></i>Acción Rápida</h5>
+                    <p class="small opacity-75 mb-3">Registrar paciente presencial sin cita previa.</p>
+                    <button class="btn btn-white text-primary w-100 fw-bold rounded-pill shadow-sm"
+                      onclick="Medi.nuevaConsultaWalkIn()">
+                      Atender Ahora
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ADMIN TAB 2: AGENDA -->
+          <div class="tab-pane fade" id="adm-tab-agenda">
+            <div class="card border-0 shadow-sm rounded-4">
+              <div class="card-header bg-white border-0 pt-4 px-4 d-flex justify-content-between align-items-center">
+                <h5 class="fw-bold mb-0">Agenda Personal</h5>
+                <select id="adm-agenda-filter"
+                  onchange="if(window.AdminMedi && AdminMedi.loadMyAgenda) AdminMedi.loadMyAgenda();"
+                  class="form-select form-select-sm w-auto rounded-pill border-0  fw-bold text-secondary">
+                  <option value="hoy">Hoy</option>
+                  <option value="semana">Esta Semana</option>
+                  <option value="todas" selected>Todas las Próximas</option>
+                </select>
+              </div>
+              <div class="card-body p-0">
+                <div id="medi-agenda-list" class="table-responsive"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ADMIN TAB 3: PACIENTES -->
+          <div class="tab-pane fade" id="adm-tab-pacientes">
+            <div class="card border-0 shadow-sm rounded-4">
+              <div class="card-body p-4">
+                <h5 class="fw-bold mb-3">Expediente Digital</h5>
+                <div class="input-group mb-4 shadow-sm rounded-pill overflow-hidden border-0">
+                  <span class="input-group-text bg-white border-0 ps-4"><i class="bi bi-search text-muted"></i></span>
+                  <input type="text" class="form-control border-0 py-3" id="medi-search-paciente"
+                    placeholder="Buscar por matrícula, nombre o correo del estudiante...">
+                </div>
+                <div id="medi-pacientes-results">
+                  <div class="text-center py-5 opacity-50">
+                    <i class="bi bi-person-badge display-1 mb-3"></i>
+                    <p>Busca un estudiante para ver su historial o iniciar consulta.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ADMIN TAB 4: CONFIGURACIÓN -->
+          <div class="tab-pane fade" id="adm-tab-config">
+            <div class="row g-4 justify-content-center">
+              <div class="col-md-8">
+                <div class="card border-0 shadow-sm rounded-4">
+                  <div class="card-header bg-white border-0 pt-4 px-4">
+                    <h5 class="fw-bold mb-0">Configuración del Servicio</h5>
+                    <small class="text-muted">Ajusta tus horarios y disponibilidad.</small>
+                  </div>
+                  <div class="card-body p-4">
+                    <form onsubmit="event.preventDefault(); Medi.saveConfig();">
+                      <div class="mb-4">
+                        <label class="form-label fw-bold small text-muted text-uppercase">Horario de Atención</label>
+                        <div class="input-group">
+                          <span class="input-group-text  border-0">De</span>
+                          <select id="cfg-hora-inicio" class="form-select border-0 ">
+                            <option value="7">07:00 AM</option>
+                            <option value="8" selected>08:00 AM</option>
+                            <option value="9">09:00 AM</option>
+                          </select>
+                          <span class="input-group-text  border-0">a</span>
+                          <select id="cfg-hora-fin" class="form-select border-0 ">
+                            <option value="14">02:00 PM</option>
+                            <option value="16">04:00 PM</option>
+                            <option value="18">06:00 PM</option>
+                            <option value="20" selected>08:00 PM</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div class="mb-4">
+                        <label class="form-label fw-bold small text-muted text-uppercase">Duración de Consulta</label>
+                        <div class="btn-group w-100" role="group">
+                          <input type="radio" class="btn-check" name="cfg-duracion" id="dur-15" value="15">
+                          <label class="btn btn-outline-secondary" for="dur-15">15 min</label>
+
+                          <input type="radio" class="btn-check" name="cfg-duracion" id="dur-30" value="30" checked>
+                          <label class="btn btn-outline-secondary" for="dur-30">30 min</label>
+
+                          <input type="radio" class="btn-check" name="cfg-duracion" id="dur-60" value="60">
+                          <label class="btn btn-outline-secondary" for="dur-60">1h</label>
+                        </div>
+                      </div>
+
+                      <hr class="opacity-10 my-4">
+
+                      <div class="d-flex justify-content-end align-items-center">
+                        <button type="submit" class="btn btn-primary rounded-pill px-4 shadow-sm fw-bold">
+                          Guardar Configuración
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- ==================== VISTA SUPERADMIN (GLOBAL) ==================== -->
+      <section id="medi-superadmin" class="d-none">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+          <h2 class="h4 fw-bold text-primary mb-0">Supervisión Médica</h2>
+          <span class="badge bg-info text-dark">Vista Global</span>
+        </div>
+        <div class="row g-3 mb-4">
+          <div class="col-md-6">
+            <div class="card border-0 shadow-sm p-3 border-start border-4 border-info">
+              <div class="small text-muted fw-bold">CONSULTAS MÉDICAS (MES)</div>
+              <div class="h3 mb-0" id="medi-sa-medico">0</div>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="card border-0 shadow-sm p-3 border-start border-4 border-primary">
+              <div class="small text-muted fw-bold">ATENCIÓN PSICOLÓGICA (MES)</div>
+              <div class="h3 mb-0" id="medi-sa-psico">0</div>
+            </div>
+          </div>
+        </div>
+        <div class="card border-0 shadow-sm rounded-4">
+          <div class="card-header bg-white py-3 d-flex justify-content-between">
+            <h5 class="mb-0 fw-bold">Bitácora de Atención</h5>
+            <small class="text-muted">Últimos 50 registros</small>
+          </div>
+          <div class="card-body p-0">
+            <div id="medi-sa-list" class="table-responsive scroll-container" style="max-height: 500px;"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==================== MODALS MEDI ==================== -->
+      <!-- Modal SOS -->
+      <div class="modal fade" id="modalSOS" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+          <div class="modal-content border-0 rounded-4 overflow-hidden">
+            <div class="modal-header bg-danger text-white border-0">
+              <h5 class="modal-title fw-bold"><i class="bi bi-shield-exclamation me-2"></i>Ayuda de Emergencia</h5>
+              <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center p-4">
+              <p class="text-muted mb-4">Si estás en el campus y requieres asistencia inmediata:</p>
+              <div class="d-grid gap-3">
+                <a href="tel:911" class="btn btn-outline-danger btn-lg fw-bold rounded-pill">
+                  <i class="bi bi-telephone-fill me-2"></i> Llamar al 911
+                </a>
+                <a href="tel:1234567890" class="btn btn-danger btn-lg fw-bold rounded-pill shadow">
+                  <i class="bi bi-hospital-fill me-2"></i> Enfermería Campus
+                </a>
+              </div>
+              <div class="mt-4 p-3  rounded-3 text-start">
+                <h6 class="fw-bold text-dark small mb-2">Ubicación Enfermería:</h6>
+                <p class="mb-0 small text-muted"><i class="bi bi-geo-alt-fill me-1"></i> Edificio B, Planta Baja
+                  (Junto
+                  a
+                  cafetería).</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal Consulta SOAP -->
+      <div class="modal fade" id="modalConsultaSOAP" tabindex="-1" data-bs-backdrop="static" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
+          <div class="modal-content rounded-4 border-0">
+            <div class="modal-header bg-primary text-white border-0">
+              <div>
+                <h5 class="modal-title fw-bold" id="soap-modal-title">Consulta Médica</h5>
+                <div class="small opacity-75" id="soap-patient-info">Cargando paciente...</div>
+              </div>
+              <div class="d-flex gap-2 align-items-center">
+                <button type="button" class="btn btn-white text-primary btn-sm rounded-pill fw-bold"
+                  data-bs-dismiss="modal">
+                  <i class="bi bi-pause-circle-fill me-1"></i> Pausar
+                </button>
+                <button type="button" class="btn btn-success btn-sm rounded-pill fw-bold shadow-sm"
+                  onclick="Medi.saveConsultation(event)">
+                  <i class="bi bi-check-circle-fill me-1"></i> Finalizar
+                </button>
+                <button type="button" class="btn-close btn-close-white ms-2" data-bs-dismiss="modal"></button>
+              </div>
+            </div>
+            <div class="modal-body bg-surface-muted p-0">
+              <div class="row g-0 h-100">
+                <div class="col-lg-4 border-end bg-white d-flex flex-column" style="max-height: 80vh;">
+                  <div class="p-3 border-bottom ">
+                    <h6 class="fw-bold mb-0 text-primary"><i class="bi bi-clock-history me-2"></i>Historial Clúnico
+                    </h6>
+                  </div>
+                  <div id="soap-history-list" class="flex-grow-1 overflow-auto p-3"></div>
+                </div>
+                <div class="col-lg-8 d-flex flex-column" style="max-height: 80vh; overflow-y: auto;">
+                  <form id="form-soap" class="p-4" onsubmit="return false;">
+                    <input type="hidden" id="soap-cita-id">
+                    <input type="hidden" id="soap-student-id">
+                    <input type="hidden" id="soap-student-email">
+                    <div class="mb-4">
+                      <label class="small fw-bold text-muted text-uppercase mb-2">Subjetivo (Motivo de
+                        consulta)</label>
+                      <textarea class="form-control bg-white shadow-sm border-0" id="soap-s" rows="3"
+                        placeholder="¿Qué refiere el paciente?" required></textarea>
+                    </div>
+                    <div class="mb-4">
+                      <label class="small fw-bold text-muted text-uppercase mb-2">Objetivo (Signos Vitales)</label>
+                      <div class="card border-0 shadow-sm p-3 bg-white">
+                        <div class="row g-3">
+                          <div class="col-md-3"><label class="form-label small">Temp (°C)</label><input type="number"
+                              step="0.1" class="form-control form-control-sm" id="soap-temp"></div>
+                          <div class="col-md-3"><label class="form-label small">Presión (mmHg)</label><input type="text"
+                              class="form-control form-control-sm" id="soap-presion" placeholder="120/80">
+                          </div>
+                          <div class="col-md-3"><label class="form-label small">Peso (kg)</label><input type="number"
+                              step="0.1" class="form-control form-control-sm" id="soap-peso"></div>
+                          <div class="col-md-3"><label class="form-label small">Talla (cm)</label><input type="number"
+                              class="form-control form-control-sm" id="soap-talla"></div>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="mb-4">
+                      <label class="small fw-bold text-muted text-uppercase mb-2">Análisis (Diagnóstico)</label>
+                      <textarea class="form-control bg-white shadow-sm border-0" id="soap-a" rows="2"
+                        placeholder="Conclusión diagnóstica..."></textarea>
+                    </div>
+                    <div class="mb-4">
+                      <label class="small fw-bold text-muted text-uppercase mb-2">Plan (Indicaciones
+                        Generales)</label>
+                      <textarea class="form-control bg-white shadow-sm border-0" id="soap-p" rows="3"
+                        placeholder="Reposo, dieta, cuidados generales..."></textarea>
+                    </div>
+                    <div class="mb-4">
+                      <label class="small fw-bold text-muted text-uppercase mb-2 text-primary"><i
+                          class="bi bi-capsule me-1"></i>Medicamentos / Receta</label>
+                      <textarea class="form-control bg-white shadow-sm border-0" id="soap-meds" rows="4"
+                        placeholder="Ej: Paracetamol 500mg - 1 tableta cada 8 horas por 3 días..."></textarea>
+                      <div class="form-text small">Esto aparecerá en la receta PDF.</div>
+                    </div>
+                    <div class="form-check form-switch mb-4">
+                      <input class="form-check-input" type="checkbox" id="soap-visible" checked>
+                      <label class="form-check-label small" for="soap-visible">Hacer visible el Plan/Receta al
+                        paciente
+                        (en su app)</label>
+                    </div>
+                    <div class="d-grid">
+                      <!-- Buttons moved to Header -->
+                    </div>
+                  </form>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal Success Consulta -->
+      <div class="modal fade" id="modalConsultaSuccess" tabindex="-1" data-bs-backdrop="static">
+        <div class="modal-dialog modal-sm modal-dialog-centered">
+          <div class="modal-content rounded-4 border-0 shadow-lg">
+            <div class="modal-body text-center p-4">
+              <div class="mb-3 text-success"><i class="bi bi-check-circle-fill display-1"></i></div>
+              <h5 class="fw-bold mb-3">¡Consulta Guardada!</h5>
+              <p class="small text-muted mb-4">La consulta se ha registrado correctamente.</p>
+              <div class="d-grid gap-2">
+                <button class="btn btn-primary rounded-pill" onclick="Medi.printReceta()"><i
+                    class="bi bi-printer-fill me-2"></i>Imprimir Receta</button>
+                <button class="btn btn-outline-primary rounded-pill" onclick="Medi.sendToPatient()"><i
+                    class="bi bi-send-fill me-2"></i>Enviar a Paciente</button>
+                <button class="btn btn-light rounded-pill text-muted" data-bs-dismiss="modal">Cerrar</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal Detalle Consulta (Estudiante) -->
+      <div class="modal fade" id="modalDetalleConsulta" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+          <div class="modal-content rounded-4 border-0">
+            <div class="modal-header  border-0">
+              <h5 class="modal-title fw-bold text-primary">Detalle de Consulta</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+              <div class="d-flex justify-content-between mb-4">
+                <div>
+                  <div class="small text-muted text-uppercase">Fecha</div>
+                  <div class="fw-bold" id="detail-date">--</div>
+                </div>
+                <div class="text-end">
+                  <div class="small text-muted text-uppercase">Servicio</div><span class="badge bg-primary"
+                    id="detail-service">--</span>
+                </div>
+              </div>
+              <div class="mb-3">
+                <div class="small text-muted text-uppercase fw-bold">Diagnóstico</div>
+                <div class="p-3  rounded-3 mt-1" id="detail-diagnosis">--</div>
+              </div>
+              <div class="mb-3">
+                <div class="small text-muted text-uppercase fw-bold">Plan / Indicaciones</div>
+                <div class="p-3  rounded-3 mt-1" id="detail-plan">--</div>
+              </div>
+              <div id="detail-meds-container" class="d-none mb-4">
+                <div class="small text-muted text-uppercase fw-bold text-primary"><i
+                    class="bi bi-capsule me-1"></i>Medicamentos Recetados</div>
+                <div class="p-3 bg-primary-subtle text-primary-emphasis rounded-3 mt-1 border border-primary-subtle"
+                  id="detail-meds">--</div>
+              </div>
+              <hr>
+              <div class="d-flex justify-content-end gap-2">
+                <button type="button" class="btn btn-light border" data-bs-dismiss="modal">Cerrar</button>
+                <button type="button" class="btn btn-primary shadow-sm d-none" id="btn-download-receta"><i
+                    class="bi bi-file-earmark-pdf-fill me-2"></i>Descargar Receta</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+    </main>
+  </div>
+
+  <!-- view-aula-course: reutilizado como vista de clase individual (inyectado por JS) -->
+  <section id="view-aula-course" class="app-view d-none container my-4 mb-5"></section>
+
+
+  <!-- NUEVA VISTA: Verificación de constancias -->
+  <div id="verify-shell" class="d-none">
+    <main class="min-vh-100 d-flex align-items-center bg-surface-muted py-5">
+      <div class="container">
+        <div class="row justify-content-center">
+          <div class="col-lg-8">
+            <div class="card border-0 shadow-sm rounded-4">
+              <div class="card-body p-4 p-md-5">
+
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                  <div>
+                    <h1 class="h5 fw-bold text-primary mb-1">
+                      <i class="bi bi-shield-check me-2"></i>
+                      Verificación de Constancia
+                    </h1>
+                    <p class="small text-muted mb-0">
+                      Validación electrónica emitida por SIA — TecNM Campus Los Cabos.
+                    </p>
+                  </div>
+                  <span id="verify-badge" class="badge bg-secondary-subtle text-secondary">
+                    Pendiente
+                  </span>
+                </div>
+
+                <!-- Estado: cargando -->
+                <div id="verify-loading" class="text-center py-5">
+                  <div class="spinner-border text-primary mb-3"></div>
+                  <div class="small text-muted">Consultando información...</div>
+                </div>
+
+                <!-- Estado: constancia válida -->
+                <div id="verify-ok" class="d-none"></div>
+
+                <!-- Estado: error / no encontrada -->
+                <div id="verify-error" class="d-none"></div>
+
+                <div class="mt-4 d-flex justify-content-between align-items-center small text-muted">
+                  <span>© 2025 Sistema de Integración Académico (SIA)</span>
+                  <a href="/" class="text-decoration-none" id="verify-back-link">
+                    Volver al inicio
+                  </a>
+                </div>
+
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+  <!-- ==================== MÓDULO TEST VOCACIONAL (Standalone - Outside app-shell) ==================== -->
+  <!-- Estas vistas son públicas y no dependen del estado de app-shell -->
+
+  <div id="view-test-vocacional" class="sia-public-view d-none" style="min-height:100vh;">
+    <vocacional-landing></vocacional-landing>
+  </div>
+
+  <div id="view-vocacional-test-active" class="sia-public-view d-none" style="min-height:100vh;">
+    <vocacional-test></vocacional-test>
+  </div>
+
+  <div class="modal fade" id="modal-consulta" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+      <div class="modal-content rounded-4 border-0">
+        <div class="modal-header border-0">
+          <h5 class="modal-title fw-bold">Detalle</h5><button type="button" class="btn-close"
+            data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body bg-surface-muted">
+          <div id="modal-consulta-body" class="bg-surface p-3 rounded shadow-sm"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+
+  <!-- Modales Aula: inyectados dinamicamente por aula.js y sub-modulos -->
+
+  <div id="view-vocacional-admin" class="app-view d-none">
+    <!-- El script modules/vocacional-admin.js inyectará el contenido aquí -->
+  </div>
+
+  <div class="toast-container position-fixed top-0 start-50 translate-middle-x p-3" id="toast-container"
+    style="z-index: 2000;"></div>
+
+
+
+  <sia-dev-tools></sia-dev-tools>
+  <sia-superadmin-switcher></sia-superadmin-switcher>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-storage-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-functions-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-messaging-compat.js"></script>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <!-- jsPDF ya está cargado en línea 42-43 con autoTable -->
+  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+  <!-- SCRIPTS LOCALES CON CACHE-BUSTING AUTOMÁTICO -->
+  <script>
+    // [NEW ARCHITECTURE] Core & Components
+    const localScripts = [
+      '/config/departments.js',       // Config Global (Critical: Before App)
+      '/services/firebase.js',        // Base SDK
+      '/services/panic-service.js',   // Panic / SOS institutional flow
+      '/utils/pdf-generator.js',      // Utils
+      '/services/notify.js',          // Global Service
+      '/utils/ui.js',                 // Utils
+      '/core/state.js',               // Core State
+      '/core/ui.js',                  // Core UI
+      '/core/router.js',              // Core Router
+      '/core/auth.js',                // Core Auth
+      '/components/navbar.js',        // Web Component
+      '/components/admin-navbar.js',  // Web Component (Admin)
+      '/components/landing-view.js',  // Web Component
+      '/components/vocacional-landing.js', // Web Component [VOCTEST]
+      '/components/vocacional-test.js',    // Web Component [VOCTEST]
+      '/services/lactario-service.js', // [NEW]
+      '/modules/lactario/lactario.shared.js',
+      '/modules/lactario/lactario.student.js',
+      '/modules/lactario/lactario.admin.js',
+      '/modules/lactario.js',         // [NEW]
+      '/services/vocacional-service.js', // [VOCTEST]
+      '/modules/vocacional-admin.js',    // [VOCTEST]
+      '/modules/register.js',         // Needed globally for now
+      '/main.js',                     // New Entry Point
+      '/app.js'                       // Legacy Glue (Runs last)
+    ];
+
+    localScripts.forEach(src => {
+      // Usar document.write para mantener orden de ejecución síncrono durante parsing
+      const typeAttr = (src.includes('/core/') || src.includes('/components/') || src.includes('main.js') || src.includes('app.js')) ? ' type="module"' : '';
+      document.write('<script src="' + src + '?v=' + window.SIA_VERSION + '"' + typeAttr + '><\/script>');
+    });
+
+    /* [LAZY LOADED MODULES] - managed by Router.js */
+  </script>
+
+
+  <!-- FAB: crear curso Aula -->
+  <button type="button" id="aula-add-course-fab" class="btn btn-primary rounded-circle shadow position-fixed d-none"
+    style="bottom: 1.5rem; right: 1.5rem; z-index: 1080;">
+    <i class="bi bi-plus-lg"></i>
+  </button>
+
+
+  <!-- PWA INSTALL PROMPT -->
+  <div class="pwa-install-sheet" id="pwa-install-sheet">
+    <div class="d-flex align-items-center gap-3">
+      <div class="pwa-icon">
+        <i class="bi bi-rocket-takeoff-fill"></i>
+      </div>
+      <div>
+        <h5 class="fw-bold mb-1">Instalar SIA Móvil</h5>
+        <p class="text-muted small mb-0">Accede más rápido y sin conexión.</p>
+      </div>
+    </div>
+    <div class="d-flex gap-2 mt-4">
+      <button class="btn btn-light rounded-pill flex-fill fw-bold" id="pwa-dismiss">Ahora no</button>
+      <button class="btn btn-primary rounded-pill flex-fill fw-bold" id="pwa-install">Instalar App</button>
+    </div>
+  </div>
+
+
+
+
+  <!-- MODULES DRAWER OVERLAY (Dynamic) -->
+  <div id="sia-modules-drawer" class="d-none modules-drawer-overlay">
+    <div class="modules-drawer-content bg-surface shadow-lg rounded-top-4 p-4 pb-5 pt-3"
+      style="max-height: 85vh; margin-top: auto;">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h6 class="fw-bold mb-0">Módulos Disponibles</h6>
+        <button class="btn-close btn-sm" onclick="window.SIA.toggleModulesDrawer()" aria-label="Cerrar"></button>
+      </div>
+
+      <!-- Content will be populated dynamically by updateModulesDrawerContent() -->
+      <div id="modules-drawer-body" class="d-flex overflow-auto gap-3 pb-2 pt-2 px-1"
+        style="white-space: nowrap; -webkit-overflow-scrolling: touch; scroll-behavior: smooth; scroll-snap-type: x mandatory;">
+        <div class="text-center py-5 text-muted w-100">
+          <i class="bi bi-grid-fill fs-1 opacity-25 mb-2 d-block"></i>
+          <span class="small">Cargando módulos...</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SPEED DIAL DRAWER (Quick Actions) -->
+  <div id="sia-speed-dial-drawer" class="d-none modules-drawer-overlay">
+    <div class="modules-drawer-content bg-surface shadow-lg rounded-top-4 p-4 pb-5 pt-3" style="margin-top:auto;">
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <h6 class="fw-bold mb-0">Acciones Rápidas</h6>
+        <button class="btn-close btn-sm" onclick="window.SIA.toggleSpeedDial()"></button>
+      </div>
+
+      <div class="row g-3 text-center">
+        <!-- Buscar en SIA -->
+        <div class="col-4">
+          <button
+            class="btn w-100 p-0 border-0 bg-transparent text-center d-flex flex-column align-items-center speed-dial-grid-item"
+            onclick="window.SIA.toggleSpeedDial(); window.SIA.openMobileSearch();">
+            <div class="icon-box bg-primary-subtle rounded-circle d-flex align-items-center justify-content-center mb-2"
+              style="width: 50px; height: 50px;">
+              <i class="bi bi-search text-primary fs-4"></i>
+            </div>
+            <span class="extra-small fw-bold lh-sm text-wrap"
+              style="color: var(--text-heading); max-width: 80px;">Buscar en SIA</span>
+          </button>
+        </div>
+
+        <!-- Agendar Cita Médica -->
+        <div class="col-4">
+          <button
+            class="btn w-100 p-0 border-0 bg-transparent text-center d-flex flex-column align-items-center speed-dial-grid-item"
+            onclick="window.SIA.navigate('view-medi'); window.SIA.toggleSpeedDial();">
+            <div class="icon-box bg-danger-subtle rounded-circle d-flex align-items-center justify-content-center mb-2"
+              style="width: 50px; height: 50px;">
+              <i class="bi bi-calendar-plus text-danger fs-4"></i>
+            </div>
+            <span class="extra-small fw-bold lh-sm text-wrap" style="color: var(--text-heading); max-width: 80px;">Cita
+              Médica</span>
+          </button>
+        </div>
+
+        <!-- Reservar Libro -->
+        <div class="col-4">
+          <button
+            class="btn w-100 p-0 border-0 bg-transparent text-center d-flex flex-column align-items-center speed-dial-grid-item"
+            onclick="window.SIA.navigate('view-biblio'); window.SIA.toggleSpeedDial();">
+            <div class="icon-box bg-warning-subtle rounded-circle d-flex align-items-center justify-content-center mb-2"
+              style="width: 50px; height: 50px;">
+              <i class="bi bi-book text-warning fs-4"></i>
+            </div>
+            <span class="extra-small fw-bold lh-sm text-wrap"
+              style="color: var(--text-heading); max-width: 80px;">Libros</span>
+          </button>
+        </div>
+
+        <!-- Mi Credencial Digital -->
+        <div class="col-4" id="speed-dial-qr">
+          <button
+            class="btn w-100 p-0 border-0 bg-transparent text-center d-flex flex-column align-items-center speed-dial-grid-item"
+            onclick="openDigitalID(); window.SIA.toggleSpeedDial();">
+            <div class="icon-box bg-primary-subtle rounded-circle d-flex align-items-center justify-content-center mb-2"
+              style="width: 50px; height: 50px;">
+              <i class="bi bi-qr-code text-primary fs-4"></i>
+            </div>
+            <span class="extra-small fw-bold lh-sm text-wrap" style="color: var(--text-heading); max-width: 80px;">Mi
+              QR</span>
+          </button>
+        </div>
+
+        <!-- Nueva Queja/Sugerencia -->
+        <div class="col-4">
+          <button
+            class="btn w-100 p-0 border-0 bg-transparent text-center d-flex flex-column align-items-center speed-dial-grid-item"
+            onclick="window.SIA.navigate('view-quejas'); window.SIA.toggleSpeedDial();">
+            <div class="icon-box bg-info-subtle rounded-circle d-flex align-items-center justify-content-center mb-2"
+              style="width: 50px; height: 50px;">
+              <i class="bi bi-chat-heart text-info fs-4"></i>
+            </div>
+            <span class="extra-small fw-bold lh-sm text-wrap"
+              style="color: var(--text-heading); max-width: 80px;">Quejas</span>
+          </button>
+        </div>
+
+        <!-- Explorar Eventos -->
+        <div class="col-4">
+          <button
+            class="btn w-100 p-0 border-0 bg-transparent text-center d-flex flex-column align-items-center speed-dial-grid-item"
+            onclick="window.SIA.navigate('view-foro'); window.SIA.toggleSpeedDial();">
+            <div class="icon-box bg-success-subtle rounded-circle d-flex align-items-center justify-content-center mb-2"
+              style="width: 50px; height: 50px;">
+              <i class="bi bi-calendar-event text-success fs-4"></i>
+            </div>
+            <span class="extra-small fw-bold lh-sm text-wrap"
+              style="color: var(--text-heading); max-width: 80px;">Eventos</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MOBILE SEARCH DRAWER -->
+  <div id="sia-mobile-search-drawer" class="d-none modules-drawer-overlay">
+    <div class="modules-drawer-content bg-surface shadow-lg rounded-top-4 p-4" style="max-height: 90vh;">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 class="fw-bold mb-0">Buscar</h5>
+        <button class="btn-close" onclick="window.SIA.closeMobileSearch()" aria-label="Cerrar"></button>
+      </div>
+
+      <!-- Search Input -->
+      <div class="search-wrapper position-relative mb-3">
+        <i class="bi bi-search search-icon-sia"></i>
+        <input type="text" id="mobile-search-input" class="search-input-sia" placeholder="Buscar módulos, acciones..."
+          autocomplete="off" autofocus />
+        <div id="mobile-search-results" class="search-results-dropdown d-none"></div>
+      </div>
+
+      <!-- Quick Access -->
+      <div class="mt-4">
+        <div class="extra-small text-muted text-uppercase mb-2 fw-bold">Acceso Rápido</div>
+        <div class="d-flex flex-wrap gap-2">
+          <button class="btn btn-sm btn-outline-primary rounded-pill"
+            onclick="document.getElementById('mobile-search-input').value='aula'; document.getElementById('mobile-search-input').dispatchEvent(new Event('input'));">
+            Aula
+          </button>
+          <button class="btn btn-sm btn-outline-danger rounded-pill"
+            onclick="document.getElementById('mobile-search-input').value='médico'; document.getElementById('mobile-search-input').dispatchEvent(new Event('input'));">
+            Médico
+          </button>
+          <button class="btn btn-sm btn-outline-warning rounded-pill"
+            onclick="document.getElementById('mobile-search-input').value='biblioteca'; document.getElementById('mobile-search-input').dispatchEvent(new Event('input'));">
+            Biblioteca
+          </button>
+          <button class="btn btn-sm btn-outline-info rounded-pill"
+            onclick="document.getElementById('mobile-search-input').value='eventos'; document.getElementById('mobile-search-input').dispatchEvent(new Event('input'));">
+            Eventos
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- NOTIFICATIONS VIEW MODAL -->
+  <!-- NOTIFICATIONS DRAWER (Redesign: Bottom Sheet) -->
+  <div id="sia-notifications-drawer" class="d-none modules-drawer-overlay">
+    <div class="modules-drawer-content bg-surface shadow-lg rounded-top-4 p-4"
+      style="max-height: 80vh; overflow-y: auto;">
+      <div class="d-flex justify-content-between align-items-center mb-0 sticky-top bg-white pb-3" style="z-index: 1;">
+        <h5 class="fw-bold mb-0">Avisos y Novedades</h5>
+        <button class="btn-close" onclick="window.SIA.toggleNotificationsView()"></button>
+      </div>
+
+      <!-- Notifications List -->
+      <div class="list-group list-group-flush" id="notifs-list">
+        <div class="text-center py-5 text-muted small">
+          <i class="bi bi-bell-slash fs-1 opacity-25 mb-2 d-block"></i>
+          No tienes notificaciones nuevas.
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- departments.js ya incluido en localScripts -->
+
+  <!-- Modules -->
+  <script>
+    loadScript('services/quejas-service.js');
+    loadScript('modules/quejas.js');
+  </script>
+<!-- Code injected by live-server -->
+<script type="text/javascript">
+	// <![CDATA[  <-- For SVG support
+	if ('WebSocket' in window) {
+		(function() {
+			function refreshCSS() {
+				var sheets = [].slice.call(document.getElementsByTagName("link"));
+				var head = document.getElementsByTagName("head")[0];
+				for (var i = 0; i < sheets.length; ++i) {
+					var elem = sheets[i];
+					head.removeChild(elem);
+					var rel = elem.rel;
+					if (elem.href && typeof rel != "string" || rel.length == 0 || rel.toLowerCase() == "stylesheet") {
+						var url = elem.href.replace(/(&|\?)_cacheOverride=\d+/, '');
+						elem.href = url + (url.indexOf('?') >= 0 ? '&' : '?') + '_cacheOverride=' + (new Date().valueOf());
+					}
+					head.appendChild(elem);
+				}
+			}
+			var protocol = window.location.protocol === 'http:' ? 'ws://' : 'wss://';
+			var address = protocol + window.location.host + window.location.pathname + '/ws';
+			var socket = new WebSocket(address);
+			socket.onmessage = function(msg) {
+				if (msg.data == 'reload') window.location.reload();
+				else if (msg.data == 'refreshcss') refreshCSS();
+			};
+			console.log('Live reload enabled.');
+		})();
+	}
+	// ]]>
+</script>
+</body>
+
+</html>

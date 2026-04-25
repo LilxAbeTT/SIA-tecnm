@@ -286,63 +286,27 @@ if (!window.CafeteriaService) {
          * @param {string} metodoPago
          * @param {string} nota
          */
-        async function createPedido(ctx, cartItems, metodoPago, nota) {
+        async function createPedido(ctx, cartItems, metodoPago, nota, comprobanteUrl = '') {
             if (!ctx.user) throw new Error('Usuario no identificado');
             if (!cartItems || !cartItems.length) throw new Error('Carrito vacío');
 
-            // Validar que la cafeteria este abierta
-            const config = await getConfig(ctx);
-            if (config && config.recepcionActiva === false) {
-                throw new Error('La cafetería no está aceptando pedidos en este momento. Inténtalo más tarde.');
+            const functions = ctx.functions || window.SIA?.functions || firebase.functions();
+            if (!functions?.httpsCallable) {
+                throw new Error('Servicio de pedidos no disponible.');
             }
 
-            // Validar stock de cada producto
-            for (const item of cartItems) {
-                const prodDoc = await ctx.db.collection(C_PRODUCTOS).doc(item.productoId).get();
-                if (prodDoc.exists) {
-                    const prod = prodDoc.data();
-                    if (!prod.disponible) {
-                        throw new Error(`"${item.titulo}" ya no está disponible.`);
-                    }
-                    if (prod.stock !== -1 && prod.stock < item.cantidad) {
-                        const stockActual = prod.stock <= 0 ? 'agotado' : `solo ${prod.stock} disponible(s)`;
-                        throw new Error(`"${item.titulo}" está ${stockActual}.`);
-                    }
-                }
-            }
-
-            const items = cartItems.map(item => ({
-                productoId: item.productoId,
-                titulo: item.titulo,
-                precio: Number(item.precio),
-                cantidad: Number(item.cantidad),
-                subtotal: Number(item.precio) * Number(item.cantidad)
-            }));
-
-            const total = items.reduce((sum, i) => sum + i.subtotal, 0);
-            const tiempoEstimado = Math.max(...cartItems.map(i => Number(i.tiempoPreparacion) || 0));
-
-            const pedido = {
-                userId: ctx.user.uid,
-                userEmail: ctx.user.email,
-                userName: ctx.profile.displayName || 'Estudiante',
-                matricula: ctx.profile.matricula || '',
-                items,
-                total,
+            const createPedidoFn = functions.httpsCallable('cafeteriaCreatePedido');
+            const result = await createPedidoFn({
+                items: cartItems.map(item => ({
+                    productoId: item.productoId,
+                    cantidad: Number(item.cantidad)
+                })),
                 metodoPago: metodoPago || 'efectivo',
-                comprobanteUrl: '',
-                pagoConfirmado: false,
-                estado: 'pendiente',
-                tiempoEstimado,
                 nota: nota || '',
-                respuestaAdmin: '',
-                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-                history: []
-            };
-
-            const ref = await ctx.db.collection(C_PEDIDOS).add(pedido);
-            return { id: ref.id, ...pedido };
+                comprobanteUrl: comprobanteUrl || ''
+            });
+            _productosCache = null;
+            return result.data;
         }
 
         /**

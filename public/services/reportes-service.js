@@ -748,7 +748,8 @@ window.ReportesService = (function () {
                 const fechaVencimiento = toDate(d.fechaVencimiento);
                 const fechaDevReal = toDate(d.fechaDevolucionReal);
                 const now = new Date();
-                const multaActual = rawStatus === 'entregado' && fechaVencimiento && now > fechaVencimiento
+                const isLateFeeExempt = d.lateFeeExempt === true || d.tracksLateWithoutCharge === true;
+                const multaActual = !isLateFeeExempt && rawStatus === 'entregado' && fechaVencimiento && now > fechaVencimiento
                     ? Math.max(0, Math.floor((now - fechaVencimiento) / 86400000)) * 21
                     : 0;
                 let finalStatus = 'Activo';
@@ -764,7 +765,9 @@ window.ReportesService = (function () {
                 } else if (rawStatus === 'pendiente' || rawStatus === 'pendiente_entrega') {
                     finalStatus = 'Pendiente';
                 } else if (rawStatus === 'entregado') {
-                    finalStatus = fechaVencimiento && now > fechaVencimiento ? 'Retraso' : 'Activo';
+                    finalStatus = fechaVencimiento && now > fechaVencimiento
+                        ? (isLateFeeExempt ? 'Retraso sin cobro' : 'Retraso')
+                        : 'Activo';
                 }
 
                 return {

@@ -36,7 +36,10 @@
     window.loadScript = function (src) {
       const script = document.createElement('script');
       script.src = src.includes('?') ? src : `${src}?v=${window.SIA_VERSION}`;
-      document.currentScript.parentNode.insertBefore(script, document.currentScript.nextSibling);
+      script.async = false;
+      const anchor = window.__siaLastLoadedScript || document.currentScript;
+      anchor.parentNode.insertBefore(script, anchor.nextSibling);
+      window.__siaLastLoadedScript = script;
     };
 
     // FORZAR DARK MODE PERMANENTE

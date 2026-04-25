@@ -1,0 +1,241 @@
+- generic [active] [ref=e1]:
+  - text: 
+  - generic [ref=e2]:
+    - generic [ref=e3]:
+      - img "Cubo 1" [ref=e4]
+      - img "Cubo 2" [ref=e5]
+      - img "Cubo 3" [ref=e6]
+    - generic [ref=e7]: SIA
+  - generic [ref=e8]:
+    - navigation [ref=e10]:
+      - generic [ref=e11]:
+        - link "TecNM SIA SIA ITES Los Cabos" [ref=e12] [cursor=pointer]:
+          - /url: "#landing-hero"
+          - generic [ref=e13]:
+            - img "TecNM" [ref=e14]
+            - img "SIA" [ref=e16]
+          - generic [ref=e17]:
+            - strong [ref=e18]: SIA
+            - generic [ref=e19]: ITES Los Cabos
+        - button "" [ref=e20] [cursor=pointer]:
+          - generic [ref=e21]: 
+        - text: 
+    - main [ref=e22]:
+      - generic [ref=e24]:
+        - generic [ref=e25]:
+          - generic [ref=e26]: Plataforma Oficial ITES Los Cabos
+          - heading "Todo tu campus, en un solo acceso." [level=1] [ref=e27]:
+            - text: Todo tu campus,
+            - text: en un solo acceso.
+          - paragraph [ref=e28]:
+            - text: SIA es la plataforma institucional del
+            - strong [ref=e29]: TecNM Campus Los Cabos
+            - text: . Desde aqui puedes entrar a clases, servicios, credencial y avisos con tu cuenta institucional. Si aun eres aspirante, ya puedes estudiar y practicar para admision sin crear cuenta.
+          - generic [ref=e30]:
+            - button " Entrar con cuenta institucional" [ref=e31] [cursor=pointer]:
+              - generic [ref=e32]: 
+              - generic [ref=e33]: Entrar con cuenta institucional
+            - link " Prepararme para admision" [ref=e34] [cursor=pointer]:
+              - /url: "#/admisiones"
+              - generic [ref=e35]: 
+              - generic [ref=e36]: Prepararme para admision
+            - link " Mapa del campus" [ref=e37] [cursor=pointer]:
+              - /url: "#/mapa-campus"
+              - generic [ref=e38]: 
+              - generic [ref=e39]: Mapa del campus
+          - generic [ref=e40]:
+            - generic [ref=e41]:
+              - generic [ref=e42]: 
+              - text: Acceso oficial
+            - generic [ref=e43]:
+              - generic [ref=e44]: 
+              - text: Listo para celular
+            - generic [ref=e45]:
+              - generic [ref=e46]: 
+              - text: Servicios en un solo lugar
+          - generic [ref=e47]: Alumnos, docentes y personal entran con su correo institucional. Aspirantes pueden iniciar por admisiones y guardar progreso local sin iniciar sesion.
+        - generic [ref=e51]:
+          - generic [ref=e57]: sia.loscabos.tecnm.mx
+          - generic [ref=e58]:
+            - generic [ref=e59]:
+              - generic [ref=e60]:
+                - heading "Accesos mas usados" [level=5] [ref=e61]
+                - text: Lo esencial de SIA en una sola entrada
+              - generic [ref=e62]: SIA
+            - generic [ref=e63]:
+              - generic [ref=e65]:
+                - generic [ref=e66]: Entrar a clases
+                - generic [ref=e67]: Materias, actividades y seguimiento academico.
+              - generic [ref=e69]:
+                - generic [ref=e70]: Resolver servicios
+                - generic [ref=e71]: Biblioteca, cafeteria y recursos de campus.
+              - generic [ref=e73]:
+                - generic [ref=e74]: Mantenerte al dia
+                - generic [ref=e75]: Avisos, perfil, credencial y acceso rapido.
+    - generic [ref=e77]:
+      - generic [ref=e78]:
+        - generic [ref=e79]: Que hacer aqui
+        - heading "Lo esencial de SIA, sin vueltas." [level=2] [ref=e80]
+        - paragraph [ref=e81]: SIA no necesita explicarse por decenas de modulos. Estas son las acciones que concentran el uso diario dentro del campus.
+      - generic [ref=e82]:
+        - article [ref=e83]:
+          - generic [ref=e84]:
+            - generic [ref=e86]: 
+            - generic [ref=e87]: Academico
+          - heading "Clases y seguimiento" [level=3] [ref=e88]
+          - paragraph [ref=e89]: Entra a materias, revisa actividades y consulta lo pendiente sin salir de SIA.
+          - generic [ref=e90]:
+            - generic [ref=e91]: Aula
+            - generic [ref=e92]: Tareas
+            - generic [ref=e93]: Cursos
+        - article [ref=e94]:
+          - generic [ref=e95]:
+            - generic [ref=e97]: 
+            - generic [ref=e98]: Servicios
+          - heading "Servicios del campus" [level=3] [ref=e99]
+          - paragraph [ref=e100]: Usa biblioteca, cafeteria y mapa del campus desde el mismo acceso institucional.
+          - generic [ref=e101]:
+            - generic [ref=e102]: Biblioteca
+            - generic [ref=e103]: Cafeteria
+            - generic [ref=e104]: Mapa
+        - article [ref=e105]:
+          - generic [ref=e106]:
+            - generic [ref=e108]: 
+            - generic [ref=e109]: Bienestar
+          - heading "Salud y acompanamiento" [level=3] [ref=e110]
+          - paragraph [ref=e111]: Agenda atencion medica o psicologica y da seguimiento a tu bienestar desde el celular.
+          - generic [ref=e112]:
+            - generic [ref=e113]: Citas
+            - generic [ref=e114]: Salud
+            - generic [ref=e115]: Seguimiento
+        - article [ref=e116]:
+          - generic [ref=e117]:
+            - generic [ref=e119]: 
+            - generic [ref=e120]: Campus
+          - heading "Avisos, perfil y credencial" [level=3] [ref=e121]
+          - paragraph [ref=e122]: Consulta novedades, abre tu perfil y mantén a la mano tu identidad institucional.
+          - generic [ref=e123]:
+            - generic [ref=e124]: Avisos
+            - generic [ref=e125]: Perfil
+            - generic [ref=e126]: Credencial
+      - generic [ref=e127]:
+        - paragraph [ref=e128]: Todo parte del mismo acceso institucional para evitar brincar entre herramientas separadas.
+        - button " Entrar a SIA" [ref=e129] [cursor=pointer]:
+          - generic [ref=e130]: 
+          - generic [ref=e131]: Entrar a SIA
+    - generic [ref=e133]:
+      - generic [ref=e134]:
+        - generic [ref=e135]: Como funciona
+        - heading "Un acceso, tres pasos." [level=2] [ref=e136]
+      - generic [ref=e137]:
+        - article [ref=e138]:
+          - generic [ref=e139]: "1"
+          - heading "Entra con tu cuenta institucional" [level=3] [ref=e140]
+          - paragraph [ref=e141]: Alumnos, docentes y personal usan el mismo acceso oficial del campus.
+        - article [ref=e142]:
+          - generic [ref=e143]: "2"
+          - heading "Abre el modulo que necesitas" [level=3] [ref=e144]
+          - paragraph [ref=e145]: Clases, servicios, bienestar, credencial y avisos viven dentro de la misma plataforma.
+        - article [ref=e146]:
+          - generic [ref=e147]: "3"
+          - heading "Resuelve el proceso desde tu celular" [level=3] [ref=e148]
+          - paragraph [ref=e149]: La interfaz prioriza consulta rapida, continuidad y acceso diario desde movil.
+    - generic [ref=e153]:
+      - generic [ref=e154]: Ruta publica para aspirantes
+      - heading "Si aun no eres parte del campus, empieza por admisiones." [level=2] [ref=e155]
+      - paragraph [ref=e156]: El nuevo centro de admision de SIA convierte la guia EVALUATEC 2026 en una ruta de estudio por carrera, con practica por areas, fechas oficiales y progreso local sin cuenta institucional.
+      - generic [ref=e157]:
+        - generic [ref=e158]:
+          - generic [ref=e159]: 
+          - text: Nuevo ingreso
+        - generic [ref=e160]:
+          - generic [ref=e161]: 
+          - text: Estudio + practica
+        - generic [ref=e162]:
+          - generic [ref=e163]: 
+          - text: Progreso local
+      - generic [ref=e164]:
+        - link " Entrar a admisiones" [ref=e165] [cursor=pointer]:
+          - /url: "#/admisiones"
+          - generic [ref=e166]: 
+          - generic [ref=e167]: Entrar a admisiones
+        - link " Test vocacional" [ref=e168] [cursor=pointer]:
+          - /url: "#/test-vocacional"
+          - generic [ref=e169]: 
+          - generic [ref=e170]: Test vocacional
+    - generic [ref=e173]:
+      - generic [ref=e174]:
+        - generic [ref=e175]: App SIA
+        - heading "Instalala si entras seguido." [level=3] [ref=e176]
+        - paragraph [ref=e177]: Deja SIA en tu pantalla de inicio para entrar mas rapido a tus procesos de campus.
+      - generic [ref=e178]:
+        - button " Como instalar" [ref=e179] [cursor=pointer]:
+          - generic [ref=e180]: 
+          - generic [ref=e181]: Como instalar
+        - button " Compartir SIA" [ref=e182] [cursor=pointer]:
+          - generic [ref=e183]: 
+          - generic [ref=e184]: Compartir SIA
+      - generic [ref=e185]: Si tu navegador no muestra la descarga directa, te indicamos como instalar SIA manualmente.
+    - contentinfo [ref=e186]:
+      - generic [ref=e187]:
+        - generic [ref=e188]:
+          - generic [ref=e189]:
+            - generic [ref=e190]:
+              - img "TecNM" [ref=e191]
+              - img "SIA" [ref=e193]
+            - paragraph [ref=e194]: SIA es la plataforma institucional del Tecnologico Nacional de Mexico, Campus Los Cabos.
+            - generic [ref=e195]:
+              - link "Facebook ITES Los Cabos" [ref=e196] [cursor=pointer]:
+                - /url: https://www.facebook.com/itesloscabos.oficial
+                - generic [ref=e197]: 
+              - link "Instagram ITES Los Cabos" [ref=e198] [cursor=pointer]:
+                - /url: https://www.instagram.com/ites_loscabos
+                - generic [ref=e199]: 
+          - generic [ref=e200]:
+            - heading "Acceso rapido" [level=6] [ref=e201]
+            - list [ref=e202]:
+              - listitem [ref=e203]:
+                - button "Acceso institucional" [ref=e204] [cursor=pointer]
+              - listitem [ref=e205]:
+                - link "Admisiones" [ref=e206] [cursor=pointer]:
+                  - /url: "#/admisiones"
+              - listitem [ref=e207]:
+                - link "Test vocacional" [ref=e208] [cursor=pointer]:
+                  - /url: "#/test-vocacional"
+              - listitem [ref=e209]:
+                - link "Mapa del campus" [ref=e210] [cursor=pointer]:
+                  - /url: "#/mapa-campus"
+              - listitem [ref=e211]:
+                - link "Soporte" [ref=e212] [cursor=pointer]:
+                  - /url: "#landing-contacto"
+          - generic [ref=e213]:
+            - heading "Soporte" [level=6] [ref=e214]
+            - list [ref=e215]:
+              - listitem [ref=e216]:
+                - generic [ref=e217]: 
+                - text: +52 (624) 142 5939
+              - listitem [ref=e218]:
+                - link " soporte.sia@loscabos.tecnm.mx" [ref=e219] [cursor=pointer]:
+                  - /url: mailto:soporte.sia@loscabos.tecnm.mx
+                  - generic [ref=e220]: 
+                  - text: soporte.sia@loscabos.tecnm.mx
+              - listitem [ref=e221]:
+                - generic [ref=e222]: 
+                - text: C. Gandhi, Guaymitas, San Jose del Cabo, B.C.S.
+        - separator [ref=e223]
+        - generic [ref=e224]:
+          - generic [ref=e225]: © 2026 SIA | TecNM Campus Los Cabos
+          - link "Sitio Oficial ITES" [ref=e227] [cursor=pointer]:
+            - /url: https://www.itesloscabos.edu.mx
+  - text:                                                                                                                                                                                       
+  - text: 
+  - generic [ref=e228]:
+    - generic [ref=e229]:
+      - generic [ref=e231]: 
+      - generic [ref=e232]:
+        - heading "Instalar SIA Móvil" [level=5] [ref=e233]
+        - paragraph [ref=e234]: Accede más rápido y sin conexión.
+    - generic [ref=e235]:
+      - button "Ahora no" [ref=e236] [cursor=pointer]
+      - button "Instalar App" [ref=e237] [cursor=pointer]
+  - text:         

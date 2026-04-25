@@ -2,12 +2,73 @@ rules_version = '2';
 
 service firebase.storage {
   match /b/{bucket}/o {
-    
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function userData() {
+      return firestore.get(/databases/(default)/documents/usuarios/$(request.auth.uid)).data;
+    }
+
+    function isSuperAdmin() {
+      return isSignedIn() && userData().get('role', '') == 'superadmin';
+    }
+
+    function isQuejasAdmin() {
+      let data = userData();
+      let perm = data.get('permissions', {});
+      return isSignedIn() && (
+        isSuperAdmin() ||
+        request.auth.token.email == 'calidad@loscabos.tecnm.mx' ||
+        (data.get('role', '') == 'department_admin' && perm.get('quejas', '') == 'admin')
+      );
+    }
+
+    function isForoAdmin() {
+      let data = userData();
+      let perm = data.get('permissions', {});
+      return isSignedIn() && (
+        isSuperAdmin() ||
+        data.get('role', '') == 'foro' ||
+        data.get('role', '') == 'foro_admin' ||
+        perm.get('foro', '') == 'admin' ||
+        perm.get('foro', '') == 'superadmin' ||
+        request.auth.token.email == 'difusion@loscabos.tecnm.mx'
+      );
+    }
+
+    function isCafeteriaAdmin() {
+      let data = userData();
+      let perm = data.get('permissions', {});
+      return isSignedIn() && (
+        isSuperAdmin() ||
+        data.get('role', '') == 'admin' ||
+        data.get('role', '') == 'cafeteria' ||
+        perm.get('cafeteria', '') == 'admin' ||
+        perm.get('cafeteria', '') == true
+      );
+    }
+
+    function isAulaDocente() {
+      let data = userData();
+      let perm = data.get('permissions', {});
+      let role = data.get('role', '');
+      return isSignedIn() && (
+        isSuperAdmin() ||
+        role == 'aula_admin' ||
+        role == 'aula' ||
+        role == 'admin' ||
+        role == 'docente' ||
+        perm.get('aula', '') == 'admin' ||
+        perm.get('aula', '') == 'docente'
+      );
+    }
+
     // 1. Quejas y Sugerencias
     // El usuario solo puede subir archivos a su propia carpeta: quejas/{uid}/...
     match /quejas/{userId}/{fileName} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null 
+      allow read: if isSignedIn() && (request.auth.uid == userId || isQuejasAdmin());
+      allow write: if isSignedIn()
                    && request.auth.uid == userId
                    && request.resource.size < 5 * 1024 * 1024 // Max 5MB
                    && request.resource.contentType.matches('image/.*'); // Solo imagenes
@@ -15,8 +76,8 @@ service firebase.storage {
 
     // 1.1 Tickets de soporte tecnico
     match /support-tickets/{userId}/{fileName} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null
+      allow read: if isSignedIn() && (request.auth.uid == userId || isSuperAdmin());
+      allow write: if isSignedIn()
                    && request.auth.uid == userId
                    && request.resource.size < 5 * 1024 * 1024
                    && request.resource.contentType.matches('image/.*');
@@ -32,14 +93,14 @@ service firebase.storage {
     // 3. Foro de Eventos (Covers)
     match /foro/covers/{fileName} {
       allow read: if true; // Público para que todos vean los eventos
-      allow write: if request.auth != null 
+      allow write: if isForoAdmin()
                    && request.resource.size < 5 * 1024 * 1024 // Max 5MB
                    && request.resource.contentType.matches('image/.*');
     }
 
     match /foro/materials/{userId}/{allPaths=**} {
       allow read: if request.auth != null;
-      allow write: if request.auth != null
+      allow write: if isForoAdmin()
                    && request.auth.uid == userId
                    && request.resource.size < 25 * 1024 * 1024;
     }
@@ -47,13 +108,13 @@ service firebase.storage {
     // 4. Cafeteria
     match /cafeteria/productos/{fileName} {
       allow read: if true;
-      allow write: if request.auth != null 
+      allow write: if isCafeteriaAdmin()
                    && request.resource.size < 5 * 1024 * 1024 // Max 5MB
                    && request.resource.contentType.matches('image/.*');
     }
     match /cafeteria/comprobantes/{userId}/{fileName} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null
+      allow read: if isSignedIn() && (request.auth.uid == userId || isCafeteriaAdmin());
+      allow write: if isSignedIn()
                    && request.auth.uid == userId
                    && request.resource.size < 5 * 1024 * 1024 // Max 5MB
                    && request.resource.contentType.matches('image/.*');
@@ -61,8 +122,8 @@ service firebase.storage {
 
     // 5. Aula — archivos de entregas de tareas
     match /aula-entregas/{userId}/{allPaths=**} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null
+      allow read: if isSignedIn() && (request.auth.uid == userId || isAulaDocente());
+      allow write: if isSignedIn()
                    && request.auth.uid == userId
                    && request.resource.size < 20 * 1024 * 1024; // Max 20MB
     }
@@ -70,7 +131,7 @@ service firebase.storage {
     // 6. Aula — archivos publicados por docentes en materiales/tareas/avisos
     match /aula-publicaciones/{userId}/{allPaths=**} {
       allow read: if request.auth != null;
-      allow write: if request.auth != null
+      allow write: if isAulaDocente()
                    && request.auth.uid == userId
                    && request.resource.size < 20 * 1024 * 1024; // Max 20MB
     }

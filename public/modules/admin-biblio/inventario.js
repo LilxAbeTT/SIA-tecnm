@@ -165,7 +165,9 @@ window.AdminBiblio.Inventario = (function () {
                     const activeCtx = state.ctx || _ctx;
                     if (activeCtx && activeSession?.id && activeSession?.status === 'active') {
                         const details = await BiblioService.pauseInventorySession(activeCtx, activeSession.id);
-                        state.inventorySession = details?.session || activeSession;
+                        state.inventorySession = details?.session
+                            ? { ...activeSession, ...details.session }
+                            : activeSession;
                     }
                 } catch (error) {
                     console.warn('[BiblioAdmin] No se pudo pausar automaticamente el inventario al cerrar el modal:', error);
@@ -384,6 +386,36 @@ window.AdminBiblio.Inventario = (function () {
         return (entries || []).reduce((total, entry) => total + (Number(entry?.totalObserved || entry?.cantidad || entry?.lastQuantity || 0) || 0), 0);
     }
 
+    function sortLocalInventoryEntries(entries = []) {
+        return [...(entries || [])].sort((left, right) => {
+            const leftTime = Number(left?.updatedAtMs || left?.createdAtMs || 0);
+            const rightTime = Number(right?.updatedAtMs || right?.createdAtMs || 0);
+            return rightTime - leftTime;
+        });
+    }
+
+    function upsertInventoryFoundEntry(entry = null) {
+        if (!entry?.id) return;
+        const nextEntries = (_inventoryFoundEntries || []).filter((item) => String(item?.id || '') !== String(entry.id || ''));
+        nextEntries.unshift(entry);
+        _inventoryFoundEntries = sortLocalInventoryEntries(nextEntries);
+    }
+
+    function upsertInventoryMissingEntry(entry = null) {
+        if (!entry?.id) return;
+        const nextEntries = (_inventoryMissingEntries || []).filter((item) => String(item?.id || '') !== String(entry.id || ''));
+        nextEntries.unshift(entry);
+        _inventoryMissingEntries = sortLocalInventoryEntries(nextEntries);
+    }
+
+    function findLocalInventoryObservedEntry(book = null) {
+        if (!book?.id && !book?.groupKey) return null;
+        return (_inventoryFoundEntries || []).find((entry) => {
+            if (book.id && String(entry?.id || '') === String(book.id || '')) return true;
+            return book.groupKey && entry?.groupKey && String(entry.groupKey) === String(book.groupKey);
+        }) || null;
+    }
+
     function buildInventorySummary(session = {}, foundEntries = [], missingEntries = [], catalogSummary = null) {
         const systemTotal = Number(catalogSummary?.totalCopies) || 0;
         const registeredCatalog = sumInventoryObserved(foundEntries);
@@ -428,15 +460,21 @@ window.AdminBiblio.Inventario = (function () {
 
         let details = null;
         if (sessionId) {
-            details = await BiblioService.getInventorySessionDetails(_ctx, sessionId, { includeLists: true });
+            details = await BiblioService.getInventorySessionDetails(_ctx, sessionId);
         }
 
         if (!details?.session) {
-            details = await BiblioService.getLatestFinishedInventorySession(_ctx, { includeLists: true });
+            details = await BiblioService.getLatestFinishedInventorySession(_ctx);
         }
 
         if (!details?.session) {
             throw new Error('No hay un inventario cerrado para exportar.');
+        }
+
+        if (!details.session.summary) {
+            details = sessionId
+                ? await BiblioService.getInventorySessionDetails(_ctx, details.session.id, { includeLists: true })
+                : await BiblioService.getLatestFinishedInventorySession(_ctx, { includeLists: true });
         }
 
         const catalogSummary = _inventoryCatalogSummary || await BiblioService.getInventoryCatalogSummary(_ctx);
@@ -603,9 +641,12 @@ window.AdminBiblio.Inventario = (function () {
     async function openInventoryReviewModal() {
         if (!_inventorySession?.id) return;
 
-        const details = await BiblioService.getCurrentInventorySession(_ctx, { includeLists: true });
-        _inventorySession = details?.session || _inventorySession;
-        _inventoryFoundEntries = Array.isArray(details?.foundEntries) ? details.foundEntries : [];
+        const needsRemoteLoad = !_inventoryFoundEntries.length && Number(_inventorySession?.matchedItems || 0) > 0;
+        if (needsRemoteLoad) {
+            const details = await BiblioService.getCurrentInventorySession(_ctx, { includeLists: true });
+            _inventorySession = details?.session || _inventorySession;
+            _inventoryFoundEntries = Array.isArray(details?.foundEntries) ? details.foundEntries : [];
+        }
         _inventoryReviewPage = 1;
         _inventoryReviewSearchTerm = '';
         resetInventoryReviewEditor();
@@ -1330,8 +1371,13 @@ window.AdminBiblio.Inventario = (function () {
     async function refreshInventorySession(includeLists = false) {
         const details = await BiblioService.getCurrentInventorySession(_ctx, { includeLists });
         _inventorySession = details.session;
-        _inventoryFoundEntries = Array.isArray(details.foundEntries) ? details.foundEntries : [];
-        _inventoryMissingEntries = Array.isArray(details.missingEntries) ? details.missingEntries : [];
+        if (includeLists) {
+            _inventoryFoundEntries = Array.isArray(details.foundEntries) ? details.foundEntries : [];
+            _inventoryMissingEntries = Array.isArray(details.missingEntries) ? details.missingEntries : [];
+        } else if (!_inventorySession) {
+            _inventoryFoundEntries = [];
+            _inventoryMissingEntries = [];
+        }
         renderInventorySessionContent();
         if (_inventorySession?.status !== 'finished') {
             focusInventorySearchInput();
@@ -1378,7 +1424,7 @@ window.AdminBiblio.Inventario = (function () {
                 }
             }
 
-            await refreshInventorySession(false);
+            await refreshInventorySession(true);
         } catch (error) {
             console.error('[BiblioAdmin] Error cargando inventario:', error);
             showToast(error.message || 'No se pudo abrir el inventario.', 'danger');
@@ -1388,7 +1434,7 @@ window.AdminBiblio.Inventario = (function () {
     async function startInventorySession() {
         try {
             await BiblioService.startInventorySession(_ctx);
-            await refreshInventorySession(false);
+            await refreshInventorySession(true);
             showToast('Sesion de inventario iniciada.', 'success');
         } catch (error) {
             showToast(error.message || 'No se pudo iniciar el inventario.', 'danger');
@@ -1399,7 +1445,7 @@ window.AdminBiblio.Inventario = (function () {
         if (!_inventorySession?.id) return;
         try {
             await BiblioService.pauseInventorySession(_ctx, _inventorySession.id);
-            await refreshInventorySession(false);
+            await refreshInventorySession(true);
             showToast('Inventario pausado. Puedes retomarlo despues.', 'warning');
         } catch (error) {
             showToast(error.message || 'No se pudo pausar el inventario.', 'danger');
@@ -1410,7 +1456,7 @@ window.AdminBiblio.Inventario = (function () {
         if (!_inventorySession?.id) return;
         try {
             await BiblioService.resumeInventorySession(_ctx, _inventorySession.id);
-            await refreshInventorySession(false);
+            await refreshInventorySession(true);
             showToast('Inventario reanudado.', 'success');
         } catch (error) {
             showToast(error.message || 'No se pudo reanudar el inventario.', 'danger');
@@ -1552,11 +1598,23 @@ window.AdminBiblio.Inventario = (function () {
         renderInventorySearchFeedback('Buscando en catalogo...', 'muted');
 
         try {
+            const shouldCheckRemoteDuplicates = !_inventoryFoundEntries.length && Number(_inventorySession?.matchedItems || 0) > 0;
             _inventorySelectedBook = await BiblioService.findInventoryBookByCode(_ctx, {
-                sessionId: _inventorySession.id,
+                sessionId: shouldCheckRemoteDuplicates ? _inventorySession.id : '',
                 code: query
             });
-            _inventoryDuplicateSearch = Number(_inventorySelectedBook?.registeredObserved) > 0;
+            const localObservedEntry = findLocalInventoryObservedEntry(_inventorySelectedBook);
+            const observedCount = Math.max(
+                Number(_inventorySelectedBook?.registeredObserved) || 0,
+                Number(localObservedEntry?.totalObserved) || 0
+            );
+            if (_inventorySelectedBook) {
+                _inventorySelectedBook = {
+                    ..._inventorySelectedBook,
+                    registeredObserved: observedCount
+                };
+            }
+            _inventoryDuplicateSearch = observedCount > 0;
             _inventoryDraftQuantity = _inventorySelectedBook ? (_inventoryDuplicateSearch ? 0 : 1) : null;
             _inventoryMoreCopiesMode = false;
             _inventoryPendingCopyCodes = [];
@@ -1834,7 +1892,7 @@ window.AdminBiblio.Inventario = (function () {
 
             await ensureInventoryCatalogSummary(true);
             await BiblioService.preloadInventoryLookup(_ctx);
-            await refreshInventorySession(false);
+            await refreshInventorySession(true);
             closeInventoryUnregisteredModal();
             clearInventoryDraftUi();
             const searchInput = document.getElementById('inventory-search-input');
@@ -1980,7 +2038,7 @@ window.AdminBiblio.Inventario = (function () {
             });
             await ensureInventoryCatalogSummary(true);
             await BiblioService.preloadInventoryLookup(_ctx);
-            await refreshInventorySession(false);
+            await refreshInventorySession(true);
             clearInventoryDraftUi();
             const searchInput = document.getElementById('inventory-search-input');
             if (searchInput) {
@@ -2031,10 +2089,14 @@ window.AdminBiblio.Inventario = (function () {
                 systemTotal: _inventorySelectedBook.systemTotal,
                 groupSize: _inventorySelectedBook.groupSize,
                 matchedAcquisition: _inventorySelectedBook.matchedAcquisition || query,
+                observedAcquisitions: [_inventorySelectedBook.matchedAcquisition || query, ..._inventoryPendingCopyCodes],
                 quantity,
                 query
             });
             _inventorySession = details?.session || _inventorySession;
+            if (details?.entry) {
+                upsertInventoryFoundEntry(details.entry);
+            }
             renderInventorySessionContent();
             clearInventoryDraftUi();
             const searchInput = document.getElementById('inventory-search-input');
@@ -2069,6 +2131,9 @@ window.AdminBiblio.Inventario = (function () {
                 quantity
             });
             _inventorySession = details?.session || _inventorySession;
+            if (details?.entry) {
+                upsertInventoryMissingEntry(details.entry);
+            }
             renderInventorySessionContent();
             clearInventoryDraftUi();
             const searchInput = document.getElementById('inventory-search-input');

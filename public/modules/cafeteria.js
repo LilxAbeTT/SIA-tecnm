@@ -498,14 +498,14 @@ if (!window.Cafeteria) {
                 // Guardar nota en memoria
                 if (nota.trim()) localStorage.setItem(NOTE_KEY, nota.trim());
 
-                const pedido = await CafeteriaService.createPedido(_ctx, items, metodoPago, nota);
+                let comprobanteUrl = '';
                 if (metodoPago === 'transferencia') {
                     const file = document.getElementById('caf-comprobante-file')?.files?.[0];
                     if (file) {
-                        const url = await CafeteriaService.uploadComprobante(_ctx, file);
-                        await CafeteriaService.attachComprobante(_ctx, pedido.id, url);
+                        comprobanteUrl = await CafeteriaService.uploadComprobante(_ctx, file);
                     }
                 }
+                await CafeteriaService.createPedido(_ctx, items, metodoPago, nota, comprobanteUrl);
                 clearCart();
                 // Animación de confirmación
                 const carritoContent = document.getElementById('caf-carrito-content');

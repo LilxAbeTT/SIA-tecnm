@@ -1,0 +1,6 @@
+2026/04/23-21:15:58.578 2d70 Creating DB C:\Users\larr_\Documents\SIA-tecnm-main\tmp-admisiones-review\chrome-topic-practice-diagnose\Default\IndexedDB\http_127.0.0.1_5500.indexeddb.leveldb since it was missing.
+2026/04/23-21:15:58.583 2d70 Reusing MANIFEST C:\Users\larr_\Documents\SIA-tecnm-main\tmp-admisiones-review\chrome-topic-practice-diagnose\Default\IndexedDB\http_127.0.0.1_5500.indexeddb.leveldb/MANIFEST-000001
+2026/04/23-21:15:58.637 1864 Level-0 table #5: started
+2026/04/23-21:15:58.640 1864 Level-0 table #5: 1264 bytes OK
+2026/04/23-21:15:58.641 1864 Delete type=0 #3
+2026/04/23-21:15:58.642 2d70 Manual compaction at level-0 from '\x00\x01\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00\x02\x00\x00\x00' @ 0 : 0; will stop at (end)

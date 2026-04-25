@@ -3,6 +3,7 @@
 // Push notifications via FCM y agregadores de analitica.
 
 const { onDocumentCreated, onDocumentWritten } = require('firebase-functions/v2/firestore');
+const { onCall, HttpsError } = require('firebase-functions/v2/https');
 const { initializeApp } = require('firebase-admin/app');
 const { getMessaging } = require('firebase-admin/messaging');
 const { getFirestore, FieldValue } = require('firebase-admin/firestore');
@@ -25,6 +26,44 @@ const TYPE_EMOJI = {
 };
 
 const APP_URL = 'https://sia-tecnm.web.app';
+const CAFETERIA_CONFIG = 'cafeteria-config';
+const CAFETERIA_PRODUCTOS = 'cafeteria-productos';
+const CAFETERIA_PEDIDOS = 'cafeteria-pedidos';
+const VOCACIONAL_REGISTROS = 'aspirantes-registros';
+
+function cleanText(value, maxLength = 500) {
+  return String(value || '').trim().slice(0, maxLength);
+}
+
+function normalizeContact(value, maxLength = 180) {
+  return cleanText(value, maxLength).toLowerCase();
+}
+
+function normalizePedidoItems(rawItems) {
+  if (!Array.isArray(rawItems) || rawItems.length === 0) {
+    throw new HttpsError('invalid-argument', 'El carrito esta vacio.');
+  }
+  if (rawItems.length > 25) {
+    throw new HttpsError('invalid-argument', 'El pedido excede el limite de productos.');
+  }
+
+  const merged = new Map();
+  rawItems.forEach((raw) => {
+    const productoId = cleanText(raw?.productoId, 120);
+    const cantidad = Math.floor(Number(raw?.cantidad || 0));
+    if (!productoId || cantidad < 1 || cantidad > 99) {
+      throw new HttpsError('invalid-argument', 'Producto o cantidad invalida.');
+    }
+    const current = merged.get(productoId) || { productoId, cantidad: 0 };
+    current.cantidad += cantidad;
+    if (current.cantidad > 99) {
+      throw new HttpsError('invalid-argument', 'La cantidad de un producto excede el limite permitido.');
+    }
+    merged.set(productoId, current);
+  });
+
+  return Array.from(merged.values());
+}
 
 function resolveNotificationLink(link) {
   if (!link) return APP_URL;
@@ -281,6 +320,129 @@ exports.aggregateServiceSurveyExemptions = onDocumentWritten(
     return null;
   }
 );
+
+exports.cafeteriaCreatePedido = onCall({ region: 'us-central1' }, async (request) => {
+  const uid = request.auth?.uid;
+  if (!uid) {
+    throw new HttpsError('unauthenticated', 'Debes iniciar sesion.');
+  }
+
+  const itemsInput = normalizePedidoItems(request.data?.items || request.data?.cartItems || []);
+  const metodoPago = cleanText(request.data?.metodoPago || 'efectivo', 40) || 'efectivo';
+  const nota = cleanText(request.data?.nota || '', 500);
+  const comprobanteUrl = cleanText(request.data?.comprobanteUrl || '', 2000);
+  const db = getFirestore();
+
+  const [configSnap, userSnap] = await Promise.all([
+    db.collection(CAFETERIA_CONFIG).doc('main').get(),
+    db.collection('usuarios').doc(uid).get()
+  ]);
+
+  if (configSnap.exists && configSnap.data()?.recepcionActiva === false) {
+    throw new HttpsError('failed-precondition', 'La cafeteria no esta aceptando pedidos en este momento.');
+  }
+
+  const profile = userSnap.exists ? userSnap.data() || {} : {};
+  const pedidoRef = db.collection(CAFETERIA_PEDIDOS).doc();
+  let pedidoPayload = null;
+
+  await db.runTransaction(async (transaction) => {
+    const productReads = await Promise.all(itemsInput.map((item) => (
+      transaction.get(db.collection(CAFETERIA_PRODUCTOS).doc(item.productoId))
+    )));
+
+    const items = productReads.map((productSnap, index) => {
+      const requested = itemsInput[index];
+      if (!productSnap.exists) {
+        throw new HttpsError('not-found', 'Uno de los productos ya no existe.');
+      }
+
+      const product = productSnap.data() || {};
+      if (product.disponible === false) {
+        throw new HttpsError('failed-precondition', `"${product.titulo || 'Producto'}" ya no esta disponible.`);
+      }
+
+      const stock = Number(product.stock ?? -1);
+      if (stock !== -1 && stock < requested.cantidad) {
+        throw new HttpsError('failed-precondition', `"${product.titulo || 'Producto'}" no tiene stock suficiente.`);
+      }
+
+      const precio = Number(product.precio || 0);
+      if (!Number.isFinite(precio) || precio < 0) {
+        throw new HttpsError('failed-precondition', `"${product.titulo || 'Producto'}" tiene precio invalido.`);
+      }
+
+      if (stock !== -1) {
+        transaction.update(productSnap.ref, {
+          stock: stock - requested.cantidad,
+          updatedAt: FieldValue.serverTimestamp()
+        });
+      }
+
+      return {
+        productoId: requested.productoId,
+        titulo: cleanText(product.titulo || 'Producto', 140),
+        precio,
+        cantidad: requested.cantidad,
+        subtotal: precio * requested.cantidad,
+        tiempoPreparacion: Number(product.tiempoPreparacion || 0)
+      };
+    });
+
+    const total = items.reduce((sum, item) => sum + item.subtotal, 0);
+    const tiempoEstimado = Math.max(0, ...items.map((item) => Number(item.tiempoPreparacion) || 0));
+
+    pedidoPayload = {
+      userId: uid,
+      userEmail: request.auth?.token?.email || profile.email || profile.emailInstitucional || '',
+      userName: profile.displayName || profile.nombre || request.auth?.token?.name || 'Estudiante',
+      matricula: profile.matricula || '',
+      items: items.map(({ tiempoPreparacion, ...item }) => item),
+      total,
+      metodoPago,
+      comprobanteUrl,
+      pagoConfirmado: false,
+      estado: 'pendiente',
+      tiempoEstimado,
+      nota,
+      respuestaAdmin: '',
+      createdAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+      history: []
+    };
+
+    transaction.set(pedidoRef, pedidoPayload);
+  });
+
+  const { createdAt, updatedAt, ...pedidoResponse } = pedidoPayload || {};
+  return {
+    id: pedidoRef.id,
+    ...pedidoResponse,
+    createdAt: null,
+    updatedAt: null
+  };
+});
+
+exports.vocacionalRecoverAspirante = onCall({ region: 'us-central1' }, async (request) => {
+  const phone = cleanText(request.data?.phone || '', 40);
+  const email = normalizeContact(request.data?.email || '', 180);
+
+  if (!phone || !email || !email.includes('@')) {
+    throw new HttpsError('invalid-argument', 'Telefono y correo son obligatorios.');
+  }
+
+  const snapshot = await getFirestore()
+    .collection(VOCACIONAL_REGISTROS)
+    .where('personalInfo.phone', '==', phone)
+    .limit(10)
+    .get();
+
+  const match = snapshot.docs.find((doc) => (
+    normalizeContact(doc.data()?.personalInfo?.email || '', 180) === email
+  ));
+
+  return { aspiranteId: match?.id || null };
+});
 
 Object.assign(exports, require('./foro'));
 Object.assign(exports, require('./panic'));

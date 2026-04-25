@@ -1,0 +1,915 @@
+/* public/styles.css - v3.0 (Dark Mode & Fixes) */
+
+:root {
+    /* PALETA BASE */
+    --primary: #1B396A;
+    --aula: #4e1bda;
+    --med: #00D0FF;
+    --biblio: #FFD24D;
+
+    /* VARIABLES DE TEMA (DARK DEFAULT) */
+    --bg-body: #0f1114;
+    --bg-card: #1a1d23;
+    --text-main: #cbd5e1;
+    --text-heading: #f0f2f5;
+    --border-color: rgba(255, 255, 255, 0.08);
+    --nav-bg: rgba(15, 17, 20, 0.90);
+}
+
+/* MODO CLARO (Variables redefinidas para toggle) */
+[data-bs-theme="light"] {
+    --bg-body: #F6F7F8;
+    --bg-card: #FFFFFF;
+    --text-main: #4A5568;
+    --text-heading: #1B396A;
+    --border-color: rgba(0, 0, 0, 0.08);
+    --nav-bg: rgba(255, 255, 255, 0.90);
+    --surface: #FFFFFF;
+    --surface-muted: #F6F7F8;
+    --text-body: #4A5568;
+}
+
+/* APLICACIÓN GLOBAL DE TEMA */
+body {
+    background-color: var(--bg-body);
+    color: var(--text-main);
+    transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.card,
+.list-group-item,
+.bg-white {
+    background-color: var(--bg-card) !important;
+    color: var(--text-main);
+    border-color: var(--border-color) !important;
+}
+
+/*  y bg-surface-muted -> oscuro sutil */
+.,
+.bg-surface-muted,
+.course-icon-box {
+    background-color: rgba(255, 255, 255, 0.04) !important;
+    color: var(--text-main) !important;
+    border-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+/* Revertir  en modo claro */
+[data-bs-theme="light"] .,
+[data-bs-theme="light"] .bg-surface-muted,
+[data-bs-theme="light"] .course-icon-box {
+    background-color: #f8f9fa !important;
+    color: var(--text-main) !important;
+    border-color: rgba(0, 0, 0, 0.05) !important;
+}
+
+[data-bs-theme="light"] .card,
+[data-bs-theme="light"] .list-group-item,
+[data-bs-theme="light"] .bg-white {
+    background-color: #ffffff !important;
+    color: var(--text-main);
+    border-color: rgba(0, 0, 0, 0.08) !important;
+}
+
+/* Dropdown items */
+.dropdown-item. {
+    background-color: rgba(255, 255, 255, 0.1) !important;
+    color: #e2e8f0 !important;
+}
+
+.dropdown-item.:hover {
+    background-color: rgba(255, 255, 255, 0.2) !important;
+}
+
+/* Badges  */
+.badge. {
+    background-color: rgba(255, 255, 255, 0.15) !important;
+    color: #fff !important;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+.text-dark {
+    color: var(--text-heading) !important;
+}
+
+.text-muted {
+    color: #94a3b8 !important;
+}
+
+/* Form controls */
+.form-control,
+.form-select {
+    background-color: var(--bg-card);
+    border-color: rgba(255, 255, 255, 0.1);
+    color: var(--text-main);
+}
+
+.form-control::placeholder {
+    color: rgba(0, 0, 0, 0.818);
+}
+
+.border-light {
+    border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+/* Subtle backgrounds (dark-compatible) */
+.bg-danger-subtle {
+    background-color: rgba(220, 38, 38, 0.15) !important;
+    color: #fca5a5 !important;
+}
+
+.bg-success-subtle {
+    background-color: rgba(34, 197, 94, 0.15) !important;
+    color: #86efac !important;
+}
+
+.bg-warning-subtle {
+    background-color: rgba(234, 179, 8, 0.15) !important;
+    color: #fde68a !important;
+}
+
+.bg-info-subtle {
+    background-color: rgba(59, 130, 246, 0.15) !important;
+    color: #93c5fd !important;
+}
+
+/* Revertir subtle en modo claro */
+[data-bs-theme="light"] .bg-danger-subtle {
+    background-color: #f8d7da !important;
+    color: #842029 !important;
+}
+
+[data-bs-theme="light"] .bg-success-subtle {
+    background-color: #d1e7dd !important;
+    color: #0f5132 !important;
+}
+
+[data-bs-theme="light"] .bg-warning-subtle {
+    background-color: #fff3cd !important;
+    color: #664d03 !important;
+}
+
+[data-bs-theme="light"] .bg-info-subtle {
+    background-color: #cff4fc !important;
+    color: #055160 !important;
+}
+
+/* Dropdowns */
+.dropdown-menu {
+    background-color: var(--bg-card) !important;
+    border-color: var(--border-color) !important;
+    color: var(--text-main);
+}
+
+.dropdown-item {
+    color: var(--text-main);
+}
+
+.dropdown-item:hover,
+.dropdown-item:focus {
+    background-color: rgba(255, 255, 255, 0.06);
+    color: var(--text-heading);
+}
+
+.dropdown-divider {
+    border-color: var(--border-color);
+}
+
+/* Modals */
+.modal-content {
+    background-color: var(--bg-card) !important;
+    color: var(--text-main);
+    border-color: var(--border-color) !important;
+}
+
+.modal-header,
+.modal-footer {
+    border-color: var(--border-color) !important;
+}
+
+/* Tables */
+.table {
+    color: var(--text-main);
+    --bs-table-bg: transparent;
+    --bs-table-border-color: var(--border-color);
+}
+
+thead {
+    background-color: rgba(255, 255, 255, 0.04);
+}
+
+.table-hover>tbody>tr:hover {
+    --bs-table-hover-bg: rgba(255, 255, 255, 0.04);
+}
+
+/* btn-light -> oscuro sutil */
+.btn-light {
+    background-color: rgba(255, 255, 255, 0.08) !important;
+    color: var(--text-main) !important;
+    border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+.btn-light:hover {
+    background-color: rgba(255, 255, 255, 0.15) !important;
+    color: var(--text-heading) !important;
+}
+
+/* Revertir btn-light en modo claro */
+[data-bs-theme="light"] .btn-light {
+    background-color: #f8f9fa !important;
+    color: #212529 !important;
+    border-color: #f8f9fa !important;
+}
+
+/* btn-close en dark */
+.btn-close {
+    filter: invert(1) grayscale(100%) brightness(200%);
+}
+
+[data-bs-theme="light"] .btn-close {
+    filter: none;
+}
+
+/* Tabs / Nav pills */
+.nav-pills .nav-link {
+    color: var(--text-main);
+}
+
+.nav-tabs {
+    border-color: var(--border-color);
+}
+
+.nav-tabs .nav-link {
+    color: var(--text-main);
+}
+
+/* Toast */
+.toast {
+    background-color: var(--bg-card);
+    color: var(--text-main);
+    border-color: var(--border-color);
+}
+
+/* Accordion */
+.accordion-item {
+    background-color: var(--bg-card);
+    color: var(--text-main);
+    border-color: var(--border-color);
+}
+
+.accordion-button {
+    background-color: var(--bg-card);
+    color: var(--text-main);
+}
+
+.accordion-button:not(.collapsed) {
+    background-color: rgba(255, 255, 255, 0.04);
+    color: var(--text-heading);
+}
+
+/* Progress bar background */
+.progress {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Alert overrides for dark */
+.alert {
+    border-color: var(--border-color);
+}
+
+/* Input group text */
+.input-group-text {
+    background-color: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 255, 255, 0.1);
+    color: var(--text-main);
+}
+
+/* Card header/footer */
+.card-header,
+.card-footer {
+    background-color: rgba(255, 255, 255, 0.03);
+    border-color: var(--border-color) !important;
+}
+
+/* --- NAVBAR MÓVIL (FIXED BOTTOM) --- */
+
+.bottom-nav-item {
+    color: var(--text-main);
+    opacity: 0.7;
+}
+
+.bottom-nav-item.active {
+    opacity: 1;
+    font-weight: 700;
+    color: var(--text-heading);
+}
+
+/* Colores activos en móvil */
+.bottom-nav-item[data-module="aula"].active i {
+    color: var(--aula);
+}
+
+.bottom-nav-item[data-module="biblio"].active i {
+    color: var(--biblio);
+}
+
+.bottom-nav-item[data-module="medi"].active i {
+    color: var(--med);
+}
+
+.bottom-nav-item[data-view="view-dashboard"].active i {
+    color: var(--primary);
+}
+
+/* Hacemos que el contenedor del carnet sea fluido pero con límites */
+.digital-id-card {
+    max-width: 90vw;
+    /* 90% del ancho de la pantalla */
+    width: 350px;
+    /* Ancho ideal */
+    margin: 0 auto;
+    aspect-ratio: 1.586;
+    /* Proporción tarjeta crédito */
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+/* Ajuste imagen QR dentro del modal */
+#prof-qr-full {
+    width: 100%;
+    max-width: 180px;
+    height: auto;
+}
+
+/* --- PERFIL & KARDEX --- */
+.kardex-stat-box {
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-color);
+}
+
+/* Input file oculto */
+#prof-pic-input {
+    display: none;
+}
+
+/* Ajustes inputs disabled en dark mode */
+input:disabled,
+select:disabled {
+    background-color: rgba(0, 0, 0, 0.1) !important;
+    color: var(--text-muted);
+    border-color: var(--border-color);
+}
+
+/* Esto sobrescribe la regla global que obligaba a todo a ser blanco */
+.card.bg-dark {
+    background-color: #1e293b !important;
+    /* Gris oscuro azulado */
+    color: #fff !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+
+/* Asegura que el texto dentro de la tarjeta oscura sea legible */
+.card.bg-dark .text-white-50 {
+    color: rgba(255, 255, 255, 0.6) !important;
+}
+
+/* Eleva el formulario por encima de la portada para que los clicks funcionen */
+#view-profile .card {
+    position: relative;
+    z-index: 10;
+}
+
+/* Hace muy evidente qué campos están habilitados */
+input:not(:disabled),
+select:not(:disabled) {
+    background-color: #1a1d23 !important;
+    border: 1px solid rgba(255, 255, 255, 0.15) !important;
+    color: var(--text-main);
+    cursor: text;
+}
+
+/* En modo claro, el fondo habilitado debe ser blanco */
+[data-bs-theme="light"] input:not(:disabled),
+[data-bs-theme="light"] select:not(:disabled) {
+    background-color: #fff !important;
+    border-color: var(--primary) !important;
+    color: #212529;
+}
+
+/* Elevamos el contenedor del formulario por encima de la portada */
+#view-profile .container {
+    position: relative;
+    z-index: 10;
+}
+
+/* Aseguramos que la tarjeta del formulario reciba los toques */
+#view-profile .col-lg-8 .card {
+    position: relative;
+    z-index: 20 !important;
+}
+
+/* Hacemos que la tarjeta se adapte al ancho del modal, no a un tamaño fijo */
+#modalDigitalID .modal-body {
+    padding: 1rem;
+    /* Dar aire alrededor */
+    display: flex;
+    justify-content: center;
+}
+
+/* Forzar a la imagen del QR a obedecer al contenedor */
+#prof-qr-full {
+    width: 100% !important;
+    height: auto !important;
+    max-width: 160px !important;
+    /* Controlar tamaño máximo visual */
+    display: block;
+    margin: 0 auto;
+}
+
+/* 3. FONDO OSCURO FORZADO (Para que se vea el botón blanco de cerrar) */
+.digital-id-card {
+    background: #1e293b !important;
+    /* Color sólido oscuro */
+    color: white !important;
+}
+
+/* La portada se pinta por detrás, pero no bloquea el formulario ni el botón */
+#view-profile .profile-cover-image {
+    pointer-events: auto;
+    /* permite clicks normales */
+    z-index: 1;
+}
+
+/* El formulario del perfil va por encima de la portada en todas las resoluciones */
+#view-profile .container {
+    position: relative;
+    z-index: 50 !important;
+}
+
+/* Evita que la tarjeta recorte el QR y deja que el contenido marque la altura */
+#modalDigitalID .digital-id-card {
+    width: 100% !important;
+    max-width: 320px !important;
+    margin: 0 auto;
+    padding: 1.5rem !important;
+    aspect-ratio: auto !important;
+}
+
+/* El QR siempre debe entrar completo en el recuadro blanco */
+#prof-qr-full {
+    width: 100% !important;
+    max-width: 220px !important;
+    height: auto !important;
+    display: block !important;
+    margin: 0 auto !important;
+}
+
+/* 1. Navbar: Logos mucho más pequeños y sutiles */
+.nav-icon-img {
+    width: 20px;
+    /* Reducido de 24px a 20px */
+    height: 20px;
+    object-fit: contain;
+    transition: transform 0.2s;
+    opacity: 0.9;
+}
+
+/* --- NAVBAR CORE --- */
+.sia-navbar {
+    background: var(--nav-bg);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--nav-border);
+    padding: 0.6rem 1.2rem;
+    transition: all 0.3s ease;
+}
+
+/* --- RESPONSIVE MOBILE --- */
+@media (max-width: 768px) {
+    .sia-navbar {
+        padding: 0.5rem 0.8rem;
+    }
+
+}
+
+/* === PROFILE CENTER === */
+#view-profile .profile-shell__container {
+    position: relative;
+    z-index: 20 !important;
+    padding-bottom: 6rem;
+}
+
+#view-profile .profile-shell {
+    overflow: visible;
+}
+
+#view-profile .profile-cover-image {
+    position: relative;
+    z-index: auto !important;
+    overflow: visible;
+    isolation: auto;
+}
+
+#view-profile .profile-shell .row > [class*="col-"],
+#view-profile .profile-content-card,
+#view-profile .tab-content,
+#view-profile .tab-pane,
+#view-profile .profile-surface,
+#view-profile .profile-mini-panel,
+#view-profile .profile-alert,
+#view-profile .profile-activity-item {
+    min-width: 0;
+}
+
+#view-profile .profile-sidebar-card,
+#view-profile .profile-content-card,
+#view-profile .profile-surface,
+#view-profile .profile-mini-panel {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+}
+
+#view-profile .profile-sidebar-card {
+    position: sticky;
+    top: 5.75rem;
+}
+
+#view-profile .profile-avatar-shell {
+    width: 132px;
+    height: 132px;
+}
+
+#view-profile .profile-role-pill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.45rem 0.95rem;
+    border-radius: 999px;
+    background: rgba(13, 110, 253, 0.12);
+    color: var(--primary);
+    font-weight: 700;
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+#view-profile .profile-mini-panel,
+#view-profile .profile-inline-note,
+#view-profile .profile-empty-state {
+    border-radius: 1rem;
+    padding: 1rem;
+}
+
+#view-profile .profile-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1rem;
+}
+
+#view-profile .profile-summary-grid .display-6 {
+    font-size: clamp(1.85rem, 5vw, 2.65rem);
+    line-height: 1;
+}
+
+#view-profile .profile-summary-grid .h4 {
+    font-size: clamp(1.05rem, 3.8vw, 1.5rem);
+    line-height: 1.15;
+}
+
+#view-profile .profile-tab-scroller {
+    overflow-x: auto;
+    padding-bottom: 0.25rem;
+    scroll-padding-inline: 0.25rem;
+    scroll-snap-type: x proximity;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-x;
+}
+
+#view-profile .profile-tab-scroller::-webkit-scrollbar {
+    display: none;
+}
+
+#view-profile .profile-pill-nav {
+    display: inline-flex;
+    align-items: stretch;
+    flex-wrap: nowrap;
+    gap: 0.5rem;
+    width: max-content;
+    min-width: max-content;
+    padding: 0;
+    margin: 0;
+    list-style: none;
+}
+
+#view-profile .profile-pill-nav .profile-pill-item {
+    display: block;
+    flex: 0 0 auto;
+    width: auto;
+    height: auto;
+    min-width: max-content;
+    font-size: inherit;
+    gap: 0;
+    background: transparent;
+    color: inherit;
+    scroll-snap-align: start;
+}
+
+#view-profile .profile-pill-nav .profile-pill-item::marker {
+    content: none;
+}
+
+#view-profile .profile-pill-nav .profile-pill-item,
+#view-profile .profile-pill-nav .profile-pill-item * {
+    box-sizing: border-box;
+}
+
+#view-profile .profile-pill-nav .profile-pill-item > .prof-tab-btn {
+    scroll-snap-align: start;
+}
+
+#view-profile .profile-pill-nav .prof-tab-btn.nav-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.55rem;
+    flex: 0 0 auto;
+    border: none;
+    border-radius: 999px;
+    min-height: 48px;
+    min-width: max-content;
+    padding: 0.72rem 1rem;
+    background: rgba(15, 23, 42, 0.06);
+    color: var(--text-body) !important;
+    white-space: nowrap;
+    font-weight: 700;
+    font-size: 0.92rem;
+    line-height: 1.1;
+    text-decoration: none;
+}
+
+#view-profile .profile-pill-nav .prof-tab-btn.nav-link i {
+    font-size: 1rem;
+    flex-shrink: 0;
+}
+
+#view-profile .profile-pill-nav .profile-pill-label {
+    display: inline-block;
+    white-space: nowrap;
+}
+
+#view-profile .profile-pill-nav .prof-tab-btn.nav-link.active {
+    background: var(--primary) !important;
+    color: #fff !important;
+    box-shadow: 0 10px 24px rgba(27, 57, 106, 0.18);
+}
+
+#view-profile .profile-banner-menu {
+    width: min(300px, calc(100vw - 2rem));
+}
+
+#view-profile .profile-cover-image .dropdown {
+    position: relative;
+    z-index: 95;
+}
+
+#view-profile .profile-cover-image .dropdown-menu.profile-banner-menu {
+    z-index: 110;
+    margin-top: 0.75rem;
+}
+
+#view-profile .profile-banner-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.6rem;
+}
+
+#view-profile .profile-banner-swatch {
+    width: 100%;
+    aspect-ratio: 1;
+    border-radius: 999px;
+    border: 2px solid transparent;
+    box-shadow: 0 6px 14px rgba(15, 23, 42, 0.12);
+    transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+#view-profile .profile-banner-swatch.active {
+    border-color: #fff;
+    transform: scale(1.08);
+    outline: 2px solid var(--primary);
+}
+
+#view-profile .profile-progress-bar {
+    height: 0.55rem;
+    background: rgba(148, 163, 184, 0.2);
+}
+
+#view-profile .profile-keyline {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    align-items: flex-start;
+}
+
+#view-profile .profile-keyline > :last-child {
+    text-align: right;
+    overflow-wrap: anywhere;
+}
+
+#view-profile .profile-chip-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.55rem;
+}
+
+#view-profile .profile-chip {
+    display: inline-flex;
+    align-items: center;
+    max-width: 100%;
+    padding: 0.4rem 0.75rem;
+    border-radius: 999px;
+    background: rgba(15, 23, 42, 0.06);
+    color: var(--text-body);
+    font-size: 0.8rem;
+    font-weight: 600;
+    overflow-wrap: anywhere;
+}
+
+#view-profile .profile-chip--muted {
+    background: rgba(148, 163, 184, 0.16);
+    color: var(--text-muted);
+}
+
+#view-profile .profile-status-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.45rem 0.8rem;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    background: rgba(59, 130, 246, 0.12);
+    color: var(--primary);
+}
+
+#view-profile .profile-status-badge--danger {
+    background: rgba(239, 68, 68, 0.12);
+    color: #b91c1c;
+}
+
+#view-profile .profile-status-badge--success {
+    background: rgba(22, 163, 74, 0.14);
+    color: #166534;
+}
+
+#view-profile .profile-alert {
+    border-radius: 1rem;
+    padding: 1rem;
+    border: 1px solid var(--border-color);
+    background: rgba(255, 255, 255, 0.7);
+    margin-bottom: 0.75rem;
+}
+
+#view-profile .profile-alert--critical {
+    border-color: rgba(220, 38, 38, 0.18);
+    background: rgba(254, 242, 242, 0.9);
+}
+
+#view-profile .profile-alert--warning {
+    border-color: rgba(245, 158, 11, 0.2);
+    background: rgba(255, 251, 235, 0.9);
+}
+
+#view-profile .profile-alert--info {
+    border-color: rgba(59, 130, 246, 0.18);
+    background: rgba(239, 246, 255, 0.9);
+}
+
+#view-profile .profile-alert--success {
+    border-color: rgba(22, 163, 74, 0.18);
+    background: rgba(240, 253, 244, 0.92);
+}
+
+#view-profile .profile-quick-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    align-items: stretch;
+    gap: 0.85rem;
+}
+
+#view-profile .profile-quick-btn {
+    width: 100%;
+    min-width: 0;
+    border-radius: 1rem;
+    border: 1px solid var(--border-color);
+    padding: 1rem;
+    overflow-wrap: anywhere;
+}
+
+#view-profile .profile-activity-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+}
+
+#view-profile .profile-activity-item {
+    display: flex;
+    gap: 0.9rem;
+    padding: 1rem;
+    border-radius: 1rem;
+    border: 1px solid var(--border-color);
+    background: rgba(255, 255, 255, 0.72);
+}
+
+#view-profile .profile-activity-icon {
+    width: 42px;
+    height: 42px;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    background: rgba(59, 130, 246, 0.12);
+    color: var(--primary);
+}
+
+#view-profile .profile-activity-icon--success {
+    background: rgba(22, 163, 74, 0.14);
+    color: #166534;
+}
+
+#view-profile .profile-activity-icon--info {
+    background: rgba(14, 165, 233, 0.16);
+    color: #0369a1;
+}
+
+#view-profile .profile-activity-icon--accent {
+    background: rgba(0, 208, 255, 0.14);
+    color: #0369a1;
+}
+
+#view-profile[data-bs-theme="dark"] .profile-alert,
+html[data-bs-theme="dark"] #view-profile .profile-alert,
+html[data-bs-theme="dark"] #view-profile .profile-activity-item,
+html[data-bs-theme="dark"] #view-profile .profile-inline-note,
+html[data-bs-theme="dark"] #view-profile .profile-empty-state,
+html[data-bs-theme="dark"] #view-profile .profile-quick-btn {
+    background: rgba(15, 23, 42, 0.72);
+    border-color: rgba(255, 255, 255, 0.08);
+}
+
+html[data-bs-theme="dark"] #view-profile .profile-chip,
+html[data-bs-theme="dark"] #view-profile .profile-pill-nav .prof-tab-btn.nav-link {
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--text-body) !important;
+}
+
+#view-profile textarea.prof-editable,
+#view-profile textarea:disabled {
+    resize: vertical;
+}
+
+@media (max-width: 1199.98px) {
+    #view-profile .profile-sidebar-card {
+        position: static;
+    }
+}
+
+@media (max-width: 767.98px) {
+    #view-profile .profile-summary-grid {
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    }
+
+    #view-profile .profile-keyline {
+        flex-direction: column;
+        gap: 0.25rem;
+    }
+
+    #view-profile .profile-keyline > :last-child {
+        text-align: left;
+    }
+
+    #view-profile .profile-pill-nav .prof-tab-btn.nav-link {
+        justify-content: flex-start;
+        min-width: max-content;
+        min-height: 50px;
+        padding: 0.78rem 0.95rem;
+        white-space: nowrap;
+        text-align: left;
+        line-height: 1.1;
+        font-size: 0.9rem;
+    }
+
+    #view-profile .profile-activity-item {
+        padding: 0.9rem;
+    }
+
+    #view-profile .profile-banner-grid {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+}

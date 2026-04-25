@@ -23,17 +23,10 @@
   const QA_ACTOR_STORAGE_KEY = 'sia_superadmin_actor_map';
   const TEMP_EXTRADATA_STORAGE_KEY = 'sia_temp_extradata';
   const MICROSOFT_TENANT_ID = 'e5da4e41-4181-4acd-a7e9-3c954a086c06';
-  const QA_SECRET_LOGIN_ROUTE = '/qa-portal-k9m2x7c4';
-  const QA_SECRET_LOGIN_EMAIL = 'admin@super.com';
-  const QA_SECRET_LOGIN_PASSWORD = 'lilxabe123';
-  const QA_SUPERADMIN_ALLOWLIST = {
-    [QA_SECRET_LOGIN_EMAIL]: {
-      displayName: 'SuperAdmin QA',
-      defaultContext: 'student',
-      allowMicrosoftLogin: false,
-      secretLoginOnly: true
-    }
-  };
+  const QA_SECRET_LOGIN_ROUTE = '';
+  const QA_SECRET_LOGIN_EMAIL = '';
+  const QA_SECRET_LOGIN_PASSWORD = '';
+  const QA_SUPERADMIN_ALLOWLIST = {};
   const QA_CONTEXT_DEFAULT_ACTORS = Object.freeze({
     medico: {
       email: 'atencionmedica@loscabos.tecnm.mx',
@@ -605,6 +598,7 @@
   function getQaSecretLoginConfig() {
     const allowConfig = QA_SUPERADMIN_ALLOWLIST[QA_SECRET_LOGIN_EMAIL] || {};
     return {
+      enabled: Boolean(QA_SECRET_LOGIN_ROUTE && QA_SECRET_LOGIN_EMAIL && QA_SECRET_LOGIN_PASSWORD),
       route: QA_SECRET_LOGIN_ROUTE,
       email: QA_SECRET_LOGIN_EMAIL,
       displayName: allowConfig.displayName || 'SuperAdmin QA'
@@ -1251,6 +1245,12 @@
   }
 
   async function loginQaSecret(password) {
+    if (!QA_SECRET_LOGIN_EMAIL || !QA_SECRET_LOGIN_PASSWORD) {
+      const disabledError = new Error('El acceso QA por clave no esta habilitado.');
+      disabledError.code = 'auth/operation-not-allowed';
+      throw disabledError;
+    }
+
     const expectedPassword = QA_SECRET_LOGIN_PASSWORD;
     const normalizedPassword = String(password || '');
 

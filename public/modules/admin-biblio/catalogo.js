@@ -249,11 +249,14 @@ window.AdminBiblio.Catalogo = (function () {
 
         inventoryEl.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Revisando estado...';
         try {
-            const [currentState, catalogSummary, latestFinished] = await Promise.all([
+            const [currentState, catalogSummary, latestFinishedBase] = await Promise.all([
                 BiblioService.getCurrentInventorySession(_ctx),
                 BiblioService.getInventoryCatalogSummary(_ctx),
-                BiblioService.getLatestFinishedInventorySession(_ctx, { includeLists: true })
+                BiblioService.getLatestFinishedInventorySession(_ctx)
             ]);
+            const latestFinished = latestFinishedBase?.session && !latestFinishedBase.session.summary
+                ? await BiblioService.getInventorySessionDetails(_ctx, latestFinishedBase.session.id, { includeLists: true })
+                : latestFinishedBase;
 
             inventoryEl.innerHTML = buildGestionLibrosInventoryStatusHtml(currentState, catalogSummary, latestFinished);
         } catch (error) {
@@ -307,16 +310,20 @@ window.AdminBiblio.Catalogo = (function () {
         if (!_ctx) return;
 
         try {
-            const details = sessionId
-                ? await BiblioService.getInventorySessionDetails(_ctx, sessionId, { includeLists: true })
-                : await BiblioService.getLatestFinishedInventorySession(_ctx, { includeLists: true });
+            let details = sessionId
+                ? await BiblioService.getInventorySessionDetails(_ctx, sessionId)
+                : await BiblioService.getLatestFinishedInventorySession(_ctx);
             const session = details?.session || null;
             if (!session?.id) {
                 showToast('No hay un inventario cerrado para ajustar.', 'warning');
                 return;
             }
 
-            const summary = session.summary || {
+            if (!session.summary) {
+                details = await BiblioService.getInventorySessionDetails(_ctx, session.id, { includeLists: true });
+            }
+
+            const summary = details?.session?.summary || {
                 systemTotal: 0,
                 registeredCatalog: sumInventoryStatusObserved(details?.foundEntries),
                 outsideCatalog: sumInventoryStatusObserved(details?.missingEntries),
@@ -1278,4 +1285,3 @@ window.AdminBiblio.Catalogo = (function () {
         toggleAssetStatus: withState(toggleAssetStatus)
     };
 })();
-

@@ -1,11 +1,43 @@
-﻿if (!window.AdmisionesPublic) {
+if (!window.AdmisionesPublic) {
   window.AdmisionesPublic = (function () {
-    const STORAGE_KEY = 'sia_admisiones_guest_v1';
+    const STORAGE_KEY = 'sia_admisiones_guest_v2';
+    const LEGACY_STORAGE_KEY = 'sia_admisiones_guest_v1';
     const STYLE_ID = 'sia-admisiones-public-style';
     const DATA_FILES = {
       admissions: '/data/admisiones-2026.json',
       content: '/data/evaluatec-2026-content.json'
     };
+
+    const AREA_ICONS = {
+      matematicas: 'bi-calculator',
+      administracion: 'bi-briefcase',
+      'comprension-lectora': 'bi-book',
+      'estructura-lenguaje': 'bi-pencil-square',
+      fisica: 'bi-lightning-charge',
+      quimica: 'bi-droplet-half',
+      arquitectura: 'bi-buildings',
+      tics: 'bi-laptop',
+      ingles: 'bi-translate'
+    };
+
+    const CAREER_ICONS = {
+      iadm: 'bi-diagram-3',
+      cp: 'bi-cash-coin',
+      arq: 'bi-rulers',
+      gastro: 'bi-cup-hot',
+      tur: 'bi-compass',
+      isc: 'bi-cpu',
+      civil: 'bi-cone-striped',
+      electro: 'bi-gear'
+    };
+
+    const NAV_ITEMS = [
+      { screen: 'welcome', label: 'Inicio', icon: 'bi-house-door', hint: 'Bienvenida' },
+      { screen: 'route', label: 'Ruta', icon: 'bi-signpost-split', hint: 'Carrera' },
+      { screen: 'learn', label: 'Temas', icon: 'bi-journal-bookmark', hint: 'Estudia' },
+      { screen: 'practice', label: 'Práctica', icon: 'bi-ui-checks-grid', hint: 'Reactivos' },
+      { screen: 'exam', label: 'Proceso', icon: 'bi-calendar-check', hint: 'Fechas' }
+    ];
 
     let _ctx = null;
     let _root = null;
@@ -19,7 +51,6 @@
       return {
         guestId: (window.crypto && window.crypto.randomUUID ? window.crypto.randomUUID() : `guest-${Date.now()}`),
         selectedCareer: '',
-        selectedAreas: [],
         progressByTopic: {},
         practiceResults: {
           scopes: {},
@@ -27,6 +58,7 @@
           areaStats: {}
         },
         bookmarks: [],
+        tourSeen: false,
         lastVisited: null,
         createdAt: now,
         updatedAt: now
@@ -35,11 +67,12 @@
 
     function defaultUiState() {
       return {
-        screen: 'home',
+        screen: 'welcome',
         areaId: '',
         topicId: '',
-        search: '',
-        practiceScope: '',
+        quizMode: '',
+        quizTitle: '',
+        quizDescription: '',
         quizId: '',
         quizQuestions: [],
         quizAnswers: {},
@@ -59,10 +92,42 @@
         .replace(/'/g, '&#39;');
     }
 
+    function icon(name) {
+      return `<i class="bi ${escapeHtml(name)}" aria-hidden="true"></i>`;
+    }
+
+    function clamp(value, min, max) {
+      return Math.max(min, Math.min(max, value));
+    }
+
+    function formatPercent(value) {
+      return `${Math.round(Number(value || 0))}%`;
+    }
+
+    function shuffleList(items) {
+      const next = [...items];
+      for (let index = next.length - 1; index > 0; index -= 1) {
+        const swapIndex = Math.floor(Math.random() * (index + 1));
+        [next[index], next[swapIndex]] = [next[swapIndex], next[index]];
+      }
+      return next;
+    }
+
+    function buildOptions(correct, distractors) {
+      const unique = [];
+      [correct, ...(distractors || [])].forEach((item) => {
+        if (!item || unique.includes(item)) return;
+        unique.push(item);
+      });
+      const options = shuffleList(unique).slice(0, 4);
+      const correctIndex = options.findIndex((item) => item === correct);
+      return { options, correctIndex: correctIndex >= 0 ? correctIndex : 0 };
+    }
+
     const GuestStore = {
       load() {
         try {
-          const raw = localStorage.getItem(STORAGE_KEY);
+          const raw = localStorage.getItem(STORAGE_KEY) || localStorage.getItem(LEGACY_STORAGE_KEY);
           if (!raw) return createDefaultGuest();
           const parsed = JSON.parse(raw);
           return {
@@ -74,8 +139,7 @@
               topicStats: parsed?.practiceResults?.topicStats || {},
               areaStats: parsed?.practiceResults?.areaStats || {}
             },
-            bookmarks: Array.isArray(parsed?.bookmarks) ? parsed.bookmarks : [],
-            selectedAreas: Array.isArray(parsed?.selectedAreas) ? parsed.selectedAreas : []
+            bookmarks: Array.isArray(parsed?.bookmarks) ? parsed.bookmarks : []
           };
         } catch (error) {
           console.warn('[AdmisionesPublic] No se pudo leer el progreso local:', error);
@@ -120,6 +184,7 @@
       reset() {
         const fresh = createDefaultGuest();
         localStorage.setItem(STORAGE_KEY, JSON.stringify(fresh));
+        localStorage.removeItem(LEGACY_STORAGE_KEY);
         _guest = fresh;
         return fresh;
       }
@@ -128,99 +193,57 @@
     const ContentRepo = {
       async load() {
         if (_resources) return _resources;
+        const version = window.SIA_VERSION || Date.now();
         const [admissions, content] = await Promise.all([
-          fetch(`${DATA_FILES.admissions}?v=${window.SIA_VERSION || Date.now()}`).then((res) => res.json()),
-          fetch(`${DATA_FILES.content}?v=${window.SIA_VERSION || Date.now()}`).then((res) => res.json())
+          fetch(`${DATA_FILES.admissions}?v=${version}`).then((res) => res.json()),
+          fetch(`${DATA_FILES.content}?v=${version}`).then((res) => res.json())
         ]);
         _resources = { admissions, content };
         return _resources;
       }
     };
 
-    const CareerPlanner = {
-      getCareer(careerId) {
-        return _resources?.content?.careers?.find((career) => career.id === careerId) || null;
-      },
-
-      getAreasForCareer(careerId) {
-        return this.getCareer(careerId)?.routeAreaIds || [];
-      }
-    };
-
-    const PracticeEngine = {
-      buildAreaQuiz(areaId) {
-        const area = getArea(areaId);
-        if (!area) return [];
-        return area.topics.map((topic) => ({
-          id: `${area.id}-${topic.id}`,
-          areaId: area.id,
-          areaTitle: area.title,
-          topicId: topic.id,
-          topicTitle: topic.title,
-          question: topic.microPractice.question,
-          options: topic.microPractice.options,
-          correctIndex: topic.microPractice.correctIndex,
-          explanation: topic.microPractice.explanation
-        }));
-      },
-
-      buildCareerQuiz(careerId) {
-        const areaIds = CareerPlanner.getAreasForCareer(careerId);
-        const pool = [];
-        areaIds.forEach((areaId) => {
-          const areaQuestions = this.buildAreaQuiz(areaId);
-          pool.push(...areaQuestions.slice(0, Math.min(2, areaQuestions.length)));
-        });
-        return pool.slice(0, 10);
-      },
-
-      grade(questions, answers) {
-        let correct = 0;
-        const items = questions.map((question, index) => {
-          const selectedIndex = Number(answers[question.id]);
-          const isCorrect = selectedIndex === question.correctIndex;
-          if (isCorrect) correct += 1;
-          return {
-            ...question,
-            selectedIndex,
-            isCorrect,
-            index
-          };
-        });
-
-        return {
-          correct,
-          total: questions.length,
-          percent: questions.length ? Math.round((correct / questions.length) * 100) : 0,
-          items
-        };
-      }
-    };
-
     function ensureRoot() {
       _root = document.getElementById('view-admisiones-public');
-      return _root;
+      if (!_root) {
+        throw new Error('No existe el contenedor view-admisiones-public.');
+      }
+      _root.classList.add('admisiones-public-page');
     }
 
     function ensureStyles() {
-      if (document.getElementById(STYLE_ID)) return;
-      const link = document.createElement('link');
-      link.id = STYLE_ID;
-      link.rel = 'stylesheet';
-      link.href = `/styles/17-admisiones-public.css?v=${window.SIA_VERSION || Date.now()}`;
-      document.head.appendChild(link);
+      const href = `/styles/17-admisiones-public.css?v=${window.SIA_VERSION || Date.now()}`;
+      let link = document.getElementById(STYLE_ID);
+      if (!link) {
+        link = document.createElement('link');
+        link.id = STYLE_ID;
+        link.rel = 'stylesheet';
+        document.head.appendChild(link);
+      }
+      link.href = href;
     }
 
     function bindEvents() {
       if (_bound || !_root) return;
       _root.addEventListener('click', handleClick);
       _root.addEventListener('change', handleChange);
-      _root.addEventListener('input', handleInput);
       _bound = true;
     }
 
+    function getCareers() {
+      return _resources?.content?.careers || [];
+    }
+
+    function getSelectedCareer() {
+      return getCareers().find((career) => career.id === _guest?.selectedCareer) || null;
+    }
+
+    function getCareer(careerId) {
+      return getCareers().find((career) => career.id === careerId) || null;
+    }
+
     function getArea(areaId) {
-      return _resources.content.areas.find((area) => area.id === areaId) || null;
+      return (_resources?.content?.areas || []).find((area) => area.id === areaId) || null;
     }
 
     function getTopic(areaId, topicId) {
@@ -228,8 +251,8 @@
     }
 
     function getAllTopics() {
-      return _resources.content.areas.flatMap((area) =>
-        area.topics.map((topic) => ({
+      return (_resources?.content?.areas || []).flatMap((area) =>
+        (area.topics || []).map((topic) => ({
           ...topic,
           areaId: area.id,
           areaTitle: area.title,
@@ -243,1143 +266,1088 @@
     }
 
     function getRouteAreaIds() {
-      return CareerPlanner.getAreasForCareer(_guest.selectedCareer);
+      const career = getSelectedCareer();
+      return career?.routeAreaIds || [];
+    }
+
+    function getRouteAreas() {
+      const areaIds = getRouteAreaIds();
+      return areaIds.map((areaId) => getArea(areaId)).filter(Boolean);
+    }
+
+    function getRouteTopics() {
+      return getRouteAreas().flatMap((area) =>
+        (area.topics || []).map((topic) => ({
+          ...topic,
+          areaId: area.id,
+          areaTitle: area.title,
+          roleLabel: area.roleLabel
+        }))
+      );
     }
 
     function getTopicProgress(areaId, topicId) {
-      return _guest.progressByTopic[getTopicKey(areaId, topicId)] || {};
+      return _guest?.progressByTopic?.[getTopicKey(areaId, topicId)] || {};
     }
 
     function getAreaProgress(areaId) {
       const area = getArea(areaId);
-      if (!area) {
-        return {
-          totalTopics: 0,
-          studiedCount: 0,
-          studiedPercent: 0,
-          averageScore: 0
-        };
-      }
-
-      const studiedCount = area.topics.filter((topic) => getTopicProgress(area.id, topic.id).studied).length;
-      const areaStats = _guest.practiceResults.areaStats?.[area.id];
-      const averageScore = areaStats?.total ? Math.round((Number(areaStats.correct || 0) / Number(areaStats.total || 1)) * 100) : 0;
-
+      const topics = area?.topics || [];
+      const studied = topics.filter((topic) => getTopicProgress(areaId, topic.id).studied).length;
+      const stats = _guest?.practiceResults?.areaStats?.[areaId] || { correct: 0, total: 0 };
       return {
-        totalTopics: area.topics.length,
-        studiedCount,
-        studiedPercent: area.topics.length ? Math.round((studiedCount / area.topics.length) * 100) : 0,
-        averageScore
+        total: topics.length,
+        studied,
+        studiedPercent: topics.length ? Math.round((studied / topics.length) * 100) : 0,
+        practicePercent: stats.total ? Math.round((stats.correct / stats.total) * 100) : null
       };
     }
 
-    function getOrderedAreas() {
-      const selected = new Set(getRouteAreaIds());
-      return [..._resources.content.areas].sort((a, b) => {
-        const aSelected = selected.has(a.id) ? 0 : 1;
-        const bSelected = selected.has(b.id) ? 0 : 1;
-        if (aSelected !== bSelected) return aSelected - bSelected;
-        return a.title.localeCompare(b.title);
-      });
-    }
-
-    function getPreferredAreaId() {
-      const orderedAreas = getOrderedAreas();
-      return getArea(_ui?.areaId)?.id || orderedAreas[0]?.id || '';
-    }
-
-    function ensureFocusArea() {
-      if (!getArea(_ui.areaId)) {
-        _ui.areaId = getPreferredAreaId();
-      }
-    }
-
-    function hydrateSelectedAreas() {
-      const selectedAreas = getRouteAreaIds();
-      if (selectedAreas.length && JSON.stringify(selectedAreas) !== JSON.stringify(_guest.selectedAreas)) {
-        GuestStore.patch({ selectedAreas });
-      }
-    }
-
-    function setLastVisited(payload) {
-      GuestStore.patch({ lastVisited: payload });
-    }
-
-    function applyLastVisited() {
-      const lastVisited = _guest.lastVisited;
-      if (!lastVisited) {
-        _ui = defaultUiState();
-        _ui.areaId = getPreferredAreaId();
-        return;
-      }
-
-      if (lastVisited.kind === 'topic' && getTopic(lastVisited.areaId, lastVisited.topicId)) {
-        _ui = {
-          ...defaultUiState(),
-          screen: 'topic',
-          areaId: lastVisited.areaId,
-          topicId: lastVisited.topicId
-        };
-        return;
-      }
-
-      if (lastVisited.kind === 'practice') {
-        const questions = lastVisited.scope === 'career'
-          ? PracticeEngine.buildCareerQuiz(_guest.selectedCareer)
-          : PracticeEngine.buildAreaQuiz(lastVisited.areaId);
-        _ui = {
-          ...defaultUiState(),
-          screen: 'practice',
-          areaId: lastVisited.areaId || '',
-          practiceScope: lastVisited.scope,
-          quizId: `${lastVisited.scope}-${lastVisited.areaId || _guest.selectedCareer || 'mix'}`,
-          quizQuestions: questions
-        };
-        ensureFocusArea();
-        return;
-      }
-
-      _ui = defaultUiState();
-      _ui.areaId = getPreferredAreaId();
-    }
-
-    function getNextRecommendedTopic(areaIds) {
-      const orderedAreaIds = areaIds.length ? areaIds : getOrderedAreas().map((area) => area.id);
-      for (let areaIndex = 0; areaIndex < orderedAreaIds.length; areaIndex += 1) {
-        const area = getArea(orderedAreaIds[areaIndex]);
-        if (!area) continue;
-        const pending = area.topics.find((topic) => !getTopicProgress(area.id, topic.id).studied);
-        if (pending) {
-          return {
-            ...pending,
-            areaId: area.id,
-            areaTitle: area.title,
-            roleLabel: area.roleLabel
-          };
-        }
-      }
-
-      const firstArea = getArea(orderedAreaIds[0]);
-      const firstTopic = firstArea?.topics?.[0];
-      return firstArea && firstTopic ? {
-        ...firstTopic,
-        areaId: firstArea.id,
-        areaTitle: firstArea.title,
-        roleLabel: firstArea.roleLabel
-      } : null;
-    }
-
-    function getTopicNeighbors(areaId, topicId) {
-      const area = getArea(areaId);
-      if (!area) return { previous: null, next: null };
-      const index = area.topics.findIndex((topic) => topic.id === topicId);
-      if (index === -1) return { previous: null, next: null };
+    function getRouteProgress() {
+      const topics = getRouteTopics();
+      const studied = topics.filter((topic) => getTopicProgress(topic.areaId, topic.id).studied).length;
+      const total = topics.length;
       return {
-        previous: index > 0 ? area.topics[index - 1] : null,
-        next: index < area.topics.length - 1 ? area.topics[index + 1] : null
+        total,
+        studied,
+        percent: total ? Math.round((studied / total) * 100) : 0
       };
     }
 
-    function getBookmarkedTopics(limit = 4) {
-      return (_guest.bookmarks || [])
-        .map((topicKey) => {
-          const [areaId, topicId] = String(topicKey).split('::');
-          const area = getArea(areaId);
+    function getNextTopic() {
+      const topics = getRouteTopics();
+      return topics.find((topic) => !getTopicProgress(topic.areaId, topic.id).studied) || topics[0] || null;
+    }
+
+    function getBookmarkedTopics() {
+      const marks = new Set(_guest?.bookmarks || []);
+      return getRouteTopics().filter((topic) => marks.has(getTopicKey(topic.areaId, topic.id)));
+    }
+
+    function getWeakTopics() {
+      const stats = _guest?.practiceResults?.topicStats || {};
+      return Object.entries(stats)
+        .map(([key, value]) => {
+          const [areaId, topicId] = key.split('::');
           const topic = getTopic(areaId, topicId);
-          if (!area || !topic) return null;
+          const area = getArea(areaId);
+          if (!topic || !area || !value?.total) return null;
           return {
-            topicKey,
             areaId,
             topicId,
             areaTitle: area.title,
-            title: topic.title,
-            summary: topic.summary
+            topicTitle: topic.title,
+            percent: Math.round((value.correct / value.total) * 100)
           };
         })
         .filter(Boolean)
-        .slice(0, limit);
-    }
-
-    function getScopeLabel(scopeResult) {
-      if (!scopeResult) return '';
-      if (scopeResult.scope === 'career') {
-        const career = CareerPlanner.getCareer(scopeResult.careerId);
-        return career ? `Práctica mixta: ${career.shortName}` : 'Práctica mixta por carrera';
-      }
-      const area = getArea(scopeResult.areaId);
-      return area ? `Práctica de ${area.title}` : 'Práctica por área';
+        .filter((item) => item.percent < 75)
+        .sort((a, b) => a.percent - b.percent)
+        .slice(0, 3);
     }
 
     function computeMetrics() {
-      const allTopics = getAllTopics();
-      const routeAreaIds = getRouteAreaIds();
-      const routeTopics = routeAreaIds.length ? allTopics.filter((topic) => routeAreaIds.includes(topic.areaId)) : allTopics;
-      const studiedCount = allTopics.filter((topic) => getTopicProgress(topic.areaId, topic.id).studied).length;
-      const routeStudiedCount = routeTopics.filter((topic) => getTopicProgress(topic.areaId, topic.id).studied).length;
-      const topicStats = _guest.practiceResults.topicStats || {};
-
-      const weakTopics = Object.entries(topicStats)
-        .filter(([, stat]) => Number(stat.total || 0) > 0)
-        .map(([topicKey, stat]) => {
-          const [areaId, topicId] = topicKey.split('::');
-          const area = getArea(areaId);
-          const topic = getTopic(areaId, topicId);
-          if (!area || !topic) return null;
-          return {
-            topicKey,
-            areaId,
-            topicId,
-            areaTitle: area.title,
-            title: topic.title,
-            percent: Math.round((Number(stat.correct || 0) / Number(stat.total || 1)) * 100)
-          };
-        })
-        .filter(Boolean)
-        .sort((a, b) => a.percent - b.percent)
-        .slice(0, 4);
-
-      const recentResults = Object.entries(_guest.practiceResults.scopes || {})
-        .map(([id, stat]) => ({ ...stat, id }))
-        .sort((a, b) => new Date(b.takenAt || 0) - new Date(a.takenAt || 0))
-        .slice(0, 4)
-        .map((item) => ({
-          ...item,
-          label: getScopeLabel(item)
-        }));
-
-      const averageScore = recentResults.length
-        ? Math.round(recentResults.reduce((sum, item) => sum + Number(item.percent || 0), 0) / recentResults.length)
-        : 0;
-
-      const lastScore = recentResults[0] || null;
-      const bookmarkedTopics = getBookmarkedTopics();
-      const nextTopic = getNextRecommendedTopic(routeAreaIds);
+      const career = getSelectedCareer();
+      const route = getRouteProgress();
+      const practiceScopes = Object.values(_guest?.practiceResults?.scopes || {});
+      const lastPractice = practiceScopes
+        .slice()
+        .sort((a, b) => String(b.takenAt || '').localeCompare(String(a.takenAt || '')))[0] || null;
+      const nextTopic = getNextTopic();
+      const weakTopics = getWeakTopics();
 
       return {
-        totalTopics: allTopics.length,
-        studiedCount,
-        studiedPercent: allTopics.length ? Math.round((studiedCount / allTopics.length) * 100) : 0,
-        routeTopicCount: routeTopics.length,
-        routeStudiedCount,
-        routeStudiedPercent: routeTopics.length ? Math.round((routeStudiedCount / routeTopics.length) * 100) : 0,
-        bookmarkedCount: (_guest.bookmarks || []).length,
-        bookmarkedTopics,
+        career,
+        route,
+        nextTopic,
         weakTopics,
-        recentResults,
-        averageScore,
-        lastScore,
-        nextTopic
+        bookmarks: getBookmarkedTopics(),
+        lastPractice,
+        practiceLabel: lastPractice ? `${lastPractice.percent}% último intento` : 'Sin intento'
       };
     }
 
-    function getNavScreen() {
-      if (_ui.screen === 'topic') return 'study';
-      if (_ui.screen === 'practice') return 'practice';
-      return _ui.screen;
+    function getPoolFromOtherTopics(topicKey, extractor, limit = 12) {
+      return shuffleList(
+        getAllTopics()
+          .filter((topic) => getTopicKey(topic.areaId, topic.id) !== topicKey)
+          .flatMap((topic) => extractor(topic) || [])
+          .filter(Boolean)
+      ).slice(0, limit);
     }
 
-    function hasUnsubmittedPractice() {
-      return _ui.screen === 'practice'
-        && _ui.quizQuestions.length
-        && !_ui.quizSubmitted
-        && Object.keys(_ui.quizAnswers || {}).length > 0;
+    function getTopicExamples(topic) {
+      const examples = Array.isArray(topic.solvedExamples) ? topic.solvedExamples : [];
+      if (examples.length) return examples.filter((example) => example?.problem);
+      return topic.solvedExample?.problem ? [topic.solvedExample] : [];
     }
 
-    function confirmDiscardPracticeIfNeeded() {
-      if (!hasUnsubmittedPractice()) return true;
-      return window.confirm('La práctica actual aún no se ha calificado. Si sales ahora, perderás tus respuestas. ¿Deseas continuar?');
+    function getTopicPracticeQuestions(topic) {
+      const questions = Array.isArray(topic.practiceQuestions) ? topic.practiceQuestions : [];
+      if (questions.length) return questions.filter((question) => question?.question);
+      return topic.microPractice?.question ? [topic.microPractice] : [];
     }
 
-    function goToScreen(screen, patch = {}) {
-      if (screen !== 'practice' && !confirmDiscardPracticeIfNeeded()) return;
+    function createTopicQuestion(area, topic, practice, index = 0) {
+      return {
+        id: `${area.id}-${topic.id}-practice-${index}`,
+        areaId: area.id,
+        areaTitle: area.title,
+        topicId: topic.id,
+        topicTitle: topic.title,
+        difficulty: practice?.difficulty || 'básico',
+        question: practice?.question || `Repaso de ${topic.title}`,
+        options: practice?.options || ['Lo entiendo', 'Necesito repasarlo'],
+        correctIndex: Number(practice?.correctIndex || 0),
+        explanation: practice?.explanation || topic.summary || ''
+      };
+    }
+
+    function getTopicQuestionPool(area, topic) {
+      return getTopicPracticeQuestions(topic).map((practice, index) => createTopicQuestion(area, topic, practice, index));
+    }
+
+    function getAreaQuestionPool(areaId, includeGenerated = false) {
+      const area = getArea(areaId);
+      if (!area) return [];
+      const pool = [];
+      (area.topics || []).forEach((topic) => {
+        const questions = getTopicQuestionPool(area, topic);
+        pool.push(...questions);
+        if (includeGenerated || questions.length < 3) {
+          pool.push(createCoverageQuestion(area, topic));
+          pool.push(createCheckpointQuestion(area, topic));
+        }
+      });
+      return pool;
+    }
+
+    function getCareerBankMetrics(career = getSelectedCareer()) {
+      if (!career) return { topics: 0, examples: 0, questions: 0 };
+      const routeAreas = getRouteAreas();
+      return routeAreas.reduce((metrics, area) => {
+        (area.topics || []).forEach((topic) => {
+          metrics.topics += 1;
+          metrics.examples += getTopicExamples(topic).length;
+          metrics.questions += getTopicPracticeQuestions(topic).length;
+        });
+        return metrics;
+      }, { topics: 0, examples: 0, questions: 0 });
+    }
+
+    function createCoverageQuestion(area, topic) {
+      const topicKey = getTopicKey(area.id, topic.id);
+      const correct = topic.officialCoverage?.[0] || topic.title;
+      const distractors = getPoolFromOtherTopics(topicKey, (candidate) => candidate.officialCoverage);
+      const built = buildOptions(correct, distractors);
+      return {
+        id: `${area.id}-${topic.id}-coverage`,
+        areaId: area.id,
+        areaTitle: area.title,
+        topicId: topic.id,
+        topicTitle: topic.title,
+        question: `¿Qué apartado pertenece a ${topic.title}?`,
+        options: built.options,
+        correctIndex: built.correctIndex,
+        explanation: `${correct} forma parte del bloque ${topic.title}.`
+      };
+    }
+
+    function createCheckpointQuestion(area, topic) {
+      const topicKey = getTopicKey(area.id, topic.id);
+      const correct = topic.checkpoint?.items?.[0] || topic.summary || topic.title;
+      const distractors = getPoolFromOtherTopics(topicKey, (candidate) => candidate.checkpoint?.items);
+      const built = buildOptions(correct, distractors);
+      return {
+        id: `${area.id}-${topic.id}-checkpoint`,
+        areaId: area.id,
+        areaTitle: area.title,
+        topicId: topic.id,
+        topicTitle: topic.title,
+        question: `Para dominar ${topic.title}, ¿qué debes poder hacer?`,
+        options: built.options,
+        correctIndex: built.correctIndex,
+        explanation: correct
+      };
+    }
+
+    const PracticeEngine = {
+      topicQuiz(areaId, topicId) {
+        const area = getArea(areaId);
+        const topic = getTopic(areaId, topicId);
+        if (!area || !topic) return [];
+        const questions = getTopicQuestionPool(area, topic);
+        const pool = questions.length >= 5
+          ? questions
+          : [...questions, createCoverageQuestion(area, topic), createCheckpointQuestion(area, topic)];
+        return shuffleList(pool).slice(0, 5);
+      },
+
+      areaQuiz(areaId, limit = 12) {
+        return shuffleList(getAreaQuestionPool(areaId)).slice(0, limit);
+      },
+
+      routeQuiz(limit = 15) {
+        const pool = getRouteAreas().flatMap((area) => getAreaQuestionPool(area.id));
+        return shuffleList(pool).slice(0, limit);
+      },
+
+      simulator(limit = 25) {
+        const pool = getRouteAreas().flatMap((area) => getAreaQuestionPool(area.id));
+        return shuffleList(pool).slice(0, limit);
+      },
+
+      grade(questions, answers) {
+        const items = questions.map((question) => {
+          const selectedIndex = Number(answers[question.id]);
+          const isCorrect = selectedIndex === Number(question.correctIndex);
+          return { ...question, selectedIndex, isCorrect };
+        });
+        const correct = items.filter((item) => item.isCorrect).length;
+        const total = items.length;
+        return {
+          correct,
+          total,
+          percent: total ? Math.round((correct / total) * 100) : 0,
+          items
+        };
+      }
+    };
+
+    function setLastVisited(patch) {
+      GuestStore.patch({
+        lastVisited: {
+          ...patch,
+          updatedAt: new Date().toISOString()
+        }
+      });
+    }
+
+    function goToScreen(screen) {
       _ui = {
         ...defaultUiState(),
         screen,
-        areaId: patch.areaId || _ui.areaId || getPreferredAreaId(),
-        topicId: patch.topicId || '',
-        search: patch.search || ''
+        areaId: _ui.areaId || getRouteAreaIds()[0] || ''
       };
-      ensureFocusArea();
       render();
+      _root?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 
-    function renderPills(items, className = '') {
-      return items.map((item) => `<span class="adm-pill ${className}">${escapeHtml(item)}</span>`).join('');
+    function openTopic(areaId, topicId) {
+      _ui = {
+        ...defaultUiState(),
+        screen: 'topic',
+        areaId,
+        topicId,
+        microAnswers: _ui.microAnswers || {}
+      };
+      setLastVisited({ kind: 'topic', areaId, topicId });
+      render();
+      _root?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 
-    function renderHeader(metrics) {
-      const exam = _resources.admissions.exam;
-      const selectedCareer = CareerPlanner.getCareer(_guest.selectedCareer);
+    function startQuiz({ mode, title, description, questions, quizId, areaId = '', topicId = '' }) {
+      if (!questions.length) {
+        window.showToast?.('Primero elige carrera o tema para generar tu práctica.', 'warning');
+        return;
+      }
+      _ui = {
+        ...defaultUiState(),
+        screen: 'quiz',
+        areaId,
+        topicId,
+        quizMode: mode,
+        quizTitle: title,
+        quizDescription: description,
+        quizId,
+        quizQuestions: questions,
+        quizAnswers: {},
+        quizSubmitted: false,
+        quizResult: null,
+        quizIndex: 0
+      };
+      setLastVisited({ kind: 'quiz', mode, quizId, areaId, topicId });
+      render();
+      _root?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    function persistPracticeResult() {
+      if (!_ui.quizResult) return;
+
+      const practiceResults = _guest.practiceResults || { scopes: {}, topicStats: {}, areaStats: {} };
+      const takenAt = new Date().toISOString();
+      const nextTopicStats = { ...practiceResults.topicStats };
+      const nextAreaStats = { ...practiceResults.areaStats };
+      const nextProgressByTopic = { ..._guest.progressByTopic };
+
+      _ui.quizResult.items.forEach((item) => {
+        const key = getTopicKey(item.areaId, item.topicId);
+        const topicStats = nextTopicStats[key] || { correct: 0, total: 0 };
+        const areaStats = nextAreaStats[item.areaId] || { correct: 0, total: 0 };
+
+        nextTopicStats[key] = {
+          correct: topicStats.correct + (item.isCorrect ? 1 : 0),
+          total: topicStats.total + 1
+        };
+        nextAreaStats[item.areaId] = {
+          correct: areaStats.correct + (item.isCorrect ? 1 : 0),
+          total: areaStats.total + 1
+        };
+
+        nextProgressByTopic[key] = {
+          ...(nextProgressByTopic[key] || {}),
+          practiced: true,
+          studied: item.isCorrect ? true : Boolean(nextProgressByTopic[key]?.studied),
+          updatedAt: takenAt
+        };
+      });
+
+      GuestStore.patch({
+        progressByTopic: nextProgressByTopic,
+        practiceResults: {
+          scopes: {
+            ...practiceResults.scopes,
+            [_ui.quizId]: {
+              percent: _ui.quizResult.percent,
+              correct: _ui.quizResult.correct,
+              total: _ui.quizResult.total,
+              mode: _ui.quizMode,
+              areaId: _ui.areaId || null,
+              topicId: _ui.topicId || null,
+              careerId: _guest.selectedCareer || null,
+              takenAt
+            }
+          },
+          topicStats: nextTopicStats,
+          areaStats: nextAreaStats
+        }
+      });
+    }
+
+    function renderAppBar() {
       return `
-        <section class="adm-hero">
-          <div class="adm-hero-top">
-            <div class="adm-hero-copy">
-              <span class="adm-eyebrow">Nuevo ingreso · ITES Los Cabos</span>
-              <h1 class="adm-title-xl">Prepárate para EVALUATEC 2026</h1>
-              <p class="adm-lead">Elige tu carrera, estudia por bloque y guarda tu avance sin crear cuenta.</p>
-              <div class="adm-action-row">
-                <button class="adm-button is-primary" data-action="continue-progress">${_guest.lastVisited ? 'Continuar' : 'Comenzar'}</button>
-                <button class="adm-button is-secondary" data-action="scroll-careers">${selectedCareer ? 'Cambiar carrera' : 'Ver carreras'}</button>
-                <a class="adm-button is-ghost-light" href="#/test-vocacional">Test vocacional</a>
-              </div>
-            </div>
-            <div class="adm-hero-summary">
-              <div class="adm-hero-focus">
-                <div class="adm-section-label is-light">Ruta activa</div>
-                <h2>${selectedCareer ? escapeHtml(selectedCareer.name) : 'Aún sin carrera'}</h2>
-                <p class="adm-copy is-light">${selectedCareer ? 'Tus áreas clave y tus prácticas ya están ordenadas.' : 'Elige una carrera para ver solo lo que más te conviene estudiar.'}</p>
-                <div class="adm-inline-list">
-                  <span class="adm-chip is-light">${escapeHtml(`${metrics.routeStudiedCount}/${metrics.routeTopicCount} temas`)}</span>
-                  <span class="adm-chip is-light">Inglés diagnóstico</span>
-                </div>
-              </div>
-            </div>
+        <header class="adm-appbar">
+          <button class="adm-icon-button" type="button" data-action="back-landing" aria-label="Regresar al inicio de SIA">
+            ${icon('bi-arrow-left')}
+          </button>
+          <div class="adm-brand-lockup">
+            <img src="/images/logo-ites.png" alt="ITES Los Cabos">
+            <span>Admisiones</span>
           </div>
-          <div class="adm-hero-stats">
-            <article class="adm-stat-card is-hero">
-              <div class="adm-stat-value">${escapeHtml(exam.reactives)}</div>
-              <div class="adm-stat-label is-light">reactivos</div>
-            </article>
-            <article class="adm-stat-card is-hero">
-              <div class="adm-stat-value">${escapeHtml(exam.duration)}</div>
-              <div class="adm-stat-label is-light">duración</div>
-            </article>
-            <article class="adm-stat-card is-hero">
-              <div class="adm-stat-value">${metrics.studiedPercent}%</div>
-              <div class="adm-stat-label is-light">avance</div>
-            </article>
-            <article class="adm-stat-card is-hero is-wide">
-              <div class="adm-stat-label is-light">Toma en cuenta</div>
-              <p class="adm-copy is-light">${escapeHtml(exam.englishPolicy)}</p>
-            </article>
-          </div>
-        </section>
+          <button class="adm-icon-button" type="button" data-action="go-screen" data-screen="tour" aria-label="Ver tour">
+            ${icon('bi-info-circle')}
+          </button>
+        </header>
       `;
     }
 
-    function renderTopNav() {
-      const activeScreen = getNavScreen();
-      const items = [
-        { id: 'home', label: 'Inicio' },
-        { id: 'study', label: 'Temario' },
-        { id: 'practice', label: 'Práctica' },
-        { id: 'info', label: 'Admisión' }
-      ];
-
+    function renderNav() {
       return `
-        <nav class="adm-nav">
-          ${items.map((item) => `
-            <button class="adm-nav-button ${activeScreen === item.id ? 'is-active' : ''}" data-action="go-screen" data-screen="${escapeHtml(item.id)}">
-              <strong>${escapeHtml(item.label)}</strong>
-            </button>
-          `).join('')}
+        <nav class="adm-tabbar" aria-label="Secciones de admisiones">
+          ${NAV_ITEMS.map((item) => {
+            const active = _ui.screen === item.screen || (item.screen === 'practice' && _ui.screen === 'quiz');
+            return `
+              <button class="adm-tab ${active ? 'is-active' : ''}" type="button" data-action="go-screen" data-screen="${escapeHtml(item.screen)}" ${active ? 'aria-current="page"' : ''}>
+                ${icon(item.icon)}
+                <span>${escapeHtml(item.label)}</span>
+              </button>
+            `;
+          }).join('')}
         </nav>
       `;
     }
 
-    function renderSidebar(metrics) {
-      const selectedCareer = CareerPlanner.getCareer(_guest.selectedCareer);
-      const routeAreaIds = getRouteAreaIds();
+    function renderProgressStrip(metrics) {
+      const career = metrics.career;
       return `
-        <aside class="adm-sidebar">
-          <article class="adm-panel">
-            <div class="adm-section-label">Tu ruta</div>
-            <h3 class="adm-panel-title">${selectedCareer ? escapeHtml(selectedCareer.shortName) : 'Sin carrera'}</h3>
-            <p class="adm-meta">${selectedCareer ? 'Tus bloques recomendados aparecen primero.' : 'Elige una carrera para ordenar mejor este módulo.'}</p>
-            ${selectedCareer ? `<div class="adm-pill-row">${routeAreaIds.map((areaId) => `<span class="adm-pill">${escapeHtml(getArea(areaId)?.title || areaId)}</span>`).join('')}</div>` : ''}
-            <div class="adm-action-row">
-              <button class="adm-button is-ghost" data-action="scroll-careers">${selectedCareer ? 'Cambiar carrera' : 'Elegir carrera'}</button>
-              ${selectedCareer ? '<button class="adm-button is-ghost" data-action="clear-career">Ver todas las áreas</button>' : ''}
-            </div>
-          </article>
-
-          <article class="adm-panel">
-            <div class="adm-section-label">Avance</div>
-            <div class="adm-metric-stack">
-              <div>
-                <div class="adm-stat-value">${metrics.studiedPercent}%</div>
-                <div class="adm-stat-label">avance general</div>
-              </div>
-              <div>
-                <div class="adm-progress-bar"><div class="adm-progress-fill" style="width:${metrics.routeStudiedPercent}%"></div></div>
-                <div class="adm-note">${metrics.routeStudiedCount} de ${metrics.routeTopicCount} temas de tu ruta revisados</div>
-              </div>
-              <div class="adm-mini-metrics">
-                <div><strong>${metrics.averageScore}%</strong><span>promedio</span></div>
-                <div><strong>${metrics.bookmarkedCount}</strong><span>guardados</span></div>
-              </div>
-              <div class="adm-action-row">
-                <button class="adm-button is-ghost" data-action="reset-progress">Borrar avance</button>
-              </div>
-            </div>
-          </article>
-
-          <article class="adm-panel">
-            <div class="adm-section-label">Sigue con</div>
-            ${metrics.nextTopic ? `
-              <div class="adm-sidebar-focus">
-                <strong>${escapeHtml(metrics.nextTopic.title)}</strong>
-                <p class="adm-meta">${escapeHtml(metrics.nextTopic.areaTitle)}</p>
-                <p class="adm-note">${escapeHtml(metrics.nextTopic.summary)}</p>
-                <div class="adm-action-row">
-                  <button class="adm-button is-primary" data-action="open-topic" data-area-id="${escapeHtml(metrics.nextTopic.areaId)}" data-topic-id="${escapeHtml(metrics.nextTopic.id)}">Abrir tema</button>
-                </div>
-              </div>
-            ` : '<div class="adm-empty-state compact">Aún no hay sugerencia.</div>'}
-          </article>
-
-          <article class="adm-panel">
-            <div class="adm-section-label">Guardados</div>
-            ${metrics.bookmarkedTopics.length ? `
-              <div class="adm-compact-list">
-                ${metrics.bookmarkedTopics.map((topic) => `
-                  <button class="adm-compact-link" data-action="open-topic" data-area-id="${escapeHtml(topic.areaId)}" data-topic-id="${escapeHtml(topic.topicId)}">
-                    <strong>${escapeHtml(topic.title)}</strong>
-                    <span>${escapeHtml(topic.areaTitle)}</span>
-                  </button>
-                `).join('')}
-              </div>
-            ` : '<div class="adm-empty-state compact">No has guardado temas.</div>'}
-          </article>
-
-          <article class="adm-panel is-accent">
-            <div class="adm-section-label">Extra</div>
-            <h3 class="adm-panel-title">Test vocacional</h3>
-            <p class="adm-meta">Si aún dudas de carrera, puedes tomar el test vocacional.</p>
-            <a class="adm-button is-secondary-solid" href="#/test-vocacional">Abrir test</a>
-          </article>
-        </aside>
-      `;
-    }
-
-    function renderHomeScreen(metrics) {
-      const selectedCareer = CareerPlanner.getCareer(_guest.selectedCareer);
-      const weakTopicsHtml = metrics.weakTopics.length
-        ? metrics.weakTopics.map((topic) => `
-            <article class="adm-soft-card">
-              <div class="adm-chip is-accent">${escapeHtml(topic.areaTitle)}</div>
-              <h4>${escapeHtml(topic.title)}</h4>
-              <p class="adm-meta">Rendimiento reciente: ${topic.percent}%</p>
-              <button class="adm-button is-ghost" data-action="open-topic" data-area-id="${escapeHtml(topic.areaId)}" data-topic-id="${escapeHtml(topic.topicId)}">Reforzar tema</button>
-            </article>
-          `).join('')
-        : '<div class="adm-empty-state">Tus temas débiles aparecerán cuando completes prácticas por área o por carrera.</div>';
-
-      return `
-        <section class="adm-screen">
-          <div class="adm-screen-grid is-home">
-            <article class="adm-panel">
-              <div class="adm-section-label">Empieza rápido</div>
-              <h2 class="adm-panel-title">Tu ruta en 3 pasos</h2>
-              <ol class="adm-steps-list">
-                <li><strong>1.</strong><span>Elige tu carrera.</span></li>
-                <li><strong>2.</strong><span>Estudia un bloque a la vez.</span></li>
-                <li><strong>3.</strong><span>Practica y vuelve a tus temas débiles.</span></li>
-              </ol>
-              <div class="adm-action-row">
-                <button class="adm-button is-primary" data-action="go-screen" data-screen="study">Abrir temario</button>
-                <button class="adm-button is-ghost" data-action="go-screen" data-screen="practice">Abrir práctica</button>
-              </div>
-            </article>
-
-            <article class="adm-panel">
-              <div class="adm-section-label">Tu avance</div>
-              <h2 class="adm-panel-title">${metrics.studiedPercent}% completado</h2>
-              <p class="adm-meta">${metrics.routeStudiedCount} de ${metrics.routeTopicCount} temas revisados en tu ruta actual.</p>
-              <div class="adm-progress-bar"><div class="adm-progress-fill" style="width:${metrics.routeStudiedPercent}%"></div></div>
-              <div class="adm-mini-metrics">
-                <div><strong>${metrics.averageScore}%</strong><span>promedio reciente</span></div>
-                <div><strong>${metrics.bookmarkedCount}</strong><span>temas guardados</span></div>
-              </div>
-              <div class="adm-action-row">
-                <button class="adm-button is-ghost" data-action="go-screen" data-screen="study">Ver temario</button>
-              </div>
-            </article>
-
-            <article class="adm-panel">
-              <div class="adm-section-label">Sigue aquí</div>
-              <h2 class="adm-panel-title">${metrics.nextTopic ? escapeHtml(metrics.nextTopic.title) : 'Elige tu carrera'}</h2>
-              <p class="adm-meta">${metrics.nextTopic ? escapeHtml(metrics.nextTopic.summary) : 'Activa una ruta para recibir una sugerencia inmediata.'}</p>
-              ${metrics.nextTopic ? `<div class="adm-pill-row"><span class="adm-pill">${escapeHtml(metrics.nextTopic.areaTitle)}</span><span class="adm-pill">${escapeHtml(metrics.nextTopic.estimatedMinutes)} min</span></div>` : ''}
-              <div class="adm-mini-metrics">
-                <div><strong>${metrics.lastScore ? `${metrics.lastScore.percent}%` : '--'}</strong><span>último resultado</span></div>
-                <div><strong>${metrics.averageScore}%</strong><span>promedio</span></div>
-              </div>
-              <div class="adm-action-row">
-                ${metrics.nextTopic ? `<button class="adm-button is-primary" data-action="open-topic" data-area-id="${escapeHtml(metrics.nextTopic.areaId)}" data-topic-id="${escapeHtml(metrics.nextTopic.id)}">Abrir tema</button>` : '<button class="adm-button is-primary" data-action="scroll-careers">Elegir carrera</button>'}
-              </div>
-            </article>
+        <section class="adm-status-strip" aria-label="Estado de tu preparación">
+          <div>
+            <span class="adm-kicker">Tu preparación</span>
+            <strong>${career ? escapeHtml(career.name) : 'Elige una carrera para personalizar todo'}</strong>
           </div>
-
-          <section class="adm-subsection" id="adm-careers">
-            <div class="adm-section-header">
-              <div>
-                <div class="adm-kicker">Elige tu carrera</div>
-                <h2>Activa tu ruta</h2>
-              </div>
-              <div class="adm-note">${selectedCareer ? `Ruta activa: ${escapeHtml(selectedCareer.name)}` : 'La ruta por carrera te ordena mejor el temario.'}</div>
-            </div>
-            <div class="adm-career-grid">
-              ${_resources.content.careers.map((career) => {
-                const isActive = career.id === _guest.selectedCareer;
-                return `
-                  <button class="adm-career-choice ${isActive ? 'is-active' : ''}" data-action="select-career" data-career-id="${escapeHtml(career.id)}">
-                    <div class="adm-career-choice-top">
-                      <span class="adm-chip">${escapeHtml(career.shortName)}</span>
-                      ${isActive ? '<span class="adm-chip is-accent">Ruta activa</span>' : ''}
-                    </div>
-                    <strong>${escapeHtml(career.name)}</strong>
-                    <p>${escapeHtml(career.routeAreaIds.map((areaId) => getArea(areaId)?.title || areaId).join(' | '))}</p>
-                  </button>
-                `;
-              }).join('')}
-            </div>
-            ${selectedCareer ? `
-              <div class="adm-action-row top-gap">
-                <button class="adm-button is-ghost" data-action="clear-career">Quitar ruta</button>
-                <button class="adm-button is-primary" data-action="go-screen" data-screen="study">Abrir ruta</button>
-              </div>
-            ` : ''}
-          </section>
-
-          ${selectedCareer ? `
-            <section class="adm-subsection">
-              <div class="adm-section-header">
-                <div>
-                  <div class="adm-kicker">Ruta recomendada</div>
-                  <h2>Empieza por estas áreas</h2>
-                </div>
-                <button class="adm-button is-ghost" data-action="go-screen" data-screen="practice">Practicar ruta</button>
-              </div>
-              <div class="adm-route-grid">
-                ${getRouteAreaIds().map((areaId) => {
-                  const area = getArea(areaId);
-                  const stats = getAreaProgress(areaId);
-                  if (!area) return '';
-                  return `
-                    <article class="adm-route-card">
-                      <span class="adm-chip">${escapeHtml(area.roleLabel)}</span>
-                      <h3>${escapeHtml(area.title)}</h3>
-                      <p class="adm-meta">${escapeHtml(area.summary)}</p>
-                      <div class="adm-progress-bar"><div class="adm-progress-fill" style="width:${stats.studiedPercent}%"></div></div>
-                      <div class="adm-note">${stats.studiedCount} de ${stats.totalTopics} temas revisados</div>
-                      <div class="adm-action-row">
-                        <button class="adm-button is-ghost" data-action="focus-area" data-area-id="${escapeHtml(area.id)}">Abrir área</button>
-                      </div>
-                    </article>
-                  `;
-                }).join('')}
-              </div>
-            </section>
-          ` : ''}
-
-          ${metrics.weakTopics.length ? `
-            <section class="adm-subsection">
-              <div class="adm-section-header">
-                <div>
-                  <div class="adm-kicker">Temas a reforzar</div>
-                  <h2>Refuerza esto primero</h2>
-                </div>
-              </div>
-              <div class="adm-card-grid">
-                ${weakTopicsHtml}
-              </div>
-            </section>
-          ` : ''}
+          <div class="adm-status-metrics">
+            <span>${formatPercent(metrics.route.percent)} ruta</span>
+            <span>${escapeHtml(metrics.practiceLabel)}</span>
+          </div>
         </section>
       `;
     }
 
-    function renderStudyScreen() {
-      ensureFocusArea();
-      const routeAreaIds = new Set(getRouteAreaIds());
-      const activeArea = getArea(_ui.areaId) || getOrderedAreas()[0];
-      const search = String(_ui.search || '').trim().toLowerCase();
-      const filteredTopics = activeArea
-        ? activeArea.topics.filter((topic) => {
-          if (!search) return true;
-          const haystack = [
-            topic.title,
-            topic.summary,
-            ...(topic.officialCoverage || [])
-          ].join(' ').toLowerCase();
-          return haystack.includes(search);
-        })
-        : [];
-      const areaStats = activeArea ? getAreaProgress(activeArea.id) : null;
-      const firstPending = activeArea?.topics.find((topic) => !getTopicProgress(activeArea.id, topic.id).studied) || activeArea?.topics?.[0] || null;
-
+    function renderWelcome(metrics) {
+      const next = metrics.nextTopic;
       return `
-        <section class="adm-screen">
-          <div class="adm-section-header">
-            <div>
-              <div class="adm-kicker">Estudiar</div>
-              <h2 class="adm-panel-title">Temario por áreas</h2>
-              <p class="adm-note">Selecciona un bloque y abre un tema.</p>
-            </div>
-            <div class="adm-search-field">
-              <input class="adm-search-input" type="search" placeholder="Buscar tema..." data-action="study-search" value="${escapeHtml(_ui.search || '')}">
-              ${_ui.search ? '<button class="adm-button is-ghost" data-action="clear-search">Limpiar</button>' : ''}
+        <section class="adm-welcome">
+          <div class="adm-welcome-copy">
+            <span class="adm-eyebrow">${icon('bi-stars')} Nuevo ingreso 2026</span>
+            <h1>Bienvenido aspirante</h1>
+            <p>Este módulo te ayuda a ubicar qué estudiar, practicar por tu carrera y consultar el proceso de admisión sin crear cuenta.</p>
+            <div class="adm-cta-row">
+              <button class="adm-button is-primary" type="button" data-action="go-screen" data-screen="tour">${icon('bi-play-circle')} Ver tour rápido</button>
+              <button class="adm-button is-soft" type="button" data-action="go-screen" data-screen="route">${icon('bi-signpost')} Elegir carrera</button>
             </div>
           </div>
+          <figure class="adm-visual">
+            <img src="/images/logo-sia-mob.png" alt="SIA móvil">
+            <figcaption>
+              <strong>Ruta, práctica y fechas en un solo lugar.</strong>
+              <span>Tu avance se guarda en este dispositivo.</span>
+            </figcaption>
+          </figure>
+        </section>
 
+        <section class="adm-section">
+          <div class="adm-section-head">
+            <span class="adm-kicker">Qué puedes hacer aquí</span>
+            <h2>Simple, guiado y por carrera</h2>
+          </div>
+          <div class="adm-feature-grid">
+            ${renderFeature('bi-compass', 'Ubicar tu ruta', 'Selecciona carrera y verás sólo los bloques que te corresponden.')}
+            ${renderFeature('bi-journal-check', 'Aprender por tema', 'Cada tema tiene idea clave, ejemplo y cierre rápido.')}
+            ${renderFeature('bi-ui-checks', 'Practicar con ayuda', 'Recibe explicación y detecta qué reforzar antes del simulador.')}
+            ${renderFeature('bi-calendar2-check', 'Consultar fechas', 'Ten claro registro, examen, propedéutico y soporte.')}
+          </div>
+        </section>
+
+        <section class="adm-action-panel">
+          <div>
+            <span class="adm-kicker">Siguiente paso</span>
+            <h2>${next ? escapeHtml(next.title) : 'Activa tu ruta'}</h2>
+            <p>${next ? `Continúa en ${escapeHtml(next.areaTitle)} según tu carrera.` : 'Elige tu carrera para ordenar temas, práctica y simulador.'}</p>
+          </div>
+          <button class="adm-button is-primary" type="button" ${next ? `data-action="open-topic" data-area-id="${escapeHtml(next.areaId)}" data-topic-id="${escapeHtml(next.id)}"` : 'data-action="go-screen" data-screen="route"'}>
+            ${next ? `${icon('bi-arrow-right-circle')} Continuar` : `${icon('bi-mortarboard')} Elegir carrera`}
+          </button>
+        </section>
+      `;
+    }
+
+    function renderFeature(iconName, title, body) {
+      return `
+        <article class="adm-feature">
+          <span class="adm-feature-icon">${icon(iconName)}</span>
+          <strong>${escapeHtml(title)}</strong>
+          <p>${escapeHtml(body)}</p>
+        </article>
+      `;
+    }
+
+    function renderTour() {
+      const steps = [
+        ['bi-person-check', '1. Elige carrera', 'La ruta se filtra para mostrar sólo los bloques que aplican a tu rumbo.'],
+        ['bi-map', '2. Sigue el orden', 'Empieza por el primer tema pendiente y avanza por bloques cortos.'],
+        ['bi-patch-question', '3. Práctica guiada', 'Usa práctica guiada para aprender de tus errores sin saturarte.'],
+        ['bi-stopwatch', '4. Simula', 'Cuando ya tengas base, mide tu nivel sin ayudas y refuerza lo débil.']
+      ];
+
+      return `
+        <section class="adm-section">
+          <div class="adm-section-head">
+            <span class="adm-kicker">Tour rápido</span>
+            <h1>Cómo usar este módulo</h1>
+            <p>Son cuatro pasos. No necesitas iniciar sesión y puedes volver al inicio de SIA cuando quieras.</p>
+          </div>
+          <div class="adm-tour-list">
+            ${steps.map(([iconName, title, body]) => `
+              <article class="adm-tour-step">
+                <span>${icon(iconName)}</span>
+                <div>
+                  <strong>${escapeHtml(title)}</strong>
+                  <p>${escapeHtml(body)}</p>
+                </div>
+              </article>
+            `).join('')}
+          </div>
+          <div class="adm-cta-row">
+            <button class="adm-button is-primary" type="button" data-action="finish-tour">${icon('bi-check-circle')} Entendido, elegir carrera</button>
+            <button class="adm-button is-ghost" type="button" data-action="go-screen" data-screen="welcome">Volver</button>
+          </div>
+        </section>
+      `;
+    }
+
+    function renderCareerPicker() {
+      return `
+        <div class="adm-career-list">
+          ${getCareers().map((career) => {
+            const active = _guest.selectedCareer === career.id;
+            const areaCount = career.routeAreaIds?.length || 0;
+            return `
+              <button class="adm-career-card ${active ? 'is-active' : ''}" type="button" data-action="set-career" data-career-id="${escapeHtml(career.id)}">
+                <span class="adm-career-icon">${icon(CAREER_ICONS[career.id] || 'bi-mortarboard')}</span>
+                <span>
+                  <strong>${escapeHtml(career.shortName || career.name)}</strong>
+                  <small>${escapeHtml(areaCount)} bloques de preparación</small>
+                </span>
+                ${active ? icon('bi-check-circle-fill') : icon('bi-chevron-right')}
+              </button>
+            `;
+          }).join('')}
+        </div>
+      `;
+    }
+
+    function renderRoute(metrics) {
+      const career = metrics.career;
+      const areas = getRouteAreas();
+
+      return `
+        <section class="adm-section">
+          <div class="adm-section-head">
+            <span class="adm-kicker">Ruta personalizada</span>
+            <h1>${career ? escapeHtml(career.name) : 'Primero elige tu carrera'}</h1>
+            <p>${career ? 'Estos son los bloques que debes priorizar para tu examen. Inglés es diagnóstico y también debes presentarlo.' : 'La preparación se ordena mejor cuando SIA sabe hacia qué carrera vas.'}</p>
+          </div>
+          ${renderCareerPicker()}
+        </section>
+
+        ${career ? `
+          <section class="adm-section">
+            <div class="adm-section-head is-row">
+              <div>
+                <span class="adm-kicker">Tu mapa de estudio</span>
+                <h2>${metrics.route.studied} de ${metrics.route.total} temas revisados</h2>
+              </div>
+              <button class="adm-button is-soft" type="button" data-action="start-route-practice">${icon('bi-ui-checks')} Practicar ruta</button>
+            </div>
+            <div class="adm-route-list">
+              ${areas.map((area) => renderAreaRouteCard(area)).join('')}
+            </div>
+          </section>
+        ` : renderEmptyGuide('bi-mortarboard', 'Selecciona una carrera', 'Después verás tus bloques, temas sugeridos y prácticas acordes a tu rumbo.')}
+      `;
+    }
+
+    function renderAreaRouteCard(area) {
+      const progress = getAreaProgress(area.id);
+      const firstPending = (area.topics || []).find((topic) => !getTopicProgress(area.id, topic.id).studied) || area.topics?.[0];
+      const iconName = AREA_ICONS[area.id] || 'bi-journal';
+
+      return `
+        <article class="adm-route-item">
+          <div class="adm-route-main">
+            <span class="adm-area-icon">${icon(iconName)}</span>
+            <div>
+              <strong>${escapeHtml(area.title)}</strong>
+              <p>${escapeHtml(area.summary)}</p>
+              <div class="adm-mini-progress" aria-label="Avance ${progress.studiedPercent}%">
+                <span style="width:${progress.studiedPercent}%"></span>
+              </div>
+              <small>${progress.studied}/${progress.total} temas vistos${progress.practicePercent !== null ? ` · ${progress.practicePercent}% práctica` : ''}</small>
+            </div>
+          </div>
+          <div class="adm-compact-actions">
+            ${firstPending ? `<button class="adm-button is-primary" type="button" data-action="open-topic" data-area-id="${escapeHtml(area.id)}" data-topic-id="${escapeHtml(firstPending.id)}">Abrir tema</button>` : ''}
+            <button class="adm-button is-ghost" type="button" data-action="start-area-practice" data-area-id="${escapeHtml(area.id)}">Practicar</button>
+          </div>
+        </article>
+      `;
+    }
+
+    function renderLearn(metrics) {
+      const career = metrics.career;
+      if (!career) {
+        return renderSectionPrompt('bi-signpost-split', 'Temas por carrera', 'Elige carrera para ver un temario claro y sin ruido.', 'Elegir carrera', 'route');
+      }
+
+      const activeAreaId = _ui.areaId && getRouteAreaIds().includes(_ui.areaId) ? _ui.areaId : getRouteAreaIds()[0];
+      const activeArea = getArea(activeAreaId);
+      _ui.areaId = activeAreaId;
+
+      return `
+        <section class="adm-section">
+          <div class="adm-section-head">
+            <span class="adm-kicker">Temario guiado</span>
+            <h1>Estudia lo que aplica a ${escapeHtml(career.shortName || career.name)}</h1>
+            <p>Elige un bloque y abre un tema. Cada microlección es corta para que puedas avanzar desde el celular.</p>
+          </div>
           <div class="adm-area-tabs">
-            ${getOrderedAreas().map((area) => {
-              const stats = getAreaProgress(area.id);
-              const isActive = activeArea && area.id === activeArea.id;
+            ${getRouteAreas().map((area) => {
+              const progress = getAreaProgress(area.id);
               return `
-                <button class="adm-area-tab ${isActive ? 'is-active' : ''} ${routeAreaIds.has(area.id) ? 'is-route' : ''}" data-action="focus-area" data-area-id="${escapeHtml(area.id)}">
-                  <strong>${escapeHtml(area.title)}</strong>
-                  <span>${stats.studiedCount}/${stats.totalTopics} temas</span>
+                <button class="adm-area-tab ${activeAreaId === area.id ? 'is-active' : ''}" type="button" data-action="focus-area" data-area-id="${escapeHtml(area.id)}">
+                  ${icon(AREA_ICONS[area.id] || 'bi-journal')}
+                  <span>${escapeHtml(area.title)}</span>
+                  <small>${progress.studied}/${progress.total}</small>
                 </button>
               `;
             }).join('')}
           </div>
-
-          ${activeArea ? `
-            <div class="adm-study-layout">
-              <article class="adm-panel">
-                <div class="adm-section-label">${escapeHtml(activeArea.roleLabel)}</div>
-                <h2 class="adm-panel-title">${escapeHtml(activeArea.title)}</h2>
-                <p class="adm-meta">${escapeHtml(activeArea.summary)}</p>
-                <div class="adm-progress-bar"><div class="adm-progress-fill" style="width:${areaStats.studiedPercent}%"></div></div>
-                <div class="adm-note">${areaStats.studiedCount} de ${areaStats.totalTopics} temas revisados</div>
-                <div class="adm-info-list top-gap">
-                  <div><strong>Enfoque</strong><span>${escapeHtml(activeArea.strategy)}</span></div>
-                  <div><strong>Temas oficiales</strong><span>${escapeHtml(activeArea.officialCoverage.join(' | '))}</span></div>
-                  ${activeArea.id === 'ingles' ? '<div><strong>Nota</strong><span>Es obligatorio y diagnóstico, pero no suma al puntaje global.</span></div>' : ''}
-                </div>
-                <div class="adm-action-row top-gap">
-                  ${firstPending ? `<button class="adm-button is-primary" data-action="open-topic" data-area-id="${escapeHtml(activeArea.id)}" data-topic-id="${escapeHtml(firstPending.id)}">Continuar bloque</button>` : ''}
-                  <button class="adm-button is-ghost" data-action="start-area-practice" data-area-id="${escapeHtml(activeArea.id)}">Practicar área</button>
-                </div>
-              </article>
-
-              <div class="adm-topic-stack">
-                ${filteredTopics.length ? filteredTopics.map((topic) => {
-                  const topicKey = getTopicKey(activeArea.id, topic.id);
-                  const progress = _guest.progressByTopic[topicKey] || {};
-                  const bookmarked = (_guest.bookmarks || []).includes(topicKey);
-                  return `
-                    <article class="adm-topic-entry ${bookmarked ? 'is-bookmarked' : ''}">
-                      <div class="adm-topic-entry-head">
-                        <div>
-                          <h3>${escapeHtml(topic.title)}</h3>
-                          <p class="adm-meta">${escapeHtml(topic.summary)}</p>
-                        </div>
-                        <div class="adm-pill-row">
-                          <span class="adm-pill">${escapeHtml(topic.estimatedMinutes)} min</span>
-                          ${progress.studied ? '<span class="adm-pill is-success">Revisado</span>' : ''}
-                        </div>
-                      </div>
-                      <div class="adm-pill-row">
-                        ${renderPills((topic.officialCoverage || []).slice(0, 4))}
-                      </div>
-                      <div class="adm-action-row">
-                        <button class="adm-button is-primary" data-action="open-topic" data-area-id="${escapeHtml(activeArea.id)}" data-topic-id="${escapeHtml(topic.id)}">Abrir tema</button>
-                        <button class="adm-button is-ghost" data-action="toggle-bookmark" data-area-id="${escapeHtml(activeArea.id)}" data-topic-id="${escapeHtml(topic.id)}">${bookmarked ? 'Quitar guardado' : 'Guardar tema'}</button>
-                      </div>
-                    </article>
-                  `;
-                }).join('') : '<div class="adm-empty-state">No hay temas que coincidan con esa búsqueda dentro de esta área.</div>'}
-              </div>
-            </div>
-          ` : ''}
         </section>
+
+        ${activeArea ? `
+          <section class="adm-section">
+            <div class="adm-section-head is-row">
+              <div>
+                <span class="adm-kicker">${escapeHtml(activeArea.roleLabel || 'Bloque')}</span>
+                <h2>${escapeHtml(activeArea.title)}</h2>
+                <p>${escapeHtml(activeArea.strategy || activeArea.summary)}</p>
+              </div>
+              <button class="adm-button is-soft" type="button" data-action="start-area-practice" data-area-id="${escapeHtml(activeArea.id)}">${icon('bi-ui-checks')} Practicar</button>
+            </div>
+            <div class="adm-topic-list">
+              ${(activeArea.topics || []).map((topic) => renderTopicRow(activeArea, topic)).join('')}
+            </div>
+          </section>
+        ` : ''}
+      `;
+    }
+
+    function renderTopicRow(area, topic) {
+      const progress = getTopicProgress(area.id, topic.id);
+      const key = getTopicKey(area.id, topic.id);
+      const marked = (_guest.bookmarks || []).includes(key);
+      return `
+        <article class="adm-topic-row">
+          <div>
+            <span class="adm-topic-state ${progress.studied ? 'is-done' : ''}">${progress.studied ? icon('bi-check2') : icon('bi-circle')}</span>
+          </div>
+          <div class="adm-topic-content">
+            <strong>${escapeHtml(topic.title)}</strong>
+            <p>${escapeHtml(topic.summary)}</p>
+            <small>${escapeHtml(topic.estimatedMinutes || 20)} min · ${escapeHtml(area.title)}</small>
+          </div>
+          <div class="adm-topic-actions">
+            <button class="adm-icon-button" type="button" data-action="toggle-bookmark" data-area-id="${escapeHtml(area.id)}" data-topic-id="${escapeHtml(topic.id)}" aria-label="${marked ? 'Quitar guardado' : 'Guardar tema'}">${icon(marked ? 'bi-bookmark-fill' : 'bi-bookmark')}</button>
+            <button class="adm-button is-primary" type="button" data-action="open-topic" data-area-id="${escapeHtml(area.id)}" data-topic-id="${escapeHtml(topic.id)}">Abrir</button>
+          </div>
+        </article>
       `;
     }
 
     function renderTopicDetail() {
       const area = getArea(_ui.areaId);
       const topic = getTopic(_ui.areaId, _ui.topicId);
-      if (!area || !topic) return '';
-
+      if (!area || !topic) return renderSectionPrompt('bi-journal', 'Tema no encontrado', 'Vuelve al temario para elegir otro tema.', 'Ver temas', 'learn');
+      const progress = getTopicProgress(area.id, topic.id);
       const topicKey = getTopicKey(area.id, topic.id);
-      const progress = _guest.progressByTopic[topicKey] || {};
-      const microAnswer = _ui.microAnswers[topicKey];
-      const microEvaluated = Number.isInteger(microAnswer);
-      const microCorrect = microEvaluated && microAnswer === topic.microPractice.correctIndex;
-      const { previous, next } = getTopicNeighbors(area.id, topic.id);
+      const answer = _ui.microAnswers?.[topicKey];
+      const practiceQuestions = getTopicPracticeQuestions(topic);
+      const micro = practiceQuestions[0] || null;
+      const examples = getTopicExamples(topic);
 
       return `
-        <section class="adm-screen">
-          <div class="adm-breadcrumbs">
-            <button class="adm-breadcrumb-button" data-action="go-screen" data-screen="study">Temario</button>
-            <span>/</span>
-            <button class="adm-breadcrumb-button" data-action="focus-area" data-area-id="${escapeHtml(area.id)}">${escapeHtml(area.title)}</button>
-            <span>/</span>
-            <strong>${escapeHtml(topic.title)}</strong>
+        <section class="adm-topic-hero">
+          <button class="adm-back-link" type="button" data-action="go-screen" data-screen="learn">${icon('bi-arrow-left')} Temario</button>
+          <span class="adm-kicker">${escapeHtml(area.title)}</span>
+          <h1>${escapeHtml(topic.title)}</h1>
+          <p>${escapeHtml(topic.summary)}</p>
+          <div class="adm-cta-row">
+            <button class="adm-button is-primary" type="button" data-action="mark-topic" data-area-id="${escapeHtml(area.id)}" data-topic-id="${escapeHtml(topic.id)}">${icon(progress.studied ? 'bi-check-circle-fill' : 'bi-check-circle')} ${progress.studied ? 'Tema visto' : 'Marcar como visto'}</button>
+            <button class="adm-button is-soft" type="button" data-action="start-topic-practice" data-area-id="${escapeHtml(area.id)}" data-topic-id="${escapeHtml(topic.id)}">${icon('bi-ui-checks')} Practicar ${practiceQuestions.length || 3}</button>
           </div>
+        </section>
 
-          <div class="adm-section-header">
-            <div>
-              <div class="adm-kicker">Tema</div>
-              <h2>${escapeHtml(topic.title)}</h2>
-              <p class="adm-note">${escapeHtml(topic.summary)}</p>
-            </div>
-            <div class="adm-toolbar">
-              <button class="adm-button is-ghost" data-action="toggle-bookmark" data-area-id="${escapeHtml(area.id)}" data-topic-id="${escapeHtml(topic.id)}">${(_guest.bookmarks || []).includes(topicKey) ? 'Quitar guardado' : 'Guardar'}</button>
-              <button class="adm-button is-primary" data-action="mark-topic-studied" data-area-id="${escapeHtml(area.id)}" data-topic-id="${escapeHtml(topic.id)}">${progress.studied ? 'Listo' : 'Marcar listo'}</button>
-            </div>
-          </div>
-
-          <div class="adm-topic-detail-grid">
-            <article class="adm-panel">
-              <div class="adm-pill-row">
-                <span class="adm-pill">${escapeHtml(area.title)}</span>
-                <span class="adm-pill">${escapeHtml(area.roleLabel)}</span>
-                <span class="adm-pill">${escapeHtml(topic.estimatedMinutes)} min</span>
-                ${progress.studied ? '<span class="adm-pill is-success">Tema revisado</span>' : ''}
-              </div>
-
-              <div class="adm-topic-block">
-                <div class="adm-section-label">Resumen</div>
-                <p>${escapeHtml(topic.explanation)}</p>
-              </div>
-
-              <div class="adm-topic-block">
-                <div class="adm-section-label">Puntos clave</div>
-                <div class="adm-pill-row">
-                  ${renderPills(topic.officialCoverage || [])}
-                </div>
-              </div>
-
-              <div class="adm-topic-block">
-                <div class="adm-section-label">Ejemplo resuelto</div>
-                <p><strong>Problema:</strong> ${escapeHtml(topic.solvedExample.problem)}</p>
-                <ol class="adm-steps-list simple">
-                  ${topic.solvedExample.steps.map((step, index) => `<li><strong>${index + 1}.</strong><span>${escapeHtml(step)}</span></li>`).join('')}
-                </ol>
-                <p><strong>Respuesta:</strong> ${escapeHtml(topic.solvedExample.answer)}</p>
-              </div>
-
-              <div class="adm-topic-block">
-                <div class="adm-section-label">Errores comunes</div>
-                <ul class="adm-checklist">
-                  ${topic.commonMistakes.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}
-                </ul>
-              </div>
-            </article>
-
-            <aside class="adm-panel">
-              <div class="adm-section-label">Prueba rápida</div>
-              <h3 class="adm-panel-title">${escapeHtml(topic.microPractice.question)}</h3>
-              <div class="adm-option-list">
-                ${topic.microPractice.options.map((option, index) => {
-                  let optionClass = '';
-                  if (microEvaluated) {
-                    if (index === topic.microPractice.correctIndex) optionClass = 'is-correct';
-                    else if (index === microAnswer) optionClass = 'is-wrong';
-                  }
-                  return `
-                    <label class="adm-option ${optionClass}">
-                      <input type="radio" name="micro-${escapeHtml(topicKey)}" value="${index}" data-action="set-micro-answer" data-area-id="${escapeHtml(area.id)}" data-topic-id="${escapeHtml(topic.id)}" ${microAnswer === index ? 'checked' : ''}>
-                      <span>${escapeHtml(option)}</span>
-                    </label>
-                  `;
-                }).join('')}
-              </div>
-              ${microEvaluated ? `<div class="adm-alert ${microCorrect ? 'is-success' : 'is-warning'}">${escapeHtml(topic.microPractice.explanation)}</div>` : ''}
-
-              <div class="adm-topic-block">
-                <div class="adm-section-label">Checklist</div>
-                <p>${escapeHtml(topic.checkpoint.prompt)}</p>
-                <ul class="adm-checklist">
-                  ${topic.checkpoint.items.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}
-                </ul>
-              </div>
-
-              <div class="adm-action-row">
-                <button class="adm-button is-ghost" data-action="start-area-practice" data-area-id="${escapeHtml(area.id)}">Practicar área</button>
-                <button class="adm-button is-ghost" data-action="focus-area" data-area-id="${escapeHtml(area.id)}">Volver</button>
-              </div>
-            </aside>
-          </div>
-
-          <div class="adm-pagination-row">
-            ${previous ? `<button class="adm-button is-ghost" data-action="open-topic" data-area-id="${escapeHtml(area.id)}" data-topic-id="${escapeHtml(previous.id)}">Anterior: ${escapeHtml(previous.title)}</button>` : '<span></span>'}
-            ${next ? `<button class="adm-button is-primary" data-action="open-topic" data-area-id="${escapeHtml(area.id)}" data-topic-id="${escapeHtml(next.id)}">Siguiente: ${escapeHtml(next.title)}</button>` : `<button class="adm-button is-primary" data-action="start-area-practice" data-area-id="${escapeHtml(area.id)}">Practicar área</button>`}
-          </div>
+        <section class="adm-lesson-grid">
+          ${renderLessonCard('bi-lightbulb', 'Idea clave', topic.explanation)}
+          ${renderExampleCard(examples)}
+          ${micro ? renderMicroPractice(area, topic, micro, answer) : ''}
+          ${renderListCard('bi-exclamation-triangle', 'Errores comunes', topic.commonMistakes || [])}
+          ${renderListCard('bi-flag', topic.checkpoint?.prompt || 'Cierra el tema si puedes:', topic.checkpoint?.items || [])}
         </section>
       `;
     }
 
-    function renderPracticeHub(metrics) {
-      const selectedCareer = CareerPlanner.getCareer(_guest.selectedCareer);
-      const practiceAreas = getOrderedAreas();
+    function renderLessonCard(iconName, title, body) {
       return `
-        <section class="adm-screen">
-          <div class="adm-section-header">
-            <div>
-              <div class="adm-kicker">Practicar</div>
-              <h2>Práctica por área o por ruta</h2>
-              <p class="adm-note">Responde, revisa y vuelve al tema si hace falta.</p>
-            </div>
-            ${selectedCareer ? '<button class="adm-button is-primary" data-action="start-career-practice">Práctica mixta</button>' : '<button class="adm-button is-ghost" data-action="scroll-careers">Elegir carrera</button>'}
-          </div>
+        <article class="adm-lesson-card">
+          <span class="adm-feature-icon">${icon(iconName)}</span>
+          <strong>${escapeHtml(title)}</strong>
+          <p>${escapeHtml(body || 'Sin contenido disponible.')}</p>
+        </article>
+      `;
+    }
 
-          <div class="adm-screen-grid">
-            <article class="adm-panel">
-              <div class="adm-section-label">Cómo usarla</div>
-              <h3 class="adm-panel-title">Haz práctica corta y corrige</h3>
-              <ol class="adm-steps-list simple">
-                <li><strong>1.</strong><span>Practica un bloque a la vez.</span></li>
-                <li><strong>2.</strong><span>Usa la práctica mixta cuando ya tengas carrera.</span></li>
-                <li><strong>3.</strong><span>Si fallas, vuelve al tema y repite.</span></li>
-              </ol>
-            </article>
-
-            <article class="adm-panel">
-              <div class="adm-section-label">Resultados recientes</div>
-              ${metrics.recentResults.length ? `
-                <div class="adm-compact-list">
-                  ${metrics.recentResults.map((item) => `
-                    <div class="adm-compact-item">
-                      <strong>${escapeHtml(item.label)}</strong>
-                      <span>${item.percent}%</span>
-                    </div>
-                  `).join('')}
+    function renderExampleCard(examples) {
+      if (!examples.length) return '';
+      const [example, ...extraExamples] = examples;
+      return `
+        <article class="adm-lesson-card">
+          <span class="adm-feature-icon">${icon('bi-card-checklist')}</span>
+          <strong>Ejemplos resueltos</strong>
+          ${example.level ? `<small class="adm-mini-label">${escapeHtml(example.level)}</small>` : ''}
+          <p>${escapeHtml(example.problem)}</p>
+          <ol>
+            ${(example.steps || []).map((step) => `<li>${escapeHtml(step)}</li>`).join('')}
+          </ol>
+          <small>Respuesta: ${escapeHtml(example.answer)}</small>
+          ${extraExamples.length ? `
+            <details class="adm-extra-examples">
+              <summary>Ver ${extraExamples.length} ejemplos más</summary>
+              ${extraExamples.map((item) => `
+                <div class="adm-extra-example">
+                  ${item.level ? `<span>${escapeHtml(item.level)}</span>` : ''}
+                  <p>${escapeHtml(item.problem)}</p>
+                  <ol>
+                    ${(item.steps || []).map((step) => `<li>${escapeHtml(step)}</li>`).join('')}
+                  </ol>
+                  <small>Respuesta: ${escapeHtml(item.answer)}</small>
                 </div>
-              ` : '<div class="adm-empty-state compact">Aún no has calificado prácticas.</div>'}
-            </article>
-          </div>
+              `).join('')}
+            </details>
+          ` : ''}
+        </article>
+      `;
+    }
 
+    function renderMicroPractice(area, topic, micro, answer) {
+      const evaluated = typeof answer === 'number';
+      const correct = evaluated && answer === Number(micro.correctIndex);
+      return `
+        <article class="adm-lesson-card">
+          <span class="adm-feature-icon">${icon('bi-patch-question')}</span>
+          <strong>Intenta ahora</strong>
+          ${micro.difficulty ? `<small class="adm-mini-label">${escapeHtml(micro.difficulty)}</small>` : ''}
+          <p>${escapeHtml(micro.question)}</p>
+          <div class="adm-option-list">
+            ${(micro.options || []).map((option, index) => `
+              <label class="adm-option ${evaluated && index === micro.correctIndex ? 'is-correct' : ''} ${evaluated && answer === index && !correct ? 'is-wrong' : ''}">
+                <input type="radio" name="micro-${escapeHtml(getTopicKey(area.id, topic.id))}" value="${index}" data-action="micro-answer" data-area-id="${escapeHtml(area.id)}" data-topic-id="${escapeHtml(topic.id)}" ${answer === index ? 'checked' : ''}>
+                <span>${escapeHtml(option)}</span>
+              </label>
+            `).join('')}
+          </div>
+          ${evaluated ? `<div class="adm-result ${correct ? 'is-good' : 'is-bad'}">${correct ? 'Bien. ' : 'Repasa esta parte. '}${escapeHtml(micro.explanation)}</div>` : ''}
+        </article>
+      `;
+    }
+
+    function renderListCard(iconName, title, items) {
+      if (!items.length) return '';
+      return `
+        <article class="adm-lesson-card">
+          <span class="adm-feature-icon">${icon(iconName)}</span>
+          <strong>${escapeHtml(title)}</strong>
+          <ul>
+            ${items.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}
+          </ul>
+        </article>
+      `;
+    }
+
+    function renderPractice(metrics) {
+      const career = metrics.career;
+      if (!career) {
+        return renderSectionPrompt('bi-ui-checks-grid', 'Práctica personalizada', 'Primero elige carrera para generar reactivos de tus bloques.', 'Elegir carrera', 'route');
+      }
+      const weakTopics = metrics.weakTopics;
+      const bank = getCareerBankMetrics(career);
+
+      return `
+        <section class="adm-section">
+          <div class="adm-section-head">
+            <span class="adm-kicker">Práctica guiada</span>
+            <h1>Entrena con retroalimentación</h1>
+            <p>Usa esta sección para detectar qué tema reforzar antes de hacer un simulador. Tu ruta tiene ${bank.questions} reactivos y ${bank.examples} ejemplos disponibles.</p>
+          </div>
           <div class="adm-practice-grid">
-            ${practiceAreas.map((area) => {
-              const stats = getAreaProgress(area.id);
-              const isRoute = getRouteAreaIds().includes(area.id);
-              return `
-                <article class="adm-practice-card ${isRoute ? 'is-route' : ''}">
-                  <div class="adm-practice-card-top">
-                    <span class="adm-chip">${escapeHtml(area.roleLabel)}</span>
-                    ${isRoute ? '<span class="adm-chip is-accent">Ruta</span>' : ''}
-                  </div>
-                  <h3>${escapeHtml(area.title)}</h3>
-                  <p class="adm-meta">${escapeHtml(area.strategy)}</p>
-                  <div class="adm-mini-metrics">
-                    <div><strong>${area.topics.length}</strong><span>reactivos base</span></div>
-                    <div><strong>${stats.averageScore}%</strong><span>acierto del área</span></div>
-                  </div>
-                  <div class="adm-action-row">
-                    <button class="adm-button is-primary" data-action="start-area-practice" data-area-id="${escapeHtml(area.id)}">Practicar área</button>
-                    <button class="adm-button is-ghost" data-action="focus-area" data-area-id="${escapeHtml(area.id)}">Ver temario</button>
-                  </div>
-                </article>
-              `;
-            }).join('')}
+            ${renderPracticeCard('bi-signpost-split', 'Mi ruta', '15 reactivos aleatorios con los bloques de tu carrera.', 'start-route-practice', '', 'Comenzar')}
+            ${renderPracticeCard('bi-bullseye', 'Tema débil', weakTopics[0] ? `${weakTopics[0].topicTitle}: ${weakTopics[0].percent}%` : 'Aparecerá cuando tengas intentos calificados.', weakTopics[0] ? 'start-topic-practice' : 'go-screen', weakTopics[0] ? `data-area-id="${escapeHtml(weakTopics[0].areaId)}" data-topic-id="${escapeHtml(weakTopics[0].topicId)}"` : 'data-screen="learn"', weakTopics[0] ? 'Reforzar' : 'Ver temas')}
+            ${renderPracticeCard('bi-stopwatch', 'Simulador', '25 reactivos sin ayuda, con revisión al final.', 'start-simulator', '', 'Abrir')}
+          </div>
+        </section>
+
+        <section class="adm-section">
+          <div class="adm-section-head">
+            <span class="adm-kicker">Practicar por bloque</span>
+            <h2>Elige un área de tu carrera</h2>
+          </div>
+          <div class="adm-route-list">
+            ${getRouteAreas().map((area) => renderPracticeArea(area)).join('')}
           </div>
         </section>
       `;
     }
 
-    function renderPracticeRun() {
-      const currentQuestion = _ui.quizQuestions[_ui.quizIndex];
-      if (!currentQuestion) return renderPracticeHub(computeMetrics());
+    function renderPracticeCard(iconName, title, body, action, extraAttrs, buttonText) {
+      return `
+        <article class="adm-practice-card">
+          <span class="adm-feature-icon">${icon(iconName)}</span>
+          <strong>${escapeHtml(title)}</strong>
+          <p>${escapeHtml(body)}</p>
+          <button class="adm-button is-primary" type="button" data-action="${escapeHtml(action)}" ${extraAttrs || ''}>${escapeHtml(buttonText)}</button>
+        </article>
+      `;
+    }
 
-      const answeredCount = _ui.quizQuestions.filter((question) => Object.prototype.hasOwnProperty.call(_ui.quizAnswers, question.id)).length;
-      const questionResult = _ui.quizSubmitted && _ui.quizResult ? _ui.quizResult.items[_ui.quizIndex] : null;
-      const allAnswered = answeredCount === _ui.quizQuestions.length;
-      const currentArea = getArea(currentQuestion.areaId);
+    function renderPracticeArea(area) {
+      const progress = getAreaProgress(area.id);
+      const questionCount = getAreaQuestionPool(area.id, false).length;
+      return `
+        <article class="adm-route-item">
+          <div class="adm-route-main">
+            <span class="adm-area-icon">${icon(AREA_ICONS[area.id] || 'bi-journal')}</span>
+            <div>
+              <strong>${escapeHtml(area.title)}</strong>
+              <p>${escapeHtml(area.strategy || area.summary)}</p>
+              <small>${progress.total} temas · ${questionCount} reactivos · ${progress.practicePercent === null ? 'sin intento' : `${progress.practicePercent}% práctica`}</small>
+            </div>
+          </div>
+          <button class="adm-button is-soft" type="button" data-action="start-area-practice" data-area-id="${escapeHtml(area.id)}">Practicar bloque</button>
+        </article>
+      `;
+    }
+
+    function renderQuiz() {
+      const question = _ui.quizQuestions[_ui.quizIndex];
+      if (!question) return renderSectionPrompt('bi-ui-checks', 'Práctica vacía', 'Vuelve a elegir un bloque o tema.', 'Practicar', 'practice');
+      const answer = _ui.quizAnswers[question.id];
+      const resultItem = _ui.quizResult?.items?.find((item) => item.id === question.id);
+      const total = _ui.quizQuestions.length;
+      const answered = Object.keys(_ui.quizAnswers || {}).length;
 
       return `
-        <section class="adm-screen">
-          <div class="adm-section-header">
-            <div>
-              <div class="adm-kicker">Práctica activa</div>
-              <h2>${escapeHtml(_ui.practiceScope === 'career' ? 'Práctica mixta por carrera' : `Práctica de ${currentQuestion.areaTitle}`)}</h2>
-              <p class="adm-note">Responde y avanza. Califica al final.</p>
+        <section class="adm-quiz-shell">
+          <button class="adm-back-link" type="button" data-action="go-screen" data-screen="${_ui.quizMode === 'simulator' ? 'practice' : 'practice'}">${icon('bi-arrow-left')} Salir</button>
+          <span class="adm-kicker">${escapeHtml(_ui.quizMode === 'simulator' ? 'Simulador' : 'Práctica')}</span>
+          <h1>${escapeHtml(_ui.quizTitle)}</h1>
+          <p>${escapeHtml(_ui.quizDescription)}</p>
+
+          ${_ui.quizSubmitted ? renderQuizResult() : `
+            <div class="adm-mini-progress" aria-label="${answered} de ${total} respondidas">
+              <span style="width:${total ? Math.round((answered / total) * 100) : 0}%"></span>
             </div>
-            <div class="adm-toolbar">
-              <button class="adm-button is-ghost" data-action="go-screen" data-screen="practice">Volver</button>
-              <button class="adm-button is-ghost" data-action="restart-practice">Reiniciar</button>
+            <small>${answered}/${total} respondidas</small>
+          `}
+
+          <article class="adm-question-card">
+            <span class="adm-question-index">${_ui.quizIndex + 1} de ${total}</span>
+            <h2>${escapeHtml(question.question)}</h2>
+            <div class="adm-option-list">
+              ${(question.options || []).map((option, index) => {
+                const isChosen = Number(answer) === index;
+                const isCorrect = _ui.quizSubmitted && Number(question.correctIndex) === index;
+                const isWrong = _ui.quizSubmitted && isChosen && !isCorrect;
+                return `
+                  <label class="adm-option ${isCorrect ? 'is-correct' : ''} ${isWrong ? 'is-wrong' : ''}">
+                    <input type="radio" name="quiz-${escapeHtml(question.id)}" value="${index}" data-action="quiz-answer" data-question-id="${escapeHtml(question.id)}" ${isChosen ? 'checked' : ''} ${_ui.quizSubmitted ? 'disabled' : ''}>
+                    <span>${escapeHtml(option)}</span>
+                  </label>
+                `;
+              }).join('')}
             </div>
-          </div>
+            ${_ui.quizSubmitted && resultItem ? `<div class="adm-result ${resultItem.isCorrect ? 'is-good' : 'is-bad'}">${escapeHtml(question.explanation)}</div>` : ''}
+          </article>
 
-          <div class="adm-practice-run">
-            <aside class="adm-panel">
-              <div class="adm-section-label">Progreso</div>
-              <div class="adm-stat-value">${answeredCount}/${_ui.quizQuestions.length}</div>
-              <div class="adm-stat-label">preguntas respondidas</div>
-              <div class="adm-progress-bar"><div class="adm-progress-fill" style="width:${Math.round((answeredCount / _ui.quizQuestions.length) * 100)}%"></div></div>
-              <div class="adm-question-nav">
-                ${_ui.quizQuestions.map((question, index) => `
-                  <button class="adm-question-dot ${index === _ui.quizIndex ? 'is-active' : ''} ${Object.prototype.hasOwnProperty.call(_ui.quizAnswers, question.id) ? 'is-answered' : ''}" data-action="jump-question" data-question-index="${index}">${index + 1}</button>
-                `).join('')}
-              </div>
-              ${_ui.quizSubmitted && _ui.quizResult ? `
-                <div class="adm-result-card">
-                  <div class="adm-score-pill">Resultado: ${_ui.quizResult.percent}%</div>
-                  <p class="adm-note">${_ui.quizResult.correct} de ${_ui.quizResult.total} reactivos correctos.</p>
-                  <button class="adm-button is-primary" data-action="open-topic" data-area-id="${escapeHtml(currentQuestion.areaId)}" data-topic-id="${escapeHtml(currentQuestion.topicId)}">Abrir tema</button>
-                </div>
-              ` : `
-                <div class="adm-note-box">
-                  ${allAnswered ? 'Ya puedes calificar la práctica.' : 'Te faltan respuestas antes de calificar.'}
-                </div>
-              `}
-            </aside>
-
-            <article class="adm-panel">
-              <div class="adm-pill-row">
-                <span class="adm-pill">Pregunta ${_ui.quizIndex + 1} de ${_ui.quizQuestions.length}</span>
-                <span class="adm-pill">${escapeHtml(currentQuestion.areaTitle)}</span>
-                ${currentArea?.id === 'ingles' ? '<span class="adm-pill">Diagnóstico</span>' : ''}
-              </div>
-              <h3 class="adm-panel-title">${escapeHtml(currentQuestion.topicTitle)}</h3>
-              <p>${escapeHtml(currentQuestion.question)}</p>
-
-              <div class="adm-option-list">
-                ${currentQuestion.options.map((option, optionIndex) => {
-                  let optionClass = '';
-                  if (_ui.quizSubmitted && questionResult) {
-                    if (optionIndex === currentQuestion.correctIndex) optionClass = 'is-correct';
-                    else if (Number(_ui.quizAnswers[currentQuestion.id]) === optionIndex) optionClass = 'is-wrong';
-                  }
-                  return `
-                    <label class="adm-option ${optionClass}">
-                      <input type="radio" name="practice-${escapeHtml(currentQuestion.id)}" value="${optionIndex}" data-action="practice-answer" data-question-id="${escapeHtml(currentQuestion.id)}" ${Number(_ui.quizAnswers[currentQuestion.id]) === optionIndex ? 'checked' : ''} ${_ui.quizSubmitted ? 'disabled' : ''}>
-                      <span>${escapeHtml(option)}</span>
-                    </label>
-                  `;
-                }).join('')}
-              </div>
-
-              ${_ui.quizSubmitted && questionResult ? `
-                <div class="adm-alert ${questionResult.isCorrect ? 'is-success' : 'is-warning'}">
-                  ${escapeHtml(currentQuestion.explanation)}
-                </div>
-              ` : ''}
-
-              <div class="adm-toolbar top-gap">
-                <button class="adm-button is-ghost" data-action="prev-question" ${_ui.quizIndex === 0 ? 'disabled' : ''}>Anterior</button>
-                ${_ui.quizSubmitted
-                  ? `<button class="adm-button is-primary" data-action="next-question" ${_ui.quizIndex === _ui.quizQuestions.length - 1 ? 'disabled' : ''}>Siguiente</button>`
-                  : _ui.quizIndex === _ui.quizQuestions.length - 1
-                    ? `<button class="adm-button is-primary" data-action="submit-practice">Calificar</button>`
-                    : `<button class="adm-button is-primary" data-action="next-question">Siguiente</button>`}
-              </div>
-            </article>
+          <div class="adm-quiz-actions">
+            <button class="adm-button is-ghost" type="button" data-action="prev-question" ${_ui.quizIndex === 0 ? 'disabled' : ''}>Anterior</button>
+            ${_ui.quizIndex < total - 1 ? `<button class="adm-button is-primary" type="button" data-action="next-question">Siguiente</button>` : ''}
+            ${!_ui.quizSubmitted ? `<button class="adm-button is-primary" type="button" data-action="submit-quiz">Calificar</button>` : `<button class="adm-button is-soft" type="button" data-action="go-screen" data-screen="practice">Volver a práctica</button>`}
           </div>
         </section>
       `;
     }
 
-    function renderInfoScreen() {
+    function renderQuizResult() {
+      const result = _ui.quizResult;
+      if (!result) return '';
+      const label = result.percent >= 80 ? 'Buen nivel' : result.percent >= 60 ? 'Vas avanzando' : 'Conviene reforzar';
+      return `
+        <div class="adm-score-card">
+          <strong>${result.percent}%</strong>
+          <span>${label}</span>
+          <small>${result.correct} de ${result.total} correctas</small>
+        </div>
+      `;
+    }
+
+    function renderExam() {
       const admissions = _resources.admissions;
       return `
-        <section class="adm-screen">
-          <div class="adm-section-header">
-            <div>
-              <div class="adm-kicker">Admisiones 2026</div>
-              <h2>Proceso de admisión 2026</h2>
-              <p class="adm-note">Fechas, pago, registro y contacto.</p>
-            </div>
-            <a class="adm-button is-primary" href="${escapeHtml(admissions.platform.registrationUrl)}" target="_blank" rel="noopener">Portal de registro</a>
+        <section class="adm-section">
+          <div class="adm-section-head">
+            <span class="adm-kicker">Admisión 2026</span>
+            <h1>Fechas y proceso</h1>
+            <p>Consulta lo esencial para no perderte: ficha, pago, examen, propedéutico y soporte.</p>
           </div>
-
-          <div class="adm-card-grid">
-            <article class="adm-soft-card">
-              <div class="adm-section-label">Fichas</div>
-              <h3>09 febrero al 30 abril 2026</h3>
-              <p class="adm-meta">Registro y pago del derecho de admisión.</p>
-            </article>
-            <article class="adm-soft-card">
-              <div class="adm-section-label">Examen</div>
-              <h3>Sábado 16 mayo 2026</h3>
-              <p class="adm-meta">Modalidad en línea. Duración total: 3 horas.</p>
-            </article>
-            <article class="adm-soft-card">
-              <div class="adm-section-label">Propedéutico</div>
-              <h3>06 al 17 julio 2026</h3>
-              <p class="adm-meta">Curso presencial para quienes sigan en el proceso.</p>
-            </article>
-            <article class="adm-soft-card">
-              <div class="adm-section-label">Costo</div>
-              <h3>${escapeHtml(admissions.payment.amount)}</h3>
-              <p class="adm-meta">Incluye ficha, examen de admisión y curso propedéutico.</p>
-            </article>
+          <div class="adm-date-grid">
+            ${(admissions.timeline || []).map((item) => `
+              <article class="adm-date-card">
+                <span>${escapeHtml(item.status)}</span>
+                <strong>${escapeHtml(item.label)}</strong>
+                <p>${escapeHtml(item.date)}</p>
+              </article>
+            `).join('')}
           </div>
+        </section>
 
-          <div class="adm-info-layout">
-            <article class="adm-panel">
-              <div class="adm-section-label">Pasos</div>
-              <div class="adm-timeline">
-                ${admissions.processSteps.map((step) => `
-                  <div class="adm-timeline-item">
-                    <div class="adm-timeline-dot"></div>
-                    <div>
-                      <strong>${escapeHtml(step.title)}</strong>
-                      <div class="adm-chip">${escapeHtml(step.dateLabel)}</div>
-                      <p class="adm-meta">${escapeHtml(step.description)}</p>
-                    </div>
-                  </div>
-                `).join('')}
-              </div>
+        <section class="adm-section">
+          <div class="adm-section-head">
+            <span class="adm-kicker">Pasos oficiales</span>
+            <h2>Proceso sin vueltas</h2>
+          </div>
+          <div class="adm-process-list">
+            ${(admissions.processSteps || []).map((step, index) => `
+              <article class="adm-process-step">
+                <span>${index + 1}</span>
+                <div>
+                  <strong>${escapeHtml(step.title)}</strong>
+                  <small>${escapeHtml(step.dateLabel)}</small>
+                  <p>${escapeHtml(step.description)}</p>
+                </div>
+              </article>
+            `).join('')}
+          </div>
+        </section>
+
+        <section class="adm-section">
+          <div class="adm-info-grid">
+            <article class="adm-info-card">
+              <span class="adm-feature-icon">${icon('bi-credit-card')}</span>
+              <strong>Pago</strong>
+              <p>${escapeHtml(admissions.payment?.amount || '')} en ${escapeHtml(admissions.payment?.bank || '')}. Incluye ficha, examen y curso propedéutico.</p>
             </article>
-
-            <article class="adm-panel">
-              <div class="adm-section-label">Soporte</div>
-              <div class="adm-info-list">
-                <div><strong>Pago</strong><span>${escapeHtml(admissions.payment.flow)}</span></div>
-                <div><strong>Banco</strong><span>${escapeHtml(admissions.payment.bank)}</span></div>
-                <div><strong>Correo</strong><span><a href="mailto:${escapeHtml(admissions.support.email)}">${escapeHtml(admissions.support.email)}</a></span></div>
-                <div><strong>Teléfonos</strong><span>${admissions.support.phones.map((phone) => escapeHtml(phone)).join('<br>')}</span></div>
-                <div><strong>Horario</strong><span>${escapeHtml(admissions.support.hours)}</span></div>
-              </div>
-              <div class="adm-action-row top-gap">
-                <a class="adm-button is-ghost" href="${escapeHtml(admissions.support.officialSite)}" target="_blank" rel="noopener">Sitio oficial</a>
-                <a class="adm-button is-ghost" href="${escapeHtml(admissions.support.videoGuide)}" target="_blank" rel="noopener">Video guía</a>
-              </div>
+            <article class="adm-info-card">
+              <span class="adm-feature-icon">${icon('bi-envelope')}</span>
+              <strong>Soporte</strong>
+              <p>${escapeHtml(admissions.support?.email || '')}</p>
+              <small>${escapeHtml(admissions.support?.hours || '')}</small>
             </article>
           </div>
-
-          <div class="adm-card-grid">
-            <article class="adm-soft-card">
-              <div class="adm-section-label">Requisitos</div>
-              <ul class="adm-checklist">
-                ${admissions.requirements.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}
-              </ul>
-            </article>
-            <article class="adm-soft-card">
-              <div class="adm-section-label">Antes del examen</div>
-              <ul class="adm-checklist">
-                ${admissions.examDay.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}
-              </ul>
-            </article>
-            <article class="adm-soft-card">
-              <div class="adm-section-label">Dudas comunes</div>
-              <div class="adm-compact-list">
-                ${admissions.faq.map((item) => `
-                  <div class="adm-compact-item is-text">
-                    <strong>${escapeHtml(item.question)}</strong>
-                    <span>${escapeHtml(item.answer)}</span>
-                  </div>
-                `).join('')}
-              </div>
-            </article>
+          <div class="adm-cta-row">
+            <a class="adm-button is-primary" href="${escapeHtml(admissions.platform?.registrationUrl || '#')}" target="_blank" rel="noopener noreferrer">${icon('bi-box-arrow-up-right')} Portal de registro</a>
+            <a class="adm-button is-soft" href="${escapeHtml(admissions.support?.officialSite || '#')}" target="_blank" rel="noopener noreferrer">${icon('bi-globe2')} Sitio oficial</a>
           </div>
+        </section>
+
+        <section class="adm-section">
+          <div class="adm-section-head">
+            <span class="adm-kicker">Preguntas frecuentes</span>
+            <h2>Dudas comunes</h2>
+          </div>
+          <div class="adm-faq-list">
+            ${(admissions.faq || []).map((item) => `
+              <details>
+                <summary>${escapeHtml(item.question)}</summary>
+                <p>${escapeHtml(item.answer)}</p>
+              </details>
+            `).join('')}
+          </div>
+        </section>
+      `;
+    }
+
+    function renderSectionPrompt(iconName, title, body, actionLabel, screen) {
+      return `
+        <section class="adm-empty">
+          <span class="adm-feature-icon">${icon(iconName)}</span>
+          <h1>${escapeHtml(title)}</h1>
+          <p>${escapeHtml(body)}</p>
+          <button class="adm-button is-primary" type="button" data-action="go-screen" data-screen="${escapeHtml(screen)}">${escapeHtml(actionLabel)}</button>
+        </section>
+      `;
+    }
+
+    function renderEmptyGuide(iconName, title, body) {
+      return `
+        <section class="adm-empty">
+          <span class="adm-feature-icon">${icon(iconName)}</span>
+          <h2>${escapeHtml(title)}</h2>
+          <p>${escapeHtml(body)}</p>
         </section>
       `;
     }
 
     function renderActiveScreen(metrics) {
-      if (_ui.screen === 'study') return renderStudyScreen();
+      if (_ui.screen === 'tour') return renderTour();
+      if (_ui.screen === 'route') return renderRoute(metrics);
+      if (_ui.screen === 'learn') return renderLearn(metrics);
       if (_ui.screen === 'topic') return renderTopicDetail();
-      if (_ui.screen === 'practice') {
-        return _ui.quizQuestions.length ? renderPracticeRun() : renderPracticeHub(metrics);
-      }
-      if (_ui.screen === 'info') return renderInfoScreen();
-      return renderHomeScreen(metrics);
+      if (_ui.screen === 'practice') return renderPractice(metrics);
+      if (_ui.screen === 'quiz') return renderQuiz();
+      if (_ui.screen === 'exam') return renderExam();
+      return renderWelcome(metrics);
     }
 
-    function render() {
-      if (!_root) return;
-      ensureFocusArea();
-      const metrics = computeMetrics();
-      const navScreen = getNavScreen();
-      const showHero = navScreen === 'home';
-      const showSidebar = navScreen === 'home';
-      _root.classList.add('admisiones-public-page');
+    function renderError(error) {
       _root.innerHTML = `
         <div class="adm-shell">
-          ${renderTopNav()}
-          ${showHero ? renderHeader(metrics) : ''}
-          <div class="adm-app-layout ${showSidebar ? '' : 'is-single'}">
-            <main class="adm-content">
-              ${renderActiveScreen(metrics)}
-            </main>
-            ${showSidebar ? renderSidebar(metrics) : ''}
-          </div>
-          <p class="adm-footer-note">Este espacio adapta la guía oficial EVALUATEC 2026 para que estudies con una ruta más clara dentro de SIA.</p>
+          ${renderAppBar()}
+          <section class="adm-empty">
+            <span class="adm-feature-icon">${icon('bi-exclamation-triangle')}</span>
+            <h1>No se pudo cargar admisiones</h1>
+            <p>${escapeHtml(error?.message || 'Intenta recargar la página.')}</p>
+            <button class="adm-button is-primary" type="button" data-action="back-landing">Regresar a SIA</button>
+          </section>
         </div>
       `;
     }
 
+    function render() {
+      if (!_root || !_resources || !_guest || !_ui) return;
+      const metrics = computeMetrics();
+      _root.innerHTML = `
+        <div class="adm-shell">
+          ${renderAppBar()}
+          ${renderNav()}
+          ${renderProgressStrip(metrics)}
+          <main class="adm-main">
+            ${renderActiveScreen(metrics)}
+          </main>
+          <footer class="adm-footer">
+            <button class="adm-link-button" type="button" data-action="back-landing">${icon('bi-arrow-left-circle')} Regresar al inicio de SIA</button>
+            <button class="adm-link-button" type="button" data-action="reset-progress">${icon('bi-arrow-counterclockwise')} Reiniciar avance local</button>
+          </footer>
+        </div>
+      `;
+    }
+
+    function handleBackLanding() {
+      const router = window.SIA?._router || window.SIA_CORE?.router;
+      if (router?.navigate) {
+        router.navigate('landing', true, true);
+        return;
+      }
+      window.location.hash = '#/';
+    }
+
     function handleClick(event) {
       const target = event.target.closest('[data-action]');
-      if (!target) return;
-
+      if (!target || !_root.contains(target)) return;
       const action = target.dataset.action;
-      const areaId = target.dataset.areaId || '';
-      const topicId = target.dataset.topicId || '';
-      const careerId = target.dataset.careerId || '';
-      const screen = target.dataset.screen || '';
-      const questionIndex = Number(target.dataset.questionIndex);
+      const screen = target.dataset.screen;
+      const areaId = target.dataset.areaId;
+      const topicId = target.dataset.topicId;
+
+      if (action === 'back-landing') {
+        handleBackLanding();
+        return;
+      }
 
       if (action === 'go-screen') {
-        if (screen === 'practice') {
-          if (!confirmDiscardPracticeIfNeeded()) return;
-          _ui = { ...defaultUiState(), screen: 'practice', areaId: _ui.areaId || getPreferredAreaId() };
-          ensureFocusArea();
-          render();
-          return;
-        }
-        goToScreen(screen || 'home', { areaId: _ui.areaId || getPreferredAreaId() });
+        goToScreen(screen || 'welcome');
         return;
       }
 
-      if (action === 'scroll-careers') {
-        if (getNavScreen() !== 'home') {
-          goToScreen('home', { areaId: _ui.areaId || getPreferredAreaId() });
-          if (getNavScreen() !== 'home') return;
-        }
-        window.requestAnimationFrame(() => {
-          document.getElementById('adm-careers')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        });
+      if (action === 'finish-tour') {
+        GuestStore.patch({ tourSeen: true });
+        goToScreen('route');
         return;
       }
 
-      if (action === 'select-career') {
-        if (!confirmDiscardPracticeIfNeeded()) return;
-        const routeAreaIds = CareerPlanner.getAreasForCareer(careerId);
-        GuestStore.patch({ selectedCareer: careerId, selectedAreas: routeAreaIds });
-        _ui = {
-          ...defaultUiState(),
-          screen: 'home',
-          areaId: routeAreaIds[0] || getPreferredAreaId()
-        };
-        render();
-        return;
-      }
-
-      if (action === 'clear-career') {
-        if (!confirmDiscardPracticeIfNeeded()) return;
-        GuestStore.patch({ selectedCareer: '', selectedAreas: [] });
-        _ui = {
-          ...defaultUiState(),
-          screen: 'home',
-          areaId: getOrderedAreas()[0]?.id || ''
-        };
+      if (action === 'set-career') {
+        const career = getCareer(target.dataset.careerId);
+        if (!career) return;
+        GuestStore.patch({ selectedCareer: career.id });
+        _ui.areaId = career.routeAreaIds?.[0] || '';
+        _ui.screen = 'route';
         render();
         return;
       }
 
       if (action === 'focus-area') {
-        if (!confirmDiscardPracticeIfNeeded()) return;
-        _ui = {
-          ...defaultUiState(),
-          screen: 'study',
-          areaId
-        };
-        render();
-        return;
-      }
-
-      if (action === 'clear-search') {
-        _ui.search = '';
+        _ui.areaId = areaId || '';
+        _ui.screen = 'learn';
         render();
         return;
       }
 
       if (action === 'open-topic') {
-        if (_ui.screen === 'practice' && !_ui.quizSubmitted && !confirmDiscardPracticeIfNeeded()) return;
-        _ui = {
-          ...defaultUiState(),
-          screen: 'topic',
-          areaId,
-          topicId
-        };
-        setLastVisited({ kind: 'topic', areaId, topicId, title: getTopic(areaId, topicId)?.title || '' });
+        openTopic(areaId, topicId);
+        return;
+      }
+
+      if (action === 'mark-topic') {
+        GuestStore.updateTopic(getTopicKey(areaId, topicId), { studied: true });
         render();
         return;
       }
@@ -1390,74 +1358,70 @@
         return;
       }
 
-      if (action === 'mark-topic-studied') {
-        GuestStore.updateTopic(getTopicKey(areaId, topicId), { studied: true });
-        setLastVisited({ kind: 'topic', areaId, topicId, title: getTopic(areaId, topicId)?.title || '' });
-        render();
+      if (action === 'start-topic-practice') {
+        startQuiz({
+          mode: 'practice',
+          title: 'Práctica por tema',
+          description: 'Cinco reactivos para reforzar este subtema.',
+          questions: PracticeEngine.topicQuiz(areaId, topicId),
+          quizId: `topic-${areaId}-${topicId}`,
+          areaId,
+          topicId
+        });
         return;
       }
 
       if (action === 'start-area-practice') {
-        if (_ui.screen === 'practice' && !confirmDiscardPracticeIfNeeded()) return;
-        const questions = PracticeEngine.buildAreaQuiz(areaId);
-        _ui = {
-          ...defaultUiState(),
-          screen: 'practice',
-          areaId,
-          practiceScope: 'area',
+        const area = getArea(areaId);
+        startQuiz({
+          mode: 'practice',
+          title: area ? `Práctica de ${area.title}` : 'Práctica por bloque',
+          description: 'Reactivos guiados con explicación al calificar.',
+          questions: PracticeEngine.areaQuiz(areaId),
           quizId: `area-${areaId}`,
-          quizQuestions: questions,
-          quizIndex: 0
-        };
-        setLastVisited({ kind: 'practice', scope: 'area', areaId });
-        render();
+          areaId
+        });
         return;
       }
 
-      if (action === 'start-career-practice') {
-        if (!_guest.selectedCareer) {
-          window.showToast?.('Selecciona una carrera primero para armar una práctica mixta.', 'warning');
-          return;
-        }
-        if (_ui.screen === 'practice' && !confirmDiscardPracticeIfNeeded()) return;
-        const questions = PracticeEngine.buildCareerQuiz(_guest.selectedCareer);
-        _ui = {
-          ...defaultUiState(),
-          screen: 'practice',
-          practiceScope: 'career',
-          quizId: `career-${_guest.selectedCareer}`,
-          quizQuestions: questions,
-          quizIndex: 0
-        };
-        setLastVisited({ kind: 'practice', scope: 'career', careerId: _guest.selectedCareer });
-        render();
+      if (action === 'start-route-practice') {
+        startQuiz({
+          mode: 'practice',
+          title: 'Práctica de mi ruta',
+          description: 'Quince reactivos aleatorios con los bloques de tu carrera.',
+          questions: PracticeEngine.routeQuiz(15),
+          quizId: `route-${_guest.selectedCareer || 'general'}`
+        });
+        return;
+      }
+
+      if (action === 'start-simulator') {
+        startQuiz({
+          mode: 'simulator',
+          title: 'Simulador EVALUATEC',
+          description: 'Veinticinco reactivos sin ayuda. La revisión aparece al final.',
+          questions: PracticeEngine.simulator(25),
+          quizId: `simulator-${_guest.selectedCareer || 'general'}`
+        });
         return;
       }
 
       if (action === 'prev-question') {
-        _ui.quizIndex = Math.max(0, _ui.quizIndex - 1);
+        _ui.quizIndex = clamp(_ui.quizIndex - 1, 0, _ui.quizQuestions.length - 1);
         render();
         return;
       }
 
       if (action === 'next-question') {
-        _ui.quizIndex = Math.min(_ui.quizQuestions.length - 1, _ui.quizIndex + 1);
+        _ui.quizIndex = clamp(_ui.quizIndex + 1, 0, _ui.quizQuestions.length - 1);
         render();
         return;
       }
 
-      if (action === 'jump-question') {
-        if (!Number.isNaN(questionIndex)) {
-          _ui.quizIndex = Math.max(0, Math.min(_ui.quizQuestions.length - 1, questionIndex));
-          render();
-        }
-        return;
-      }
-
-      if (action === 'submit-practice') {
-        const missing = _ui.quizQuestions.find((question) => !Object.prototype.hasOwnProperty.call(_ui.quizAnswers, question.id));
+      if (action === 'submit-quiz') {
+        const missing = _ui.quizQuestions.some((question) => !Object.prototype.hasOwnProperty.call(_ui.quizAnswers, question.id));
         if (missing) {
-          window.showToast?.('Contesta todos los reactivos antes de calificar la práctica.', 'warning');
+          window.showToast?.('Responde todos los reactivos antes de calificar.', 'warning');
           return;
         }
         _ui.quizSubmitted = true;
@@ -1467,43 +1431,12 @@
         return;
       }
 
-      if (action === 'restart-practice') {
-        if (_ui.practiceScope === 'career') {
-          _ui = {
-            ...defaultUiState(),
-            screen: 'practice',
-            practiceScope: 'career',
-            quizId: `career-${_guest.selectedCareer}`,
-            quizQuestions: PracticeEngine.buildCareerQuiz(_guest.selectedCareer),
-            quizIndex: 0
-          };
-        } else {
-          _ui = {
-            ...defaultUiState(),
-            screen: 'practice',
-            areaId: _ui.areaId,
-            practiceScope: 'area',
-            quizId: `area-${_ui.areaId}`,
-            quizQuestions: PracticeEngine.buildAreaQuiz(_ui.areaId),
-            quizIndex: 0
-          };
-        }
-        render();
-        return;
-      }
-
-      if (action === 'continue-progress') {
-        if (!_guest.lastVisited && !_guest.selectedCareer) {
-          document.getElementById('adm-careers')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          return;
-        }
-        window.AdmisionesPublic.resumeGuestProgress();
-        return;
-      }
-
       if (action === 'reset-progress') {
-        const confirmed = window.confirm('Se reiniciará el progreso local del invitado. ¿Deseas continuar?');
-        if (confirmed) window.AdmisionesPublic.resetGuestProgress();
+        const confirmed = window.confirm('Se reiniciará sólo el avance local de este dispositivo. ¿Deseas continuar?');
+        if (!confirmed) return;
+        _guest = GuestStore.reset();
+        _ui = defaultUiState();
+        render();
       }
     }
 
@@ -1511,128 +1444,73 @@
       const target = event.target;
       if (!target || !target.dataset.action) return;
 
-      if (target.dataset.action === 'set-micro-answer') {
-        const topicKey = getTopicKey(target.dataset.areaId, target.dataset.topicId);
-        const value = Number(target.value);
-        _ui.microAnswers = { ..._ui.microAnswers, [topicKey]: value };
-        const topic = getTopic(target.dataset.areaId, target.dataset.topicId);
-        GuestStore.updateTopic(topicKey, { microPassed: value === topic.microPractice.correctIndex });
+      if (target.dataset.action === 'quiz-answer') {
+        _ui.quizAnswers = {
+          ..._ui.quizAnswers,
+          [target.dataset.questionId]: Number(target.value)
+        };
         render();
         return;
       }
 
-      if (target.dataset.action === 'practice-answer') {
-        _ui.quizAnswers = { ..._ui.quizAnswers, [target.dataset.questionId]: Number(target.value) };
-      }
-    }
-
-    function handleInput(event) {
-      const target = event.target;
-      if (!target || !target.dataset.action) return;
-
-      if (target.dataset.action === 'study-search') {
-        _ui.search = target.value || '';
-        if (_ui.screen !== 'study') _ui.screen = 'study';
+      if (target.dataset.action === 'micro-answer') {
+        const areaId = target.dataset.areaId;
+        const topicId = target.dataset.topicId;
+        const topic = getTopic(areaId, topicId);
+        const topicKey = getTopicKey(areaId, topicId);
+        const value = Number(target.value);
+        _ui.microAnswers = { ...(_ui.microAnswers || {}), [topicKey]: value };
+        GuestStore.updateTopic(topicKey, {
+          practiced: true,
+          microPassed: topic ? value === Number(topic.microPractice?.correctIndex) : false
+        });
         render();
       }
     }
 
-    function persistPracticeResult() {
-      if (!_ui.quizResult) return;
+    function applyInitialState(options = {}) {
+      _ui = defaultUiState();
+      const firstArea = getRouteAreaIds()[0] || '';
+      _ui.areaId = firstArea;
 
-      const practiceResults = _guest.practiceResults || { scopes: {}, topicStats: {}, areaStats: {} };
-      const takenAt = new Date().toISOString();
-      const scopeId = _ui.quizId;
-      const nextTopicStats = { ...practiceResults.topicStats };
-      const nextAreaStats = { ...practiceResults.areaStats };
-      const nextProgressByTopic = { ..._guest.progressByTopic };
-
-      _ui.quizResult.items.forEach((item) => {
-        const topicKey = getTopicKey(item.areaId, item.topicId);
-        const currentTopic = nextTopicStats[topicKey] || { correct: 0, total: 0 };
-        const currentArea = nextAreaStats[item.areaId] || { correct: 0, total: 0 };
-
-        nextTopicStats[topicKey] = {
-          correct: currentTopic.correct + (item.isCorrect ? 1 : 0),
-          total: currentTopic.total + 1
-        };
-        nextAreaStats[item.areaId] = {
-          correct: currentArea.correct + (item.isCorrect ? 1 : 0),
-          total: currentArea.total + 1
-        };
-
-        nextProgressByTopic[topicKey] = {
-          ...(nextProgressByTopic[topicKey] || {}),
-          studied: item.isCorrect ? true : Boolean(nextProgressByTopic[topicKey]?.studied),
-          updatedAt: takenAt
-        };
-      });
-
-      GuestStore.patch({
-        progressByTopic: nextProgressByTopic,
-        practiceResults: {
-          scopes: {
-            ...practiceResults.scopes,
-            [scopeId]: {
-              percent: _ui.quizResult.percent,
-              correct: _ui.quizResult.correct,
-              total: _ui.quizResult.total,
-              takenAt,
-              scope: _ui.practiceScope,
-              areaId: _ui.areaId || null,
-              careerId: _guest.selectedCareer || null
-            }
-          },
-          topicStats: nextTopicStats,
-          areaStats: nextAreaStats
+      if (options.resume !== false && _guest?.lastVisited?.kind === 'topic') {
+        const { areaId, topicId } = _guest.lastVisited;
+        if (getTopic(areaId, topicId)) {
+          _ui.screen = 'topic';
+          _ui.areaId = areaId;
+          _ui.topicId = topicId;
+          return;
         }
-      });
+      }
+
+      _ui.screen = _guest?.tourSeen ? 'welcome' : 'welcome';
     }
 
     async function init(ctx, options = {}) {
       _ctx = ctx;
-      ensureRoot();
-      ensureStyles();
-      _resources = await ContentRepo.load();
-      _guest = GuestStore.load();
-      hydrateSelectedAreas();
-      _ui = defaultUiState();
-      _ui.areaId = getPreferredAreaId();
-      if (options.resume !== false) applyLastVisited();
-      ensureFocusArea();
-      bindEvents();
-      render();
+      try {
+        ensureRoot();
+        ensureStyles();
+        _resources = await ContentRepo.load();
+        _guest = GuestStore.load();
+        applyInitialState(options);
+        bindEvents();
+        render();
+      } catch (error) {
+        console.error('[AdmisionesPublic] Error al iniciar:', error);
+        if (_root) renderError(error);
+      }
     }
 
     function resetGuestProgress() {
       _guest = GuestStore.reset();
       _ui = defaultUiState();
-      _ui.areaId = getPreferredAreaId();
       render();
     }
 
     function resumeGuestProgress() {
       _guest = GuestStore.load();
-      if (_guest.lastVisited) {
-        applyLastVisited();
-      } else {
-        const nextTopic = _guest.selectedCareer ? getNextRecommendedTopic(getRouteAreaIds()) : null;
-        if (nextTopic) {
-          _ui = {
-            ...defaultUiState(),
-            screen: 'topic',
-            areaId: nextTopic.areaId,
-            topicId: nextTopic.id
-          };
-        } else {
-          _ui = {
-            ...defaultUiState(),
-            screen: _guest.selectedCareer ? 'study' : 'home',
-            areaId: getPreferredAreaId()
-          };
-        }
-      }
-      ensureFocusArea();
+      applyInitialState({ resume: true });
       render();
     }
 

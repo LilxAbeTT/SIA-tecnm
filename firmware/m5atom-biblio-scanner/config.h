@@ -3,11 +3,11 @@
 
 // Renombra este archivo a config.h antes de compilar.
 
-#define WIFI_SSID "14+"
-#define WIFI_PASSWORD "soytuperra"
+#define WIFI_SSID "TU_WIFI"
+#define WIFI_PASSWORD "TU_PASSWORD"
 
 #define SCANNER_FUNCTION_URL "https://us-central1-sia-tecnm.cloudfunctions.net/ingestScannerEvent"
-#define SCANNER_DEVICE_KEY "ej4Ir8pDfgq4422JBxec8BAebNeqfX3BOBd_DohPk6o"
+#define SCANNER_DEVICE_KEY "TU_DEVICE_KEY"
 
 #define SCANNER_MODULE "biblio"
 #define SCANNER_STATION_ID "biblio-entrada-1"

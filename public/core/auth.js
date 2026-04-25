@@ -57,7 +57,10 @@ export class AuthManager {
                     path = window.location.hash.replace('#', '');
                 }
 
-                const isPublicRoute = path.startsWith('/test-vocacional') || path.startsWith('/vocacional/test') || path.startsWith('/encuesta-publica');
+                const isPublicRoute = path.startsWith('/test-vocacional')
+                    || path.startsWith('/vocacional/test')
+                    || path.startsWith('/encuesta-publica')
+                    || path.startsWith('/admisiones');
 
                 if (!isPublicRoute) {
                     this.ui.showLanding();

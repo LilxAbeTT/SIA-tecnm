@@ -1,0 +1,159 @@
+- generic [active] [ref=e1]:
+  - text:                          
+  - generic [ref=e239]:
+    - navigation "Navegación de admisiones" [ref=e240]:
+      - button "Inicio Ruta" [ref=e241] [cursor=pointer]:
+        - strong [ref=e242]: Inicio
+        - generic [ref=e243]: Ruta
+      - button "Aprender Temario" [ref=e244] [cursor=pointer]:
+        - strong [ref=e245]: Aprender
+        - generic [ref=e246]: Temario
+      - button "Practicar Ayuda" [ref=e247] [cursor=pointer]:
+        - strong [ref=e248]: Practicar
+        - generic [ref=e249]: Ayuda
+      - button "Simulador Sin ayuda" [ref=e250] [cursor=pointer]:
+        - strong [ref=e251]: Simulador
+        - generic [ref=e252]: Sin ayuda
+      - button "Admisión Fechas" [ref=e253] [cursor=pointer]:
+        - strong [ref=e254]: Admisión
+        - generic [ref=e255]: Fechas
+    - generic [ref=e256]:
+      - generic [ref=e257]:
+        - generic [ref=e258]: Inicio
+        - strong [ref=e259]: Elige carrera para ordenar tu ruta
+        - paragraph [ref=e260]: Primero selecciona carrera; después verás tus bloques recomendados, práctica y simulador.
+      - generic [ref=e261]:
+        - generic [ref=e262]: 0% ruta
+        - generic [ref=e263]: 0% práctica
+    - generic [ref=e264]:
+      - generic [ref=e265]:
+        - generic [ref=e266]:
+          - generic [ref=e267]: Nuevo ingreso · ITES Los Cabos
+          - heading "Prepárate para EVALUATEC 2026" [level=1] [ref=e268]
+          - paragraph [ref=e269]: Una ruta simple para aprender, practicar y llegar más preparado a tu examen de admisión.
+          - generic [ref=e270]:
+            - button "Comenzar a estudiar" [ref=e271] [cursor=pointer]
+            - button "Elegir carrera" [ref=e272] [cursor=pointer]
+            - button "Ver proceso" [ref=e273] [cursor=pointer]
+        - generic [ref=e275]:
+          - generic [ref=e276]: Ruta de hoy
+          - heading "Fundamentos de administración" [level=2] [ref=e277]
+          - paragraph [ref=e278]: Siguiente microlección recomendada en Administración, gestión y contabilidad.
+          - generic [ref=e279]:
+            - generic [ref=e280]: 0/36 temas
+            - generic [ref=e281]: Inglés diagnóstico
+      - generic [ref=e282]:
+        - article [ref=e283]:
+          - generic [ref=e284]: "110"
+          - generic [ref=e285]: reactivos
+        - article [ref=e286]:
+          - generic [ref=e287]: 3 horas
+          - generic [ref=e288]: duración
+        - article [ref=e289]:
+          - generic [ref=e290]: 0%
+          - generic [ref=e291]: avance
+        - article [ref=e292]:
+          - generic [ref=e293]: Toma en cuenta
+          - paragraph [ref=e294]: El módulo de inglés es obligatorio y diagnóstico, pero no suma al puntaje global del examen de admisión.
+    - main [ref=e296]:
+      - generic [ref=e297]:
+        - generic [ref=e298]:
+          - article [ref=e299]:
+            - generic [ref=e300]: 1. Elige tu carrera
+            - heading "Activa tu ruta" [level=2] [ref=e301]
+            - paragraph [ref=e302]: Elige una carrera para ver primero lo que sí te conviene estudiar.
+            - button "Elegir carrera" [ref=e304] [cursor=pointer]
+          - article [ref=e305]:
+            - generic [ref=e306]: 2. Aprende
+            - heading "Fundamentos de administración" [level=2] [ref=e307]
+            - paragraph [ref=e308]: Repasa origen, definicion, eficiencia, eficacia, productividad y proceso administrativo.
+            - generic [ref=e309]:
+              - generic [ref=e310]: Administración, gestión y contabilidad
+              - generic [ref=e311]: 25 min
+            - button "Continuar microlección" [ref=e313] [cursor=pointer]
+          - article [ref=e314]:
+            - generic [ref=e315]: 3. Practica
+            - heading "Práctica guiada" [level=2] [ref=e316]
+            - paragraph [ref=e317]: Resuelve reactivos cortos con retroalimentación para detectar qué tema reforzar.
+            - button "Ir a practicar" [ref=e319] [cursor=pointer]
+          - article [ref=e320]:
+            - generic [ref=e321]: 4. Simula
+            - heading "Mide tu nivel" [level=2] [ref=e322]
+            - paragraph [ref=e323]: Haz un intento sin ayuda cuando ya hayas estudiado algunos bloques de tu ruta.
+            - button "Abrir simulador" [ref=e325] [cursor=pointer]
+        - generic [ref=e326]:
+          - generic [ref=e328]:
+            - generic [ref=e329]: Tu tablero
+            - heading "Qué hacer hoy" [level=2] [ref=e330]
+          - generic [ref=e331]:
+            - article [ref=e332]:
+              - generic [ref=e333]: Avance
+              - heading "0% completado" [level=3] [ref=e334]
+              - paragraph [ref=e335]: 0 de 36 temas revisados en tu ruta actual.
+            - article [ref=e337]:
+              - generic [ref=e338]: Práctica guiada
+              - heading "Sin intento" [level=3] [ref=e339]
+              - paragraph [ref=e340]: Aún no has calificado una práctica guiada.
+              - button "Ir a practicar" [ref=e342] [cursor=pointer]
+            - article [ref=e343]:
+              - generic [ref=e344]: Simulador
+              - heading "Pendiente" [level=3] [ref=e345]
+              - paragraph [ref=e346]: Haz un simulador cuando quieras medir tu nivel sin ayudas.
+              - button "Ir al simulador" [ref=e348] [cursor=pointer]
+            - article [ref=e349]:
+              - generic [ref=e350]: Refuerzo
+              - heading "Sin temas débiles" [level=3] [ref=e351]
+              - paragraph [ref=e352]: Tus errores aparecerán aquí cuando termines prácticas.
+              - button "Practicar" [ref=e354] [cursor=pointer]
+        - generic [ref=e355]:
+          - generic [ref=e356]:
+            - generic [ref=e357]:
+              - generic [ref=e358]: Elige tu carrera
+              - heading "Activa tu ruta" [level=2] [ref=e359]
+            - generic [ref=e360]: La ruta por carrera te ordena mejor el temario.
+          - generic [ref=e361]:
+            - button "Ing. en Administración Ingeniería en Administración Matemáticas | Administración, gestión y contabilidad | Comprensión lectora | Estructura del lenguaje | Inglés" [ref=e362] [cursor=pointer]:
+              - generic [ref=e364]: Ing. en Administración
+              - strong [ref=e365]: Ingeniería en Administración
+              - paragraph [ref=e366]: Matemáticas | Administración, gestión y contabilidad | Comprensión lectora | Estructura del lenguaje | Inglés
+            - button "Contador Público Contador Público Matemáticas | Administración, gestión y contabilidad | Comprensión lectora | Estructura del lenguaje | Inglés" [ref=e367] [cursor=pointer]:
+              - generic [ref=e369]: Contador Público
+              - strong [ref=e370]: Contador Público
+              - paragraph [ref=e371]: Matemáticas | Administración, gestión y contabilidad | Comprensión lectora | Estructura del lenguaje | Inglés
+            - button "Arquitectura Arquitectura Matemáticas | Arquitectura | Comprensión lectora | Estructura del lenguaje | Inglés" [ref=e372] [cursor=pointer]:
+              - generic [ref=e374]: Arquitectura
+              - strong [ref=e375]: Arquitectura
+              - paragraph [ref=e376]: Matemáticas | Arquitectura | Comprensión lectora | Estructura del lenguaje | Inglés
+            - button "Gastronomía Gastronomía Matemáticas | Estructura del lenguaje | Química | Comprensión lectora | Inglés" [ref=e377] [cursor=pointer]:
+              - generic [ref=e379]: Gastronomía
+              - strong [ref=e380]: Gastronomía
+              - paragraph [ref=e381]: Matemáticas | Estructura del lenguaje | Química | Comprensión lectora | Inglés
+            - button "Turismo Licenciatura en Turismo Matemáticas | Estructura del lenguaje | Tecnologías de información y comunicación | Comprensión lectora | Inglés" [ref=e382] [cursor=pointer]:
+              - generic [ref=e384]: Turismo
+              - strong [ref=e385]: Licenciatura en Turismo
+              - paragraph [ref=e386]: Matemáticas | Estructura del lenguaje | Tecnologías de información y comunicación | Comprensión lectora | Inglés
+            - button "ISC Ingeniería en Sistemas Computacionales Matemáticas | Física | Química | Comprensión lectora | Inglés" [ref=e387] [cursor=pointer]:
+              - generic [ref=e389]: ISC
+              - strong [ref=e390]: Ingeniería en Sistemas Computacionales
+              - paragraph [ref=e391]: Matemáticas | Física | Química | Comprensión lectora | Inglés
+            - button "Ing. Civil Ingeniería Civil Matemáticas | Física | Química | Comprensión lectora | Inglés" [ref=e392] [cursor=pointer]:
+              - generic [ref=e394]: Ing. Civil
+              - strong [ref=e395]: Ingeniería Civil
+              - paragraph [ref=e396]: Matemáticas | Física | Química | Comprensión lectora | Inglés
+            - button "Ing. Electromecánica Ingeniería Electromecánica Matemáticas | Física | Química | Comprensión lectora | Inglés" [ref=e397] [cursor=pointer]:
+              - generic [ref=e399]: Ing. Electromecánica
+              - strong [ref=e400]: Ingeniería Electromecánica
+              - paragraph [ref=e401]: Matemáticas | Física | Química | Comprensión lectora | Inglés
+    - paragraph [ref=e402]: "Este espacio adapta la guía oficial EVALUATEC 2026 para que estudies con una ruta clara: aprende, practica, simula y refuerza sólo lo que te falta dominar."
+  - text:                                                                                                                                                                                        
+  - text: 
+  - generic [ref=e228]:
+    - generic [ref=e229]:
+      - generic [ref=e231]: 
+      - generic [ref=e232]:
+        - heading "Instalar SIA Móvil" [level=5] [ref=e233]
+        - paragraph [ref=e234]: Accede más rápido y sin conexión.
+    - generic [ref=e235]:
+      - button "Ahora no" [ref=e236] [cursor=pointer]
+      - button "Instalar App" [ref=e237] [cursor=pointer]
+  - text:         

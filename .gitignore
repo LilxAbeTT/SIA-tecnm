@@ -64,6 +64,13 @@ node_modules/
 
 # dotenv environment variables file
 .env
+.env.*
+!.env.example
+functions/.env*
+!functions/.env.example
+
+# Local firmware secrets
+firmware/**/config.h
 
 # dataconnect generated files
 .dataconnect

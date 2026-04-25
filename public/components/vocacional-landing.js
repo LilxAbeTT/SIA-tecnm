@@ -436,8 +436,8 @@ class VocacionalLanding extends HTMLElement {
             const phone = this.querySelector('#recover-phone').value.trim();
             const email = this.querySelector('#recover-email').value.trim();
 
-            if (!phone && !email) {
-                recoveryErr.textContent = "Por favor ingresa al menos un método de contacto.";
+            if (!phone || !email) {
+                recoveryErr.textContent = "Por seguridad, ingresa teléfono y correo registrados.";
                 recoveryErr.classList.remove('d-none');
                 return;
             }

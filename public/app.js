@@ -227,8 +227,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const qaSecretLoginSubmit = document.getElementById('qa-secret-login-submit');
   const qaSecretLoginSignOut = document.getElementById('qa-secret-login-signout');
   const QA_SECRET_LOGIN_CONFIG = window.SIA?.getQaSecretLoginConfig?.() || {
-    route: '/qa-portal-k9m2x7c4',
-    email: 'admin@super.com',
+    enabled: false,
+    route: '',
+    email: '',
     displayName: 'SuperAdmin QA'
   };
 
@@ -405,7 +406,8 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function isQaSecretRoute(path = getCurrentRoutePath()) {
-    return String(path || '').trim() === QA_SECRET_LOGIN_CONFIG.route;
+    return Boolean(QA_SECRET_LOGIN_CONFIG.enabled && QA_SECRET_LOGIN_CONFIG.route)
+      && String(path || '').trim() === QA_SECRET_LOGIN_CONFIG.route;
   }
 
   function setQaSecretLoginMessage(message = '', level = 'danger') {
@@ -979,6 +981,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       const isVerifyRoute = path.startsWith('/verify/');
       const isVocacionalRoute = path === '/test-vocacional' || path === '/vocacional/test';
+      const isAdmisionesPublicRoute = path === '/admisiones' || path.startsWith('/admisiones/');
       const isCampusMapPublicRoute = path === '/mapa-campus';
       const isQaSecretRoutePath = isQaSecretRoute(path);
 
@@ -1014,7 +1017,7 @@ document.addEventListener('DOMContentLoaded', () => {
           startVerifyFlowFromCurrentPath();
         } else if (isQaSecretRoutePath) {
           showQaSecretLogin({ resetPassword: false });
-        } else if (isVocacionalRoute || isCampusMapPublicRoute) {
+        } else if (isVocacionalRoute || isAdmisionesPublicRoute || isCampusMapPublicRoute) {
           await restoreCurrentRoute();
         } else if (_loginPopupInProgress) {
           // NO regresar al landing mientras el popup de Microsoft esta abierto
@@ -2267,6 +2270,7 @@ document.addEventListener('DOMContentLoaded', () => {
     'view-avisos': '/avisos',
     'view-notificaciones': '/notificaciones',
     'view-encuesta-publica': '/encuesta-publica',
+    'view-admisiones-public': '/admisiones',
     'view-test-vocacional': '/test-vocacional',
     'view-vocacional-test-active': '/vocacional/test',
     'view-vocacional-admin': '/vocacional-admin'
@@ -2799,7 +2803,9 @@ document.addEventListener('DOMContentLoaded', () => {
   window.SIA.getEffectiveSessionUser = getEffectiveSessionUser;
   window.SIA.getEffectiveSessionUid = getEffectiveSessionUid;
   window.SIA.getEffectiveAuth = getEffectiveAuth;
-  window.SIA.getQaSecretLoginLink = () => `${window.location.origin}/#${QA_SECRET_LOGIN_CONFIG.route}`;
+  window.SIA.getQaSecretLoginLink = () => QA_SECRET_LOGIN_CONFIG.enabled
+    ? `${window.location.origin}/#${QA_SECRET_LOGIN_CONFIG.route}`
+    : '';
   // loginConGoogle eliminado - ahora solo usamos Microsoft
   window.SIA.getCtx = getCtx; // Para depuración
 

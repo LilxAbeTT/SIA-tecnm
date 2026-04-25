@@ -11,7 +11,6 @@ service cloud.firestore {
     function isTrustedOwnerProfileBootstrap(uid) {
       return isOwner(uid) && (
         isDev() ||
-        request.auth.token.email == 'admin@super.com' ||
         request.auth.token.email == 'atencionmedica@loscabos.tecnm.mx' ||
         request.auth.token.email == 'atencionpsicopedagogica@loscabos.tecnm.mx' ||
         request.auth.token.email == 'biblioteca@loscabos.tecnm.mx' ||
@@ -118,10 +117,8 @@ service cloud.firestore {
     
     // Roles Específicos
     
-    // --- BACKDOOR DE DESARROLLADOR ---
-    function isDev() { 
-      return request.auth.uid == 'G7HRuNnlePNLYr26z9ad5jBgHA82'; 
-    }
+    // --- Acceso de desarrollo deshabilitado en reglas versionadas ---
+    function isDev() { return false; }
 
     function isSalud() { 
       let data = userDoc(request.auth.uid).data;
@@ -291,7 +288,7 @@ service cloud.firestore {
     match /usuarios/{uid} {
       allow read: if isSignedIn(); // Desarrollo necesita leer nombres para reportes
       allow create: if isOwner(uid);
-      allow update: if isSuperAdmin() || isBiblio() || isTrustedOwnerProfileBootstrap(uid) || isSafeOwnerUserUpdate(uid);
+      allow update: if isSuperAdmin() || isTrustedOwnerProfileBootstrap(uid) || isSafeOwnerUserUpdate(uid);
       
       match /notificaciones/{notifId} {
         allow create: if isOwner(uid) || isSalud() || isSuperAdmin() || isBiblio() || isLactarioAdmin();
@@ -633,7 +630,21 @@ service cloud.firestore {
 
     match /aula-cursos/{id} { allow read: if isSignedIn(); allow write: if isAulaDocente(); }
     match /aula-inscripciones/{id} { allow read: if isSignedIn() && (resource.data.studentId == request.auth.uid || isAulaDocente()); allow create: if isSignedIn(); allow update: if isAulaDocente(); }
-    match /aula-progress/{id} { allow read: if isSignedIn(); allow write: if isSignedIn(); }
+    match /aula-progress/{id} {
+      allow read: if isSignedIn() && (
+        isSuperAdmin() ||
+        isAulaDocente() ||
+        id.matches(request.auth.uid + '_.*') ||
+        resource.data.studentId == request.auth.uid
+      );
+      allow create, update: if isSignedIn() && (
+        isSuperAdmin() ||
+        isAulaDocente() ||
+        id.matches(request.auth.uid + '_.*') ||
+        request.resource.data.studentId == request.auth.uid
+      );
+      allow delete: if isSuperAdmin() || isAulaDocente();
+    }
     match /aula-certificados/{id} { allow read: if isSignedIn(); allow write: if isAulaDocente(); }
 
     // Clases: docentes crean, todos los auth leen
@@ -1264,11 +1275,11 @@ function isEncuestasAdmin() {
 
     match /aspirantes-registros/{aspiranteId} {
         // Cualquiera puede crear un perfil temporal
-        allow create: if true;
+        allow create: if !aspiranteId.matches('^[0-9+()\\-\\s]{7,}$');
         // Solo el aspirante que conoce su ID exacto (guardado en LocalStorage) puede leer/actualizar su propio documento.
         // No permitimos un "list" (getDocs) público para evitar que alguien descargue toda la base.
         // El admin de difusión sí puede hacer todo.
-        allow get, update: if true; 
+        allow get, update: if !aspiranteId.matches('^[0-9+()\\-\\s]{7,}$') || isDifusionAdmin();
         allow list, delete: if isDifusionAdmin();
     }
 
@@ -1286,7 +1297,7 @@ function isEncuestasAdmin() {
     // [NEW] System Logs — auditoría SuperAdmin
     match /system-logs/{logId} {
       allow read: if isSuperAdmin();
-      allow create: if isSignedIn();
+      allow create: if isSuperAdmin();
     }
 
     // [NEW] Config global
@@ -1331,7 +1342,7 @@ function isEncuestasAdmin() {
     }
 
     match /cafeteria-pedidos/{pedidoId} {
-      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow create: if false;
       allow read: if isSignedIn() && (
         resource.data.userId == request.auth.uid ||
         isCafeteriaAdmin() || isSuperAdmin()

@@ -547,18 +547,19 @@ document.addEventListener('DOMContentLoaded', () => {
             else col.classList.add('d-none');
         };
 
-        if (user.allowedViews && Array.isArray(user.allowedViews)) {
+        const profile = user?.profile || user?.userProfile || user || {};
+        if (profile.allowedViews && Array.isArray(profile.allowedViews)) {
             Object.keys(moduleMap).forEach(key => toggleModule(key, false));
-            user.allowedViews.forEach(view => toggleModule(view, true));
+            profile.allowedViews.forEach(view => toggleModule(view, true));
 
             const elLact = document.getElementById('smart-card-lactario-wrapper');
-            if (user.allowedViews.includes('view-lactario') && elLact) elLact.classList.remove('d-none');
+            if (profile.allowedViews.includes('view-lactario') && elLact) elLact.classList.remove('d-none');
         } else {
             Object.keys(moduleMap).forEach(key => toggleModule(key, true));
         }
 
         if (reportBtn) {
-            const role = user.role || (user.profile && user.profile.role) || 'student';
+            const role = profile.role || 'student';
             if (role === 'superadmin') reportBtn.classList.add('d-none');
             else reportBtn.classList.remove('d-none');
         }

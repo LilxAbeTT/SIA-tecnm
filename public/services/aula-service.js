@@ -1094,7 +1094,12 @@
         estado = 'tarde';
       }
 
-      const ref = await ctx.db.collection(ENTREGAS).add({
+      const entregaId = [
+        data.publicacionId,
+        grupo?.id ? `grupo_${grupo.id}` : user.uid
+      ].join('_').replace(/[^a-zA-Z0-9_-]/g, '_');
+      const ref = ctx.db.collection(ENTREGAS).doc(entregaId);
+      const payload = {
         publicacionId: data.publicacionId,
         claseId: pub.claseId,
         estudianteId: user.uid,
@@ -1114,6 +1119,12 @@
         estado,
         entregadoAt: fv.serverTimestamp(),
         updatedAt: fv.serverTimestamp()
+      };
+
+      await ctx.db.runTransaction(async (transaction) => {
+        const existing = await transaction.get(ref);
+        if (existing.exists) throw new Error('YA_ENTREGADO');
+        transaction.set(ref, payload);
       });
       invalidateCache('entregas_');
       invalidateCache('entregas_pub_');
