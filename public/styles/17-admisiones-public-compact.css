@@ -1,0 +1,35 @@
+
+/* NUEVAS CLASES COMPACTAS (MAY 2026) */
+.adm-compact-alert {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  border-radius: 0.5rem;
+  margin-bottom: 0.5rem;
+  gap: 1rem;
+}
+.adm-compact-alert > div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  font-size: 0.875rem;
+}
+.adm-compact-alert strong {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.adm-compact-alert span {
+  color: var(--text-secondary);
+}
+.adm-compact-alert.is-info { background: rgba(13, 110, 253, 0.05); border: 1px solid rgba(13, 110, 253, 0.2); }
+.adm-compact-alert.is-info strong { color: var(--primary); }
+.adm-compact-alert.is-warning { background: rgba(255, 193, 7, 0.08); border: 1px solid rgba(255, 193, 7, 0.3); }
+.adm-compact-alert.is-warning strong { color: #856404; }
+.adm-compact-alert.is-success { background: rgba(25, 135, 84, 0.05); border: 1px solid rgba(25, 135, 84, 0.2); }
+.adm-compact-alert.is-success strong { color: var(--success); }
+
+.adm-compact-alert .adm-button { padding: 0.35rem 0.75rem; font-size: 0.875rem; white-space: nowrap; }
+.adm-compact-alert .adm-icon-button { display: flex; align-items: center; justify-content: center; width: 2rem; height: 2rem; border-radius: 0.25rem; color: var(--text-secondary); border: none; background: transparent; cursor: pointer; }
+.adm-compact-alert .adm-icon-button:hover { background: var(--surface-hover); color: var(--text-primary); }

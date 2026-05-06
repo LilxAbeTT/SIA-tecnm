@@ -78,3 +78,9 @@ firmware/**/config.h
 # Local scratch files
 active
 22222.txt
+
+# AI and Browser Automation temp files
+chrome-*
+.playwright-mcp/
+.tmp-edge-profile/
+*.png

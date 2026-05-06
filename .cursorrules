@@ -1,0 +1,9 @@
+# SIA Project - AI Global Rules
+
+As an AI assistant working on this project, you MUST adhere to the following rules:
+
+1. **NO TEMPORARY PROFILES**: Do NOT create temporary browser profiles (e.g., `chrome-*`, `.playwright-mcp`, `.tmp-edge-profile`) in the project directory. If you must run a test, use a true system temporary directory.
+2. **NO BROWSER AUTOMATION**: Do NOT use tools like `browser_subagent`, Playwright, or Puppeteer unless the user explicitly requests you to navigate or run end-to-end tests.
+3. **NO IMAGE GENERATION**: Do NOT use the `generate_image` tool to create PNGs or assets unless explicitly instructed to generate mockups.
+4. **AVOID UNNECESSARY EXECUTIONS**: Do not run commands that consume excessive tokens or time unless they are necessary for debugging a specific issue. Keep your tool calls focused and minimal.
+5. **READ THE MAP**: Always refer to `.agents/project-map.md` to understand the architecture before proposing changes.

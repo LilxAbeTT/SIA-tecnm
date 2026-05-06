@@ -231,7 +231,7 @@ class VocacionalLanding extends HTMLElement {
                                                 <input type="tel" class="form-control  border-0 py-2 py-md-3" id="v-phone" placeholder="10 dígitos" minlength="10" maxlength="10" pattern="[0-9]{10}" required>
                                             </div>
                                             <div class="col-md-6">
-                                                <label class="form-label fw-bold small text-muted">Correo (Opcional)</label>
+                                                <label class="form-label fw-bold small text-muted">Correo Electrónico<span class="text-danger">*</span></label>
                                                 <input type="email" class="form-control  border-0 py-2 py-md-3" id="v-email" placeholder="correo@ejemplo.com">
                                             </div>
 

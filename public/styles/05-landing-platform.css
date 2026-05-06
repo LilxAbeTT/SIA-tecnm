@@ -1,761 +1,1400 @@
 /* ============================================================
-   MODO OSCURO TOTAL (DARK LANDING V3.0)
-   Unifica el fondo con el Hero (#051525) y adapta componentes.
+   SIA Landing - institutional, mobile-first
    ============================================================ */
 
-/* ============================================================
-   LANDING V4.0 - COLORES OFICIALES TecNM
-   Pantone 294: #1B396A | Cool Gray 10C: #807E82 | Negro: #000
-   Tipografía: Noto Sans (body) + Source Serif 4 / Patria (headings)
-   ============================================================ */
-
-/* --- Variables del Landing --- */
 #landing-view {
-    --landing-bg: #0f1114;
-    --landing-bg-alt: #161a1e;
-    --landing-primary: #1B396A;
-    --landing-primary-light: #2a5298;
-    --landing-gray: #807E82;
-    --landing-text: #ffffff;
-    --landing-text-muted: rgba(255, 255, 255, 0.55);
-    --landing-text-soft: rgba(255, 255, 255, 0.75);
-    --landing-border: rgba(255, 255, 255, 0.08);
-    --landing-card-bg: rgba(255, 255, 255, 0.04);
-    --landing-font-body: 'Noto Sans', sans-serif;
-    --landing-font-heading: 'Source Serif 4', 'Patria', Georgia, serif;
+    --sia-blue: #1B396A;
+    --sia-blue-deep: #09203B;
+    --sia-blue-soft: #D7E8F7;
+    --sia-teal: #087B77;
+    --sia-teal-soft: #DCEFEB;
+    --sia-gold: #C18A12;
+    --sia-gold-soft: #F5E8C8;
+    --sia-burgundy: #8A1638;
+    --sia-burgundy-soft: #F0D8DF;
+    --sia-heading-solid: #071827;
+    --sia-ink: #172D43;
+    --sia-copy: #40566B;
+    --sia-copy-soft: #687C8F;
+    --sia-line: rgba(27, 57, 106, 0.16);
+    --sia-paper: #F8FBFE;
+    --sia-surface: #EAF3FA;
+    --sia-surface-strong: #DCEAF5;
+    --sia-surface-warm: #FFF9EA;
+    --sia-panel: rgba(244, 249, 253, 0.94);
+    --sia-panel-strong: rgba(250, 253, 255, 0.98);
+    --sia-border: rgba(27, 57, 106, 0.18);
+    --sia-border-strong: rgba(27, 57, 106, 0.28);
+    --sia-shadow: 0 24px 48px rgba(9, 32, 59, 0.16);
+    --sia-shadow-soft: 0 14px 32px rgba(9, 32, 59, 0.1);
+    --sia-shadow-color: 0 18px 38px rgba(8, 123, 119, 0.16);
+    --sia-font-body: 'Noto Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --sia-font-heading: 'Source Serif 4', Georgia, serif;
+    display: block;
+    min-height: 100vh;
+    overflow-x: clip;
+    color: var(--sia-ink);
+    background:
+        radial-gradient(circle at 8% 6%, rgba(8, 123, 119, 0.14), transparent 28%),
+        radial-gradient(circle at 92% 0%, rgba(27, 57, 106, 0.24), transparent 34%),
+        radial-gradient(circle at 18% 92%, rgba(193, 138, 18, 0.1), transparent 30%),
+        linear-gradient(180deg, #E8F2FA 0%, #DFECF6 42%, #D8E7F2 72%, #EAF3FA 100%);
+    font-family: var(--sia-font-body);
 }
 
-/* =============================================
-   OVERRIDE BOOTSTRAP LIGHT/DARK THEME INSIDE LANDING
-   El landing SIEMPRE es oscuro, sin importar el tema del navegador.
-   ============================================= */
-
-/* Force dark context on the landing root */
 #landing-view,
-#landing-view *:not(i):not(span.bi) {
-    color-scheme: dark;
+#landing-view * {
+    box-sizing: border-box;
 }
 
-/* 1. Tipografía global del landing */
-#landing-view {
-    font-family: var(--landing-font-body);
-    color: var(--landing-text) !important;
-    background-color: var(--landing-bg) !important;
+#landing-view a,
+#landing-view button {
+    -webkit-tap-highlight-color: transparent;
+}
+
+#landing-view a {
+    text-decoration: none;
+}
+
+#landing-view button {
+    font-family: inherit;
 }
 
 #landing-view h1,
 #landing-view h2,
-#landing-view h3 {
-    font-family: var(--landing-font-heading);
-    color: var(--landing-text) !important;
-    font-weight: 800;
+#landing-view h3,
+#landing-view p {
+    margin-top: 0;
 }
 
-#landing-view h4,
-#landing-view h5,
-#landing-view h6,
-#landing-view p,
-#landing-view span,
-#landing-view li,
-#landing-view small,
-#landing-view div {
-    color: inherit;
-}
-
+#landing-view h1,
+#landing-view h2,
+#landing-view h3,
 #landing-view h4,
 #landing-view h5,
 #landing-view h6 {
-    font-family: var(--landing-font-body);
-    color: var(--landing-text) !important;
-    font-weight: 700;
+    opacity: 1 !important;
+    color: var(--sia-heading-solid) !important;
+    -webkit-text-fill-color: currentColor !important;
+    background-clip: border-box !important;
+    -webkit-background-clip: border-box !important;
+    filter: none !important;
 }
 
-#landing-view .text-muted {
-    color: var(--landing-text-muted) !important;
+.sia-landing-nav-wrap {
+    position: fixed;
+    top: max(0.8rem, env(safe-area-inset-top));
+    left: 0.8rem;
+    right: 0.8rem;
+    z-index: 1030;
 }
 
-#landing-view .lead {
-    color: var(--landing-text-soft) !important;
-}
-
-#landing-view .text-dark,
-#landing-view .text-body {
-    color: var(--landing-text) !important;
-}
-
-/* 2. Forzar fondos oscuros en TODAS las secciones */
-#landing-view,
-#landing-view main,
-#landing-view section,
-#landing-view footer {
-    background-color: var(--landing-bg) !important;
-    background-image: none !important;
-    color: var(--landing-text) !important;
-}
-
-#landing-view .landing-section-alt {
-    background-color: var(--landing-bg-alt) !important;
-}
-
-/* 3. Cards de Bootstrap: forzar fondo oscuro (override --bs-card-bg) */
-#landing-view .card {
-    --bs-card-bg: rgba(15, 17, 20, 0.7);
-    --bs-card-color: #fff;
-    --bs-card-border-color: rgba(255, 255, 255, 0.08);
-    --bs-card-cap-bg: transparent;
-    background-color: rgba(15, 17, 20, 0.7) !important;
-    background: rgba(15, 17, 20, 0.7) !important;
-    border-color: rgba(255, 255, 255, 0.08) !important;
-    color: var(--landing-text) !important;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3) !important;
-}
-
-#landing-view .card-body,
-#landing-view .card-header,
-#landing-view .card-footer {
-    background-color: transparent !important;
-    background: transparent !important;
-    color: var(--landing-text) !important;
-    border-color: rgba(255, 255, 255, 0.06) !important;
-}
-
-/* Mockup card extra specificity */
-#landing-view main .card {
-    background: rgba(15, 17, 20, 0.7) !important;
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-}
-
-#landing-view .landing-mockup-card {
-    --bs-card-bg: rgba(15, 17, 20, 0.8) !important;
-    background: rgba(15, 17, 20, 0.8) !important;
-    backdrop-filter: blur(20px) !important;
-    -webkit-backdrop-filter: blur(20px) !important;
-    border: 1px solid rgba(255, 255, 255, 0.08) !important;
-    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5) !important;
-    color: #fff !important;
-}
-
-#landing-view .landing-mockup-card * {
-    color: inherit;
-}
-
-/* 4. Bootstrap bg-* overrides */
-#landing-view .bg-white,
-#landing-view .bg-surface-muted {
-    background-color: var(--landing-bg) !important;
-}
-
-/* 5. Borders Bootstrap override */
-#landing-view .border,
-#landing-view .border-top,
-#landing-view .border-bottom {
-    border-color: rgba(255, 255, 255, 0.08) !important;
-}
-
-/* 6. Dropdown/List overrides */
-#landing-view .dropdown-menu {
-    background-color: rgba(15, 17, 20, 0.95) !important;
-    border-color: rgba(255, 255, 255, 0.1) !important;
-}
-
-#landing-view .dropdown-item {
-    color: rgba(255, 255, 255, 0.7) !important;
-}
-
-#landing-view .dropdown-item:hover {
-    background-color: rgba(255, 255, 255, 0.08) !important;
-    color: #fff !important;
-}
-
-/* 7. btn-outline-light forced contrast */
-#landing-view .btn-outline-light {
-    color: rgba(255, 255, 255, 0.8) !important;
-    border-color: rgba(255, 255, 255, 0.15) !important;
-}
-
-#landing-view .btn-outline-light:hover {
-    background-color: rgba(255, 255, 255, 0.1) !important;
-    color: #fff !important;
-    border-color: rgba(255, 255, 255, 0.3) !important;
-}
-
-/* 8. hr separator */
-#landing-view hr {
-    border-color: rgba(255, 255, 255, 0.06) !important;
-    opacity: 1;
-}
-
-/* 9. Rounded containers inside mockup card */
-#landing-view .card .rounded-3,
-#landing-view .card .rounded-4 {
-    background-color: transparent;
-}
-
-/* 10. Bootstrap text-white-50 override */
-#landing-view .text-white-50 {
-    color: rgba(255, 255, 255, 0.5) !important;
-}
-
-#landing-view .text-white {
-    color: #fff !important;
-}
-
-/* 11. Navbar pill: ensure always dark */
-.landing-nav-pill {
-    --bs-navbar-color: rgba(255, 255, 255, 0.7);
-    --bs-navbar-hover-color: #fff;
-    --bs-navbar-brand-color: #fff;
-    --bs-navbar-toggler-border-color: transparent;
-}
-
-/* 12. Override .bg-primary-subtle and similar Bootstrap contextual inside landing */
-#landing-view [class*="bg-"][class*="-subtle"] {
-    background-color: rgba(255, 255, 255, 0.08) !important;
-}
-
-/* 13. List-unstyled links in footer */
-#landing-view .list-unstyled a {
-    color: rgba(255, 255, 255, 0.4) !important;
-    text-decoration: none;
-    transition: color 0.2s;
-}
-
-#landing-view .list-unstyled a:hover {
-    color: #fff !important;
-}
-
-/* 14. Ensure bootstrap .fw-bold doesn't change color */
-#landing-view .fw-bold {
-    color: inherit;
-}
-
-/* 15. Badge override */
-#landing-view .badge {
-    color: inherit !important;
-}
-
-/* 16. Navbar collapse mobile - force dark */
-.landing-nav-collapse.show,
-.landing-nav-collapse.collapsing {
-    background: rgba(15, 17, 20, 0.95) !important;
-}
-
-/* 3. Tarjetas landing con glass effect */
-#landing-view .landing-card {
-    background: var(--landing-card-bg) !important;
-    border: 1px solid var(--landing-border) !important;
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-#landing-view .landing-card:hover {
-    background: rgba(255, 255, 255, 0.07) !important;
-    border-color: rgba(27, 57, 106, 0.4) !important;
-    transform: translateY(-4px);
-    box-shadow: 0 12px 40px rgba(27, 57, 106, 0.2);
-}
-
-/* 4. Navbar flotante del landing */
-.landing-nav-pill {
-    background: rgba(15, 17, 20, 0.8);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-    transition: all 0.3s ease;
-}
-
-.landing-nav-pill .nav-link {
-    color: rgba(255, 255, 255, 0.6);
-    font-weight: 600;
-    font-size: 0.85rem;
-    padding: 0.4rem 1rem;
-    border-radius: 50rem;
-    transition: all 0.25s ease;
-    font-family: 'Noto Sans', sans-serif;
-}
-
-.landing-nav-pill .nav-link:hover {
-    color: #fff;
-    background: rgba(255, 255, 255, 0.08);
-}
-
-/* Botón CTA del navbar */
-.btn-landing-cta {
-    background: #ffffff !important;
-    color: var(--landing-primary) !important;
-    font-weight: 700 !important;
-    font-size: 0.85rem;
-    padding: 0.5rem 1.25rem;
-    border-radius: 50rem;
-    border: none;
-    transition: all 0.25s ease;
-    font-family: 'Noto Sans', sans-serif;
-    box-shadow: 0 2px 12px rgba(255, 255, 255, 0.15);
-}
-
-.btn-landing-cta:hover {
-    background: #f0f0f0 !important;
-    transform: translateY(-1px);
-    box-shadow: 0 4px 20px rgba(255, 255, 255, 0.25);
-}
-
-/* 5. Botón Hero principal (Acceso Institucional) */
-.btn-acceso-institucional {
-    background: linear-gradient(135deg, #ffffff 0%, #e8edf5 100%);
-    color: #1B396A;
-    font-weight: 800;
-    font-size: 1.05rem;
-    padding: 1rem 2.5rem;
-    border-radius: 50rem;
-    border: none;
-    box-shadow: 0 4px 24px rgba(255, 255, 255, 0.2), 0 0 0 1px rgba(255, 255, 255, 0.1);
-    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-    font-family: 'Noto Sans', sans-serif;
-    letter-spacing: -0.01em;
-    position: relative;
-    overflow: hidden;
-}
-
-.btn-acceso-institucional::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(135deg, rgba(27, 57, 106, 0.05) 0%, rgba(27, 57, 106, 0.1) 100%);
-    opacity: 0;
-    transition: opacity 0.3s;
-}
-
-.btn-acceso-institucional:hover {
-    transform: translateY(-2px) scale(1.02);
-    box-shadow: 0 8px 40px rgba(255, 255, 255, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.2);
-    color: #1B396A;
-}
-
-.btn-acceso-institucional:hover::before {
-    opacity: 1;
-}
-
-.landing-gradient-text {
-    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-}
-
-#landing-view .landing-hero-subtitle {
-    max-width: 58ch;
-    color: rgba(255, 255, 255, 0.72) !important;
-    font-size: 1.05rem;
-    line-height: 1.78;
-}
-
-#landing-view .landing-hero-subtitle strong {
-    color: rgba(255, 255, 255, 0.95) !important;
-}
-
-#landing-view .landing-hero-actions,
-#landing-view .landing-vocational-actions,
-#landing-view .landing-process-footer {
+.sia-landing-nav {
     display: flex;
-    flex-wrap: wrap;
-    gap: 1rem;
-}
-
-#landing-view .landing-hero-actions {
-    margin-bottom: 1.35rem;
-}
-
-#landing-view .landing-secondary-cta {
-    border-color: rgba(255, 255, 255, 0.15) !important;
-    font-size: 0.95rem;
-}
-
-#landing-view .landing-trust-list {
-    display: flex;
-    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
     gap: 0.75rem;
-    margin-bottom: 1rem;
-}
-
-#landing-view .landing-trust-chip,
-#landing-view .landing-process-badge,
-#landing-view .landing-process-tag,
-#landing-view .landing-route-pill,
-#landing-view .landing-preview-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    border-radius: 999px;
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    background: rgba(255, 255, 255, 0.06);
-    color: rgba(255, 255, 255, 0.82);
-    font-size: 0.76rem;
-    font-weight: 700;
-    letter-spacing: 0.02em;
-}
-
-#landing-view .landing-trust-chip,
-#landing-view .landing-process-tag {
-    padding: 0.5rem 0.8rem;
-}
-
-#landing-view .landing-trust-chip i {
-    color: #7dd3fc;
-}
-
-#landing-view .landing-hero-note {
-    max-width: 48ch;
-    color: rgba(255, 255, 255, 0.58);
-    font-size: 0.88rem;
-    line-height: 1.7;
-    margin-bottom: 2rem;
-}
-
-#landing-view .landing-dashboard-preview {
-    max-width: 430px;
-    transform: rotate(-1deg);
-}
-
-#landing-view .landing-preview-mark {
-    width: 52px;
-    height: 52px;
-    background: linear-gradient(135deg, #1B396A, #2a5298);
-    color: #fff;
-    font-size: 0.95rem;
-}
-
-#landing-view .landing-preview-list {
-    display: grid;
-    gap: 0.85rem;
-}
-
-#landing-view .landing-preview-item {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 0.9rem;
-    padding: 0.95rem 1rem;
-    border-radius: 18px;
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.06);
-}
-
-#landing-view .landing-preview-item.is-priority {
-    background: rgba(27, 57, 106, 0.18);
-    border-color: rgba(79, 172, 254, 0.22);
-}
-
-#landing-view .landing-preview-label {
-    font-size: 0.88rem;
-    font-weight: 800;
-    color: #fff;
-    margin-bottom: 0.2rem;
-}
-
-#landing-view .landing-preview-text {
-    color: rgba(255, 255, 255, 0.58);
-    font-size: 0.78rem;
-    line-height: 1.6;
-}
-
-#landing-view .landing-preview-badge {
-    flex-shrink: 0;
-    padding: 0.42rem 0.7rem;
-}
-
-#landing-view .landing-vocational-spotlight {
-    display: grid;
-    grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
-    gap: 1.25rem;
-    align-items: stretch;
-}
-
-#landing-view .landing-vocational-copy,
-#landing-view .landing-vocational-card,
-#landing-view .landing-process-card,
-#landing-view .landing-value-card {
-    padding: 1.5rem;
-}
-
-#landing-view .landing-vocational-copy {
-    border-radius: 28px;
+    min-height: 68px;
+    padding: 0.6rem 0.7rem;
+    border: 1px solid rgba(27, 57, 106, 0.12);
+    border-radius: 24px;
     background:
-        radial-gradient(circle at top left, rgba(79, 172, 254, 0.18), transparent 28%),
-        linear-gradient(145deg, rgba(12, 25, 46, 0.96) 0%, rgba(16, 47, 92, 0.88) 100%);
-    border: 1px solid rgba(79, 172, 254, 0.2);
-    box-shadow: 0 24px 60px rgba(4, 12, 28, 0.35);
+        linear-gradient(180deg, rgba(250, 253, 255, 0.94), rgba(229, 240, 248, 0.9)),
+        linear-gradient(90deg, rgba(8, 123, 119, 0.1), rgba(27, 57, 106, 0.12));
+    box-shadow: 0 18px 40px rgba(9, 32, 59, 0.14);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
 }
 
-#landing-view .landing-vocational-copy h2,
-#landing-view .landing-process-card h3,
-#landing-view .landing-value-card h3,
-#landing-view .landing-vocational-card h3 {
-    font-size: 1.45rem;
-    line-height: 1.15;
-}
-
-#landing-view .landing-vocational-lead,
-#landing-view .landing-vocational-card p,
-#landing-view .landing-process-desc,
-#landing-view .landing-value-card p {
-    color: rgba(255, 255, 255, 0.68) !important;
-    font-size: 0.95rem;
-    line-height: 1.75;
-}
-
-#landing-view .landing-vocational-grid {
-    display: grid;
-    grid-template-columns: repeat(1, minmax(0, 1fr));
-    gap: 1rem;
-}
-
-#landing-view .landing-route-pill {
-    width: fit-content;
-    padding: 0.5rem 0.8rem;
-    margin-bottom: 1rem;
-    color: #9bdcff;
-}
-
-#landing-view .landing-process-grid {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 1rem;
-}
-
-#landing-view .landing-process-card {
-    min-height: 100%;
-}
-
-#landing-view .landing-process-top {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
-    margin-bottom: 1rem;
-}
-
-#landing-view .landing-process-badge {
-    padding: 0.42rem 0.75rem;
-}
-
-#landing-view .landing-process-title {
-    margin-bottom: 0.75rem;
-    font-size: 1.2rem !important;
-}
-
-#landing-view .landing-process-tags {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.65rem;
-    margin-top: auto;
-}
-
-#landing-view .landing-process-footer {
-    align-items: center;
-    justify-content: space-between;
-    margin-top: 1.5rem;
-    padding: 1rem 1.2rem;
-    border-radius: 22px;
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-#landing-view .landing-process-footer p {
-    color: rgba(255, 255, 255, 0.62) !important;
-    line-height: 1.7;
-}
-
-#landing-view .landing-value-grid {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 1rem;
-}
-
-#landing-view .landing-value-card {
-    min-height: 100%;
-}
-
-#landing-view .landing-value-icon,
-#landing-view .landing-module-icon {
+.sia-landing-brand {
     display: inline-flex;
     align-items: center;
-    justify-content: center;
-}
-
-#landing-view .landing-value-icon {
-    width: 3.25rem;
-    height: 3.25rem;
-    border-radius: 18px;
-    margin-bottom: 1rem;
-    font-size: 1.2rem;
-}
-
-#landing-view .landing-module-icon.is-blue,
-#landing-view .landing-value-icon.is-blue {
-    background: rgba(27, 57, 106, 0.24);
-    color: #6ecbff;
-}
-
-#landing-view .landing-module-icon.is-amber {
-    background: rgba(217, 119, 6, 0.22);
-    color: #fbbf24;
-}
-
-#landing-view .landing-module-icon.is-red,
-#landing-view .landing-value-icon.is-red {
-    background: rgba(220, 38, 38, 0.2);
-    color: #f87171;
-}
-
-#landing-view .landing-module-icon.is-cyan,
-#landing-view .landing-value-icon.is-cyan {
-    background: rgba(8, 145, 178, 0.22);
-    color: #67e8f9;
-}
-
-#landing-view .landing-module-icon.is-orange {
-    background: rgba(249, 115, 22, 0.18);
-    color: #fb923c;
-}
-
-#landing-view .landing-module-icon.is-emerald,
-#landing-view .landing-value-icon.is-emerald {
-    background: rgba(16, 185, 129, 0.2);
-    color: #6ee7b7;
-}
-
-#landing-view .landing-social-link {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 2.6rem;
-    height: 2.6rem;
-    border-radius: 50%;
-    color: rgba(255, 255, 255, 0.45);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    background: rgba(255, 255, 255, 0.03);
-    transition: color 0.2s ease, border-color 0.2s ease, transform 0.2s ease, background 0.2s ease;
-}
-
-#landing-view .landing-social-link:hover {
-    color: #fff;
-    border-color: rgba(255, 255, 255, 0.22);
-    background: rgba(255, 255, 255, 0.07);
-    transform: translateY(-1px);
-}
-
-/* 17. Compact layout refresh */
-#landing-view .landing-hero {
-    min-height: 84vh !important;
-}
-
-#landing-view .landing-brand-lockup {
+    gap: 0.7rem;
     min-width: 0;
 }
 
-#landing-view .landing-brand-copy {
-    display: flex;
-    flex-direction: column;
+.sia-brand-logos {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.55rem;
+    min-width: 0;
+}
+
+.sia-brand-logo-tecnm,
+.sia-brand-logo-ites,
+.sia-brand-logo-sia {
+    width: auto;
+    object-fit: contain;
+}
+
+.sia-brand-logo-tecnm {
+    height: 30px;
+}
+
+.sia-brand-logo-ites {
+    height: 28px;
+}
+
+.sia-brand-logo-sia {
+    height: 24px;
+}
+
+.sia-brand-divider {
+    flex: 0 0 auto;
+    width: 1px;
+    height: 28px;
+    background: rgba(27, 57, 106, 0.2);
+}
+
+.sia-brand-copy {
+    display: none;
+    min-width: 0;
+}
+
+.sia-brand-copy strong,
+.sia-brand-copy small {
+    display: block;
     line-height: 1.05;
 }
 
-#landing-view .landing-brand-copy strong {
-    font-size: 0.9rem;
-    font-weight: 800;
-    color: #fff;
+.sia-brand-copy strong {
+    color: var(--sia-blue-deep);
+    font-size: 0.84rem;
+    font-weight: 900;
 }
 
-#landing-view .landing-brand-copy span {
-    font-size: 0.7rem;
-    color: rgba(255, 255, 255, 0.56);
+.sia-brand-copy small {
+    color: var(--sia-teal);
+    font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    text-shadow: 0 1px 0 rgba(235, 245, 251, 0.92);
+}
+
+.sia-nav-toggle {
+    display: inline-grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    border: 0;
+    border-radius: 16px;
+    color: #fff;
+    background: linear-gradient(135deg, var(--sia-blue-deep) 0%, var(--sia-blue) 66%, #2A5F8E 100%);
+    box-shadow: 0 12px 24px rgba(9, 32, 59, 0.24);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.sia-nav-toggle i {
+    font-size: 1.35rem;
+}
+
+.sia-nav-toggle:active {
+    transform: scale(0.96);
+}
+
+.sia-nav-content {
+    position: absolute;
+    top: calc(100% + 0.6rem);
+    left: 0;
+    right: 0;
+    padding: 0.75rem;
+    border: 1px solid var(--sia-border);
+    border-radius: 22px;
+    background: rgba(245, 250, 253, 0.98);
+    box-shadow: var(--sia-shadow);
+}
+
+.sia-nav-link,
+.sia-nav-login {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    min-height: 46px;
+    padding: 0.72rem 0.95rem;
+    border-radius: 16px;
+    border: 0;
+    font-size: 0.92rem;
+    font-weight: 800;
+    transition: transform 0.2s ease, background 0.2s ease, color 0.2s ease;
+}
+
+.sia-nav-link {
+    color: var(--sia-ink);
+    background: transparent;
+}
+
+.sia-nav-link:hover,
+.sia-nav-link:focus-visible {
+    color: var(--sia-blue);
+    background: var(--sia-blue-soft);
+}
+
+.sia-nav-login {
+    gap: 0.5rem;
+    margin-top: 0.25rem;
+    color: #fff;
+    background: linear-gradient(135deg, var(--sia-blue-deep) 0%, var(--sia-blue) 100%);
+    box-shadow: 0 12px 26px rgba(9, 32, 59, 0.18);
+}
+
+.sia-nav-login:hover,
+.sia-nav-login:focus-visible {
+    color: #fff;
+    transform: translateY(-1px);
+}
+
+.sia-landing-hero {
+    position: relative;
+    display: grid;
+    gap: 1.4rem;
+    min-height: 82svh;
+    padding: calc(6rem + env(safe-area-inset-top)) 1rem 1.75rem;
+}
+
+.sia-hero-glow {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+        radial-gradient(circle at 14% 20%, rgba(8, 123, 119, 0.14), transparent 28%),
+        radial-gradient(circle at 90% 14%, rgba(27, 57, 106, 0.16), transparent 24%),
+        radial-gradient(circle at 48% 82%, rgba(193, 138, 18, 0.12), transparent 24%);
+}
+
+.sia-hero-main,
+.sia-hero-panel {
+    position: relative;
+    z-index: 1;
+}
+
+.sia-hero-main {
+    align-self: end;
+}
+
+.sia-hero-kicker {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.55rem;
+    margin-bottom: 1rem;
+    padding: 0.5rem 0.8rem;
+    border-radius: 999px;
+    color: var(--sia-blue-deep);
+    background: linear-gradient(135deg, rgba(248, 252, 254, 0.9), rgba(215, 234, 242, 0.86));
+    border: 1px solid rgba(8, 123, 119, 0.18);
+    font-size: 0.78rem;
+    font-weight: 900;
     letter-spacing: 0.04em;
     text-transform: uppercase;
 }
 
-#landing-view .landing-hero-actions .btn {
-    min-height: 56px;
+.sia-hero-kicker i {
+    color: var(--sia-teal);
 }
 
-#landing-view .landing-hero-surface {
-    max-width: 400px;
-}
-
-#landing-view .landing-process-grid,
-#landing-view .landing-step-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 1rem;
-}
-
-#landing-view .landing-process-card,
-#landing-view .landing-step-card {
-    min-height: 100%;
+.sia-hero-logo-title {
     display: flex;
-    flex-direction: column;
+    align-items: center;
+    width: min(100%, 320px);
+    min-height: 112px;
+    margin-bottom: 0.45rem;
 }
 
-#landing-view .landing-step-card {
-    padding: 1.35rem;
+.sia-hero-logo-title img {
+    display: block;
+    width: min(100%, 300px);
+    height: auto;
+    object-fit: contain;
+    filter:
+        drop-shadow(0 2px 0 rgba(235, 245, 251, 0.92))
+        drop-shadow(0 16px 26px rgba(9, 32, 59, 0.2));
 }
 
-#landing-view .landing-step-number {
-    width: 2.8rem;
-    height: 2.8rem;
-    border-radius: 50%;
+.sia-hero-subtitle {
+    max-width: 22rem;
+    margin-bottom: 1.35rem;
+    color: var(--sia-ink);
+    font-size: clamp(1.08rem, 5vw, 1.4rem);
+    font-weight: 800;
+    line-height: 1.2;
+    text-shadow: 0 1px 0 rgba(235, 245, 251, 0.78);
+}
+
+.sia-hero-actions {
+    display: grid;
+    gap: 0.72rem;
+}
+
+.sia-action-primary,
+.sia-action-secondary,
+.sia-read-more,
+.sia-phone-row,
+.sia-audience-card button,
+.sia-audience-card a,
+.sia-route-card button,
+.sia-route-card a,
+.sia-module-sticker,
+.sia-strip-actions button,
+.sia-app-actions button,
+.sia-modal-close,
+.sia-footer-links button {
+    border: 0;
+    cursor: pointer;
+}
+
+.sia-action-primary,
+.sia-action-secondary {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.65rem;
+    min-height: 58px;
+    padding: 0.92rem 1rem;
+    border-radius: 20px;
+    font-weight: 900;
+    line-height: 1.1;
+    transition: transform 0.22s ease, box-shadow 0.22s ease, background 0.22s ease;
+}
+
+.sia-action-primary {
+    color: #fff;
+    background: linear-gradient(135deg, var(--sia-blue-deep) 0%, var(--sia-blue) 58%, #2A6E97 100%);
+    box-shadow: 0 16px 32px rgba(9, 32, 59, 0.24);
+}
+
+.sia-action-secondary {
+    color: var(--sia-ink);
+    background: var(--sia-panel-strong);
+    border: 1px solid var(--sia-border);
+    box-shadow: var(--sia-shadow-soft);
+}
+
+.sia-action-secondary.is-admissions {
+    border-color: rgba(138, 22, 56, 0.18);
+    background:
+        linear-gradient(180deg, rgba(250, 253, 255, 0.96), rgba(243, 231, 236, 0.94)),
+        linear-gradient(135deg, rgba(138, 22, 56, 0.09), rgba(232, 242, 250, 0));
+}
+
+.sia-action-secondary.is-admissions i {
+    color: var(--sia-burgundy);
+}
+
+.sia-action-secondary.is-map {
+    border-color: rgba(8, 123, 119, 0.18);
+    background:
+        linear-gradient(180deg, rgba(250, 253, 255, 0.96), rgba(230, 244, 242, 0.94)),
+        linear-gradient(135deg, rgba(8, 123, 119, 0.09), rgba(232, 242, 250, 0));
+}
+
+.sia-action-secondary.is-map i {
+    color: var(--sia-teal);
+}
+
+.sia-action-primary:hover,
+.sia-action-primary:focus-visible,
+.sia-action-secondary:hover,
+.sia-action-secondary:focus-visible,
+.sia-route-card:hover,
+.sia-module-sticker:hover,
+.sia-strip-actions button:hover,
+.sia-app-actions button:hover {
+    transform: translateY(-2px);
+}
+
+.sia-action-primary:active,
+.sia-action-secondary:active,
+.sia-route-card button:active,
+.sia-route-card a:active,
+.sia-module-sticker:active,
+.sia-strip-actions button:active,
+.sia-app-actions button:active {
+    transform: scale(0.98);
+}
+
+.sia-read-more {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    margin-top: 0.9rem;
+    padding: 0.5rem 0;
+    color: var(--sia-blue);
+    background: transparent;
+    font-weight: 900;
+    text-shadow: 0 1px 0 rgba(235, 245, 251, 0.82);
+}
+
+.sia-read-more i {
+    font-size: 1.2rem;
+    transition: transform 0.2s ease;
+}
+
+.sia-read-more:hover i {
+    transform: translateX(3px);
+}
+
+.sia-hero-panel {
+    align-self: start;
+    display: none;
+    justify-content: center;
+}
+
+.sia-phone-shell {
+    width: min(100%, 320px);
+    padding: 0.75rem;
+    border: 1px solid rgba(27, 57, 106, 0.14);
+    border-radius: 34px;
+    background:
+        linear-gradient(180deg, rgba(247, 252, 254, 0.98) 0%, rgba(219, 234, 244, 0.96) 100%),
+        linear-gradient(135deg, rgba(8, 123, 119, 0.08), rgba(193, 138, 18, 0.08));
+    box-shadow: var(--sia-shadow);
+}
+
+.sia-phone-top {
+    display: flex;
+    justify-content: center;
+    padding: 0.25rem 0 0.8rem;
+}
+
+.sia-phone-top span {
+    width: 70px;
+    height: 5px;
+    border-radius: 999px;
+    background: rgba(9, 32, 59, 0.18);
+}
+
+.sia-phone-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.9rem;
+    padding: 0.85rem;
+    border-radius: 24px;
+    color: #fff;
+    background:
+        linear-gradient(135deg, var(--sia-blue-deep) 0%, var(--sia-blue) 54%, var(--sia-teal) 100%);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12), 0 14px 28px rgba(9, 32, 59, 0.18);
+}
+
+.sia-phone-header img {
+    width: 48px;
+    height: 48px;
+    object-fit: contain;
+    border-radius: 16px;
+    background: rgba(237, 247, 252, 0.96);
+}
+
+.sia-phone-header strong,
+.sia-phone-header span {
+    display: block;
+}
+
+.sia-phone-header strong {
+    font-size: 1rem;
+}
+
+.sia-phone-header span {
+    color: rgba(236, 246, 250, 0.86);
+    font-size: 0.78rem;
+}
+
+.sia-phone-list {
+    display: grid;
+    gap: 0.7rem;
+}
+
+.sia-phone-row {
+    display: grid;
+    grid-template-columns: 38px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.7rem;
+    width: 100%;
+    min-height: 58px;
+    padding: 0.7rem;
+    border-radius: 20px;
+    color: var(--sia-ink) !important;
+    border: 1px solid rgba(27, 57, 106, 0.08);
+    background: rgba(246, 251, 254, 0.96);
+    box-shadow: 0 10px 22px rgba(9, 32, 59, 0.08);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.sia-phone-row:hover,
+.sia-phone-row:focus-visible {
+    color: var(--sia-ink) !important;
+    transform: translateX(3px);
+    box-shadow: 0 14px 28px rgba(9, 32, 59, 0.13);
+}
+
+.sia-phone-row i {
+    display: inline-grid;
+    place-items: center;
+    width: 38px;
+    height: 38px;
+    border-radius: 14px;
+    color: #fff;
+    background: var(--sia-blue);
+}
+
+.sia-phone-row:nth-child(2) i {
+    background: var(--sia-burgundy);
+}
+
+.sia-phone-row:nth-child(3) i {
+    background: var(--sia-teal);
+}
+
+.sia-phone-row span {
+    min-width: 0;
+    overflow: hidden;
+    color: var(--sia-ink);
+    font-size: 0.9rem;
+    font-weight: 900;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.sia-phone-row b {
+    color: var(--sia-copy-soft);
+    font-size: 0.75rem;
+}
+
+.sia-landing-section {
+    padding: 2.2rem 1rem;
+}
+
+.sia-section-heading {
+    display: grid;
+    gap: 0.55rem;
+    margin-bottom: 1rem;
+}
+
+.sia-section-brief {
+    max-width: 42rem;
+    margin: 0;
+    color: var(--sia-copy);
+    font-size: 0.95rem;
+    line-height: 1.58;
+}
+
+.sia-section-heading span,
+.sia-strip-label {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    margin-bottom: 1rem;
-    font-size: 1rem;
-    font-weight: 800;
-    color: #fff;
-    background: linear-gradient(135deg, rgba(27, 57, 106, 0.95), rgba(79, 172, 254, 0.86));
-    box-shadow: 0 10px 24px rgba(8, 18, 38, 0.35);
-}
-
-#landing-view .landing-step-card h3 {
-    font-size: 1.25rem;
-    line-height: 1.15;
-    margin-bottom: 0.7rem;
-}
-
-#landing-view .landing-step-card p {
+    width: fit-content;
+    min-height: 32px;
     margin-bottom: 0;
-    color: rgba(255, 255, 255, 0.68) !important;
-    line-height: 1.72;
+    padding: 0.35rem 0.75rem;
+    border: 1px solid rgba(138, 22, 56, 0.16);
+    border-radius: 999px;
+    color: var(--sia-burgundy);
+    background: linear-gradient(135deg, rgba(249, 253, 255, 0.92), rgba(230, 239, 247, 0.84));
+    font-size: 0.76rem;
+    font-weight: 900;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    box-shadow: 0 10px 22px rgba(9, 32, 59, 0.05);
 }
 
-#landing-view .landing-vocational-spotlight {
+.sia-section-heading h2,
+.sia-info-strip h2,
+.sia-app-panel h2 {
+    display: block;
+    width: fit-content;
+    margin-bottom: 0;
+    color: var(--sia-heading-solid) !important;
+    -webkit-text-fill-color: var(--sia-heading-solid) !important;
+    font-family: var(--sia-font-body);
+    font-size: clamp(1.18rem, 5vw, 1.72rem);
+    font-weight: 800;
+    line-height: 1.16;
+    padding-left: 0.9rem;
+    border-left: 4px solid var(--sia-teal);
+    text-shadow: none !important;
+    box-shadow: none;
+}
+
+.sia-audience-grid {
+    display: grid;
     grid-template-columns: 1fr;
+    gap: 0.85rem;
 }
 
-#landing-view .landing-vocational-copy {
-    max-width: 860px;
-    margin: 0 auto;
+.sia-audience-card {
+    --audience-accent: var(--sia-blue);
+    display: grid;
+    gap: 0.7rem;
+    min-height: 210px;
+    padding: 1rem;
+    border: 1px solid color-mix(in srgb, var(--audience-accent), white 76%);
+    border-radius: 26px;
+    background:
+        linear-gradient(180deg, rgba(249, 253, 255, 0.98), rgba(230, 240, 248, 0.94)),
+        linear-gradient(135deg, color-mix(in srgb, var(--audience-accent), white 84%), rgba(226, 239, 248, 0));
+    box-shadow: var(--sia-shadow-soft);
+    transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease;
 }
 
-#landing-view .landing-process-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+.sia-audience-card:hover,
+.sia-audience-card:focus-within {
+    border-color: color-mix(in srgb, var(--audience-accent), white 48%);
+    box-shadow: var(--sia-shadow);
+    transform: translateY(-2px);
 }
 
-#landing-view .landing-process-title {
-    max-width: 16ch;
-}
-
-#landing-view .landing-process-footer {
-    margin-top: 1.25rem;
-}
-
-#landing-view footer button[data-landing-login] {
-    color: rgba(255, 255, 255, 0.4);
-    font-size: inherit;
-    text-decoration: none;
-    transition: color 0.2s;
-}
-
-#landing-view footer button[data-landing-login]:hover {
+.sia-audience-card>span {
+    display: inline-grid;
+    place-items: center;
+    width: 54px;
+    height: 54px;
+    border-radius: 18px;
     color: #fff;
+    background: linear-gradient(135deg, color-mix(in srgb, var(--audience-accent), #071827 14%), var(--audience-accent));
+    box-shadow: 0 14px 28px color-mix(in srgb, var(--audience-accent), transparent 72%);
+    font-size: 1.35rem;
+}
+
+.sia-audience-card h3 {
+    margin: 0;
+    color: var(--sia-heading-solid) !important;
+    -webkit-text-fill-color: var(--sia-heading-solid) !important;
+    font-size: 1.08rem;
+    font-weight: 900;
+}
+
+.sia-audience-card p {
+    margin: 0;
+    color: var(--sia-copy);
+    font-size: 0.9rem;
+    line-height: 1.48;
+}
+
+.sia-audience-card div {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.55rem;
+    margin-top: auto;
+}
+
+.sia-audience-card button,
+.sia-audience-card a,
+.sia-audience-card a:visited,
+.sia-audience-card a:hover,
+.sia-audience-card a:focus-visible {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+    padding: 0.72rem 0.8rem;
+    border: 0;
+    border-radius: 16px;
+    color: #fff !important;
+    background: linear-gradient(135deg, color-mix(in srgb, var(--audience-accent), #071827 18%), var(--audience-accent));
+    font-size: 0.82rem;
+    font-weight: 900;
+    line-height: 1.1;
+    text-align: center;
+}
+
+.sia-audience-card button:last-child {
+    color: var(--sia-heading-solid) !important;
+    background: rgba(237, 246, 251, 0.86);
+    border: 1px solid color-mix(in srgb, var(--audience-accent), white 78%);
+}
+
+.sia-audience-card.is-student {
+    --audience-accent: var(--sia-blue);
+}
+
+.sia-audience-card.is-staff {
+    --audience-accent: #315C78;
+}
+
+.sia-audience-card.is-applicant {
+    --audience-accent: var(--sia-burgundy);
+}
+
+.sia-audience-card.is-visitor {
+    --audience-accent: var(--sia-teal);
+}
+
+
+.sia-route-carousel,
+.sia-module-carousel {
+    display: flex;
+    gap: 0.9rem;
+    margin-inline: -1rem;
+    padding: 0.35rem 1rem 0.8rem;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scroll-padding-inline: 1rem;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+}
+
+.sia-route-carousel::-webkit-scrollbar,
+.sia-module-carousel::-webkit-scrollbar {
+    display: none;
+}
+
+.sia-route-card {
+    flex: 0 0 min(86vw, 320px);
+    display: grid;
+    align-content: start;
+    min-height: 208px;
+    padding: 1.15rem;
+    border: 1px solid var(--sia-border);
+    border-radius: 26px;
+    background:
+        linear-gradient(180deg, rgba(249, 253, 255, 0.98), rgba(229, 240, 248, 0.94)),
+        linear-gradient(135deg, rgba(27, 57, 106, 0.06), rgba(8, 123, 119, 0.04));
+    box-shadow: var(--sia-shadow-soft);
+    scroll-snap-align: start;
+    transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease;
+}
+
+.sia-route-card.is-campus {
+    border-color: rgba(27, 57, 106, 0.18);
+    background:
+        linear-gradient(180deg, rgba(249, 253, 255, 0.98), rgba(226, 238, 247, 0.94)),
+        linear-gradient(135deg, rgba(27, 57, 106, 0.12), rgba(226, 239, 248, 0));
+}
+
+.sia-route-card.is-admissions {
+    border-color: rgba(138, 22, 56, 0.18);
+    background:
+        linear-gradient(180deg, rgba(249, 253, 255, 0.98), rgba(244, 231, 236, 0.94)),
+        linear-gradient(135deg, rgba(138, 22, 56, 0.12), rgba(226, 239, 248, 0));
+}
+
+.sia-route-card.is-location {
+    border-color: rgba(8, 123, 119, 0.18);
+    background:
+        linear-gradient(180deg, rgba(249, 253, 255, 0.98), rgba(226, 243, 241, 0.94)),
+        linear-gradient(135deg, rgba(8, 123, 119, 0.12), rgba(226, 239, 248, 0));
+}
+
+.sia-route-card.is-vocational {
+    border-color: rgba(193, 138, 18, 0.22);
+    background:
+        linear-gradient(180deg, rgba(249, 253, 255, 0.98), rgba(250, 241, 219, 0.94)),
+        linear-gradient(135deg, rgba(193, 138, 18, 0.14), rgba(226, 239, 248, 0));
+}
+
+.sia-route-card:hover {
+    border-color: var(--sia-border-strong);
+    box-shadow: var(--sia-shadow);
+}
+
+.sia-route-card > i {
+    display: inline-grid;
+    place-items: center;
+    width: 52px;
+    height: 52px;
+    margin-bottom: 1rem;
+    border-radius: 18px;
+    color: #fff;
+    background: linear-gradient(135deg, var(--sia-blue-deep), var(--sia-blue));
+    box-shadow: 0 12px 24px rgba(27, 57, 106, 0.22);
+    font-size: 1.35rem;
+}
+
+.sia-route-card.is-admissions > i {
+    background: linear-gradient(135deg, var(--sia-burgundy), #B12A52);
+    box-shadow: 0 12px 24px rgba(138, 22, 56, 0.2);
+}
+
+.sia-route-card.is-location > i {
+    background: linear-gradient(135deg, var(--sia-teal), #13A094);
+    box-shadow: 0 12px 24px rgba(8, 123, 119, 0.2);
+}
+
+.sia-route-card.is-vocational > i {
+    background: linear-gradient(135deg, var(--sia-gold), #D99A18);
+    box-shadow: 0 12px 24px rgba(193, 138, 18, 0.22);
+}
+
+.sia-route-card h3 {
+    margin-bottom: 0.4rem;
+    color: var(--sia-heading-solid) !important;
+    -webkit-text-fill-color: var(--sia-heading-solid) !important;
+    font-size: 1.12rem;
+    font-weight: 900;
+    text-shadow: 0 1px 0 rgba(235, 245, 251, 0.7);
+}
+
+.sia-route-card p {
+    margin-bottom: 1rem;
+    color: var(--sia-copy);
+    font-size: 0.93rem;
+    line-height: 1.48;
+    text-shadow: 0 1px 0 rgba(235, 245, 251, 0.6);
+}
+
+.sia-route-card button,
+.sia-route-card a,
+.sia-route-card a:visited,
+.sia-route-card a:hover,
+.sia-route-card a:focus-visible {
+    align-self: end;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 46px;
+    margin-top: auto;
+    padding: 0.75rem 0.95rem;
+    border-radius: 16px;
+    font-size: 0.88rem;
+    font-weight: 900;
+    transition: transform 0.2s ease, background 0.2s ease;
+}
+
+.sia-route-card button {
+    color: #fff;
+    background: linear-gradient(135deg, var(--sia-blue-deep), var(--sia-blue));
+}
+
+.sia-route-card.is-admissions a,
+.sia-route-card.is-admissions a:visited,
+.sia-route-card.is-admissions a:hover,
+.sia-route-card.is-admissions a:focus-visible {
+    color: #fff !important;
+    background: linear-gradient(135deg, var(--sia-burgundy), #B12A52);
+}
+
+.sia-route-card.is-location a,
+.sia-route-card.is-location a:visited,
+.sia-route-card.is-location a:hover,
+.sia-route-card.is-location a:focus-visible {
+    color: #fff !important;
+    background: linear-gradient(135deg, var(--sia-teal), #13A094);
+}
+
+.sia-route-card.is-vocational a,
+.sia-route-card.is-vocational a:visited,
+.sia-route-card.is-vocational a:hover,
+.sia-route-card.is-vocational a:focus-visible {
+    color: #fff !important;
+    background: linear-gradient(135deg, #9B6A08, var(--sia-gold));
+}
+
+.sia-aspirants-panel {
+    display: grid;
+    gap: 1rem;
+    padding: 1.05rem;
+    border: 1px solid rgba(138, 22, 56, 0.18);
+    border-radius: 30px;
+    background:
+        linear-gradient(180deg, rgba(249, 253, 255, 0.96), rgba(239, 228, 235, 0.92)),
+        linear-gradient(135deg, rgba(138, 22, 56, 0.1), rgba(193, 138, 18, 0.1));
+    box-shadow: var(--sia-shadow-soft);
+}
+
+.sia-route-carousel.is-aspirants {
+    margin-inline: -1.05rem;
+    padding-inline: 1.05rem;
+    scroll-padding-inline: 1.05rem;
+}
+
+.sia-modules-section {
+    position: relative;
+}
+
+.sia-module-carousel {
+    gap: 0.8rem;
+    padding-bottom: 1rem;
+}
+
+.sia-module-sticker {
+    --sticker-accent: var(--sia-blue);
+    flex: 0 0 min(76vw, 250px);
+    display: grid;
+    grid-template-columns: 58px minmax(0, 1fr);
+    align-items: center;
+    gap: 0.9rem;
+    min-height: 118px;
+    padding: 0.95rem;
+    border: 1px solid color-mix(in srgb, var(--sticker-accent), white 76%);
+    border-radius: 26px;
+    color: var(--sia-ink);
+    background:
+        linear-gradient(145deg, rgba(249, 253, 255, 0.97), rgba(229, 240, 248, 0.92)),
+        linear-gradient(135deg, color-mix(in srgb, var(--sticker-accent), white 82%), rgba(226, 239, 248, 0.3));
+    box-shadow: var(--sia-shadow-soft);
+    scroll-snap-align: start;
+    text-align: left;
+    animation: siaStickerFloat 5s ease-in-out infinite;
+    animation-delay: calc(var(--sticker-index, 0) * -0.35s);
+    transition: transform 0.24s ease, box-shadow 0.24s ease, border-color 0.24s ease;
+}
+
+.sia-module-sticker:hover,
+.sia-module-sticker:focus-visible {
+    border-color: color-mix(in srgb, var(--sticker-accent), white 42%);
+    box-shadow: 0 22px 44px rgba(9, 32, 59, 0.15);
+}
+
+.sia-module-sticker-icon {
+    display: inline-grid;
+    place-items: center;
+    width: 58px;
+    height: 58px;
+    border-radius: 20px;
+    color: #fff;
+    background: linear-gradient(135deg, color-mix(in srgb, var(--sticker-accent), #071827 12%), var(--sticker-accent));
+    box-shadow: 0 14px 26px color-mix(in srgb, var(--sticker-accent), transparent 70%);
+    font-size: 1.45rem;
+}
+
+.sia-module-sticker-copy {
+    min-width: 0;
+}
+
+.sia-module-sticker-copy strong,
+.sia-module-sticker-copy small {
+    display: block;
+}
+
+.sia-module-sticker-copy strong {
+    margin-bottom: 0.25rem;
+    color: var(--sia-heading-solid) !important;
+    -webkit-text-fill-color: var(--sia-heading-solid) !important;
+    font-size: 1rem;
+    font-weight: 900;
+    text-shadow: 0 1px 0 rgba(235, 245, 251, 0.78);
+}
+
+.sia-module-sticker-copy small {
+    display: -webkit-box;
+    overflow: hidden;
+    color: var(--sia-copy);
+    font-size: 0.8rem;
+    line-height: 1.38;
+    text-shadow: 0 1px 0 rgba(235, 245, 251, 0.72);
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+}
+
+.sia-module-sticker.is-aula {
+    --sticker-accent: var(--sia-blue);
+}
+
+.sia-module-sticker.is-biblio {
+    --sticker-accent: #315C78;
+}
+
+.sia-module-sticker.is-medi {
+    --sticker-accent: #B13B4A;
+}
+
+.sia-module-sticker.is-comunidad {
+    --sticker-accent: #0C7C7A;
+}
+
+.sia-module-sticker.is-cafeteria {
+    --sticker-accent: #B8860B;
+}
+
+.sia-module-sticker.is-avisos {
+    --sticker-accent: #A15C18;
+}
+
+.sia-module-sticker.is-quejas {
+    --sticker-accent: #7B1530;
+}
+
+.sia-module-sticker.is-mapa {
+    --sticker-accent: #17765F;
+}
+
+.sia-minimal-info,
+.sia-app-section {
+    padding-top: 0.5rem;
+}
+
+.sia-info-strip,
+.sia-app-panel {
+    display: grid;
+    gap: 1rem;
+    padding: 1.2rem;
+    border: 1px solid var(--sia-border);
+    border-radius: 28px;
+    background:
+        linear-gradient(180deg, rgba(249, 253, 255, 0.96), rgba(226, 238, 247, 0.92)),
+        linear-gradient(135deg, rgba(8, 123, 119, 0.07), rgba(27, 57, 106, 0.05));
+    box-shadow: var(--sia-shadow-soft);
+}
+
+.sia-info-strip.is-trust {
+    border-color: rgba(8, 123, 119, 0.16);
+    background:
+        linear-gradient(180deg, rgba(249, 253, 255, 0.96), rgba(224, 242, 239, 0.92)),
+        linear-gradient(135deg, rgba(8, 123, 119, 0.11), rgba(27, 57, 106, 0.08));
+}
+
+.sia-info-strip>div:first-child,
+.sia-app-panel>div:first-child {
+    display: grid;
+    align-content: start;
+    gap: 0.55rem;
+}
+
+.sia-strip-actions,
+.sia-app-actions {
+    display: grid;
+    gap: 0.72rem;
+}
+
+.sia-strip-actions button,
+.sia-app-actions button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.55rem;
+    min-height: 50px;
+    padding: 0.75rem 0.95rem;
+    border-radius: 18px;
+    font-size: 0.9rem;
+    font-weight: 900;
+    transition: transform 0.2s ease, background 0.2s ease;
+}
+
+.sia-strip-actions button {
+    color: var(--sia-ink);
+    border: 1px solid rgba(27, 57, 106, 0.09);
+    background: linear-gradient(180deg, #F8FCFE, #DFECF6);
+}
+
+.sia-strip-actions button:nth-child(1) i {
+    color: var(--sia-gold);
+}
+
+.sia-strip-actions button:nth-child(2) i {
+    color: var(--sia-burgundy);
+}
+
+.sia-strip-actions button:nth-child(3) i {
+    color: var(--sia-teal);
+}
+
+.sia-strip-actions button:hover,
+.sia-strip-actions button:focus-visible {
+    background: linear-gradient(180deg, #F8FCFE, #D7E8F7);
+}
+
+.sia-app-panel {
+    color: var(--sia-blue-deep);
+    background:
+        linear-gradient(120deg, rgba(249, 253, 255, 0.94), rgba(226, 238, 247, 0.88)),
+        linear-gradient(135deg, rgba(27, 57, 106, 0.14), rgba(8, 123, 119, 0.14) 58%, rgba(193, 138, 18, 0.12));
+}
+
+.sia-app-panel h2 {
+    color: var(--sia-heading-solid) !important;
+    -webkit-text-fill-color: var(--sia-heading-solid) !important;
+}
+
+.sia-app-panel p {
+    max-width: 34rem;
+    margin-bottom: 0.5rem;
+    color: var(--sia-copy);
+    line-height: 1.6;
+    text-shadow: 0 1px 0 rgba(235, 245, 251, 0.66);
+}
+
+.sia-app-panel small {
+    display: block;
+    color: var(--sia-copy-soft);
+    line-height: 1.45;
+    text-shadow: 0 1px 0 rgba(235, 245, 251, 0.66);
+}
+
+.sia-app-actions button {
+    color: #fff;
+    background: linear-gradient(135deg, var(--sia-blue-deep) 0%, var(--sia-blue) 100%);
+    box-shadow: 0 14px 28px rgba(9, 32, 59, 0.18);
+}
+
+.sia-app-actions button:nth-child(2) {
+    color: var(--sia-blue-deep);
+    border: 1px solid rgba(27, 57, 106, 0.12);
+    background: linear-gradient(180deg, #F8FCFE, #DDEBF6);
+    box-shadow: none;
+}
+
+.sia-app-panel.is-installed {
+    background:
+        linear-gradient(120deg, rgba(249, 253, 255, 0.94), rgba(226, 238, 247, 0.88)),
+        linear-gradient(135deg, rgba(23, 118, 95, 0.14), rgba(8, 123, 119, 0.16));
+}
+
+.sia-landing-footer {
+    display: grid;
+    gap: 1.25rem;
+    padding: 2rem 1rem calc(2rem + env(safe-area-inset-bottom));
+    border-top: 1px solid var(--sia-border);
+    background:
+        linear-gradient(180deg, rgba(226, 238, 247, 0.82), rgba(210, 227, 240, 0.96)),
+        linear-gradient(135deg, rgba(27, 57, 106, 0.1), rgba(8, 123, 119, 0.08));
+}
+
+body.sia-landing-active .bottom-nav,
+body.sia-landing-active #student-bottom-nav,
+body.sia-landing-active #admin-bottom-nav {
+    display: none !important;
+}
+
+body.sia-landing-active .modal-backdrop.show {
+    opacity: 0.32;
+    background: #163154;
+}
+
+@media (max-width: 767.98px) {
+    body.sia-landing-active {
+        padding-bottom: 0 !important;
+    }
+}
+
+.sia-footer-brand p {
+    max-width: 24rem;
+    margin: 0.8rem 0 0;
+    color: var(--sia-copy);
+    font-size: 0.88rem;
+    line-height: 1.55;
+    text-shadow: 0 1px 0 rgba(235, 245, 251, 0.74);
+}
+
+.sia-footer-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.55rem;
+}
+
+.sia-footer-links a,
+.sia-footer-links button {
+    display: inline-flex;
+    align-items: center;
+    min-height: 40px;
+    padding: 0.55rem 0.75rem;
+    border-radius: 999px;
+    border: 1px solid rgba(27, 57, 106, 0.1);
+    color: var(--sia-blue-deep);
+    background: rgba(240, 248, 252, 0.86);
+    font-size: 0.82rem;
+    font-weight: 900;
+    transition: transform 0.2s ease, background 0.2s ease;
+}
+
+.sia-footer-links a:hover,
+.sia-footer-links button:hover {
+    color: var(--sia-blue-deep);
+    background: var(--sia-blue-soft);
+    transform: translateY(-1px);
+}
+
+#landing-view .sia-info-modal {
+    color: var(--sia-ink);
+}
+
+#landing-view .sia-info-modal .modal-dialog {
+    margin: 1rem;
+}
+
+#landing-view .sia-info-modal .modal-content {
+    overflow: hidden;
+    border: 1px solid var(--sia-border-strong);
+    border-radius: 28px;
+    color: var(--sia-ink);
+    background:
+        linear-gradient(180deg, #F8FCFE 0%, #E7F2F8 100%),
+        linear-gradient(135deg, rgba(8, 123, 119, 0.08), rgba(27, 57, 106, 0.06));
+    box-shadow: 0 28px 80px rgba(9, 32, 59, 0.22);
+    animation: siaModalIn 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+#landing-view .sia-info-modal .modal-header,
+#landing-view .sia-info-modal .modal-footer {
+    border: 0;
+    padding: 1rem 1rem 0;
+}
+
+#landing-view .sia-info-modal .modal-header {
+    align-items: flex-start;
+    padding: 1.1rem 1.1rem 0.95rem;
+    background:
+        linear-gradient(135deg, rgba(27, 57, 106, 0.1), rgba(8, 123, 119, 0.1)),
+        linear-gradient(180deg, rgba(248, 252, 254, 0.98), rgba(223, 237, 246, 0.96));
+}
+
+#landing-view .sia-info-modal .modal-footer {
+    padding: 0 1.1rem 1.1rem;
+}
+
+#landing-view .sia-info-modal .modal-body {
+    padding: 1.05rem 1.1rem 1.1rem;
+}
+
+#landing-view .sia-info-modal .btn-close {
+    width: 2.5rem;
+    height: 2.5rem;
+    margin: 0;
+    border-radius: 999px;
+    background-color: rgba(242, 249, 253, 0.98);
+    box-shadow: 0 10px 24px rgba(9, 32, 59, 0.13);
+    opacity: 1;
+}
+
+.sia-modal-heading {
+    display: flex;
+    align-items: center;
+    gap: 0.9rem;
+}
+
+.sia-modal-icon {
+    display: inline-grid;
+    place-items: center;
+    flex: 0 0 auto;
+    width: 52px;
+    height: 52px;
+    border-radius: 18px;
+    color: #fff;
+    background: linear-gradient(135deg, var(--sia-blue-deep) 0%, var(--sia-blue) 64%, var(--sia-teal) 100%);
+    box-shadow: 0 12px 24px rgba(9, 32, 59, 0.2);
+}
+
+.sia-modal-heading p {
+    margin: 0 0 0.15rem;
+    color: var(--sia-burgundy);
+    font-size: 0.72rem;
+    font-weight: 900;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.sia-modal-heading h2 {
+    margin: 0;
+    color: var(--sia-blue-deep);
+    font-size: 1.28rem;
+    font-weight: 900;
+    line-height: 1.1;
+    text-shadow: none;
+}
+
+.sia-modal-lead {
+    margin-bottom: 1rem;
+    color: #24384E;
+    font-size: 1rem;
+    font-weight: 700;
+    line-height: 1.56;
+    text-shadow: none;
+}
+
+.sia-modal-list {
+    display: grid;
+    gap: 0.75rem;
+    padding: 0;
+    margin: 0;
+    list-style: none;
+}
+
+.sia-modal-list li {
+    position: relative;
+    padding: 0.95rem 1rem 0.95rem 2.45rem;
+    border: 1px solid rgba(27, 57, 106, 0.1);
+    border-radius: 20px;
+    color: #31485F;
+    background:
+        linear-gradient(180deg, rgba(249, 253, 255, 0.98), rgba(232, 242, 249, 0.96));
+    line-height: 1.5;
+    text-shadow: none;
+    box-shadow: 0 12px 24px rgba(9, 32, 59, 0.06);
+}
+
+.sia-modal-list li::before {
+    content: '';
+    position: absolute;
+    top: 1.22rem;
+    left: 1rem;
+    width: 0.6rem;
+    height: 0.6rem;
+    border-radius: 50%;
+    background: var(--sia-teal);
+}
+
+.sia-modal-close {
+    width: 100%;
+    min-height: 50px;
+    border: 0;
+    border-radius: 18px;
+    color: #fff;
+    background: linear-gradient(135deg, var(--sia-blue-deep) 0%, var(--sia-blue) 100%);
+    font-weight: 900;
+    box-shadow: 0 14px 28px rgba(9, 32, 59, 0.18);
+}
+
+[data-reveal] {
+    opacity: 1;
+    transform: translateY(20px);
+    transition: opacity 0.65s cubic-bezier(0.16, 1, 0.3, 1), transform 0.65s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+[data-reveal].is-visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+@keyframes siaFloat {
+    0%,
+    100% {
+        transform: translateY(0);
+    }
+
+    50% {
+        transform: translateY(-8px);
+    }
+}
+
+@keyframes siaStickerFloat {
+    0%,
+    100% {
+        transform: translateY(0) rotate(0deg);
+    }
+
+    50% {
+        transform: translateY(-4px) rotate(-0.7deg);
+    }
+}
+
+@keyframes siaModalIn {
+    from {
+        opacity: 0;
+        transform: translateY(18px) scale(0.97);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.sia-phone-shell {
+    animation: siaFloat 5.5s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #landing-view *,
+    #landing-view *::before,
+    #landing-view *::after {
+        animation-duration: 0.001ms !important;
+        animation-iteration-count: 1 !important;
+        scroll-behavior: auto !important;
+        transition-duration: 0.001ms !important;
+    }
+
+    [data-reveal] {
+        opacity: 1;
+        transform: none;
+    }
 }

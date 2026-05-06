@@ -35,6 +35,7 @@ Ejemplos de invocacion:
 
 Antes de recomendar o editar cualquier cosa:
 
+0. **REGLA CRITICA DE AGENTE:** NO uses herramientas de navegador (`browser_subagent`), NO generes imagenes (`generate_image`), y NO crees perfiles temporales de Chrome (`chrome-*`) a menos que el usuario te lo exija explicitamente.
 1. Lee `.agents/project-map.md`.
 2. Ubica el alcance real del pedido:
    - sistema en general

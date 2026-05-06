@@ -45,7 +45,7 @@ window.Encuestas.Responses = (function () {
                   <input id="pub-name" class="form-control rounded-3" placeholder="Tu nombre">
                 </div>
                 <div class="col-md-6">
-                  <label class="form-label fw-semibold small">Correo (opcional)</label>
+                  <label class="form-label fw-semibold small"></label>
                   <input id="pub-email" class="form-control rounded-3" placeholder="correo@ejemplo.com">
                 </div>
               </div>

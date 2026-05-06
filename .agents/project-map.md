@@ -7,6 +7,14 @@
 
 ---
 
+## 0. AI Agent Constraints & Global Rules (CRITICAL)
+- **Do NOT create temporary files or browser profiles** (e.g., `chrome-*`, `.playwright-mcp`, `.tmp-edge-profile`) in the project directory.
+- **Do NOT use the `browser_subagent` tool, Puppeteer, or Playwright** to open the browser unless explicitly requested by the user.
+- **Do NOT use the `generate_image` tool** to create PNGs unless explicitly requested to create mockups or assets.
+- **Minimize token consumption**: Do not run unnecessary commands or background validations unless required for the task.
+
+---
+
 ## 1. Root Structure
 
 ```text
@@ -507,15 +515,25 @@ public/modules/
   - Poblacion
 - Submodules are preloaded from `index.html`.
 
+## Admisiones / Vocacional
+
+```text
+public/modules/
+|-- admisiones-public.js
+`-- vocacional-admin.js
+```
+
+- **Admisiones Public** (`admisiones-public.js`): Public admissions 2026 study center for *aspirantes*. Features a practice engine, route simulations, topic quizzes, and local guest progress tracking (`sia_admisiones_guest_v2`).
+- **Vocacional Admin** (`vocacional-admin.js`): CRM for aspirantes, handling statistics and test results.
+- Supported by public components: `<vocacional-landing>` and `<vocacional-test>`.
+
 ## Other module entrypoints
 
 | File | Global | Responsibility |
 |---|---|---|
 | `public/modules/profile.js` | `window.Profile` | Personal center: account, health, context, preferences, activity |
 | `public/modules/register.js` | `window.SIA_Register` | Full registration wizard with student/docente/administrativo/operativo paths and staff presets |
-| `public/modules/admisiones-public.js` | `window.AdmisionesPublic` | Public admissions 2026 study center with local guest progress and practice engine |
 | `public/modules/superadmin.js` | `window.SuperAdmin` | Users, logs, support tickets, config, dashboards |
-| `public/modules/vocacional-admin.js` | `window.AdminVocacional` | CRM for aspirantes and stats |
 | `public/modules/notifications.js` | `window.Notifications` | Dedicated notification center |
 | `public/modules/quejas.js` | `window.Quejas` | Complaints/suggestions UX |
 | `public/modules/campus-map.js` | `window.CampusMap` | Interactive campus map driven by a fixed institutional image and local building metadata |
@@ -557,6 +575,7 @@ public/modules/
 | `public/services/notify.js` | `window.Notify` | `usuarios/{uid}/notificaciones` | In-app feed, toast, sound, local push delegation |
 | `public/services/push-service.js` | `window.PushService` | `usuarios/{uid}/pushTokens/{web|native_*}` | Hybrid push service: web FCM + Capacitor native |
 | `public/services/vocacional-service.js` | `window.VocacionalService` | `aspirantes-registros`, `vocacional_config`, `reportes_cache/vocacional_stats` | Vocational test data and CRM |
+| `public/services/panic-service.js` | `window.PanicService` | `config/panic_main`, `config/panic_groups`, `panic_alerts` | SOS/Panic button service with geolocation tracking, active alert lifecycle, and group dispatching |
 
 ### Config and utility files that now matter
 
@@ -813,7 +832,6 @@ Known QA presets in `firebase.js`:
     |-- analizador_seguridad.md
     |-- asesor_pre_desarrollo_sia.md
     |-- corregir_ortografia.md
-    |-- crear_modulo_sia.md
     |-- crear_servicio_firebase.md
     |-- crear_web_component.md
     |-- optimizar_firebase_queries.md

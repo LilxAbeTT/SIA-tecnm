@@ -2,17 +2,49 @@ class SiaLandingView extends HTMLElement {
   constructor() {
     super();
     this.handlePwaStateChange = this.updateAppPromoState.bind(this);
+    this.revealObserver = null;
+    this.visibilityObserver = null;
   }
 
   connectedCallback() {
     this.render();
+    this.syncBodyState();
+    this.observeVisibilityState();
     window.addEventListener('beforeinstallprompt', this.handlePwaStateChange);
     window.addEventListener('appinstalled', this.handlePwaStateChange);
   }
 
   disconnectedCallback() {
+    document.body.classList.remove('sia-landing-active');
     window.removeEventListener('beforeinstallprompt', this.handlePwaStateChange);
     window.removeEventListener('appinstalled', this.handlePwaStateChange);
+
+    if (this.revealObserver) {
+      this.revealObserver.disconnect();
+      this.revealObserver = null;
+    }
+
+    if (this.visibilityObserver) {
+      this.visibilityObserver.disconnect();
+      this.visibilityObserver = null;
+    }
+  }
+
+  syncBodyState() {
+    document.body.classList.toggle('sia-landing-active', !this.classList.contains('d-none'));
+  }
+
+  observeVisibilityState() {
+    if (this.visibilityObserver) return;
+
+    this.visibilityObserver = new MutationObserver(() => {
+      this.syncBodyState();
+    });
+
+    this.visibilityObserver.observe(this, {
+      attributes: true,
+      attributeFilter: ['class']
+    });
   }
 
   isAppInstalled() {
@@ -39,6 +71,196 @@ class SiaLandingView extends HTMLElement {
     if (toastFn) toastFn(message, type);
   }
 
+  getInfoContent() {
+    return {
+      que_es: {
+        icon: 'bi-grid-1x2-fill',
+        title: 'La plataforma',
+        lead: 'SIA concentra en un solo acceso lo que más se usa dentro del TecNM Campus Los Cabos.',
+        items: [
+          'Reúne clases, servicios, avisos y herramientas institucionales dentro del mismo entorno.',
+          'Evita brincar entre enlaces, módulos aislados y canales informales para resolver lo cotidiano.',
+          'Prioriza consulta y acceso rápido desde el celular, sin perder la versión completa en escritorio.'
+        ]
+      },
+      beneficios: {
+        icon: 'bi-stars',
+        title: 'Lo que encuentras aquí',
+        lead: 'La idea es simple: entrar una vez y ubicar rápido lo importante.',
+        items: [
+          'Acceso único para estudiantes, docentes y personal.',
+          'Rutas directas para aula, perfil, avisos, servicios de campus y seguimiento.',
+          'Herramientas públicas para aspirantes como admisiones, práctica y mapa del campus.'
+        ]
+      },
+      resuelve: {
+        icon: 'bi-tools',
+        title: 'Por qué existe',
+        lead: 'Nace para que los procesos comunes del campus no dependan de varios sitios o pasos dispersos.',
+        items: [
+          'Centraliza accesos que antes se consultaban por separado.',
+          'Da visibilidad a avisos, ubicaciones y trámites de uso frecuente.',
+          'Reduce tiempo perdido al buscar dónde entrar, a quién acudir o cómo continuar un proceso.'
+        ]
+      },
+      comunidad: {
+        icon: 'bi-people-fill',
+        title: 'Perfiles',
+        lead: 'La experiencia cambia según quién entra, pero la puerta principal sigue siendo la misma.',
+        items: [
+          'Estudiantes: clases, servicios, bienestar, comunidad y avisos.',
+          'Docentes y personal: herramientas operativas según permisos.',
+          'Aspirantes: admisiones, práctica EVALUATEC, test vocacional y mapa del campus.'
+        ]
+      },
+      contacto: {
+        icon: 'bi-headset',
+        title: 'Soporte y contacto',
+        lead: 'Si necesitas ayuda con acceso o uso de SIA, estos son los canales base.',
+        items: [
+          'Teléfono: +52 (624) 142 5939',
+          'Correo: soporte.sia@loscabos.tecnm.mx',
+          'Campus: C. Gandhi, Guaymitas, San José del Cabo, B.C.S.'
+        ]
+      },
+      estudiante: {
+        icon: 'bi-mortarboard-fill',
+        title: 'Estudiantes',
+        lead: 'Entrada directa para consultar clases, avisos, servicios y herramientas de uso diario.',
+        items: [
+          'Acceso con cuenta institucional autorizada.',
+          'Aula, perfil, credencial, servicios y avisos desde el mismo entorno.',
+          'Rutas pensadas para uso frecuente desde celular.'
+        ]
+      },
+      docente: {
+        icon: 'bi-person-workspace',
+        title: 'Docentes y personal',
+        lead: 'Acceso operativo para herramientas internas según permisos institucionales.',
+        items: [
+          'Ingreso con cuenta institucional.',
+          'Módulos disponibles de acuerdo con el perfil y el área asignada.',
+          'Servicios de campus, avisos y seguimiento desde SIA.'
+        ]
+      },
+      aspirante: {
+        icon: 'bi-compass-fill',
+        title: 'Aspirantes',
+        lead: 'Ruta pública para explorar admisiones, practicar y ubicar el campus antes de ingresar.',
+        items: [
+          'Proceso de admisión sin iniciar sesión institucional.',
+          'Práctica EVALUATEC y test vocacional como apoyo previo.',
+          'Mapa del campus para ubicar edificios y servicios.'
+        ]
+      },
+      visitante: {
+        icon: 'bi-geo-alt-fill',
+        title: 'Visitantes',
+        lead: 'Consulta pública para ubicar el campus, revisar accesos principales y encontrar canales oficiales.',
+        items: [
+          'Mapa del campus disponible sin cuenta.',
+          'Enlaces oficiales del TecNM Campus Los Cabos.',
+          'Soporte y contacto institucional desde el pie del sitio.'
+        ]
+      },
+      confianza: {
+        icon: 'bi-shield-check',
+        title: 'Acceso institucional',
+        lead: 'SIA funciona como puerta de entrada para la comunidad del TecNM Campus Los Cabos.',
+        items: [
+          'El acceso interno requiere cuenta autorizada.',
+          'Los módulos visibles cambian según el perfil del usuario.',
+          'Las rutas públicas se mantienen separadas para aspirantes y visitantes.'
+        ]
+      }
+    };
+  }
+
+  getModuleHighlights() {
+    return {
+      aula: {
+        icon: 'bi-mortarboard-fill',
+        title: 'Aula',
+        lead: 'El espacio académico para consultar clases, actividades y seguimiento escolar.',
+        items: [
+          'Acceso a materias, publicaciones y entregas.',
+          'Seguimiento de pendientes y avisos de clase.',
+          'Herramientas para estudiantes y docentes según su perfil.'
+        ]
+      },
+      biblio: {
+        icon: 'bi-book-half',
+        title: 'Biblioteca',
+        lead: 'Servicios bibliotecarios y recursos del campus desde SIA.',
+        items: [
+          'Consulta de catálogo y préstamos.',
+          'Reservas y seguimiento de servicios disponibles.',
+          'Apoyo para localizar recursos académicos.'
+        ]
+      },
+      medi: {
+        icon: 'bi-heart-pulse-fill',
+        title: 'Bienestar',
+        lead: 'Atención médica, psicológica y acompañamiento para la comunidad del campus.',
+        items: [
+          'Agenda de citas y seguimiento de atención.',
+          'Comunicación con profesionales de apoyo.',
+          'Registro institucional para continuidad del servicio.'
+        ]
+      },
+      comunidad: {
+        icon: 'bi-people-fill',
+        title: 'Comunidad',
+        lead: 'Un punto de encuentro para avisos, participación y vida estudiantil.',
+        items: [
+          'Publicaciones y conversaciones del campus.',
+          'Interacción entre estudiantes y áreas institucionales.',
+          'Moderación para mantener un entorno seguro.'
+        ]
+      },
+      cafeteria: {
+        icon: 'bi-cup-hot-fill',
+        title: 'Cafetería',
+        lead: 'Consulta y seguimiento de servicios de cafetería dentro de SIA.',
+        items: [
+          'Menú y disponibilidad de productos.',
+          'Pedidos y seguimiento de estado.',
+          'Reseñas y comunicación con el servicio.'
+        ]
+      },
+      avisos: {
+        icon: 'bi-megaphone-fill',
+        title: 'Avisos',
+        lead: 'Comunicación institucional para no perder información importante del campus.',
+        items: [
+          'Avisos destacados y comunicados oficiales.',
+          'Consulta rápida desde móvil.',
+          'Seguimiento de novedades relevantes para cada perfil.'
+        ]
+      },
+      quejas: {
+        icon: 'bi-chat-square-heart-fill',
+        title: 'Quejas y sugerencias',
+        lead: 'Canal institucional para levantar reportes, comentarios y solicitudes.',
+        items: [
+          'Registro de tickets desde la plataforma.',
+          'Historial y seguimiento de respuestas.',
+          'Comunicación directa con las áreas responsables.'
+        ]
+      },
+      mapa: {
+        icon: 'bi-map-fill',
+        title: 'Mapa del campus',
+        lead: 'Guía visual para ubicar edificios, accesos y servicios dentro del plantel.',
+        items: [
+          'Ubicación de edificios principales.',
+          'Consulta pública para aspirantes y visitantes.',
+          'Acceso rápido desde el portal.'
+        ]
+      }
+    };
+  }
+
   getInstallInstructionsHtml(reinstall = false) {
     const actionLabel = reinstall ? 'volver a instalar' : 'instalar';
 
@@ -48,9 +270,9 @@ class SiaLandingView extends HTMLElement {
           <h6 class="fw-bold mb-3"><i class="bi bi-android2 text-success me-2"></i>Android</h6>
           <p class="small mb-3">Para ${actionLabel} SIA en Android, usa Chrome y sigue estos pasos:</p>
           <ol class="small ps-3 mb-0">
-            <li class="mb-2">Abre SIA y toca el menu de <strong>tres puntos</strong>.</li>
+            <li class="mb-2">Abre SIA y toca el menú de <strong>tres puntos</strong>.</li>
             <li class="mb-2">Selecciona <strong>"Instalar app"</strong> o <strong>"Agregar a pantalla principal"</strong>.</li>
-            <li>Confirma la instalacion para tener acceso directo a tus procesos, credencial y avisos.</li>
+            <li>Confirma la instalación para tener acceso directo a tus procesos, credencial y avisos.</li>
           </ol>
         </div>
       `;
@@ -60,7 +282,7 @@ class SiaLandingView extends HTMLElement {
       return `
         <div class="text-start">
           <h6 class="fw-bold mb-3"><i class="bi bi-apple me-2"></i>iPhone y iPad</h6>
-          <p class="small mb-3">En iOS se instala desde <strong>Safari</strong> usando el menu de compartir:</p>
+          <p class="small mb-3">En iOS se instala desde <strong>Safari</strong> usando el menú de compartir:</p>
           <ol class="small ps-3 mb-0">
             <li class="mb-2">Abre SIA en <strong>Safari</strong>.</li>
             <li class="mb-2">Toca <strong>Compartir</strong> <i class="bi bi-box-arrow-up"></i>.</li>
@@ -72,19 +294,19 @@ class SiaLandingView extends HTMLElement {
 
     return `
       <div class="text-start">
-        <h6 class="fw-bold mb-3"><i class="bi bi-laptop me-2"></i>Instalacion desde navegador</h6>
-        <p class="small mb-3">Si tu navegador permite instalar SIA, encontraras la opcion en alguno de estos puntos:</p>
+        <h6 class="fw-bold mb-3"><i class="bi bi-laptop me-2"></i>Instalación desde navegador</h6>
+        <p class="small mb-3">Si tu navegador permite instalar SIA, encontrarás la opción en alguno de estos puntos:</p>
         <ol class="small ps-3 mb-0">
-          <li class="mb-2">Icono de instalacion en la barra de direcciones.</li>
-          <li class="mb-2">Menu principal del navegador con la opcion <strong>"Instalar app"</strong>.</li>
-          <li>Si ya la tenias instalada y quieres ${actionLabel}, primero eliminala y luego vuelve a agregarla.</li>
+          <li class="mb-2">Ícono de instalación en la barra de direcciones.</li>
+          <li class="mb-2">Menú principal del navegador con la opción <strong>"Instalar app"</strong>.</li>
+          <li>Si ya la tenías instalada y quieres ${actionLabel}, primero elimínala y luego vuelve a agregarla.</li>
         </ol>
       </div>
     `;
   }
 
   showInstallInstructions(reinstall = false) {
-    const title = reinstall ? 'SIA ya esta instalada' : 'Instalar SIA';
+    const title = reinstall ? 'SIA ya está instalada' : 'Instalar SIA';
     const html = this.getInstallInstructionsHtml(reinstall);
 
     if (typeof Swal !== 'undefined') {
@@ -131,11 +353,11 @@ class SiaLandingView extends HTMLElement {
       return;
     }
 
-    window.alert('Instalacion disponible desde el navegador o agregando SIA a la pantalla de inicio.');
+    window.alert('Instalación disponible desde el navegador o agregando SIA a la pantalla de inicio.');
   }
 
   async confirmReinstall() {
-    const message = 'SIA ya esta instalada en este dispositivo. Quieres ver como volver a instalarla?';
+    const message = 'SIA ya está instalada en este dispositivo. ¿Quieres ver cómo volver a instalarla?';
 
     if (typeof Swal !== 'undefined') {
       const result = await Swal.fire({
@@ -143,7 +365,7 @@ class SiaLandingView extends HTMLElement {
         text: message,
         icon: 'question',
         showCancelButton: true,
-        confirmButtonText: 'Si, mostrar',
+        confirmButtonText: 'Sí, mostrar',
         cancelButtonText: 'Cancelar',
         confirmButtonColor: '#1B396A'
       });
@@ -173,7 +395,7 @@ class SiaLandingView extends HTMLElement {
     const shareUrl = `${window.location.origin}${window.location.pathname}`;
     const payload = {
       title: 'SIA | TecNM Campus Los Cabos',
-      text: 'Instala SIA y entra mas rapido a tus procesos academicos y de campus.',
+      text: 'SIA conecta acceso académico, servicios y avisos del TecNM Campus Los Cabos.',
       url: shareUrl
     };
 
@@ -183,7 +405,7 @@ class SiaLandingView extends HTMLElement {
       } catch (error) {
         if (error && error.name !== 'AbortError') {
           console.error('No fue posible compartir SIA:', error);
-          this.notify('No fue posible abrir el menu para compartir.', 'warning');
+          this.notify('No fue posible abrir el menú para compartir.', 'warning');
         }
       }
       return;
@@ -213,20 +435,20 @@ class SiaLandingView extends HTMLElement {
     if (this.isAppInstalled()) {
       card.classList.add('is-installed');
       installBtn.innerHTML = '<i class="bi bi-arrow-repeat"></i><span>Reinstalar app</span>';
-      status.textContent = 'SIA ya esta instalada en este dispositivo. Si quieres volver a instalarla, te guiaremos paso a paso.';
+      status.textContent = 'SIA ya está instalada en este dispositivo.';
       return;
     }
 
     if (this.canInstallApp()) {
       installBtn.innerHTML = '<i class="bi bi-download"></i><span>Instalar app</span>';
-      status.textContent = 'Disponible para Android y iOS. Instalarla te deja el acceso directo en tu pantalla de inicio.';
+      status.textContent = 'Disponible para dejar SIA como acceso directo.';
       return;
     }
 
-    installBtn.innerHTML = '<i class="bi bi-phone"></i><span>Como instalar</span>';
+    installBtn.innerHTML = '<i class="bi bi-phone"></i><span>Cómo instalar</span>';
     status.textContent = this.isIOS()
-      ? 'En iPhone y iPad se instala desde Safari con Compartir y luego Agregar a pantalla de inicio.'
-      : 'Si tu navegador no muestra la descarga directa, te indicamos como instalar SIA manualmente.';
+      ? 'En iPhone y iPad se instala desde Safari.'
+      : 'Te mostramos la instalación manual si el navegador no ofrece descarga directa.';
   }
 
   updateAppPromoState() {
@@ -235,289 +457,270 @@ class SiaLandingView extends HTMLElement {
     });
   }
 
-  getStudentProcesses() {
-    return [
-      {
-        module: 'Academico',
-        title: 'Clases y seguimiento',
-        desc: 'Entra a materias, revisa actividades y consulta lo pendiente sin salir de SIA.',
-        icon: 'bi-mortarboard-fill',
-        tone: 'is-blue',
-        tags: ['Aula', 'Tareas', 'Cursos']
-      },
-      {
-        module: 'Servicios',
-        title: 'Servicios del campus',
-        desc: 'Usa biblioteca, cafeteria y mapa del campus desde el mismo acceso institucional.',
-        icon: 'bi-grid-1x2-fill',
-        tone: 'is-amber',
-        tags: ['Biblioteca', 'Cafeteria', 'Mapa']
-      },
-      {
-        module: 'Bienestar',
-        title: 'Salud y acompanamiento',
-        desc: 'Agenda atencion medica o psicologica y da seguimiento a tu bienestar desde el celular.',
-        icon: 'bi-heart-pulse-fill',
-        tone: 'is-red',
-        tags: ['Citas', 'Salud', 'Seguimiento']
-      },
-      {
-        module: 'Campus',
-        title: 'Avisos, perfil y credencial',
-        desc: 'Consulta novedades, abre tu perfil y mantén a la mano tu identidad institucional.',
-        icon: 'bi-megaphone-fill',
-        tone: 'is-cyan',
-        tags: ['Avisos', 'Perfil', 'Credencial']
-      }
-    ];
-  }
-
-  renderStudentProcesses() {
-    return this.getStudentProcesses().map((process) => `
-      <article class="landing-card landing-process-card rounded-4">
-        <div class="landing-process-top">
-          <div class="landing-module-icon ${process.tone}">
-            <i class="bi ${process.icon}"></i>
-          </div>
-          <span class="landing-process-badge">${process.module}</span>
-        </div>
-        <h3 class="landing-process-title">${process.title}</h3>
-        <p class="landing-process-desc">${process.desc}</p>
-        <div class="landing-process-tags">
-          ${process.tags.map((tag) => `<span class="landing-process-tag">${tag}</span>`).join('')}
-        </div>
-      </article>
-    `).join('');
-  }
-
   getNavHtml() {
     return `
-      <div class="fixed-top d-flex justify-content-center mt-3" style="z-index: 1030;">
-        <nav class="navbar navbar-expand-lg landing-nav-pill rounded-pill py-2 px-3 position-relative" style="max-width: 95%; width: auto;">
-          <div class="container-fluid gap-3">
-            <a class="navbar-brand landing-brand-lockup d-flex align-items-center gap-2 m-0" href="#landing-hero">
-              <div class="landing-brand-logos">
-                <img src="/images/logo-ites.png" alt="TecNM" class="logo-tecnm">
-                <div class="brand-divider"></div>
-                <img src="/images/logo-sia.png" alt="SIA" class="logo-ites">
-              </div>
-              <div class="landing-brand-copy">
-                <strong>SIA</strong>
-                <span>ITES Los Cabos</span>
-              </div>
-            </a>
+      <header class="sia-landing-nav-wrap">
+        <nav class="sia-landing-nav" aria-label="Navegación principal">
+          <a class="sia-landing-brand" href="#landing-hero" aria-label="Inicio SIA">
+            <span class="sia-brand-logos">
+              <img src="/images/logo-tecnm.png" alt="TecNM" class="sia-brand-logo-tecnm">
+              <span class="sia-brand-divider"></span>
+              <img src="/images/logo-ites.png" alt="ITES Los Cabos" class="sia-brand-logo-ites">
+             </span>
+            <span class="sia-brand-copy">
+              <strong>Campus Los Cabos</strong>
+              <small>TecNM</small>
+            </span>
+          </a>
 
-            <button class="navbar-toggler border-0 p-1 ms-2" type="button" data-bs-toggle="collapse" data-bs-target="#landingNavContent">
-              <i class="bi bi-list fs-4 text-white"></i>
+          <button class="sia-nav-toggle" type="button" data-bs-toggle="collapse" data-bs-target="#landingNavContent" aria-controls="landingNavContent" aria-expanded="false" aria-label="Abrir menú">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <div class="collapse sia-nav-content" id="landingNavContent">
+            <a class="sia-nav-link" href="#landing-personas">Entradas</a>
+            <a class="sia-nav-link" href="#landing-aspirantes">Aspirantes</a>
+            <a class="sia-nav-link" href="#landing-servicios">Servicios</a>
+            <button type="button" class="sia-nav-link" data-landing-info="contacto">Contacto</button>
+            <button type="button" class="sia-nav-login" data-landing-login>
+              <i class="bi bi-box-arrow-in-right"></i>
+              <span>Acceder</span>
             </button>
-
-            <div class="collapse navbar-collapse landing-nav-collapse" id="landingNavContent">
-              <ul class="navbar-nav mx-3 gap-1">
-                <li class="nav-item"><a href="#landing-hero" class="nav-link">Inicio</a></li>
-                <li class="nav-item"><a href="#landing-procesos" class="nav-link">Que hacer</a></li>
-                <li class="nav-item"><a href="#landing-vocacional" class="nav-link">Aspirantes</a></li>
-                <li class="nav-item"><a href="#landing-contacto" class="nav-link">Contacto</a></li>
-              </ul>
-
-              <button id="btn-login-hero-nav" data-landing-login class="btn btn-landing-cta d-flex align-items-center gap-2">
-                <i class="bi bi-box-arrow-in-right"></i>
-                <span>Acceso Institucional</span>
-              </button>
-            </div>
           </div>
         </nav>
-      </div>
+      </header>
     `;
   }
 
   getHeroHtml() {
     return `
-      <main id="landing-hero" class="landing-hero w-100 position-relative d-flex align-items-center" style="min-height: 92vh; background: linear-gradient(160deg, #0f1114 0%, #111825 40%, #1B396A 100%); overflow: hidden;">
-        <div class="position-absolute w-100 h-100 top-0 start-0 pe-none" style="overflow: hidden;">
-          <div class="position-absolute w-100 h-100" style="opacity: 0.03; background-image:
-            linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px);
-            background-size: 60px 60px;"></div>
-          <div class="position-absolute" style="top: -20%; right: -10%; width: 600px; height: 600px; background: radial-gradient(circle, rgba(27,57,106,0.4) 0%, transparent 70%); border-radius: 50%; filter: blur(80px);"></div>
-          <div class="position-absolute" style="bottom: -30%; left: -10%; width: 500px; height: 500px; background: radial-gradient(circle, rgba(128,126,130,0.2) 0%, transparent 70%); border-radius: 50%; filter: blur(60px);"></div>
-        </div>
+      <main id="landing-hero" class="sia-landing-hero">
+        <div class="sia-hero-glow" aria-hidden="true"></div>
 
-        <div class="container position-relative pt-5" style="z-index: 2;">
-          <div class="row align-items-center gy-5 landing-hero-layout">
-            <div class="col-lg-6 order-1">
-              <div class="landing-section-label mb-4 landing-fade-up landing-fade-up-1">Plataforma Oficial ITES Los Cabos</div>
+        <section class="sia-hero-main" data-reveal>
+          <div class="sia-hero-kicker">
+            <i class="bi bi-buildings-fill"></i>
+            <span>TecNM Campus Los Cabos</span>
+          </div>
 
-              <h1 class="landing-hero-title display-3 fw-bold lh-sm mb-4 landing-fade-up landing-fade-up-2">
-                Todo tu campus,<br>
-                <span class="landing-gradient-text">en un solo acceso.</span>
-              </h1>
+          <h1 class="sia-hero-logo-title">
+            <img src="/images/logo-sia-mob.png" alt="SIA">
+          </h1>
+          <p class="sia-hero-subtitle">Portal de entrada para comunidad, aspirantes y visitantes del TecNM Campus Los Cabos.</p>
 
-              <p class="landing-hero-subtitle mb-4 landing-fade-up landing-fade-up-3">
-                SIA es la plataforma institucional del <strong>TecNM Campus Los Cabos</strong>. Desde aqui puedes entrar a clases, servicios, credencial y avisos con tu cuenta institucional. Si aun eres aspirante, ya puedes estudiar y practicar para admision sin crear cuenta.
-              </p>
+          <div class="sia-hero-actions" aria-label="Acciones principales">
+            <button type="button" class="sia-action-primary" data-landing-login>
+              <i class="bi bi-box-arrow-in-right"></i>
+              <span>Acceder</span>
+            </button>
+            <a class="sia-action-secondary is-admissions" href="#/admisiones">
+              <i class="bi bi-journal-check"></i>
+              <span>Proceso de admisión</span>
+            </a>
+            <a class="sia-action-secondary is-map" href="#/mapa-campus">
+              <i class="bi bi-geo-alt-fill"></i>
+              <span>Mapa del campus</span>
+            </a>
+          </div>
 
-              <div class="landing-hero-actions landing-fade-up landing-fade-up-4">
-                <button id="btn-hero-cta-login" data-landing-login class="btn btn-acceso-institucional d-flex align-items-center justify-content-center gap-2">
-                  <i class="bi bi-microsoft"></i>
-                  <span>Entrar con cuenta institucional</span>
-                </button>
-                <a href="#/admisiones" class="btn btn-outline-light landing-secondary-cta rounded-pill px-4 py-3 fw-semibold d-flex align-items-center justify-content-center gap-2">
-                  <i class="bi bi-journal-richtext"></i>
-                  <span>Prepararme para admision</span>
-                </a>
-                <a href="#/mapa-campus" class="btn landing-campus-cta rounded-pill px-4 py-3 fw-semibold d-flex align-items-center justify-content-center gap-2">
-                  <i class="bi bi-geo-alt-fill"></i>
-                  <span>Mapa del campus</span>
-                </a>
-              </div>
+          <button type="button" class="sia-read-more" data-landing-info="que_es">
+            <span>Qué es SIA</span>
+            <i class="bi bi-arrow-right-short"></i>
+          </button>
+        </section>
 
-              <div class="landing-trust-list landing-fade-up landing-fade-up-5">
-                <span class="landing-trust-chip"><i class="bi bi-shield-check"></i>Acceso oficial</span>
-                <span class="landing-trust-chip"><i class="bi bi-phone"></i>Listo para celular</span>
-                <span class="landing-trust-chip"><i class="bi bi-grid-1x2-fill"></i>Servicios en un solo lugar</span>
-              </div>
-
-              <div class="landing-hero-note landing-fade-up landing-fade-up-5">
-                Alumnos, docentes y personal entran con su correo institucional. Aspirantes pueden iniciar por admisiones y guardar progreso local sin iniciar sesion.
+        <section class="sia-hero-panel" data-reveal>
+          <div class="sia-phone-shell" aria-label="Vista rápida de SIA">
+            <div class="sia-phone-top">
+              <span></span>
+            </div>
+            <div class="sia-phone-header">
+              <img src="/images/logo-sia-mob.png" alt="SIA">
+              <div>
+                <strong>Entrada SIA</strong>
+                <span>Elige tu ruta</span>
               </div>
             </div>
-
-            <div class="col-lg-6 order-2 text-center position-relative">
-              <div class="position-relative d-inline-block landing-float">
-                <div class="position-absolute top-50 start-50 translate-middle rounded-circle" style="width: 280px; height: 280px; background: rgba(27,57,106,0.3); filter: blur(60px);"></div>
-                <div class="card landing-mockup-card landing-dashboard-preview landing-hero-surface rounded-4 overflow-hidden ms-auto me-auto">
-                  <div class="p-3 d-flex align-items-center gap-2" style="border-bottom: 1px solid rgba(255,255,255,0.06);">
-                    <div class="d-flex gap-1">
-                      <div class="rounded-circle" style="width:9px; height:9px; background:#ff5f56;"></div>
-                      <div class="rounded-circle" style="width:9px; height:9px; background:#ffbd2e;"></div>
-                      <div class="rounded-circle" style="width:9px; height:9px; background:#27c93f;"></div>
-                    </div>
-                    <span style="font-size: 0.7rem; color: rgba(255,255,255,0.3); font-family: 'Noto Sans', sans-serif;">sia.loscabos.tecnm.mx</span>
-                  </div>
-                  <div class="p-4 text-start">
-                    <div class="d-flex justify-content-between mb-4">
-                      <div>
-                        <h5 class="fw-bold mb-1" style="color: #fff; font-size: 1.1rem;">Accesos mas usados</h5>
-                        <small style="color: rgba(255,255,255,0.45); font-size: 0.8rem;">Lo esencial de SIA en una sola entrada</small>
-                      </div>
-                      <div class="rounded-circle d-flex align-items-center justify-content-center fw-bold landing-preview-mark">SIA</div>
-                    </div>
-                    <div class="landing-preview-list">
-                      <div class="landing-preview-item is-priority">
-                        <div>
-                          <div class="landing-preview-label">Entrar a clases</div>
-                          <div class="landing-preview-text">Materias, actividades y seguimiento academico.</div>
-                        </div>
-                      </div>
-                      <div class="landing-preview-item">
-                        <div>
-                          <div class="landing-preview-label">Resolver servicios</div>
-                          <div class="landing-preview-text">Biblioteca, cafeteria y recursos de campus.</div>
-                        </div>
-                      </div>
-                      <div class="landing-preview-item">
-                        <div>
-                          <div class="landing-preview-label">Mantenerte al dia</div>
-                          <div class="landing-preview-text">Avisos, perfil, credencial y acceso rapido.</div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
+            <div class="sia-phone-list">
+              <button type="button" class="sia-phone-row" data-landing-login>
+                <i class="bi bi-mortarboard-fill"></i>
+                <span>Comunidad ITES</span>
+                <b>Entrar</b>
+              </button>
+              <a class="sia-phone-row" href="#/admisiones">
+                <i class="bi bi-pencil-square"></i>
+                <span>Soy aspirante</span>
+                <b>Ver</b>
+              </a>
+              <a class="sia-phone-row" href="#/mapa-campus">
+                <i class="bi bi-signpost-split-fill"></i>
+                <span>Visito el campus</span>
+                <b>Mapa</b>
+              </a>
             </div>
           </div>
-        </div>
+        </section>
       </main>
     `;
   }
 
-  getVocacionalHtml() {
+  getQuickRoutesHtml() {
     return `
-      <section id="landing-vocacional" class="landing-section-alt py-5">
-        <div class="container py-4">
-          <div class="landing-vocational-spotlight">
-            <div class="landing-vocational-copy">
-              <div class="landing-section-label mb-3">Ruta publica para aspirantes</div>
-              <h2 class="fw-bold mb-3">Si aun no eres parte del campus, empieza por admisiones.</h2>
-              <p class="landing-vocational-lead mb-4">
-                El nuevo centro de admision de SIA convierte la guia EVALUATEC 2026 en una ruta de estudio por carrera, con practica por areas, fechas oficiales y progreso local sin cuenta institucional.
-              </p>
-              <div class="landing-trust-list mb-4">
-                <span class="landing-trust-chip"><i class="bi bi-stars"></i>Nuevo ingreso</span>
-                <span class="landing-trust-chip"><i class="bi bi-journal-check"></i>Estudio + practica</span>
-                <span class="landing-trust-chip"><i class="bi bi-arrow-repeat"></i>Progreso local</span>
-              </div>
-              <div class="landing-vocational-actions">
-                <a href="#/admisiones" class="btn btn-acceso-institucional d-inline-flex align-items-center justify-content-center gap-2">
-                  <i class="bi bi-journal-richtext"></i>
-                  <span>Entrar a admisiones</span>
-                </a>
-                <a href="#/test-vocacional" class="btn btn-outline-light landing-secondary-cta rounded-pill px-4 py-3 fw-semibold d-inline-flex align-items-center justify-content-center gap-2">
-                  <i class="bi bi-compass-fill"></i>
-                  <span>Test vocacional</span>
-                </a>
-              </div>
+      <section id="landing-personas" class="sia-landing-section sia-audience-section" aria-label="Entradas por tipo de usuario">
+        <div class="sia-section-heading" data-reveal>
+          <span>Elige tu entrada</span>
+          <h2>¿Cómo usarás SIA?</h2>
+          <p class="sia-section-brief">Cada perfil muestra los accesos que normalmente necesita primero.</p>
+        </div>
+
+        <div class="sia-audience-grid">
+          <article class="sia-audience-card is-student" data-reveal>
+            <span><i class="bi bi-mortarboard-fill"></i></span>
+            <h3>Estudiante</h3>
+            <p>Clases, perfil, avisos y servicios del campus.</p>
+            <div>
+              <button type="button" data-landing-login>Acceder</button>
+              <button type="button" data-landing-info="estudiante">Ver ruta</button>
             </div>
+          </article>
+
+          <article class="sia-audience-card is-staff" data-reveal>
+            <span><i class="bi bi-person-workspace"></i></span>
+            <h3>Docente o personal</h3>
+            <p>Herramientas internas según permisos institucionales.</p>
+            <div>
+              <button type="button" data-landing-login>Acceder</button>
+              <button type="button" data-landing-info="docente">Ver ruta</button>
+            </div>
+          </article>
+
+          <article class="sia-audience-card is-applicant" data-reveal>
+            <span><i class="bi bi-compass-fill"></i></span>
+            <h3>Aspirante</h3>
+            <p>Admisiones, práctica, test vocacional y mapa.</p>
+            <div>
+              <a href="#/admisiones">Abrir admisiones</a>
+              <button type="button" data-landing-info="aspirante">Ver ruta</button>
+            </div>
+          </article>
+
+          <article class="sia-audience-card is-visitor" data-reveal>
+            <span><i class="bi bi-geo-alt-fill"></i></span>
+            <h3>Visitante</h3>
+            <p>Ubicación, acceso al campus y canales oficiales.</p>
+            <div>
+              <a href="#/mapa-campus">Ver mapa</a>
+              <button type="button" data-landing-info="visitante">Ver ruta</button>
+            </div>
+          </article>
+        </div>
+      </section>
+    `;
+  }
+
+  renderModuleStickers() {
+    const modules = this.getModuleHighlights();
+    return Object.entries(modules).map(([key, module], index) => `
+      <button
+        type="button"
+        class="sia-module-sticker is-${key}"
+        data-landing-module="${key}"
+        data-reveal
+        style="--sticker-index: ${index};"
+      >
+        <span class="sia-module-sticker-icon">
+          <i class="bi ${module.icon}"></i>
+        </span>
+        <span class="sia-module-sticker-copy">
+          <strong>${module.title}</strong>
+          <small>${module.lead}</small>
+        </span>
+      </button>
+    `).join('');
+  }
+
+  getModulesHtml() {
+    return `
+      <section class="sia-landing-section sia-modules-section" aria-label="Accesos frecuentes">
+        <div class="sia-section-heading" data-reveal>
+          <span>Accesos frecuentes</span>
+          <h2>Lo que más se usa dentro de SIA</h2>
+          <p class="sia-section-brief">Abre una vista rápida de cada módulo sin salir del portal.</p>
+        </div>
+
+        <div class="sia-module-carousel" aria-label="Carrusel de módulos destacados de SIA">
+          ${this.renderModuleStickers()}
+        </div>
+      </section>
+    `;
+  }
+
+  getMinimalInfoHtml() {
+    return `
+      <section id="landing-aspirantes" class="sia-landing-section sia-aspirants-section" aria-label="Ruta para aspirantes">
+        <div class="sia-aspirants-panel" data-reveal>
+          <div class="sia-section-heading">
+            <span>Aspirantes</span>
+            <h2>Prepara tu ingreso al campus</h2>
+            <p class="sia-section-brief">Consulta el proceso, practica y ubica el plantel antes de iniciar tu vida universitaria.</p>
+          </div>
+
+          <div class="sia-route-carousel is-aspirants" aria-label="Accesos para aspirantes">
+            <article class="sia-route-card is-admissions">
+              <i class="bi bi-journal-richtext"></i>
+              <h3>Proceso de admisión</h3>
+              <p>Guía pública con ruta, pasos y seguimiento para aspirantes.</p>
+              <a href="#/admisiones">Abrir proceso</a>
+            </article>
+
+            <article class="sia-route-card is-campus">
+              <i class="bi bi-ui-checks-grid"></i>
+              <h3>Práctica EVALUATEC</h3>
+              <p>Refuerza temas por carrera desde el módulo de admisiones.</p>
+              <a href="#/admisiones">Practicar</a>
+            </article>
+
+            <article class="sia-route-card is-vocational">
+              <i class="bi bi-compass-fill"></i>
+              <h3>Test vocacional</h3>
+              <p>Explora carreras y contrasta tu perfil antes de decidir.</p>
+              <a href="#/test-vocacional">Abrir test</a>
+            </article>
+
+            <article class="sia-route-card is-location">
+              <i class="bi bi-map-fill"></i>
+              <h3>Mapa del campus</h3>
+              <p>Ubica edificios, accesos y servicios del plantel.</p>
+              <a href="#/mapa-campus">Ver mapa</a>
+            </article>
           </div>
         </div>
       </section>
     `;
   }
 
-  getProcessesHtml() {
+  getCampusServicesHtml() {
     return `
-      <section id="landing-procesos" class="py-5">
-        <div class="container py-4">
-          <div class="text-center mb-5">
-            <div class="landing-section-label justify-content-center mb-3">Que hacer aqui</div>
-            <h2 class="fw-bold mb-3" style="font-size: 2.25rem;">Lo esencial de SIA, sin vueltas.</h2>
-            <p class="mx-auto" style="max-width: 640px; color: rgba(255,255,255,0.55); font-size: 0.98rem;">
-              SIA no necesita explicarse por decenas de modulos. Estas son las acciones que concentran el uso diario dentro del campus.
-            </p>
+      <section id="landing-servicios" class="sia-landing-section sia-campus-services" aria-label="Servicios del campus">
+        <div class="sia-info-strip is-trust" data-reveal>
+          <div>
+            <span class="sia-strip-label">Servicios del campus</span>
+            <h2>Atajos para resolver lo cotidiano</h2>
+            <p class="sia-section-brief">SIA reúne servicios que normalmente se consultan por separado.</p>
           </div>
-
-          <div class="landing-process-grid">
-            ${this.renderStudentProcesses()}
-          </div>
-
-          <div class="landing-process-footer">
-            <p class="mb-0">Todo parte del mismo acceso institucional para evitar brincar entre herramientas separadas.</p>
-            <button data-landing-login class="btn btn-landing-cta d-inline-flex align-items-center justify-content-center gap-2">
-              <i class="bi bi-box-arrow-in-right"></i>
-              <span>Entrar a SIA</span>
+          <div class="sia-strip-actions">
+            <button type="button" data-landing-module="biblio">
+              <i class="bi bi-book-half"></i>
+              <span>Biblioteca</span>
             </button>
-          </div>
-        </div>
-      </section>
-    `;
-  }
-
-  getHowItWorksHtml() {
-    return `
-      <section id="landing-beneficios" class="landing-section-alt py-5">
-        <div class="container py-4">
-          <div class="text-center mb-5">
-            <div class="landing-section-label justify-content-center mb-3">Como funciona</div>
-            <h2 class="fw-bold mb-3" style="font-size: 2.25rem;">Un acceso, tres pasos.</h2>
-          </div>
-
-          <div class="landing-step-grid">
-            <article class="landing-card landing-step-card rounded-4">
-              <div class="landing-step-number">1</div>
-              <h3>Entra con tu cuenta institucional</h3>
-              <p>Alumnos, docentes y personal usan el mismo acceso oficial del campus.</p>
-            </article>
-            <article class="landing-card landing-step-card rounded-4">
-              <div class="landing-step-number">2</div>
-              <h3>Abre el modulo que necesitas</h3>
-              <p>Clases, servicios, bienestar, credencial y avisos viven dentro de la misma plataforma.</p>
-            </article>
-            <article class="landing-card landing-step-card rounded-4">
-              <div class="landing-step-number">3</div>
-              <h3>Resuelve el proceso desde tu celular</h3>
-              <p>La interfaz prioriza consulta rapida, continuidad y acceso diario desde movil.</p>
-            </article>
+            <button type="button" data-landing-module="medi">
+              <i class="bi bi-heart-pulse-fill"></i>
+              <span>Bienestar</span>
+            </button>
+            <button type="button" data-landing-info="confianza">
+              <i class="bi bi-shield-check"></i>
+              <span>Acceso seguro</span>
+            </button>
           </div>
         </div>
       </section>
@@ -526,27 +729,24 @@ class SiaLandingView extends HTMLElement {
 
   getAppPromoHtml() {
     return `
-      <section id="landing-app" class="py-5">
-        <div class="container py-4">
-          <div id="landing-app-banner" class="landing-app-banner landing-app-banner-compact" data-landing-app-card>
-            <div class="landing-app-copy">
-              <div class="landing-app-kicker mb-2">App SIA</div>
-              <h3 class="landing-app-title mb-2">Instalala si entras seguido.</h3>
-              <p class="mb-0">
-                Deja SIA en tu pantalla de inicio para entrar mas rapido a tus procesos de campus.
-              </p>
-            </div>
-            <div class="landing-app-actions">
-              <button id="btn-landing-app-install" class="btn btn-landing-app-download d-flex align-items-center justify-content-center gap-2" data-role="install">
-                <i class="bi bi-download"></i>
-                <span>Instalar app</span>
-              </button>
-              <button id="btn-landing-app-share" class="btn btn-landing-app-share d-flex align-items-center justify-content-center gap-2" data-role="share">
-                <i class="bi bi-share-fill"></i>
-                <span>Compartir SIA</span>
-              </button>
-            </div>
-            <div id="landing-app-status" class="landing-app-status" data-role="status"></div>
+      <section class="sia-landing-section sia-app-section">
+        <div class="sia-app-panel" data-landing-app-card data-reveal>
+          <div>
+            <span class="sia-strip-label">App móvil</span>
+            <h2>Instálala en tu inicio</h2>
+            <p>Si usas SIA todos los días, instalar la app te deja entrar más rápido a tus procesos y avisos.</p>
+            <small data-role="status"></small>
+          </div>
+
+          <div class="sia-app-actions">
+            <button id="btn-landing-app-install" type="button" data-role="install">
+              <i class="bi bi-download"></i>
+              <span>Instalar app</span>
+            </button>
+            <button id="btn-landing-app-share" type="button" data-role="share">
+              <i class="bi bi-share-fill"></i>
+              <span>Compartir</span>
+            </button>
           </div>
         </div>
       </section>
@@ -555,62 +755,82 @@ class SiaLandingView extends HTMLElement {
 
   getFooterHtml() {
     return `
-      <footer id="landing-contacto" class="pt-5 pb-4" style="border-top: 1px solid rgba(255,255,255,0.06) !important;">
-        <div class="container">
-          <div class="row g-4 justify-content-between align-items-start">
-            <div class="col-lg-5">
-              <div class="landing-brand-logos mb-3">
-                <img src="/images/tecnm-logo-oscuro.png" alt="TecNM" class="logo-tecnm" style="height: 40px;">
-                <div class="brand-divider" style="height: 32px;"></div>
-                <img src="/images/logo-sia.png" alt="SIA" class="logo-ites">
-              </div>
-              <p style="color: rgba(255,255,255,0.4); font-size: 0.85rem; line-height: 1.7; max-width: 320px;">
-                SIA es la plataforma institucional del Tecnologico Nacional de Mexico, Campus Los Cabos.
-              </p>
-              <div class="d-flex gap-3 mt-3">
-                <a class="landing-social-link" href="https://www.facebook.com/itesloscabos.oficial" target="_blank" rel="noopener" aria-label="Facebook ITES Los Cabos">
-                  <i class="bi bi-facebook"></i>
-                </a>
-                <a class="landing-social-link" href="https://www.instagram.com/ites_loscabos" target="_blank" rel="noopener" aria-label="Instagram ITES Los Cabos">
-                  <i class="bi bi-instagram"></i>
-                </a>
-              </div>
-            </div>
+      <footer id="landing-contacto" class="sia-landing-footer">
+        <div class="sia-footer-brand">
+          <span class="sia-brand-logos">
+            <img src="/images/logo-tecnm.png" alt="TecNM" class="sia-brand-logo-tecnm">
+            <span class="sia-brand-divider"></span>
+            <img src="/images/logo-ites.png" alt="ITES Los Cabos" class="sia-brand-logo-ites">
+            <span class="sia-brand-divider"></span>
+            <img src="/images/logo-sia.png" alt="SIA" class="sia-brand-logo-sia">
+          </span>
+          <p>Sistema de Integración Académica del TecNM Campus Los Cabos.</p>
+        </div>
 
-            <div class="col-6 col-lg-3">
-              <h6 class="fw-bold mb-3" style="font-size: 0.85rem; color: rgba(255,255,255,0.7);">Acceso rapido</h6>
-              <ul class="list-unstyled" style="font-size: 0.85rem;">
-                <li class="mb-2"><button data-landing-login class="btn p-0 border-0 bg-transparent text-start">Acceso institucional</button></li>
-                <li class="mb-2"><a href="#/admisiones">Admisiones</a></li>
-                <li class="mb-2"><a href="#/test-vocacional">Test vocacional</a></li>
-                <li class="mb-2"><a href="#/mapa-campus">Mapa del campus</a></li>
-                <li class="mb-2"><a href="#landing-contacto">Soporte</a></li>
-              </ul>
-            </div>
-
-            <div class="col-6 col-lg-4">
-              <h6 class="fw-bold mb-3" style="font-size: 0.85rem; color: rgba(255,255,255,0.7);">Soporte</h6>
-              <ul class="list-unstyled" style="font-size: 0.85rem;">
-                <li class="mb-2" style="color: rgba(255,255,255,0.4);"><i class="bi bi-telephone me-2"></i>+52 (624) 142 5939</li>
-                <li class="mb-2"><a href="mailto:soporte.sia@loscabos.tecnm.mx"><i class="bi bi-envelope me-2"></i>soporte.sia@loscabos.tecnm.mx</a></li>
-                <li class="mb-2" style="color: rgba(255,255,255,0.4);"><i class="bi bi-geo-alt me-2"></i>C. Gandhi, Guaymitas, San Jose del Cabo, B.C.S.</li>
-              </ul>
-            </div>
-          </div>
-
-          <hr style="border-color: rgba(255,255,255,0.06); margin: 2rem 0;">
-
-          <div class="row align-items-center">
-            <div class="col-md-6 text-center text-md-start" style="font-size: 0.78rem; color: rgba(255,255,255,0.3);">
-              &copy; 2026 SIA | TecNM Campus Los Cabos
-            </div>
-            <div class="col-md-6 text-center text-md-end" style="font-size: 0.78rem;">
-              <a href="https://www.itesloscabos.edu.mx" target="_blank" rel="noopener" style="color: rgba(255,255,255,0.3);">Sitio Oficial ITES</a>
-            </div>
-          </div>
+        <div class="sia-footer-links">
+          <button type="button" data-landing-info="contacto">Soporte</button>
+          <a href="https://www.facebook.com/itesloscabos.oficial" target="_blank" rel="noopener">Facebook</a>
+          <a href="https://www.instagram.com/ites_loscabos" target="_blank" rel="noopener">Instagram</a>
+          <a href="https://www.itesloscabos.edu.mx" target="_blank" rel="noopener">Sitio oficial</a>
         </div>
       </footer>
     `;
+  }
+
+  getInfoModalHtml() {
+    return `
+      <div class="modal fade sia-info-modal" id="landingInfoModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+          <div class="modal-content">
+            <div class="modal-header">
+              <div class="sia-modal-heading">
+                <span class="sia-modal-icon"><i class="bi bi-grid-1x2-fill"></i></span>
+                <div>
+                  <p>SIA</p>
+                  <h2 class="modal-title">Información</h2>
+                </div>
+              </div>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body"></div>
+            <div class="modal-footer">
+              <button type="button" class="sia-modal-close" data-bs-dismiss="modal">Entendido</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  showInfoModal(key) {
+    const content = this.getInfoContent()[key];
+    this.showLandingModal(content);
+  }
+
+  showModuleModal(key) {
+    const content = this.getModuleHighlights()[key];
+    this.showLandingModal(content);
+  }
+
+  showLandingModal(content) {
+    const modal = this.querySelector('#landingInfoModal');
+    if (!content || !modal) return;
+
+    modal.querySelector('.sia-modal-icon i').className = `bi ${content.icon}`;
+    modal.querySelector('.modal-title').textContent = content.title;
+    modal.querySelector('.modal-body').innerHTML = `
+      <p class="sia-modal-lead">${content.lead}</p>
+      <ul class="sia-modal-list">
+        ${content.items.map((item) => `<li>${item}</li>`).join('')}
+      </ul>
+    `;
+
+    if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+      bootstrap.Modal.getOrCreateInstance(modal).show();
+      return;
+    }
+
+    window.alert([content.title, content.lead, ...content.items].join('\n\n'));
   }
 
   bindLoginButtons() {
@@ -654,14 +874,63 @@ class SiaLandingView extends HTMLElement {
         const target = document.querySelector(link.getAttribute('href'));
         if (target) {
           target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          const collapse = this.querySelector('#landingNavContent');
-          if (collapse && collapse.classList.contains('show') && typeof bootstrap !== 'undefined') {
-            const bsCollapse = bootstrap.Collapse.getInstance(collapse);
-            if (bsCollapse) bsCollapse.hide();
-          }
+          this.closeNav();
         }
       });
     });
+  }
+
+  bindInfoButtons() {
+    this.querySelectorAll('[data-landing-info]').forEach((button) => {
+      button.addEventListener('click', () => {
+        this.showInfoModal(button.dataset.landingInfo);
+        this.closeNav();
+      });
+    });
+  }
+
+  bindModuleButtons() {
+    this.querySelectorAll('[data-landing-module]').forEach((button) => {
+      button.addEventListener('click', () => {
+        this.showModuleModal(button.dataset.landingModule);
+      });
+    });
+  }
+
+  bindRouteLinks() {
+    this.querySelectorAll('a[href^="#/"]').forEach((link) => {
+      link.addEventListener('click', () => this.closeNav());
+    });
+  }
+
+  closeNav() {
+    const collapse = this.querySelector('#landingNavContent');
+    if (!collapse || !collapse.classList.contains('show') || typeof bootstrap === 'undefined') return;
+
+    const bsCollapse = bootstrap.Collapse.getInstance(collapse) || bootstrap.Collapse.getOrCreateInstance(collapse);
+    bsCollapse.hide();
+  }
+
+  setupRevealAnimations() {
+    const revealItems = this.querySelectorAll('[data-reveal]');
+
+    if (this.revealObserver) this.revealObserver.disconnect();
+
+    if (!('IntersectionObserver' in window)) {
+      revealItems.forEach((item) => item.classList.add('is-visible'));
+      return;
+    }
+
+    this.revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('is-visible');
+          this.revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.18 });
+
+    revealItems.forEach((item) => this.revealObserver.observe(item));
   }
 
   render() {
@@ -669,11 +938,13 @@ class SiaLandingView extends HTMLElement {
     this.innerHTML = `
       ${this.getNavHtml()}
       ${this.getHeroHtml()}
-      ${this.getProcessesHtml()}
-      ${this.getHowItWorksHtml()}
-      ${this.getVocacionalHtml()}
+      ${this.getQuickRoutesHtml()}
+      ${this.getModulesHtml()}
+      ${this.getMinimalInfoHtml()}
+      ${this.getCampusServicesHtml()}
       ${this.getAppPromoHtml()}
       ${this.getFooterHtml()}
+      ${this.getInfoModalHtml()}
       <button id="btn-login-microsoft" class="d-none"></button>
     `;
 
@@ -682,6 +953,10 @@ class SiaLandingView extends HTMLElement {
 
     this.bindLoginButtons();
     this.bindLandingAnchors();
+    this.bindInfoButtons();
+    this.bindModuleButtons();
+    this.bindRouteLinks();
+    this.setupRevealAnimations();
 
     if (btnInstallApp) btnInstallApp.onclick = () => this.handleInstallClick();
     if (btnShareApp) btnShareApp.onclick = () => this.handleShareClick();

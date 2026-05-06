@@ -7,6 +7,7 @@ if (!window.AdmisionesPublic) {
       admissions: '/data/admisiones-2026.json',
       content: '/data/evaluatec-2026-content.json'
     };
+    const VOCACIONAL_STORAGE_KEY = 'sia_vocacional_id';
 
     const AREA_ICONS = {
       matematicas: 'bi-calculator',
@@ -79,7 +80,11 @@ if (!window.AdmisionesPublic) {
         quizSubmitted: false,
         quizResult: null,
         quizIndex: 0,
-        microAnswers: {}
+        microAnswers: {},
+        pendingCareerId: '',
+        sourceInfoOpen: false,
+        simulatorAccepted: false,
+        simulatorStartTime: null
       };
     }
 
@@ -102,6 +107,19 @@ if (!window.AdmisionesPublic) {
 
     function formatPercent(value) {
       return `${Math.round(Number(value || 0))}%`;
+    }
+
+    function hasVocacionalSession() {
+      try {
+        return Boolean(localStorage.getItem(VOCACIONAL_STORAGE_KEY));
+      } catch (error) {
+        console.warn('[AdmisionesPublic] No se pudo leer la sesion vocacional local:', error);
+        return false;
+      }
+    }
+
+    function openVocacionalEntry() {
+      window.location.hash = hasVocacionalSession() ? '#/vocacional/test' : '#/test-vocacional';
     }
 
     function shuffleList(items) {
@@ -265,18 +283,21 @@ if (!window.AdmisionesPublic) {
       return `${areaId}::${topicId}`;
     }
 
-    function getRouteAreaIds() {
-      const career = getSelectedCareer();
+    function getCareerAreaIds(career = getSelectedCareer()) {
       return career?.routeAreaIds || [];
     }
 
-    function getRouteAreas() {
-      const areaIds = getRouteAreaIds();
+    function getRouteAreaIds() {
+      return getCareerAreaIds();
+    }
+
+    function getRouteAreas(career = getSelectedCareer()) {
+      const areaIds = getCareerAreaIds(career);
       return areaIds.map((areaId) => getArea(areaId)).filter(Boolean);
     }
 
-    function getRouteTopics() {
-      return getRouteAreas().flatMap((area) =>
+    function getRouteTopics(career = getSelectedCareer()) {
+      return getRouteAreas(career).flatMap((area) =>
         (area.topics || []).map((topic) => ({
           ...topic,
           areaId: area.id,
@@ -284,6 +305,15 @@ if (!window.AdmisionesPublic) {
           roleLabel: area.roleLabel
         }))
       );
+    }
+
+    function getCareerTopicKeys(career = getSelectedCareer()) {
+      return new Set(getRouteTopics(career).map((topic) => getTopicKey(topic.areaId, topic.id)));
+    }
+
+    function topicBelongsToCareer(areaId, topicId, career = getSelectedCareer()) {
+      if (!career) return true;
+      return getCareerTopicKeys(career).has(getTopicKey(areaId, topicId));
     }
 
     function getTopicProgress(areaId, topicId) {
@@ -326,6 +356,7 @@ if (!window.AdmisionesPublic) {
 
     function getWeakTopics() {
       const stats = _guest?.practiceResults?.topicStats || {};
+      const routeKeys = getCareerTopicKeys();
       return Object.entries(stats)
         .map(([key, value]) => {
           const [areaId, topicId] = key.split('::');
@@ -341,6 +372,7 @@ if (!window.AdmisionesPublic) {
           };
         })
         .filter(Boolean)
+        .filter((item) => routeKeys.has(getTopicKey(item.areaId, item.topicId)))
         .filter((item) => item.percent < 75)
         .sort((a, b) => a.percent - b.percent)
         .slice(0, 3);
@@ -349,7 +381,8 @@ if (!window.AdmisionesPublic) {
     function computeMetrics() {
       const career = getSelectedCareer();
       const route = getRouteProgress();
-      const practiceScopes = Object.values(_guest?.practiceResults?.scopes || {});
+      const practiceScopes = Object.values(_guest?.practiceResults?.scopes || {})
+        .filter((scope) => !career || scope.careerId === career.id || topicBelongsToCareer(scope.areaId, scope.topicId, career));
       const lastPractice = practiceScopes
         .slice()
         .sort((a, b) => String(b.takenAt || '').localeCompare(String(a.takenAt || '')))[0] || null;
@@ -368,8 +401,9 @@ if (!window.AdmisionesPublic) {
     }
 
     function getPoolFromOtherTopics(topicKey, extractor, limit = 12) {
+      const sourceTopics = getSelectedCareer() ? getRouteTopics() : getAllTopics();
       return shuffleList(
-        getAllTopics()
+        sourceTopics
           .filter((topic) => getTopicKey(topic.areaId, topic.id) !== topicKey)
           .flatMap((topic) => extractor(topic) || [])
           .filter(Boolean)
@@ -388,6 +422,24 @@ if (!window.AdmisionesPublic) {
       return topic.microPractice?.question ? [topic.microPractice] : [];
     }
 
+    function buildPracticeContext(area, topic, practice) {
+      if (practice?.context || practice?.stimulus) return practice.context || practice.stimulus;
+      if (practice?.source === 'ejemplo') {
+        const example = getTopicExamples(topic)[0];
+        if (example?.problem) return `Ejemplo base de ${topic.title}: ${example.problem}`;
+      }
+      if (practice?.source === 'cobertura') {
+        return `Temario oficial de ${area.title} para ${topic.title}: ${(topic.officialCoverage || []).join(', ')}.`;
+      }
+      if (practice?.source === 'habilidad') {
+        return `${topic.checkpoint?.prompt || 'Habilidades esperadas:'} ${(topic.checkpoint?.items || []).join(' ')}`;
+      }
+      if (practice?.source === 'error común') {
+        return `Errores comunes al estudiar ${topic.title}: ${(topic.commonMistakes || []).join(' ')}`;
+      }
+      return topic.explanation || topic.summary || '';
+    }
+
     function createTopicQuestion(area, topic, practice, index = 0) {
       return {
         id: `${area.id}-${topic.id}-practice-${index}`,
@@ -399,7 +451,9 @@ if (!window.AdmisionesPublic) {
         question: practice?.question || `Repaso de ${topic.title}`,
         options: practice?.options || ['Lo entiendo', 'Necesito repasarlo'],
         correctIndex: Number(practice?.correctIndex || 0),
-        explanation: practice?.explanation || topic.summary || ''
+        explanation: practice?.explanation || topic.summary || '',
+        context: buildPracticeContext(area, topic, practice),
+        source: practice?.source || ''
       };
     }
 
@@ -424,7 +478,7 @@ if (!window.AdmisionesPublic) {
 
     function getCareerBankMetrics(career = getSelectedCareer()) {
       if (!career) return { topics: 0, examples: 0, questions: 0 };
-      const routeAreas = getRouteAreas();
+      const routeAreas = getRouteAreas(career);
       return routeAreas.reduce((metrics, area) => {
         (area.topics || []).forEach((topic) => {
           metrics.topics += 1;
@@ -433,6 +487,80 @@ if (!window.AdmisionesPublic) {
         });
         return metrics;
       }, { topics: 0, examples: 0, questions: 0 });
+    }
+
+    function hasGuestActivity() {
+      const progressCount = Object.keys(_guest?.progressByTopic || {}).length;
+      const scopesCount = Object.keys(_guest?.practiceResults?.scopes || {}).length;
+      const marksCount = (_guest?.bookmarks || []).length;
+      return Boolean(progressCount || scopesCount || marksCount || _guest?.lastVisited);
+    }
+
+    function filterGuestForCareer(career) {
+      const routeKeys = getCareerTopicKeys(career);
+      const routeAreaIds = new Set(getCareerAreaIds(career));
+      const progressByTopic = Object.fromEntries(
+        Object.entries(_guest?.progressByTopic || {}).filter(([key]) => routeKeys.has(key))
+      );
+      const topicStats = Object.fromEntries(
+        Object.entries(_guest?.practiceResults?.topicStats || {}).filter(([key]) => routeKeys.has(key))
+      );
+      const areaStats = Object.fromEntries(
+        Object.entries(_guest?.practiceResults?.areaStats || {}).filter(([areaId]) => routeAreaIds.has(areaId))
+      );
+      const scopes = Object.fromEntries(
+        Object.entries(_guest?.practiceResults?.scopes || {}).filter(([, scope]) => {
+          if (scope?.careerId === career.id) return true;
+          if (scope?.topicId) return topicBelongsToCareer(scope.areaId, scope.topicId, career);
+          return scope?.areaId ? routeAreaIds.has(scope.areaId) : false;
+        })
+      );
+      const bookmarks = (_guest?.bookmarks || []).filter((key) => routeKeys.has(key));
+      const lastVisited = _guest?.lastVisited?.kind === 'topic'
+        && routeKeys.has(getTopicKey(_guest.lastVisited.areaId, _guest.lastVisited.topicId))
+        ? _guest.lastVisited
+        : null;
+
+      return {
+        progressByTopic,
+        practiceResults: { scopes, topicStats, areaStats },
+        bookmarks,
+        lastVisited
+      };
+    }
+
+    function applyCareerSelection(career, mode = 'keep') {
+      if (!career) return;
+      if (mode === 'reset') {
+        const fresh = createDefaultGuest();
+        GuestStore.save({
+          ...fresh,
+          guestId: _guest?.guestId || fresh.guestId,
+          selectedCareer: career.id,
+          tourSeen: _guest?.tourSeen || false
+        });
+      } else {
+        GuestStore.patch({
+          selectedCareer: career.id,
+          ...filterGuestForCareer(career)
+        });
+      }
+      _ui = {
+        ...defaultUiState(),
+        screen: 'route',
+        areaId: career.routeAreaIds?.[0] || ''
+      };
+      render();
+    }
+
+    function requestCareerSelection(career) {
+      const currentCareer = getSelectedCareer();
+      if (!currentCareer || currentCareer.id === career.id || !hasGuestActivity()) {
+        applyCareerSelection(career, 'keep');
+        return;
+      }
+      _ui.pendingCareerId = career.id;
+      render();
     }
 
     function createCoverageQuestion(area, topic) {
@@ -449,7 +577,9 @@ if (!window.AdmisionesPublic) {
         question: `¿Qué apartado pertenece a ${topic.title}?`,
         options: built.options,
         correctIndex: built.correctIndex,
-        explanation: `${correct} forma parte del bloque ${topic.title}.`
+        explanation: `${correct} forma parte del bloque ${topic.title}.`,
+        context: `Temario oficial de ${area.title}: ${(topic.officialCoverage || []).join(', ')}.`,
+        source: 'temario-oficial'
       };
     }
 
@@ -467,7 +597,9 @@ if (!window.AdmisionesPublic) {
         question: `Para dominar ${topic.title}, ¿qué debes poder hacer?`,
         options: built.options,
         correctIndex: built.correctIndex,
-        explanation: correct
+        explanation: correct,
+        context: `${topic.checkpoint?.prompt || 'Antes de cerrar el tema, verifica:'} ${(topic.checkpoint?.items || []).join(' ')}`,
+        source: 'checkpoint-sia'
       };
     }
 
@@ -534,6 +666,10 @@ if (!window.AdmisionesPublic) {
     }
 
     function openTopic(areaId, topicId) {
+      if (!topicBelongsToCareer(areaId, topicId)) {
+        window.showToast?.('Ese tema no pertenece a la carrera activa. Cambia de carrera para verlo.', 'warning');
+        return;
+      }
       _ui = {
         ...defaultUiState(),
         screen: 'topic',
@@ -564,7 +700,9 @@ if (!window.AdmisionesPublic) {
         quizAnswers: {},
         quizSubmitted: false,
         quizResult: null,
-        quizIndex: 0
+        quizIndex: 0,
+        simulatorAccepted: mode !== 'simulator',
+        simulatorStartTime: mode === 'simulator' ? Date.now() : null
       };
       setLastVisited({ kind: 'quiz', mode, quizId, areaId, topicId });
       render();
@@ -645,7 +783,9 @@ if (!window.AdmisionesPublic) {
       return `
         <nav class="adm-tabbar" aria-label="Secciones de admisiones">
           ${NAV_ITEMS.map((item) => {
-            const active = _ui.screen === item.screen || (item.screen === 'practice' && _ui.screen === 'quiz');
+            const active = _ui.screen === item.screen
+              || (item.screen === 'practice' && _ui.screen === 'quiz')
+              || (item.screen === 'learn' && _ui.screen === 'topic');
             return `
               <button class="adm-tab ${active ? 'is-active' : ''}" type="button" data-action="go-screen" data-screen="${escapeHtml(item.screen)}" ${active ? 'aria-current="page"' : ''}>
                 ${icon(item.icon)}
@@ -660,22 +800,53 @@ if (!window.AdmisionesPublic) {
     function renderProgressStrip(metrics) {
       const career = metrics.career;
       return `
-        <section class="adm-status-strip" aria-label="Estado de tu preparación">
+        <div class="adm-compact-alert is-info">
           <div>
-            <span class="adm-kicker">Tu preparación</span>
-            <strong>${career ? escapeHtml(career.name) : 'Elige una carrera para personalizar todo'}</strong>
+            <strong>${icon('bi-map')} ${career ? escapeHtml(career.name) : 'Aún no eliges carrera'}</strong>
+            <span>${formatPercent(metrics.route.percent)} ruta · ${escapeHtml(metrics.practiceLabel)}</span>
           </div>
-          <div class="adm-status-metrics">
-            <span>${formatPercent(metrics.route.percent)} ruta</span>
-            <span>${escapeHtml(metrics.practiceLabel)}</span>
+          ${career ? `<button class="adm-icon-button" type="button" data-action="go-screen" data-screen="route" aria-label="Cambiar carrera">${icon('bi-pencil')}</button>` : `<button class="adm-button is-soft" type="button" data-action="go-screen" data-screen="route">Elegir</button>`}
+        </div>
+      `;
+    }
+
+    function renderSourceNotice() {
+      const admissions = _resources?.admissions || {};
+      const guideUrl = admissions.exam?.officialGuideUrl || 'https://www.itesloscabos.edu.mx/wp-content/uploads/2026/01/GUIA-EVALUATEC-2026-.pdf';
+      return `
+        <div class="adm-compact-alert is-warning">
+          <div>
+            <strong>${icon('bi-patch-check')} Basado en la Guía EVALUATEC 2026</strong>
+            <span>Preguntas de práctica didácticas de SIA. No oficiales.</span>
           </div>
-        </section>
+          <a class="adm-icon-button" href="${escapeHtml(guideUrl)}" target="_blank" rel="noopener noreferrer" aria-label="Ver guía original">${icon('bi-box-arrow-up-right')}</a>
+        </div>
+      `;
+    }
+
+    function renderVocacionalShortcut(metrics) {
+      const hasSession = hasVocacionalSession();
+      const title = hasSession ? 'Test vocacional en pausa' : '¿Dudas con tu carrera?';
+      const body = hasSession ? 'Retoma tu sesión.' : 'Haz el test para descubrir tu afinidad.';
+      
+      return `
+        <div class="adm-compact-alert is-success">
+          <div>
+            <strong>${icon('bi-compass')} ${escapeHtml(title)}</strong>
+            <span>${escapeHtml(body)}</span>
+          </div>
+          <button class="adm-button is-primary" type="button" data-action="open-vocacional">${icon(hasSession ? 'bi-arrow-repeat' : 'bi-stars')} ${hasSession ? 'Continuar' : 'Hacer test'}</button>
+        </div>
       `;
     }
 
     function renderWelcome(metrics) {
       const next = metrics.nextTopic;
       return `
+        ${renderProgressStrip(metrics)}
+        ${renderSourceNotice()}
+        ${renderVocacionalShortcut(metrics)}
+
         <section class="adm-welcome">
           <div class="adm-welcome-copy">
             <span class="adm-eyebrow">${icon('bi-stars')} Nuevo ingreso 2026</span>
@@ -766,6 +937,27 @@ if (!window.AdmisionesPublic) {
     }
 
     function renderCareerPicker() {
+      const isExpanded = !_guest.selectedCareer || _ui.careerPickerExpanded;
+
+      if (!isExpanded) {
+        const career = getCareer(_guest.selectedCareer);
+        const areaCount = career?.routeAreaIds?.length || 0;
+        return `
+          <div class="adm-career-list">
+            <button class="adm-career-card is-active" type="button" data-action="toggle-career-picker" style="justify-content: space-between;">
+              <div style="display:flex; align-items:center; gap:1rem;">
+                <span class="adm-career-icon">${icon(CAREER_ICONS[career.id] || 'bi-mortarboard')}</span>
+                <span style="text-align: left;">
+                  <strong>${escapeHtml(career.shortName || career.name)}</strong>
+                  <small>${escapeHtml(areaCount)} bloques de preparación</small>
+                </span>
+              </div>
+              <span style="font-size:0.875rem; color:var(--primary); display:flex; align-items:center; gap:0.25rem;">Cambiar ${icon('bi-chevron-expand')}</span>
+            </button>
+          </div>
+        `;
+      }
+
       return `
         <div class="adm-career-list">
           ${getCareers().map((career) => {
@@ -896,10 +1088,16 @@ if (!window.AdmisionesPublic) {
       const progress = getTopicProgress(area.id, topic.id);
       const key = getTopicKey(area.id, topic.id);
       const marked = (_guest.bookmarks || []).includes(key);
+      const isLearned = progress.studied;
+      const isMastered = isLearned && progress.practiced;
+      let stateIcon = 'bi-circle';
+      if (isMastered) stateIcon = 'bi-check2-all';
+      else if (isLearned) stateIcon = 'bi-check2';
+
       return `
         <article class="adm-topic-row">
           <div>
-            <span class="adm-topic-state ${progress.studied ? 'is-done' : ''}">${progress.studied ? icon('bi-check2') : icon('bi-circle')}</span>
+            <span class="adm-topic-state ${isLearned ? 'is-done' : ''}">${icon(stateIcon)}</span>
           </div>
           <div class="adm-topic-content">
             <strong>${escapeHtml(topic.title)}</strong>
@@ -908,7 +1106,7 @@ if (!window.AdmisionesPublic) {
           </div>
           <div class="adm-topic-actions">
             <button class="adm-icon-button" type="button" data-action="toggle-bookmark" data-area-id="${escapeHtml(area.id)}" data-topic-id="${escapeHtml(topic.id)}" aria-label="${marked ? 'Quitar guardado' : 'Guardar tema'}">${icon(marked ? 'bi-bookmark-fill' : 'bi-bookmark')}</button>
-            <button class="adm-button is-primary" type="button" data-action="open-topic" data-area-id="${escapeHtml(area.id)}" data-topic-id="${escapeHtml(topic.id)}">Abrir</button>
+            <button class="adm-button is-primary" type="button" data-action="open-topic" data-area-id="${escapeHtml(area.id)}" data-topic-id="${escapeHtml(topic.id)}">Estudiar</button>
           </div>
         </article>
       `;
@@ -920,10 +1118,24 @@ if (!window.AdmisionesPublic) {
       if (!area || !topic) return renderSectionPrompt('bi-journal', 'Tema no encontrado', 'Vuelve al temario para elegir otro tema.', 'Ver temas', 'learn');
       const progress = getTopicProgress(area.id, topic.id);
       const topicKey = getTopicKey(area.id, topic.id);
-      const answer = _ui.microAnswers?.[topicKey];
       const practiceQuestions = getTopicPracticeQuestions(topic);
-      const micro = practiceQuestions[0] || null;
       const examples = getTopicExamples(topic);
+      
+      const allExamples = [...examples];
+      if (allExamples.length < 5) {
+        const extraNeeded = 5 - allExamples.length;
+        const extras = practiceQuestions.slice(3, 3 + extraNeeded).map(q => ({
+          problem: q.question,
+          steps: [q.explanation || 'Análisis de la pregunta.'],
+          answer: q.options[q.correctIndex],
+          source: 'didactico-sia'
+        }));
+        allExamples.push(...extras);
+      }
+      
+      const inlineQuestions = practiceQuestions.slice(0, 3);
+      const correctInlineCount = inlineQuestions.filter((q, i) => _ui.microAnswers?.[`${topicKey}-${i}`] === Number(q.correctIndex)).length;
+      const isLearned = progress.studied || correctInlineCount >= 2;
 
       return `
         <section class="adm-topic-hero">
@@ -932,94 +1144,132 @@ if (!window.AdmisionesPublic) {
           <h1>${escapeHtml(topic.title)}</h1>
           <p>${escapeHtml(topic.summary)}</p>
           <div class="adm-cta-row">
-            <button class="adm-button is-primary" type="button" data-action="mark-topic" data-area-id="${escapeHtml(area.id)}" data-topic-id="${escapeHtml(topic.id)}">${icon(progress.studied ? 'bi-check-circle-fill' : 'bi-check-circle')} ${progress.studied ? 'Tema visto' : 'Marcar como visto'}</button>
-            <button class="adm-button is-soft" type="button" data-action="start-topic-practice" data-area-id="${escapeHtml(area.id)}" data-topic-id="${escapeHtml(topic.id)}">${icon('bi-ui-checks')} Practicar ${practiceQuestions.length || 3}</button>
+            <button class="adm-button is-primary" type="button" data-action="mark-topic" data-area-id="${escapeHtml(area.id)}" data-topic-id="${escapeHtml(topic.id)}">${icon(isLearned ? 'bi-check-circle-fill' : 'bi-check-circle')} ${isLearned ? 'Tema aprendido' : 'Marcar como aprendido'}</button>
+            <button class="adm-button is-soft" type="button" data-action="start-topic-practice" data-area-id="${escapeHtml(area.id)}" data-topic-id="${escapeHtml(topic.id)}">${icon('bi-ui-checks')} Práctica completa</button>
           </div>
         </section>
 
         <section class="adm-lesson-grid">
-          ${renderLessonCard('bi-lightbulb', 'Idea clave', topic.explanation)}
-          ${renderExampleCard(examples)}
-          ${micro ? renderMicroPractice(area, topic, micro, answer) : ''}
-          ${renderListCard('bi-exclamation-triangle', 'Errores comunes', topic.commonMistakes || [])}
-          ${renderListCard('bi-flag', topic.checkpoint?.prompt || 'Cierra el tema si puedes:', topic.checkpoint?.items || [])}
+          ${renderTopicPhase1(topic)}
+          ${renderTopicPhase2(topic)}
+          ${renderTopicPhase3(allExamples)}
+          ${inlineQuestions.length ? renderTopicPhase4(area, topic, inlineQuestions) : ''}
+          ${renderTopicPhase5(topic)}
         </section>
       `;
     }
 
-    function renderLessonCard(iconName, title, body) {
+    function renderTopicPhase1(topic) {
+      const intro = topic.learning?.intro || topic.introduction || '';
+      const coverage = topic.officialCoverage || [];
       return `
-        <article class="adm-lesson-card">
-          <span class="adm-feature-icon">${icon(iconName)}</span>
-          <strong>${escapeHtml(title)}</strong>
-          <p>${escapeHtml(body || 'Sin contenido disponible.')}</p>
-        </article>
-      `;
-    }
-
-    function renderExampleCard(examples) {
-      if (!examples.length) return '';
-      const [example, ...extraExamples] = examples;
-      return `
-        <article class="adm-lesson-card">
-          <span class="adm-feature-icon">${icon('bi-card-checklist')}</span>
-          <strong>Ejemplos resueltos</strong>
-          ${example.level ? `<small class="adm-mini-label">${escapeHtml(example.level)}</small>` : ''}
-          <p>${escapeHtml(example.problem)}</p>
-          <ol>
-            ${(example.steps || []).map((step) => `<li>${escapeHtml(step)}</li>`).join('')}
-          </ol>
-          <small>Respuesta: ${escapeHtml(example.answer)}</small>
-          ${extraExamples.length ? `
-            <details class="adm-extra-examples">
-              <summary>Ver ${extraExamples.length} ejemplos más</summary>
-              ${extraExamples.map((item) => `
-                <div class="adm-extra-example">
-                  ${item.level ? `<span>${escapeHtml(item.level)}</span>` : ''}
-                  <p>${escapeHtml(item.problem)}</p>
-                  <ol>
-                    ${(item.steps || []).map((step) => `<li>${escapeHtml(step)}</li>`).join('')}
-                  </ol>
-                  <small>Respuesta: ${escapeHtml(item.answer)}</small>
-                </div>
-              `).join('')}
-            </details>
+        <article class="adm-lesson-card is-phase1">
+          <span class="adm-feature-icon">${icon('bi-journal-text')}</span>
+          <strong>Contexto del tema</strong>
+          <p>${escapeHtml(intro)}</p>
+          ${coverage.length ? `
+            <div class="adm-coverage-pills">
+              ${coverage.map(c => `<span class="adm-pill">${escapeHtml(c)}</span>`).join('')}
+            </div>
           ` : ''}
         </article>
       `;
     }
 
-    function renderMicroPractice(area, topic, micro, answer) {
-      const evaluated = typeof answer === 'number';
-      const correct = evaluated && answer === Number(micro.correctIndex);
+    function renderTopicPhase2(topic) {
+      const concepts = topic.learning?.keyConcepts || topic.concepts || [];
+      const explanation = topic.explanation || '';
       return `
-        <article class="adm-lesson-card">
-          <span class="adm-feature-icon">${icon('bi-patch-question')}</span>
-          <strong>Intenta ahora</strong>
-          ${micro.difficulty ? `<small class="adm-mini-label">${escapeHtml(micro.difficulty)}</small>` : ''}
-          <p>${escapeHtml(micro.question)}</p>
-          <div class="adm-option-list">
-            ${(micro.options || []).map((option, index) => `
-              <label class="adm-option ${evaluated && index === micro.correctIndex ? 'is-correct' : ''} ${evaluated && answer === index && !correct ? 'is-wrong' : ''}">
-                <input type="radio" name="micro-${escapeHtml(getTopicKey(area.id, topic.id))}" value="${index}" data-action="micro-answer" data-area-id="${escapeHtml(area.id)}" data-topic-id="${escapeHtml(topic.id)}" ${answer === index ? 'checked' : ''}>
-                <span>${escapeHtml(option)}</span>
-              </label>
-            `).join('')}
-          </div>
-          ${evaluated ? `<div class="adm-result ${correct ? 'is-good' : 'is-bad'}">${correct ? 'Bien. ' : 'Repasa esta parte. '}${escapeHtml(micro.explanation)}</div>` : ''}
+        <article class="adm-lesson-card is-phase2">
+          <span class="adm-feature-icon">${icon('bi-lightbulb')}</span>
+          <strong>Conceptos clave</strong>
+          <p>${escapeHtml(explanation)}</p>
+          ${concepts.length ? `
+            <div class="adm-concept-cards">
+              ${concepts.map(c => `<div class="adm-concept-card">${escapeHtml(c)}</div>`).join('')}
+            </div>
+          ` : ''}
         </article>
       `;
     }
 
-    function renderListCard(iconName, title, items) {
-      if (!items.length) return '';
+    function renderTopicPhase3(examples) {
+      if (!examples.length) return '';
       return `
-        <article class="adm-lesson-card">
-          <span class="adm-feature-icon">${icon(iconName)}</span>
-          <strong>${escapeHtml(title)}</strong>
-          <ul>
-            ${items.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}
-          </ul>
+        <article class="adm-lesson-card is-phase3">
+          <span class="adm-feature-icon">${icon('bi-card-checklist')}</span>
+          <strong>Ejemplos resueltos</strong>
+          <div class="adm-examples-carousel">
+            ${examples.map((ex, i) => `
+              <div class="adm-example-item">
+                <span class="adm-example-index">Ejemplo ${i + 1} de ${examples.length}</span>
+                ${ex.level ? `<small class="adm-mini-label">${escapeHtml(ex.level)}</small>` : ''}
+                ${renderStimulus(ex)}
+                <p><strong>${escapeHtml(ex.problem)}</strong></p>
+                <ol>
+                  ${(ex.steps || []).map(step => `<li>${escapeHtml(step)}</li>`).join('')}
+                </ol>
+                <div class="adm-example-answer">Respuesta: ${escapeHtml(ex.answer)}</div>
+              </div>
+            `).join('')}
+          </div>
+        </article>
+      `;
+    }
+
+    function renderTopicPhase4(area, topic, questions) {
+      const topicKey = getTopicKey(area.id, topic.id);
+      return `
+        <article class="adm-lesson-card is-phase4">
+          <span class="adm-feature-icon">${icon('bi-patch-question')}</span>
+          <strong>Verifica lo aprendido</strong>
+          <p>Responde estos reactivos rápidos para asegurar tu comprensión.</p>
+          <div class="adm-inline-practice">
+            ${questions.map((q, i) => {
+              const answer = _ui.microAnswers?.[`${topicKey}-${i}`];
+              const evaluated = typeof answer === 'number';
+              const correct = evaluated && answer === Number(q.correctIndex);
+              return `
+                <div class="adm-inline-question">
+                  <p><strong>${escapeHtml(q.question)}</strong></p>
+                  <div class="adm-option-list">
+                    ${(q.options || []).map((option, index) => `
+                      <label class="adm-option ${evaluated && index === Number(q.correctIndex) ? 'is-correct' : ''} ${evaluated && answer === index && !correct ? 'is-wrong' : ''}">
+                        <input type="radio" name="micro-${escapeHtml(topicKey)}-${i}" value="${index}" data-action="micro-answer-v2" data-area-id="${escapeHtml(area.id)}" data-topic-id="${escapeHtml(topic.id)}" data-q-index="${i}" ${answer === index ? 'checked' : ''}>
+                        <span>${escapeHtml(option)}</span>
+                      </label>
+                    `).join('')}
+                  </div>
+                  ${evaluated ? `<div class="adm-result ${correct ? 'is-good' : 'is-bad'}">${correct ? 'Bien. ' : 'Repasa esta parte. '}${escapeHtml(q.explanation)}</div>` : ''}
+                </div>
+              `;
+            }).join('')}
+          </div>
+        </article>
+      `;
+    }
+
+    function renderTopicPhase5(topic) {
+      const mistakes = topic.commonMistakes || [];
+      const checklist = topic.checkpoint?.items || [];
+      return `
+        <article class="adm-lesson-card is-phase5">
+          <span class="adm-feature-icon">${icon('bi-flag')}</span>
+          <strong>Cierre del tema</strong>
+          ${mistakes.length ? `
+            <div class="adm-mistakes-box">
+              <strong><i class="bi bi-exclamation-triangle"></i> Errores comunes a evitar:</strong>
+              <ul>${mistakes.map(m => `<li>${escapeHtml(m)}</li>`).join('')}</ul>
+            </div>
+          ` : ''}
+          ${checklist.length ? `
+            <div class="adm-checkpoint-box">
+              <strong>${escapeHtml(topic.checkpoint?.prompt || 'Cierra el tema si puedes:')}</strong>
+              <ul class="adm-checklist">
+                ${checklist.map(item => `<li><i class="bi bi-check2-square"></i> ${escapeHtml(item)}</li>`).join('')}
+              </ul>
+            </div>
+          ` : ''}
         </article>
       `;
     }
@@ -1094,11 +1344,15 @@ if (!window.AdmisionesPublic) {
       const resultItem = _ui.quizResult?.items?.find((item) => item.id === question.id);
       const total = _ui.quizQuestions.length;
       const answered = Object.keys(_ui.quizAnswers || {}).length;
+      const isSimulator = _ui.quizMode === 'simulator';
 
       return `
         <section class="adm-quiz-shell">
-          <button class="adm-back-link" type="button" data-action="go-screen" data-screen="${_ui.quizMode === 'simulator' ? 'practice' : 'practice'}">${icon('bi-arrow-left')} Salir</button>
-          <span class="adm-kicker">${escapeHtml(_ui.quizMode === 'simulator' ? 'Simulador' : 'Práctica')}</span>
+          <button class="adm-back-link" type="button" data-action="go-screen" data-screen="practice">${icon('bi-arrow-left')} Salir</button>
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span class="adm-kicker">${escapeHtml(isSimulator ? 'Simulacro SIA — No es el examen oficial' : 'Práctica')}</span>
+            ${isSimulator && !_ui.quizSubmitted ? `<span class="adm-timer" style="color:var(--text-secondary); font-variant-numeric: tabular-nums;">${icon('bi-clock')} 60:00 (ref)</span>` : ''}
+          </div>
           <h1>${escapeHtml(_ui.quizTitle)}</h1>
           <p>${escapeHtml(_ui.quizDescription)}</p>
 
@@ -1111,6 +1365,7 @@ if (!window.AdmisionesPublic) {
 
           <article class="adm-question-card">
             <span class="adm-question-index">${_ui.quizIndex + 1} de ${total}</span>
+            ${renderQuestionContext(question)}
             <h2>${escapeHtml(question.question)}</h2>
             <div class="adm-option-list">
               ${(question.options || []).map((option, index) => {
@@ -1125,27 +1380,94 @@ if (!window.AdmisionesPublic) {
                 `;
               }).join('')}
             </div>
-            ${_ui.quizSubmitted && resultItem ? `<div class="adm-result ${resultItem.isCorrect ? 'is-good' : 'is-bad'}">${escapeHtml(question.explanation)}</div>` : ''}
+            ${_ui.quizSubmitted && resultItem && !isSimulator ? `<div class="adm-result ${resultItem.isCorrect ? 'is-good' : 'is-bad'}">${escapeHtml(question.explanation)}</div>` : ''}
+            ${_ui.quizSubmitted && resultItem && isSimulator ? `<div class="adm-result ${resultItem.isCorrect ? 'is-good' : 'is-bad'}">${resultItem.isCorrect ? 'Correcto' : 'Incorrecto'}. ${escapeHtml(question.explanation)}</div>` : ''}
           </article>
 
           <div class="adm-quiz-actions">
             <button class="adm-button is-ghost" type="button" data-action="prev-question" ${_ui.quizIndex === 0 ? 'disabled' : ''}>Anterior</button>
             ${_ui.quizIndex < total - 1 ? `<button class="adm-button is-primary" type="button" data-action="next-question">Siguiente</button>` : ''}
-            ${!_ui.quizSubmitted ? `<button class="adm-button is-primary" type="button" data-action="submit-quiz">Calificar</button>` : `<button class="adm-button is-soft" type="button" data-action="go-screen" data-screen="practice">Volver a práctica</button>`}
+            ${!_ui.quizSubmitted ? `<button class="adm-button is-primary" type="button" data-action="submit-quiz" ${answered < total ? 'disabled' : ''}>Calificar ${answered}/${total}</button>` : `<button class="adm-button is-soft" type="button" data-action="go-screen" data-screen="practice">Volver a práctica</button>`}
           </div>
         </section>
       `;
     }
 
+    function renderQuestionContext(question) {
+      const stimulus = renderStimulus(question);
+      if (!question?.context && !stimulus) return '';
+      const sourceLabel = question.source === 'temario-oficial'
+        ? 'Temario oficial'
+        : question.source
+          ? `Material SIA: ${question.source}`
+          : 'Contexto del reactivo';
+      return `
+        <aside class="adm-question-context">
+          <span>${icon('bi-info-circle')} ${escapeHtml(sourceLabel)}</span>
+          ${question.context ? `<p>${escapeHtml(question.context)}</p>` : ''}
+          ${stimulus}
+        </aside>
+      `;
+    }
+
+    function renderStimulus(item) {
+      if (!item) return '';
+      const parts = [];
+      if (item.formula) {
+        parts.push(`<div class="adm-stimulus-line"><strong>Fórmula:</strong> ${escapeHtml(item.formula)}</div>`);
+      }
+      if (item.diagramText) {
+        parts.push(`<pre class="adm-stimulus-diagram">${escapeHtml(item.diagramText)}</pre>`);
+      }
+      if (Array.isArray(item.table) && item.table.length) {
+        parts.push(`
+          <div class="adm-stimulus-table-wrap">
+            <table class="adm-stimulus-table">
+              <tbody>
+                ${item.table.map((row) => `<tr>${(row || []).map((cell) => `<td>${escapeHtml(cell)}</td>`).join('')}</tr>`).join('')}
+              </tbody>
+            </table>
+          </div>
+        `);
+      }
+      return parts.length ? `<div class="adm-stimulus">${parts.join('')}</div>` : '';
+    }
+
     function renderQuizResult() {
       const result = _ui.quizResult;
       if (!result) return '';
-      const label = result.percent >= 80 ? 'Buen nivel' : result.percent >= 60 ? 'Vas avanzando' : 'Conviene reforzar';
+      const label = result.percent >= 80 ? 'Vas muy bien' : result.percent >= 60 ? 'Vas avanzando' : 'Conviene reforzar';
+      
+      let breakdown = '';
+      if (_ui.quizMode === 'simulator') {
+        const byArea = {};
+        result.items.forEach(item => {
+          if (!byArea[item.areaId]) byArea[item.areaId] = { correct: 0, total: 0, title: item.areaTitle };
+          byArea[item.areaId].total++;
+          if (item.isCorrect) byArea[item.areaId].correct++;
+        });
+        
+        breakdown = `
+          <div class="adm-score-breakdown" style="margin-top: 1rem; border-top: 1px solid var(--border); padding-top: 1rem; text-align:left;">
+            <strong>Desglose por área:</strong>
+            <ul style="list-style:none; padding:0; margin-top:0.5rem; display:flex; flex-direction:column; gap:0.25rem;">
+              ${Object.values(byArea).map(a => `
+                <li style="display:flex; justify-content:space-between; font-size:0.875rem;">
+                  <span>${escapeHtml(a.title)}</span>
+                  <strong>${a.correct}/${a.total} (${Math.round((a.correct/a.total)*100)}%)</strong>
+                </li>
+              `).join('')}
+            </ul>
+          </div>
+        `;
+      }
+      
       return `
         <div class="adm-score-card">
           <strong>${result.percent}%</strong>
           <span>${label}</span>
           <small>${result.correct} de ${result.total} correctas</small>
+          ${breakdown}
         </div>
       `;
     }
@@ -1247,6 +1569,30 @@ if (!window.AdmisionesPublic) {
       `;
     }
 
+    function renderCareerChangeModal() {
+      if (!_ui.pendingCareerId) return '';
+      const nextCareer = getCareer(_ui.pendingCareerId);
+      const currentCareer = getSelectedCareer();
+      if (!nextCareer) return '';
+      return `
+        <div class="adm-modal-backdrop" role="presentation">
+          <section class="adm-mini-modal" role="dialog" aria-modal="true" aria-labelledby="adm-career-modal-title">
+            <span class="adm-feature-icon">${icon('bi-arrow-left-right')}</span>
+            <div>
+              <span class="adm-kicker">Cambiar carrera</span>
+              <h2 id="adm-career-modal-title">¿Cómo quieres cambiar a ${escapeHtml(nextCareer.shortName || nextCareer.name)}?</h2>
+              <p>Vienes de ${escapeHtml(currentCareer?.shortName || currentCareer?.name || 'otra ruta')}. Puedes conservar los temas ya superados que también existan en la nueva ruta, o reiniciar todo tu avance local y empezar de cero.</p>
+            </div>
+            <div class="adm-modal-actions">
+              <button class="adm-button is-primary" type="button" data-action="confirm-career-change" data-mode="keep">${icon('bi-check2-circle')} Conservar compatibles</button>
+              <button class="adm-button is-soft" type="button" data-action="confirm-career-change" data-mode="reset">${icon('bi-arrow-counterclockwise')} Reiniciar todo</button>
+              <button class="adm-link-button" type="button" data-action="cancel-career-change">Cancelar</button>
+            </div>
+          </section>
+        </div>
+      `;
+    }
+
     function renderActiveScreen(metrics) {
       if (_ui.screen === 'tour') return renderTour();
       if (_ui.screen === 'route') return renderRoute(metrics);
@@ -1279,7 +1625,6 @@ if (!window.AdmisionesPublic) {
         <div class="adm-shell">
           ${renderAppBar()}
           ${renderNav()}
-          ${renderProgressStrip(metrics)}
           <main class="adm-main">
             ${renderActiveScreen(metrics)}
           </main>
@@ -1287,6 +1632,30 @@ if (!window.AdmisionesPublic) {
             <button class="adm-link-button" type="button" data-action="back-landing">${icon('bi-arrow-left-circle')} Regresar al inicio de SIA</button>
             <button class="adm-link-button" type="button" data-action="reset-progress">${icon('bi-arrow-counterclockwise')} Reiniciar avance local</button>
           </footer>
+          ${renderCareerChangeModal()}
+          ${renderSimulatorModal()}
+        </div>
+      `;
+    }
+
+    function renderSimulatorModal() {
+      if (_ui.screen !== 'quiz' || _ui.quizMode !== 'simulator' || _ui.simulatorAccepted) return '';
+      return `
+        <div class="adm-modal-backdrop" role="presentation">
+          <section class="adm-mini-modal" role="dialog" aria-modal="true" aria-labelledby="adm-simulator-modal-title">
+            <span class="adm-feature-icon" style="color:var(--danger)">${icon('bi-exclamation-triangle')}</span>
+            <div>
+              <span class="adm-kicker">Antes de comenzar</span>
+              <h2 id="adm-simulator-modal-title">Este es un simulacro de práctica</h2>
+              <p>Ninguno de los reactivos que verás corresponde al examen EVALUATEC oficial.</p>
+              <p>El simulador está basado en el temario de la Guía EVALUATEC 2026, pero los reactivos son material didáctico de SIA creado para ayudarte a estudiar.</p>
+              <p>El examen real puede tener cualquier formato y contenido diferente.</p>
+            </div>
+            <div class="adm-modal-actions">
+              <button class="adm-button is-primary" type="button" data-action="accept-simulator">${icon('bi-check-circle')} Entendido, comenzar</button>
+              <button class="adm-button is-ghost" type="button" data-action="go-screen" data-screen="practice">Cancelar</button>
+            </div>
+          </section>
         </div>
       `;
     }
@@ -1313,6 +1682,11 @@ if (!window.AdmisionesPublic) {
         return;
       }
 
+      if (action === 'open-vocacional') {
+        openVocacionalEntry();
+        return;
+      }
+
       if (action === 'go-screen') {
         goToScreen(screen || 'welcome');
         return;
@@ -1327,10 +1701,35 @@ if (!window.AdmisionesPublic) {
       if (action === 'set-career') {
         const career = getCareer(target.dataset.careerId);
         if (!career) return;
-        GuestStore.patch({ selectedCareer: career.id });
-        _ui.areaId = career.routeAreaIds?.[0] || '';
-        _ui.screen = 'route';
+        requestCareerSelection(career);
+        return;
+      }
+
+      if (action === 'toggle-career-picker') {
+        _ui.careerPickerExpanded = true;
         render();
+        return;
+      }
+
+      if (action === 'accept-simulator') {
+        _ui.simulatorAccepted = true;
+        _ui.simulatorStartTime = Date.now();
+        render();
+        return;
+      }
+
+      if (action === 'cancel-career-change') {
+        _ui.pendingCareerId = '';
+        _ui.careerPickerExpanded = false;
+        render();
+        return;
+      }
+
+      if (action === 'confirm-career-change') {
+        const career = getCareer(_ui.pendingCareerId);
+        const mode = target.dataset.mode === 'reset' ? 'reset' : 'keep';
+        _ui.pendingCareerId = '';
+        applyCareerSelection(career, mode);
         return;
       }
 
@@ -1453,18 +1852,27 @@ if (!window.AdmisionesPublic) {
         return;
       }
 
-      if (target.dataset.action === 'micro-answer') {
+      if (target.dataset.action === 'micro-answer-v2') {
         const areaId = target.dataset.areaId;
         const topicId = target.dataset.topicId;
-        const topic = getTopic(areaId, topicId);
+        const qIndex = target.dataset.qIndex;
         const topicKey = getTopicKey(areaId, topicId);
         const value = Number(target.value);
-        _ui.microAnswers = { ...(_ui.microAnswers || {}), [topicKey]: value };
-        GuestStore.updateTopic(topicKey, {
-          practiced: true,
-          microPassed: topic ? value === Number(topic.microPractice?.correctIndex) : false
-        });
+        
+        _ui.microAnswers = { ...(_ui.microAnswers || {}), [`${topicKey}-${qIndex}`]: value };
+        
+        const topic = getTopic(areaId, topicId);
+        if (topic) {
+          const inlineQuestions = getTopicPracticeQuestions(topic).slice(0, 3);
+          const correctCount = inlineQuestions.filter((q, i) => _ui.microAnswers?.[`${topicKey}-${i}`] === Number(q.correctIndex)).length;
+          if (correctCount >= 2) {
+            GuestStore.updateTopic(topicKey, { practiced: true, studied: true });
+          } else {
+            GuestStore.updateTopic(topicKey, { practiced: true });
+          }
+        }
         render();
+        return;
       }
     }
 
@@ -1475,7 +1883,7 @@ if (!window.AdmisionesPublic) {
 
       if (options.resume !== false && _guest?.lastVisited?.kind === 'topic') {
         const { areaId, topicId } = _guest.lastVisited;
-        if (getTopic(areaId, topicId)) {
+        if (getTopic(areaId, topicId) && topicBelongsToCareer(areaId, topicId)) {
           _ui.screen = 'topic';
           _ui.areaId = areaId;
           _ui.topicId = topicId;
