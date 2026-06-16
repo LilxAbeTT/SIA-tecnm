@@ -176,294 +176,415 @@ window.AdminBiblio.Devoluciones = (function () {
         setTimeout(() => document.getElementById('devol-user').focus(), 500);
     }
 
+    let _debtorsList = [];
+    let _condonadosList = [];
+    let _isShowingCondonados = false;
+    let _debtorsPage = 0;
+    const DEBTORS_PAGE_SIZE = 10;
+
+    async function cargarListaDeudoresGlobal() {
+        try {
+            const rawRecords = await BiblioService.fetchAllDebtorsAndCondonations(_ctx);
+            // Group by user
+            const usersMap = {};
+            rawRecords.forEach(r => {
+                const uid = r.studentId || r.studentMatricula || 'S/N';
+                if (!usersMap[uid]) {
+                    usersMap[uid] = {
+                        studentId: r.studentId,
+                        studentMatricula: r.studentMatricula,
+                        studentName: r.studentName,
+                        tipoUsuario: r.tipoUsuario || 'Usuario',
+                        deudas: [],
+                        condonaciones: [],
+                        deudaTotal: 0,
+                        totalCondonado: 0
+                    };
+                }
+                
+                if (r.perdonado) {
+                    usersMap[uid].condonaciones.push(r);
+                    usersMap[uid].totalCondonado += (Number(r.multaOriginal) || Number(r.multaReferencia) || 0);
+                } else if (r.condonable || r.montoDeuda > 0) {
+                    usersMap[uid].deudas.push(r);
+                    usersMap[uid].deudaTotal += (Number(r.montoDeuda) || 0);
+                }
+            });
+
+            _debtorsList = Object.values(usersMap).filter(u => u.deudaTotal > 0).sort((a,b) => b.deudaTotal - a.deudaTotal);
+            _condonadosList = Object.values(usersMap).filter(u => u.condonaciones.length > 0).sort((a,b) => b.totalCondonado - a.totalCondonado);
+            
+            renderDebtorsTable();
+        } catch (e) {
+            console.error(e);
+            showToast("Error al cargar deudores: " + e.message, "danger");
+            const tbody = document.getElementById('condon-table-body');
+            if (tbody) tbody.innerHTML = `<tr><td colspan="4" class="text-center text-danger py-4">Error al cargar datos.</td></tr>`;
+        }
+    }
+
+    function toggleCondonadosView() {
+        _isShowingCondonados = !_isShowingCondonados;
+        _debtorsPage = 0;
+        
+        const btn = document.getElementById('btn-toggle-condonados');
+        const title = document.getElementById('condon-table-title');
+        if (!btn || !title) return;
+        
+        if (_isShowingCondonados) {
+            btn.innerHTML = `<i class="bi bi-arrow-left-right me-1"></i>Ver Adeudos Pendientes`;
+            title.innerText = 'Usuarios Condonados';
+        } else {
+            btn.innerHTML = `<i class="bi bi-arrow-left-right me-1"></i>Ver Solo Condonaciones`;
+            title.innerText = 'Usuarios con Deuda Pendiente';
+        }
+        
+        renderDebtorsTable();
+    }
+
+    function renderDebtorsTable() {
+        const tbody = document.getElementById('condon-table-body');
+        const pagination = document.getElementById('condon-pagination');
+        if (!tbody || !pagination) return;
+
+        const listToUse = _isShowingCondonados ? _condonadosList : _debtorsList;
+        
+        if (listToUse.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="4" class="text-center py-4 text-muted">No hay registros para mostrar en esta categoría.</td></tr>`;
+            pagination.classList.add('d-none');
+            return;
+        }
+
+        const totalPages = Math.ceil(listToUse.length / DEBTORS_PAGE_SIZE);
+        const safePage = Math.min(Math.max(_debtorsPage, 0), totalPages - 1);
+        _debtorsPage = safePage;
+
+        const startIndex = safePage * DEBTORS_PAGE_SIZE;
+        const pageItems = listToUse.slice(startIndex, startIndex + DEBTORS_PAGE_SIZE);
+
+        tbody.innerHTML = pageItems.map(user => {
+            const isPersonal = user.tipoUsuario.toLowerCase().includes('personal') || user.tipoUsuario.toLowerCase().includes('docente');
+            const badgeClass = isPersonal ? 'bg-primary bg-opacity-10 text-primary border-primary' : 'bg-secondary bg-opacity-10 text-secondary border-secondary';
+            
+            if (_isShowingCondonados) {
+                const lastReason = user.condonaciones[0]?.motivoPerdon || 'Perdón general';
+                return `
+                    <tr>
+                        <td class="ps-4">
+                            <div class="fw-bold text-dark">${escapeHtml(user.studentName)}</div>
+                            <div class="small text-muted font-monospace">${escapeHtml(user.studentMatricula)}</div>
+                        </td>
+                        <td><span class="badge border ${badgeClass}">${escapeHtml(user.tipoUsuario)}</span></td>
+                        <td>
+                            <div class="fw-bold text-success">$${user.totalCondonado.toFixed(2)}</div>
+                            <div class="small text-muted" style="max-width: 150px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${escapeHtml(lastReason)}">${escapeHtml(lastReason)}</div>
+                        </td>
+                        <td class="text-end pe-4">
+                            <span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>Condonado</span>
+                        </td>
+                    </tr>
+                `;
+            } else {
+                return `
+                    <tr>
+                        <td class="ps-4">
+                            <div class="fw-bold text-dark">${escapeHtml(user.studentName)}</div>
+                            <div class="small text-muted font-monospace">${escapeHtml(user.studentMatricula)}</div>
+                        </td>
+                        <td><span class="badge border ${badgeClass}">${escapeHtml(user.tipoUsuario)}</span></td>
+                        <td>
+                            <div class="fw-bold text-danger">$${user.deudaTotal.toFixed(2)}</div>
+                            <div class="small text-muted">${user.deudas.length} préstamo(s)</div>
+                        </td>
+                        <td class="text-end pe-4">
+                            <button class="btn btn-sm btn-outline-secondary rounded-pill fw-bold shadow-sm" onclick="AdminBiblio.iniciarCondonacionUsuario('${escapeJsString(user.studentId || user.studentMatricula)}')">
+                                <i class="bi bi-shield-check me-1"></i>Condonar
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }
+        }).join('');
+
+        if (totalPages > 1) {
+            pagination.classList.remove('d-none');
+            pagination.innerHTML = `
+                <button class="btn btn-sm btn-outline-secondary rounded-pill fw-bold" onclick="AdminBiblio.cambiarPaginaDeudores(-1)" ${safePage === 0 ? 'disabled' : ''}>
+                    <i class="bi bi-chevron-left me-1"></i>Anterior
+                </button>
+                <span class="small fw-bold text-muted">Pág ${safePage + 1} de ${totalPages}</span>
+                <button class="btn btn-sm btn-outline-secondary rounded-pill fw-bold" onclick="AdminBiblio.cambiarPaginaDeudores(1)" ${safePage >= totalPages - 1 ? 'disabled' : ''}>
+                    Siguiente<i class="bi bi-chevron-right ms-1"></i>
+                </button>
+            `;
+        } else {
+            pagination.classList.add('d-none');
+        }
+    }
+
+    function cambiarPaginaDeudores(dir) {
+        _debtorsPage += dir;
+        renderDebtorsTable();
+    }
+
     function abrirModalCondonacion() {
         clearLiveAssetStreams();
-        _currentCondonacionData = null;
+        _isShowingCondonados = false;
+        _debtorsPage = 0;
         const body = document.getElementById('modal-admin-body');
         body.innerHTML = `
             <div class="modal-header border-0 bg-secondary text-white p-4">
                 <h3 class="fw-bold mb-0"><i class="bi bi-shield-check me-3"></i>Retrasos y Condonaciones</h3>
                 <button class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body p-4">
-                <div class="row g-3 mb-4">
-                    <div class="col-12">
-                        <label class="form-label small fw-bold text-muted"><i class="bi bi-person-vcard-fill me-1 text-secondary"></i>Usuario</label>
-                        <div class="input-group">
-                            <span class="input-group-text bg-secondary bg-opacity-10 border-0"><i class="bi bi-search text-secondary"></i></span>
-                            <input type="text" class="form-control rounded-end fw-bold font-monospace text-center border-0 bg-white shadow-sm" id="condon-user" placeholder="Ej: 22380123 o correo" autofocus
-                                   onkeyup="if(event.key==='Enter') AdminBiblio.buscarCondonaciones()">
-                        </div>
-                    </div>
-                </div>
-
-                <div class="d-grid gap-2 mb-4">
-                    <button class="btn btn-secondary rounded-pill border-0 fw-bold shadow-sm py-2" onclick="AdminBiblio.buscarCondonaciones()">
-                        <i class="bi bi-search me-2"></i>Buscar retrasos del usuario
-                    </button>
-                    <button class="btn btn-light rounded-pill border fw-bold shadow-sm py-2" onclick="AdminBiblio.cargarRetrasosRecientes(true)">
-                        <i class="bi bi-clock-history me-2"></i>Ver retrasos activos recientes
+            <div class="modal-body p-4 bg-light">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="fw-bold text-dark mb-0" id="condon-table-title">Usuarios con Deuda Pendiente</h5>
+                    <button class="btn btn-outline-secondary rounded-pill fw-bold btn-sm bg-white shadow-sm" id="btn-toggle-condonados" onclick="AdminBiblio.toggleCondonadosView()">
+                        <i class="bi bi-arrow-left-right me-1"></i>Ver Solo Condonaciones
                     </button>
                 </div>
-
-                <div id="condon-results" class="d-none animate__animated animate__fadeIn">
-                    <div class="card border-0 shadow-sm rounded-4 overflow-hidden mb-3">
-                        <div class="card-body bg-white p-4">
-                            <div class="d-flex justify-content-between mb-3 border-bottom pb-3">
-                                <span class="text-muted small fw-bold">USUARIO</span>
-                                <span class="fw-bold text-dark" id="condon-user-name">-</span>
-                            </div>
-                            <div class="d-flex justify-content-between mb-3 pb-3">
-                                <span class="text-muted small fw-bold">REGISTROS</span>
-                                <span class="fw-bold text-dark" id="condon-count">0</span>
-                            </div>
-                            <div id="condon-list" class="d-flex flex-column gap-3"></div>
-                            <div id="condon-pagination" class="d-flex justify-content-between align-items-center gap-3 mt-4 d-none"></div>
-                        </div>
+                
+                <div class="card border-0 shadow-sm rounded-4 overflow-hidden mb-3">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light text-secondary">
+                                <tr>
+                                    <th class="ps-4">Usuario</th>
+                                    <th>Vocación</th>
+                                    <th>Monto</th>
+                                    <th class="text-end pe-4">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="condon-table-body">
+                                <tr><td colspan="4" class="text-center py-5"><div class="spinner-border text-secondary"></div><div class="small mt-2 fw-bold text-muted">Cargando base de datos...</div></td></tr>
+                            </tbody>
+                        </table>
                     </div>
+                </div>
+                
+                <div id="condon-pagination" class="d-flex justify-content-between align-items-center mb-4 d-none"></div>
+
+                <div class="mt-4 border-top pt-3 d-flex flex-wrap justify-content-end align-items-center gap-3">
+                    <select class="form-select w-auto rounded-pill fw-bold text-secondary shadow-sm" id="export-period-select">
+                        <option value="este_mes">Este mes</option>
+                        <option value="trimestre_1">Trimestre 1</option>
+                        <option value="trimestre_2">Trimestre 2</option>
+                        <option value="trimestre_3">Trimestre 3</option>
+                        <option value="trimestre_4">Trimestre 4</option>
+                        <option value="semestre_1">Semestre 1 (de 2)</option>
+                        <option value="semestre_2">Semestre 2 (de 2)</option>
+                        <option value="ano_completo">Todo el año</option>
+                    </select>
+                    <button class="btn btn-primary rounded-pill fw-bold shadow-sm px-4" onclick="AdminBiblio.exportarDeudores()">
+                        <i class="bi bi-file-earmark-pdf me-2"></i>Exportar lista
+                    </button>
                 </div>
             </div>
         `;
         new bootstrap.Modal(document.getElementById('modal-admin-action')).show();
-        setTimeout(() => document.getElementById('condon-user')?.focus(), 500);
+        cargarListaDeudoresGlobal();
     }
 
-    function renderCondonacionList(records = [], emptyMessage = 'No hay adeudos o retrasos registrados para este usuario.') {
-        const list = document.getElementById('condon-list');
-        if (!list) return;
+    async function iniciarCondonacionUsuario(uid) {
+        const user = _debtorsList.find(u => u.studentId === uid || u.studentMatricula === uid);
+        if (!user || user.deudas.length === 0) return;
 
-        if (!records.length) {
-            list.innerHTML = `<div class="text-center text-muted small py-3">${escapeHtml(emptyMessage)}</div>`;
-            return;
+        if (user.deudas.length === 1) {
+            condonarRegistroIndividual(user.deudas[0].id);
+        } else {
+            mostrarPanelMultiCondonacion(user);
         }
+    }
 
-        list.innerHTML = records.map((item) => {
-            const titulo = escapeHtml(item.tituloLibro || 'Libro');
-            const estado = escapeHtml(item.estado || '--');
-            const adquisicion = escapeHtml(item.libroAdquisicion || item.adquisicion || item.libroId || '--');
-            const estudiante = escapeHtml(item.studentName || 'Usuario');
-            const matricula = escapeHtml(item.studentMatricula || item.studentId || 'S/N');
-            const academicInfoKind = escapeHtml(item.academicInfoKind || 'Área');
-            const academicInfoLabel = escapeHtml(item.academicInfoLabel || 'Sin información');
-            const fechaVencimiento = parseDate(item.fechaVencimiento);
-            const fechaVencLabel = fechaVencimiento ? fechaVencimiento.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' }) : '--';
-            const fechaEntrega = parseDate(item.fechaEntrega);
-            const fechaEntregaLabel = fechaEntrega ? fechaEntrega.toLocaleString('es-MX', {
-                day: '2-digit',
-                month: 'short',
-                year: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit'
-            }) : '--';
-            const fechaMovimiento = parseDate(item.fechaDevolucionReal || item.fechaSolicitud || item.fechaPago);
-            const fechaMovimientoLabel = fechaMovimiento ? fechaMovimiento.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' }) : '--';
-            const deuda = Number(item.montoDeuda) || 0;
-            const refDebt = Number(item.montoReferencia) || Number(item.multaOriginal) || 0;
-            const dias = Number(item.diasRetraso) || 0;
-            const chips = [
-                item.condonable
-                    ? `<span class="badge bg-danger-subtle text-danger border">Adeudo: $${deuda.toFixed(2)}</span>`
-                    : (item.perdonado
-                        ? `<span class="badge bg-info text-dark border">Condonado</span>`
-                        : (item.sinCobroRetraso
-                            ? `<span class="badge bg-primary text-white">Retraso sin cobro</span>`
-                            : `<span class="badge bg-success-subtle text-success border">Sin deuda</span>`)),
-                dias > 0 ? `<span class="badge bg-light text-dark border">${dias} dia(s) de retraso</span>` : '',
-                refDebt > 0 ? `<span class="badge bg-light text-dark border">Referencia: $${refDebt.toFixed(2)}</span>` : '',
-                item.estado && item.estado !== 'entregado'
-                    ? `<span class="badge bg-light text-dark border text-capitalize">${estado}</span>`
-                    : ''
-            ].filter(Boolean).join(' ');
-
-            return `
-                <div class="border rounded-4 p-3" style="background: #fafafa;">
-                    <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
-                        <div class="flex-grow-1">
-                            <div class="fw-bold">${titulo}</div>
-                            <div class="small text-muted">No. adquisición: ${adquisicion}</div>
+    function mostrarPanelMultiCondonacion(user) {
+        const modalId = 'modal-multi-condonacion';
+        let mEl = document.getElementById(modalId);
+        if (!mEl) {
+            mEl = document.createElement('div');
+            mEl.id = modalId;
+            mEl.className = 'modal fade';
+            mEl.innerHTML = `
+                <div class="modal-dialog modal-dialog-centered" style="z-index: 1060;">
+                    <div class="modal-content rounded-4 border-0 shadow">
+                        <div class="modal-header border-0 bg-secondary text-white">
+                            <h5 class="fw-bold mb-0"><i class="bi bi-shield-check me-2"></i>Condonar Préstamos Múltiples</h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                         </div>
-                        ${item.condonable ? `
-                            <button class="btn btn-sm btn-outline-secondary rounded-pill fw-bold" onclick="AdminBiblio.condonarRegistro('${escapeJsString(item.id)}')">
-                                <i class="bi bi-shield-check me-1"></i>Condonar
-                            </button>
-                        ` : ''}
-                    </div>
-                    <div class="row g-2 small mb-3">
-                        <div class="col-md-6">
-                            <div class="text-muted text-uppercase fw-bold" style="font-size: .72rem;">Estudiante</div>
-                            <div class="fw-semibold text-dark">${estudiante}</div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="text-muted text-uppercase fw-bold" style="font-size: .72rem;">Matrícula</div>
-                            <div class="fw-semibold text-dark">${matricula}</div>
-                        </div>
-                        <div class="col-md-4">
-                            <div class="text-muted text-uppercase fw-bold" style="font-size: .72rem;">Entregado</div>
-                            <div class="fw-semibold text-dark">${fechaEntregaLabel}</div>
-                        </div>
-                        <div class="col-md-4">
-                            <div class="text-muted text-uppercase fw-bold" style="font-size: .72rem;">Vencía</div>
-                            <div class="fw-semibold text-dark">${fechaVencLabel}</div>
-                        </div>
-                        <div class="col-md-4">
-                            <div class="text-muted text-uppercase fw-bold" style="font-size: .72rem;">Retraso</div>
-                            <div class="fw-semibold text-dark">${dias} día(s)</div>
-                        </div>
-                        <div class="col-md-4">
-                            <div class="text-muted text-uppercase fw-bold" style="font-size: .72rem;">Multa actual</div>
-                            <div class="fw-semibold text-dark">$${deuda.toFixed(2)}</div>
-                        </div>
-                        <div class="col-md-8">
-                            <div class="text-muted text-uppercase fw-bold" style="font-size: .72rem;">${academicInfoKind}</div>
-                            <div class="fw-semibold text-dark">${academicInfoLabel}</div>
+                        <div class="modal-body bg-light" id="multi-condonacion-body">
+                            <!-- Inyectado dinamicamente -->
                         </div>
                     </div>
-                    <div class="d-flex flex-wrap gap-2">
-                        ${chips}
-                    </div>
-                    <div class="small text-muted mt-2">Movimiento base: ${fechaMovimientoLabel}</div>
-                    ${item.motivoPerdon ? `<div class="small text-muted mt-2 fst-italic">"${escapeHtml(item.motivoPerdon)}"</div>` : ''}
                 </div>
             `;
-        }).join('');
+            document.body.appendChild(mEl);
+        }
+
+        const body = document.getElementById('multi-condonacion-body');
+        body.innerHTML = `
+            <p class="small text-muted mb-3">El usuario <strong>${escapeHtml(user.studentName)}</strong> tiene múltiples deudas. Selecciona cuál condonar:</p>
+            <div class="list-group mb-3">
+                ${user.deudas.map(loan => `
+                    <div class="list-group-item d-flex justify-content-between align-items-center bg-white border-0 shadow-sm mb-2 rounded-3 p-3">
+                        <div>
+                            <div class="fw-bold text-dark">${escapeHtml(loan.tituloLibro || 'Libro')}</div>
+                            <div class="small text-danger fw-bold"><i class="bi bi-exclamation-triangle me-1"></i>$${(Number(loan.montoDeuda)||0).toFixed(2)} de deuda</div>
+                        </div>
+                        <button class="btn btn-sm btn-outline-secondary rounded-pill fw-bold" onclick="bootstrap.Modal.getInstance(document.getElementById('${modalId}')).hide(); setTimeout(()=>AdminBiblio.condonarRegistroIndividual('${escapeJsString(loan.id)}'), 400);">
+                            Condonar
+                        </button>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+        
+        new bootstrap.Modal(mEl).show();
     }
 
-    function renderCondonacionPanel() {
-        const results = document.getElementById('condon-results');
-        const userName = document.getElementById('condon-user-name');
-        const count = document.getElementById('condon-count');
-        const pagination = document.getElementById('condon-pagination');
-        if (!results || !userName || !count || !pagination) return;
-
-        const info = _currentCondonacionData || { mode: 'recent', records: [], page: 0, user: null };
-        const records = Array.isArray(info.records) ? info.records : [];
-        const isRecentMode = info.mode !== 'search';
-        const totalPages = isRecentMode ? Math.max(1, Math.ceil(records.length / CONDONACION_PAGE_SIZE)) : 1;
-        const safePage = isRecentMode ? Math.min(Math.max(Number(info.page) || 0, 0), totalPages - 1) : 0;
-        if (safePage !== info.page) {
-            _currentCondonacionData = { ...info, page: safePage };
-        }
-
-        const visibleRecords = isRecentMode
-            ? records.slice(safePage * CONDONACION_PAGE_SIZE, (safePage + 1) * CONDONACION_PAGE_SIZE)
-            : records;
-
-        userName.innerText = isRecentMode
-            ? 'Retrasos activos recientes'
-            : `${info.user?.nombre || 'Usuario'} (${info.user?.matricula || 'S/N'})`;
-        count.innerText = records.length;
-        renderCondonacionList(
-            visibleRecords,
-            isRecentMode
-                ? 'No hay préstamos vencidos pendientes por mostrar.'
-                : 'No hay adeudos o retrasos registrados para este usuario.'
-        );
-
-        if (isRecentMode && records.length > 0) {
-            pagination.classList.remove('d-none');
-            pagination.innerHTML = `
-                <button class="btn btn-sm btn-outline-secondary rounded-pill fw-bold" ${safePage === 0 ? 'disabled' : ''} onclick="AdminBiblio.cambiarPaginaCondonacion(-1)">
-                    <i class="bi bi-chevron-left me-1"></i>Anterior
-                </button>
-                <span class="small text-muted fw-bold">Página ${safePage + 1} de ${totalPages}</span>
-                <button class="btn btn-sm btn-outline-secondary rounded-pill fw-bold" ${safePage >= totalPages - 1 ? 'disabled' : ''} onclick="AdminBiblio.cambiarPaginaCondonacion(1)">
-                    Siguiente<i class="bi bi-chevron-right ms-1"></i>
-                </button>
-            `;
-        } else {
-            pagination.classList.add('d-none');
-            pagination.innerHTML = '';
-        }
-
-        results.classList.remove('d-none');
-    }
-
-    async function cargarRetrasosRecientes(reset = true) {
-        try {
-            const records = await BiblioService.getRecentOverdueLoans(_ctx, 25);
-            _currentCondonacionData = {
-                mode: 'recent',
-                records,
-                page: reset ? 0 : Math.max(Number(_currentCondonacionData?.page) || 0, 0),
-                user: null
-            };
-            renderCondonacionPanel();
-        } catch (e) {
-            console.error('[AdminBiblio] Error cargando retrasos recientes:', e);
-            showToast(e.message, 'danger');
-            document.getElementById('condon-results')?.classList.add('d-none');
-        }
-    }
-
-    function cambiarPaginaCondonacion(direction = 0) {
-        if (_currentCondonacionData?.mode === 'search') return;
-        const records = Array.isArray(_currentCondonacionData?.records) ? _currentCondonacionData.records : [];
-        const totalPages = Math.max(1, Math.ceil(records.length / CONDONACION_PAGE_SIZE));
-        const currentPage = Number(_currentCondonacionData?.page) || 0;
-        const nextPage = Math.min(Math.max(currentPage + Number(direction || 0), 0), totalPages - 1);
-        _currentCondonacionData = { ..._currentCondonacionData, page: nextPage };
-        renderCondonacionPanel();
-    }
-
-    async function buscarCondonaciones() {
-        const query = document.getElementById('condon-user')?.value.trim();
-        if (!query) {
-            return showToast("Ingresa una matrícula o correo para buscar.", "warning");
-        }
-
-        try {
-            const info = await BiblioService.getCondonacionInfo(_ctx, query);
-            _currentCondonacionData = {
-                mode: 'search',
-                records: info.records,
-                page: 0,
-                user: info.user
-            };
-            renderCondonacionPanel();
-        } catch (e) {
-            console.error('[AdminBiblio] Error buscando condonaciones:', e);
-            showToast(e.message, "danger");
-            document.getElementById('condon-results')?.classList.add('d-none');
-        }
-    }
-
-    async function condonarRegistro(loanId) {
-        if (!_currentCondonacionData?.records?.length) return;
-        const target = _currentCondonacionData.records.find((item) => item.id === loanId);
-        if (!target || !target.condonable) {
-            return showToast("Ese registro ya no tiene deuda condonable.", "warning");
-        }
-
+    async function condonarRegistroIndividual(loanId) {
         let justificacion = await showPromptModal({
             icon: 'shield-check',
             iconColor: '#6c757d',
             title: 'Condonar registro',
-            message: `Explica el motivo de la condonacion para "${escapeHtml(target.tituloLibro || 'Libro')}". El retraso seguira registrado, pero la deuda se eliminara.`,
-            placeholder: 'Justificacion...',
-            confirmText: 'Confirmar condonacion',
-            confirmClass: 'btn-secondary'
+            message: 'Escribe el motivo o justificación de la condonación para este préstamo. El retraso seguirá registrado para historial, pero la deuda se perdonará.',
+            placeholder: 'Ej: Error de sistema, Perdonado por dirección...',
+            confirmText: 'Confirmar Condonación',
+            confirmClass: 'btn-secondary text-white'
         });
-
+        
         if (justificacion === null) return;
         justificacion = justificacion.trim();
         if (!justificacion) {
-            showToast('Debes escribir una justificacion obligatoriamente.', 'warning');
+            showToast('Debes escribir una justificación obligatoriamente.', 'warning');
             return;
         }
 
         try {
             await BiblioService.condonarRegistroPrestamo(_ctx, loanId, justificacion);
             showToast("Registro condonado correctamente.", "success");
-            if (_currentCondonacionData?.mode === 'search') {
-                await buscarCondonaciones();
-            } else {
-                await cargarRetrasosRecientes(false);
-            }
             loadAdminStats();
+            cargarListaDeudoresGlobal(); // Recargar datos
         } catch (e) {
             console.error('[AdminBiblio] Error condonando registro:', e);
             showToast(e.message, "danger");
         }
+    }
+
+    function exportarDeudores() {
+        if (!window.ExportUtils) {
+            return showToast("ExportUtils no está cargado.", "warning");
+        }
+        
+        const select = document.getElementById('export-period-select');
+        const period = select ? select.value : 'este_mes';
+        
+        const now = new Date();
+        const currentYear = now.getFullYear();
+        let startDate, endDate;
+        
+        if (period === 'este_mes') {
+            startDate = new Date(currentYear, now.getMonth(), 1);
+            endDate = new Date(currentYear, now.getMonth() + 1, 0, 23, 59, 59);
+        } else if (period === 'trimestre_1') {
+            startDate = new Date(currentYear, 0, 1);
+            endDate = new Date(currentYear, 2, 31, 23, 59, 59);
+        } else if (period === 'trimestre_2') {
+            startDate = new Date(currentYear, 3, 1);
+            endDate = new Date(currentYear, 5, 30, 23, 59, 59);
+        } else if (period === 'trimestre_3') {
+            startDate = new Date(currentYear, 6, 1);
+            endDate = new Date(currentYear, 8, 30, 23, 59, 59);
+        } else if (period === 'trimestre_4') {
+            startDate = new Date(currentYear, 9, 1);
+            endDate = new Date(currentYear, 11, 31, 23, 59, 59);
+        } else if (period === 'semestre_1') {
+            startDate = new Date(currentYear, 0, 1);
+            endDate = new Date(currentYear, 5, 30, 23, 59, 59);
+        } else if (period === 'semestre_2') {
+            startDate = new Date(currentYear, 6, 1);
+            endDate = new Date(currentYear, 11, 31, 23, 59, 59);
+        } else {
+            startDate = new Date(currentYear, 0, 1);
+            endDate = new Date(currentYear, 11, 31, 23, 59, 59);
+        }
+
+        const getMs = (dateVal) => {
+            if (!dateVal) return 0;
+            if (dateVal.toMillis) return dateVal.toMillis();
+            if (dateVal.seconds) return dateVal.seconds * 1000;
+            return new Date(dateVal).getTime() || 0;
+        };
+
+        const startMs = startDate.getTime();
+        const endMs = endDate.getTime();
+
+        const filteredDebtors = _debtorsList.map(u => {
+            const validDeudas = u.deudas.filter(d => {
+                const ms = getMs(d.fechaVencimiento);
+                return ms >= startMs && ms <= endMs;
+            });
+            return validDeudas.length > 0 ? { ...u, deudas: validDeudas, deudaTotal: validDeudas.reduce((acc, d) => acc + (Number(d.montoDeuda)||0), 0) } : null;
+        }).filter(Boolean);
+
+        const filteredCondonados = _condonadosList.map(u => {
+            const validCondon = u.condonaciones.filter(c => {
+                const ms = getMs(c.fechaVencimiento);
+                return ms >= startMs && ms <= endMs;
+            });
+            return validCondon.length > 0 ? { ...u, condonaciones: validCondon, totalCondonado: validCondon.reduce((acc, c) => acc + (Number(c.multaOriginal) || Number(c.multaReferencia) || 0), 0) } : null;
+        }).filter(Boolean);
+
+        const totalDeudaPeriodo = filteredDebtors.reduce((acc, u) => acc + u.deudaTotal, 0);
+        const totalCondonadoPeriodo = filteredCondonados.reduce((acc, u) => acc + u.totalCondonado, 0);
+
+        const sections = [];
+        
+        if (filteredDebtors.length > 0) {
+            sections.push({
+                title: 'Usuarios con Adeudos Activos',
+                headers: ['Matrícula', 'Nombre', 'Vocación', 'Monto'],
+                rows: filteredDebtors.map(u => [
+                    u.studentMatricula || 'S/N',
+                    u.studentName,
+                    u.tipoUsuario,
+                    `$${u.deudaTotal.toFixed(2)}`
+                ]),
+                tone: 'danger'
+            });
+        }
+        
+        if (filteredCondonados.length > 0) {
+            sections.push({
+                title: 'Usuarios Condonados',
+                headers: ['Matrícula', 'Nombre', 'Vocación', 'Monto'],
+                rows: filteredCondonados.map(u => [
+                    u.studentMatricula || 'S/N',
+                    u.studentName,
+                    u.tipoUsuario,
+                    `$${u.totalCondonado.toFixed(2)} (Condonado)`
+                ]),
+                tone: 'success'
+            });
+        }
+
+        if (sections.length === 0) {
+            return showToast("No hay registros en el periodo seleccionado para exportar.", "warning");
+        }
+
+        ExportUtils.generatePDF({
+            period: period
+        }, {
+            kind: 'generic',
+            filenameBase: `Deudores_${period}_${currentYear}`,
+            title: 'Reporte de Deudores y Condonaciones',
+            subtitle: `Periodo: ${startDate.toLocaleDateString('es-MX')} al ${endDate.toLocaleDateString('es-MX')}`,
+            summary: [
+                ['Total Adeudos Pendientes', `$${totalDeudaPeriodo.toFixed(2)}`],
+                ['Total Condonado', `$${totalCondonadoPeriodo.toFixed(2)}`],
+                ['Total de Usuarios en Reporte', String(filteredDebtors.length + filteredCondonados.length)]
+            ],
+            sections: sections
+        }, 'BIBLIO');
     }
 
 
@@ -678,11 +799,12 @@ window.AdminBiblio.Devoluciones = (function () {
     return {
         abrirModalDevolucion: withState(abrirModalDevolucion),
         abrirModalCondonacion: withState(abrirModalCondonacion),
-        cargarRetrasosRecientes: withState(cargarRetrasosRecientes),
-        cambiarPaginaCondonacion: withState(cambiarPaginaCondonacion),
+        toggleCondonadosView: withState(toggleCondonadosView),
+        cambiarPaginaDeudores: withState(cambiarPaginaDeudores),
+        iniciarCondonacionUsuario: withState(iniciarCondonacionUsuario),
+        condonarRegistroIndividual: withState(condonarRegistroIndividual),
+        exportarDeudores: withState(exportarDeudores),
         consultarDevolucion: withState(consultarDevolucion),
-        buscarCondonaciones: withState(buscarCondonaciones),
-        condonarRegistro: withState(condonarRegistro),
         perdonarRetrasoModal: withState(perdonarRetrasoModal),
         confirmarDevolucion: withState(confirmarDevolucion)
     };

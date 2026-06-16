@@ -3911,6 +3911,63 @@ const BiblioService = (function () {
         };
     }
 
+    let _allDebtorsCache = null;
+    let _allDebtorsCacheTime = 0;
+    const DEBTORS_CACHE_TTL = 3 * 24 * 60 * 60 * 1000; // 3 days
+
+    async function fetchAllDebtorsAndCondonations(ctx, force = false) {
+        await ensureHolidayCalendarLoaded(ctx);
+        const now = Date.now();
+
+        if (!force && _allDebtorsCache && (now - _allDebtorsCacheTime) < DEBTORS_CACHE_TTL) {
+            return _allDebtorsCache;
+        }
+
+        const [activeSnap, debtSnap, condonSnap] = await Promise.all([
+            ctx.db.collection(PRES_COLL).where('estado', '==', 'entregado').get(),
+            ctx.db.collection(PRES_COLL).where('montoDeuda', '>', 0).get(),
+            ctx.db.collection(PRES_COLL).where('perdonado', '==', true).get()
+        ]);
+
+        const allDocsMap = new Map();
+
+        const processSnap = (snap) => {
+            snap.forEach(doc => {
+                if (!allDocsMap.has(doc.id)) {
+                    allDocsMap.set(doc.id, { id: doc.id, ...doc.data() });
+                }
+            });
+        };
+
+        processSnap(activeSnap);
+        processSnap(debtSnap);
+        processSnap(condonSnap);
+
+        const allLoans = Array.from(allDocsMap.values());
+        
+        const studentIds = [...new Set(allLoans.map(l => l.studentId).filter(Boolean))];
+        const usersById = await loadVisitUsersByIds(ctx, studentIds);
+
+        const records = allLoans
+            .map((loan) => {
+                const user = usersById[loan.studentId] || {};
+                const record = buildCondonationRecord(loan, {
+                    studentName: user.displayName || user.nombre || loan.studentName || 'Usuario',
+                    studentMatricula: user.matricula || loan.studentMatricula || loan.studentId || 'S/N',
+                    profileData: user
+                });
+                record.tipoUsuario = user.tipoUsuario || loan.tipoUsuario || 'Usuario';
+                return record;
+            })
+            .filter((loan) => loan.hadDebt || loan.hadDelay);
+
+        _allDebtorsCache = records;
+        _allDebtorsCacheTime = now;
+
+        return _allDebtorsCache;
+    }
+
+
     async function condonarRegistroPrestamo(ctx, loanId, justification = '') {
         const loanRef = ctx.db.collection(PRES_COLL).doc(loanId);
         const loanSnap = await loanRef.get();
@@ -4004,6 +4061,8 @@ const BiblioService = (function () {
         await loanRef.update(updateData);
         _recentOverdueCache = null;
         _recentOverdueCacheTime = 0;
+        _allDebtorsCache = null;
+        _allDebtorsCacheTime = 0;
 
         if (loan.studentId) {
             await getPerfilBibliotecario(ctx, loan.studentId).catch(() => null);
@@ -4185,16 +4244,39 @@ const BiblioService = (function () {
         if (!uniqueIds.length) return {};
 
         const usersById = {};
-        const chunkSize = 10;
-        for (let i = 0; i < uniqueIds.length; i += chunkSize) {
-            const chunk = uniqueIds.slice(i, i + chunkSize);
-            const snap = await ctx.db.collection(USERS_COLL)
-                .where(firebase.firestore.FieldPath.documentId(), 'in', chunk)
-                .get();
+        
+        // 1. Try local cache first
+        const cacheRaw = localStorage.getItem('sia_biblio_usuarios');
+        if (cacheRaw) {
+            try {
+                const localUsers = JSON.parse(cacheRaw).data || [];
+                const localUsersMap = new Map();
+                localUsers.forEach(u => localUsersMap.set(u.uid || u.id, u));
+                
+                uniqueIds.forEach(uid => {
+                    if (localUsersMap.has(uid)) {
+                        usersById[uid] = localUsersMap.get(uid);
+                    }
+                });
+            } catch (e) {
+                console.warn("[AdminBiblio] Error parsing local users cache", e);
+            }
+        }
 
-            snap.forEach((doc) => {
-                usersById[doc.id] = doc.data() || {};
-            });
+        // 2. Fetch missing ones
+        const missingIds = uniqueIds.filter(uid => !usersById[uid]);
+        if (missingIds.length > 0) {
+            const chunkSize = 10;
+            for (let i = 0; i < missingIds.length; i += chunkSize) {
+                const chunk = missingIds.slice(i, i + chunkSize);
+                const snap = await ctx.db.collection(USERS_COLL)
+                    .where(firebase.firestore.FieldPath.documentId(), 'in', chunk)
+                    .get();
+
+                snap.forEach((doc) => {
+                    usersById[doc.id] = doc.data() || {};
+                });
+            }
         }
 
         return usersById;
@@ -6294,6 +6376,7 @@ const BiblioService = (function () {
         getPrestamoInfo,
         getDevolucionInfo,
         getCondonacionInfo,
+        fetchAllDebtorsAndCondonations,
         getRecentOverdueLoans,
         getHolidayCalendarConfig,
         saveHolidayCalendarConfig,
