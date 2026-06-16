@@ -530,7 +530,6 @@ window.AdminMedi = Object.assign(window.AdminMedi || {}, (function () {
       ? MediService.normalizeServiceRole(_resolveAdminRole(perfil))
       : _resolveAdminRole(perfil);
 
-    console.log(`[Medi] Area Identificada: ${_myRole} `);
 
     try {
       const cfg = await MediService.loadConfig(_ctx);
@@ -744,7 +743,7 @@ window.AdminMedi = Object.assign(window.AdminMedi || {}, (function () {
 
   function initAdminChat() {
     if (!window.MediChatService) {
-      console.warn("MediChatService not verified");
+
       return;
     }
 
@@ -1774,7 +1773,7 @@ style="cursor: pointer;">
       }
     });
 
-    console.log('[Medi] Estado guardado:', state);
+
     return state;
   }
 
@@ -1786,7 +1785,6 @@ style="cursor: pointer;">
   function restoreState(state) {
     if (!state) return;
 
-    console.log('[Medi] Restaurando estado:', state);
 
     // Restaurar valores de formularios
     if (state.formData) {
@@ -1855,9 +1853,8 @@ style="cursor: pointer;">
       // Final backup después de que se carguen tabs/contenido dinámico
     }
 
-    console.log('[AdminMedi] Estado restaurado exitosamente');
+
   }
 
 })());
 
-console.log("[AdminMedi] Admin Module Loaded & Globalized");

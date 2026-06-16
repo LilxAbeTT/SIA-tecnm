@@ -107,7 +107,7 @@ class SiaSuperadminSwitcher extends HTMLElement {
     try {
       this.searchResults = await window.SIA?.searchQaActors?.(term, contextKey) || [];
     } catch (error) {
-      console.warn('[QA Switcher] Error buscando actores QA:', error);
+
       this.searchResults = [];
     } finally {
       this.searching = false;

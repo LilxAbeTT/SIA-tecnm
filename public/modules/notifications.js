@@ -14,7 +14,6 @@ var Notifications = (function () {
       || (typeof firebase !== 'undefined' && firebase.auth().currentUser?.uid)
       || null;
 
-    console.log('[Notifications] init() uid =', _uid);
 
     const container = document.getElementById('view-notificaciones');
     if (!container) return;
@@ -283,9 +282,9 @@ var Notifications = (function () {
 
   async function markAllRead() {
     // ── DIAGNÓSTICO ────────────────────────────────────────────────────────
-    console.log('[markAllRead] called. _uid =', _uid, '| Notify =', !!window.Notify);
-    console.log('[markAllRead] _allNotifs =', Notify?._allNotifs?.length, 'items');
-    console.log('[markAllRead] unread snap =', (Notify?._allNotifs || []).map(n => ({id: n.id, leido: n.leido})));
+
+
+
     // ────────────────────────────────────────────────────────────────────────
 
     // Resolver uid en el momento de la llamada (no solo en init)
@@ -299,7 +298,6 @@ var Notifications = (function () {
     if (!uid) { console.error('[Notifications] markAllRead: uid nulo'); return; }
 
     const unreadIds = (Notify._allNotifs || []).filter(n => !n.leido).map(n => n.id);
-    console.log('[markAllRead] unreadIds count =', unreadIds.length);
 
     if (unreadIds.length === 0) {
       window.showToast?.('Ya no hay notificaciones sin leer', 'info');
@@ -332,12 +330,11 @@ var Notifications = (function () {
   }
 
   async function requestPush() {
-    console.log('[Notifications] requestPush() llamado. uid =', _uid, '| PushService =', !!window.PushService);
 
     // Obtener uid si falta
     if (!_uid) {
       _uid = (typeof firebase !== 'undefined' && firebase.auth().currentUser?.uid) || null;
-      console.warn('[Notifications] uid faltaba, reintentando:', _uid);
+
     }
     if (!_uid) {
       console.error('[Notifications] No hay uid — sesion no iniciada?');
@@ -350,14 +347,13 @@ var Notifications = (function () {
       return;
     }
     if (!PushService.isSupported()) {
-      console.warn('[Notifications] Push no soportado en este navegador');
+
       window.showToast?.('Tu navegador no soporta notificaciones push', 'warning');
       return;
     }
 
-    console.log('[Notifications] Solicitando token FCM...');
+
     const success = await PushService.requestAndSubscribe(_uid);
-    console.log('[Notifications] resultado:', success);
 
     if (success) {
       document.getElementById('nc-push-banner')?.classList.add('d-none');

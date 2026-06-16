@@ -591,7 +591,7 @@ async function logSystemEvent(db, actor, action, details = {}, severity = 'info'
       timestamp: FieldValue.serverTimestamp()
     });
   } catch (error) {
-    console.warn('[panic] No se pudo escribir en system-logs:', error);
+
   }
 }
 

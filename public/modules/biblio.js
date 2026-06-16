@@ -52,7 +52,7 @@ const Biblio = (function () {
         try {
             return JSON.parse(decodeURIComponent(payload || ''));
         } catch (error) {
-            console.warn('[Biblio] Payload de libro inválido:', error);
+
             return null;
         }
     }
@@ -282,7 +282,7 @@ const Biblio = (function () {
             }
             return gamification;
         } catch (error) {
-            console.warn('[Biblio] No se pudo sincronizar gamificacion:', error);
+
             return null;
         }
     }
@@ -340,7 +340,7 @@ const Biblio = (function () {
                 if (sim.role) role = sim.role;
                 // Merge permissions if needed
                 if (!_ctx.profile) _ctx.profile = sim; // Force context if missing
-                console.log(`[Biblio] ⚡ Dev Mode Detectado: Rol ${role}`);
+
             } catch (e) { console.error(e); }
         }
 
@@ -899,7 +899,7 @@ const Biblio = (function () {
             } catch (e) {
                 container.innerHTML = '<p class="text-danger small text-center mb-0 py-2">Error en búsqueda</p>';
             }
-        }, 400);
+        }, 150);
     }
 
     // --- SEARCH (Modal Global) ---
@@ -984,7 +984,7 @@ const Biblio = (function () {
             } catch (e) {
                 container.innerHTML = '<div class="col-12 text-center text-danger">Error al buscar en el catálogo. Intenta de nuevo.</div>';
             }
-        }, 500);
+        }, 150);
     }
 
     // --- CATEGORÍA INLINE ---
@@ -1631,7 +1631,7 @@ const Biblio = (function () {
                 </div>
             `;
         } catch (error) {
-            console.warn('[Biblio] No se pudieron cargar recomendaciones:', error);
+
             container.innerHTML = '';
         }
     }
@@ -1651,7 +1651,7 @@ const Biblio = (function () {
             _studentWaitlist = Array.isArray(waitlist) ? waitlist : [];
             _serviceCatalog = serviceCatalog || null;
         } catch (error) {
-            console.warn('[Biblio] No se pudieron cargar paneles del estudiante:', error);
+
             _studentWishlist = [];
             _studentWaitlist = [];
             _serviceCatalog = null;
@@ -1984,7 +1984,7 @@ const Biblio = (function () {
         } catch (e) {
             _studentReservations = [];
             renderActivitySummary();
-            console.warn("Error cargando reservas:", e);
+
             container.innerHTML = `<div class="alert alert-warning border-0 rounded-3 small mb-0">${escapeHtml(e.message || 'No se pudieron cargar tus reservas.')}</div>`;
         }
     }
@@ -2156,7 +2156,7 @@ const Biblio = (function () {
             }
 
         } catch (e) {
-            console.warn("Dashboard update failed", e);
+
         }
     }
 
@@ -2368,7 +2368,7 @@ const Biblio = (function () {
                     lastReservation: firebase.firestore.FieldValue.serverTimestamp()
                 }, { merge: true });
             } catch (statsErr) {
-                console.warn('[BIBLIO] Stats error:', statsErr);
+
             }
 
             showToast(`${serviceMeta.label} reservada para las ${_selectedTimeBlock}.`, "success");

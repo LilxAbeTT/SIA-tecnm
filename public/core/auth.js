@@ -27,7 +27,7 @@ export class AuthManager {
                             const sim = JSON.parse(simProfileJson);
                             // Merge with real UID to bind Firebase User
                             profile = { ...sim, uid: user.uid, email: user.email };
-                            console.log("[AuthManager] ⚡ Dev Mode Profile Loaded:", profile.role);
+
                         } catch (e) {
                             console.error("Sim parse error", e);
                         }
@@ -111,7 +111,7 @@ export class AuthManager {
         try {
             await this.auth.signOut();
         } catch (e) {
-            console.warn("SignOut error", e);
+
         }
 
         Store.clear();

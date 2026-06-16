@@ -175,7 +175,7 @@ if (!window.ForoModule.Shared) {
             try {
                 await window.SIA.updateUserPreferences(uid, { foroFavoriteEventIds: unique });
             } catch (error) {
-                console.warn('[Eventos] No se pudieron sincronizar favoritos:', error);
+
             }
             return unique;
         }

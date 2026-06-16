@@ -49,7 +49,7 @@ document.addEventListener('DOMContentLoaded', () => {
     },
 
     clearAll() {
-      // console.log(`[ModuleManager] Limpiando ${this._subs.length} suscripciones.`);
+
       this._subs.forEach(u => {
         try { u(); } catch (e) { console.warn("Error unsubscribing:", e); }
       });
@@ -79,10 +79,10 @@ document.addEventListener('DOMContentLoaded', () => {
               timestamp: Date.now(),
               data: state
             };
-            console.log(`💾 [StateManager] Estado guardado para ${viewId}:`, state);
+
           }
         } catch (e) {
-          console.warn(`[StateManager] Error guardando estado de ${viewId}:`, e);
+
         }
       }
     },
@@ -101,7 +101,7 @@ document.addEventListener('DOMContentLoaded', () => {
       // Verificar que no sea muy antiguo (opcional: limitar a 30 minutos)
       const maxAge = 30 * 60 * 1000; // 30 minutos
       if (Date.now() - saved.timestamp > maxAge) {
-        console.log(`⏰ [StateManager] Estado de ${viewId} expirado, limpiando...`);
+
         delete this._states[viewId];
         return null;
       }
@@ -110,10 +110,10 @@ document.addEventListener('DOMContentLoaded', () => {
       if (window[moduleName] && typeof window[moduleName].restoreState === 'function') {
         try {
           window[moduleName].restoreState(saved.data);
-          console.log(`✅ [StateManager] Estado restaurado para ${viewId}:`, saved.data);
+
           return saved.data;
         } catch (e) {
-          console.warn(`[StateManager] Error restaurando estado de ${viewId}:`, e);
+
         }
       }
 
@@ -127,7 +127,7 @@ document.addEventListener('DOMContentLoaded', () => {
     clearState(viewId) {
       if (this._states[viewId]) {
         delete this._states[viewId];
-        console.log(`🗑️ [StateManager] Estado limpiado para ${viewId}`);
+
       }
     },
 
@@ -137,7 +137,7 @@ document.addEventListener('DOMContentLoaded', () => {
     clearAll() {
       this._states = {};
       this._currentView = null;
-      console.log('🗑️ [StateManager] Todos los estados limpiados');
+
     },
 
     /**
@@ -268,13 +268,12 @@ document.addEventListener('DOMContentLoaded', () => {
     if (appLoader && !appLoader.classList.contains('d-none')) {
       // 1. Si no hay internet, damos más tiempo o mostramos mensaje, pero NO cargamos landing rota.
       if (!navigator.onLine) {
-        console.warn("⚠️ Tiempo agotado: SIN CONEXIÓ“N DETECTADA.");
+
         if (typeof showToast === 'function') showToast("Sin conexión a internet. Esperando red...", "warning");
         return; // Mantenemos el loader esperando red
       }
 
       // 2. Si hay internet pero Firebase no responde en 10s:
-      console.warn("⚠️ Tiempo de espera agotado (10s).");
 
       // Intentamos ver si ya hay una sesión "flotando" o localStorage antes de tirar al landing
       const hasLocalSession = localStorage.getItem('sia_session_hint');
@@ -300,7 +299,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Monitor de Red
   window.addEventListener('online', () => {
-    console.log("🌐 Conexión restaurada.");
+
     if (appLoader && !appLoader.classList.contains('d-none')) {
       // Si estábamos pegados en loader, tal vez ahora Firebase reaccione
     }
@@ -308,7 +307,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   window.addEventListener('offline', () => {
-    console.log("🔌 Conexión perdida.");
+
     if (typeof showToast === 'function') showToast("Estás desconectado.", "warning");
   });
 
@@ -669,7 +668,7 @@ document.addEventListener('DOMContentLoaded', () => {
       try {
         window.PanicService.bindSession(window.SIA, effectiveProfile);
       } catch (error) {
-        console.warn('[PanicService] No se pudo enlazar la sesion actual:', error);
+
       }
     }
 
@@ -757,8 +756,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const uid = Store.user?.uid || window.SIA?.auth?.currentUser?.uid || '';
     if (!uid || !window.SIA?.db) return false;
 
-    const payload = buildDevSyncPayload(profile);
-    await window.SIA.db.collection('usuarios').doc(uid).set(payload, { merge: true });
+    // [FIX] Disabled backend sync for DevMode simulations to prevent "Missing permissions"
+    // errors and to avoid locking out admins by accidentally downgrading their real DB role.
+    // DevMode is now a purely local UI simulation.
+
     return true;
   }
 
@@ -771,7 +772,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (freshProfile) return freshProfile;
       }
     } catch (error) {
-      console.warn('[DevMode] No se pudo refrescar el perfil restaurado:', error);
+
     }
 
     return fallbackProfile;
@@ -808,7 +809,7 @@ document.addEventListener('DOMContentLoaded', () => {
       await syncDevProfileToBackend(effectiveProfile);
     } catch (error) {
       backendSynced = false;
-      console.warn('[DevMode] No se pudo sincronizar el perfil simulado en Firestore:', error);
+
     }
 
     const currentView = Store.currentView || 'view-dashboard';
@@ -844,7 +845,7 @@ document.addEventListener('DOMContentLoaded', () => {
         await syncDevProfileToBackend(baseProfileSnapshot);
       } catch (error) {
         backendSynced = false;
-        console.warn('[DevMode] No se pudo restaurar el perfil real en Firestore:', error);
+
       }
     }
 
@@ -904,7 +905,7 @@ document.addEventListener('DOMContentLoaded', () => {
       try {
         await window.SIA.ensureQaActorForContext(resolvedContextKey);
       } catch (error) {
-        console.warn('[QA] No se pudo resolver el actor por defecto:', error);
+
       }
     }
 
@@ -985,8 +986,17 @@ document.addEventListener('DOMContentLoaded', () => {
       const isCampusMapPublicRoute = path === '/mapa-campus';
       const isQaSecretRoutePath = isQaSecretRoute(path);
 
-      if (!user) {
+      if (!user && window.SIA?.hasPendingMicrosoftRedirect?.()) {
+        try {
+          const redirectResult = await window.SIA.consumeMicrosoftRedirectResult();
+          if (redirectResult?.user) user = redirectResult.user;
+        } catch (redirectError) {
+          console.error('[Auth] Error procesando redirect Microsoft:', redirectError);
+          showMicrosoftLoginError(redirectError);
+        }
+      }
 
+      if (!user) {
         // === THEME: invitado ===
         const guestTheme = resolveInitialTheme(null);
         applyTheme(guestTheme, false);
@@ -1007,7 +1017,7 @@ document.addEventListener('DOMContentLoaded', () => {
           try {
             window.PanicService.cleanup();
           } catch (error) {
-            console.warn('[PanicService] Error limpiando sesion:', error);
+
           }
         }
 
@@ -1021,7 +1031,7 @@ document.addEventListener('DOMContentLoaded', () => {
           await restoreCurrentRoute();
         } else if (_loginPopupInProgress) {
           // NO regresar al landing mientras el popup de Microsoft esta abierto
-          console.log('[Auth] Popup de login abierto. Esperando autenticacion...');
+
         } else {
           showLanding();
         }
@@ -1029,6 +1039,17 @@ document.addEventListener('DOMContentLoaded', () => {
       } else {
         // ===== CASO 2: LOGUEADO CON GOOGLE/MICROSOFT =====
         try {
+          if (window.SIA?.hasPendingMicrosoftRedirect?.()) {
+            try {
+              await window.SIA.consumeMicrosoftRedirectResult();
+            } catch (redirectError) {
+              console.error('[Auth] Error procesando redirect Microsoft:', redirectError);
+              showMicrosoftLoginError(redirectError);
+              try { await SIA.auth.signOut(); } catch (_) { }
+              return;
+            }
+          }
+
           const authExtraData = readStoredRegisterExtraData();
           const canReuseAuthExtraData = !authExtraData?.authUid || authExtraData.authUid === user.uid;
           const authEmail = resolveEffectiveAuthEmail(user, authExtraData);
@@ -1092,14 +1113,14 @@ document.addEventListener('DOMContentLoaded', () => {
               // Only use if the underlying Auth UID matches (security/sanity check)
               // or just trust it for dev. Let's trust it but merge UID.
               profile = { ...simProfile, uid: user.uid, email: authEmail || user.email };
-              console.log("[DevMode] ⚡ Simulación Activada:", profile.role);
+
             } catch (e) { console.error("SimProfile Error", e); }
           }
 
           // D) SI NO HAY PERFIL SIMULADO, BUSCAR REMOTO
           if (!profile) {
             if (userType.type === 'department') {
-              console.log("[Auth] 🏢 Es departamento oficial. Forzando datos...");
+
               profile = {
                 uid: user.uid,
                 email: authEmail || user.email,
@@ -1144,7 +1165,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
           // C) SI NO EXISTE PERFIL (Y NO ES DEPARTAMENTO) -> REGISTRO
           if (!profile) {
-            console.warn("⚠️ Usuario nuevo REAL. Redirigiendo a Registro.");
+
             hideLoader();
 
             let extraData = canReuseAuthExtraData ? { ...authExtraData } : {};
@@ -1182,7 +1203,7 @@ document.addEventListener('DOMContentLoaded', () => {
             try {
               await window.SIA.ensureQaActorForContext(bootstrapContextKey);
             } catch (error) {
-              console.warn('[QA] No se pudo preparar el actor inicial:', error);
+
             }
           }
           profile = commitSessionProfile(user, profile, { source: 'app-auth' });
@@ -1194,7 +1215,7 @@ document.addEventListener('DOMContentLoaded', () => {
           if (window.Notify) {
             Notify.init(window.SIA, user.uid);
           } else {
-            console.warn('[App] Notify service not found.');
+
           }
 
           // 📲 PUSH: Solicitar permiso después de 30s (no intrusivo)
@@ -1210,7 +1231,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }, 30000);
               }
             }).catch((e) => {
-              console.warn('[App] No se pudo consultar el permiso push:', e);
+
             });
           }
 
@@ -1277,13 +1298,13 @@ document.addEventListener('DOMContentLoaded', () => {
           let path = window.location.pathname || '/';
           if (window.location.hash && window.location.hash.startsWith('#/')) {
             path = window.location.hash.replace('#', '');
-            console.log('[Nav] Hash detectado en auth:', path);
+
           }
 
           // 1. Si es departamento con VISTAS RESTRINGIDAS (ej. solo biblio), forzar esa vista
           if (profile.allowedViews && profile.allowedViews.length === 1) {
             const forcedView = profile.allowedViews[0];
-            console.log('[Nav] Usuario con vista unica. Redirigiendo a: ' + forcedView);
+
             navigate(forcedView, true, true); // Force skipAuthCheck
             return;
           }
@@ -1570,7 +1591,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
           });
         } catch (e) {
-          console.warn('[Search] Live search error:', e);
+
         }
         return results;
       }
@@ -1633,6 +1654,45 @@ document.addEventListener('DOMContentLoaded', () => {
   // Listener para el boton de Microsoft (Azure AD Institucional)
   const btnLoginMS = document.getElementById('btn-login-microsoft');
 
+  function showMicrosoftLoginError(error) {
+    error = error || {};
+    // popup-closed y cancelled-popup: el usuario cerro el popup, no es error real
+    if (error.code === 'auth/popup-closed-by-user' || error.code === 'auth/cancelled-popup-request') {
+
+      if (typeof showToast === 'function') showToast('Inicio de sesion cancelado.', 'info');
+    } else if (error.code === 'auth/popup-blocked') {
+      if (typeof showToast === 'function') showToast('El navegador bloqueo el acceso. Vuelve a intentar o permite ventanas emergentes.', 'warning');
+    } else if (error.code === 'auth/network-request-failed') {
+      if (typeof showToast === 'function') showToast('Error de conexion. Verifica tu internet.', 'danger');
+    } else if (error.code === 'auth/microsoft-consumer-not-enabled') {
+      if (typeof showToast === 'function') {
+        showToast('El proveedor Microsoft del proyecto no acepta cuentas personales. Hay que habilitar Consumers en Azure/Firebase para usar el Outlook QA.', 'warning');
+      }
+    } else if (error.code === 'auth/microsoft-single-tenant-requires-tenant' || String(error.message || '').includes('AADSTS50194')) {
+      if (typeof showToast === 'function') {
+        showToast('El login Microsoft del proyecto estaba apuntando a /common. Ya debe usar el tenant institucional.', 'warning');
+      }
+    } else if (String(error.message || '').toLowerCase().includes('unauthorized_client')) {
+      if (typeof showToast === 'function') {
+        showToast('El proveedor Microsoft del proyecto no acepta cuentas personales. Hay que habilitar Consumers en Azure/Firebase para usar el Outlook QA.', 'warning');
+      }
+    } else if (error.code === 'auth/email-not-allowed') {
+      if (typeof showToast === 'function') {
+        showToast('Solo pueden entrar por Microsoft los correos institucionales.', 'warning');
+      }
+    } else if (error.code === 'auth/account-exists-with-different-credential') {
+
+      if (typeof showToast === 'function') {
+        showToast('Esta cuenta ya existe. Por favor, intenta iniciar sesión con Google.', 'warning');
+      } else {
+        alert('Esta cuenta está ligada a Google. Inicia sesión con Google.');
+      }
+    } else {
+      console.error('[Auth] Error en Microsoft Auth:', error);
+      if (typeof showToast === 'function') showToast('Error de acceso. Intenta de nuevo.', 'danger');
+    }
+  }
+
   if (!window.SIA) window.SIA = {};
   window.SIA.initiateMicrosoftLogin = async () => {
     if (btnLoginMS && btnLoginMS.disabled) return;
@@ -1649,9 +1709,13 @@ document.addEventListener('DOMContentLoaded', () => {
     _loginPopupInProgress = true;
 
     try {
-      console.log("[Auth] Iniciando login con Microsoft...");
+
       const result = await SIA.loginWithMicrosoft();
-      console.log("[Auth] Login Microsoft exitoso");
+      if (result?.redirectStarted) {
+        if (typeof showToast === 'function') showToast('Redirigiendo a Microsoft...', 'info');
+        return;
+      }
+
       const authEmail = resolveEffectiveAuthEmail(result.user, result.extradata);
 
       // Delegar perfiles especiales al flujo central de auth para evitar
@@ -1659,7 +1723,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const userType = detectUserType(authEmail);
 
       if (userType.type === 'department' || userType.type === 'qa_superadmin') {
-        console.log("[Auth] Perfil especial detectado. Delegando a onAuthStateChanged...");
+
         return;
       }
 
@@ -1667,21 +1731,21 @@ document.addEventListener('DOMContentLoaded', () => {
       const existingProfile = await SIA.findUserByInstitutionalEmail(authEmail);
 
       if (existingProfile) {
-        console.log("[Auth] Usuario encontrado:", existingProfile.displayName);
+
         try {
           await SIA.db.collection('usuarios').doc(existingProfile.uid).update({
             lastLogin: SIA.FieldValue.serverTimestamp(),
             photoURL: result.user.photoURL || existingProfile.photoURL || ''
           });
         } catch (updateErr) {
-          console.warn("[Auth] No se pudo actualizar lastLogin:", updateErr);
+
         }
         if (typeof showToast === 'function') {
           showToast('Bienvenido de nuevo, ' + existingProfile.displayName + '!', 'success');
         }
       } else {
         // Usuario nuevo: guardar extradata y lanzar registro
-        console.log("[Auth] Usuario nuevo detectado. Iniciando registro...");
+
         if (typeof showToast === 'function') showToast('Completa tu registro institucional', 'info');
         try {
           const nextExtraData = {
@@ -1709,8 +1773,10 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (error) {
       // popup-closed y cancelled-popup: el usuario cerro el popup, no es error real
       if (error.code === 'auth/popup-closed-by-user' || error.code === 'auth/cancelled-popup-request') {
-        console.log('[Auth] Popup cerrado. Listo para reintentar.');
+
         if (typeof showToast === 'function') showToast('Inicio de sesion cancelado.', 'info');
+      } else if (error.code === 'auth/popup-blocked') {
+        if (typeof showToast === 'function') showToast('El navegador bloqueo el acceso. Vuelve a intentar o permite ventanas emergentes.', 'warning');
       } else if (error.code === 'auth/network-request-failed') {
         if (typeof showToast === 'function') showToast('Error de conexion. Verifica tu internet.', 'danger');
       } else if (error.code === 'auth/microsoft-consumer-not-enabled') {
@@ -1730,7 +1796,7 @@ document.addEventListener('DOMContentLoaded', () => {
           showToast('Solo pueden entrar por Microsoft los correos institucionales.', 'warning');
         }
       } else if (error.code === 'auth/account-exists-with-different-credential') {
-        console.warn('[Auth] Cuenta existe con credencial diferente (Google):', error);
+
         if (typeof showToast === 'function') {
           showToast('Esta cuenta ya existe. Por favor, intenta iniciar sesión con Google.', 'warning');
         } else {
@@ -1826,7 +1892,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
       }
     } catch (e) {
-      console.warn("Error restoring simulated profile before logout:", e);
+
     }
 
     // 2. Intentar cerrar sesión en Firebase limpio
@@ -1835,7 +1901,7 @@ document.addEventListener('DOMContentLoaded', () => {
         await SIA.auth.signOut();
       }
     } catch (e) {
-      console.warn("Error en signOut (no crítico):", e);
+
     }
 
     // 3. Limpieza de estado local (Storage & Memory)
@@ -2322,7 +2388,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // --- ENCUESTAS CHECKER ---
   async function checkAndDisplayPendingSurveys() {
-    console.log('[App] 🔍 Starting checkAndDisplayPendingSurveys...');
+
     // 1. Wait a bit for other services to load
     await new Promise(r => setTimeout(r, 1500));
 
@@ -2339,18 +2405,17 @@ document.addEventListener('DOMContentLoaded', () => {
     const ctx = { ...baseCtx, user: baseCtx.auth?.currentUser };
 
     if (!ctx.user && !ctx.profile) {
-      console.log('[App] ❌ No active user for surveys (ctx.user and ctx.profile are missing).');
+
       return;
     }
 
-    console.log('[App] 👤 User Context:', { uid: ctx.user?.uid || ctx.profile?.uid, role: ctx.profile?.role });
 
     // A. Check Admin-launched campaigns
     if (window.Encuestas?.checkAndShowLaunchedSurvey) {
       try {
         const shown = await window.Encuestas.checkAndShowLaunchedSurvey(ctx);
         if (shown) {
-          console.log('[App] Launched campaign shown.');
+
           return;
         }
       } catch (err) {
@@ -2360,14 +2425,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // B. Check Service Surveys (Triggered)
     const serviceTypes = ['servicio-medico', 'psicologia', 'biblioteca'];
-    console.log('[App] 📋 Checking service types:', serviceTypes);
 
     if (window.EncuestasServicioService && window.Encuestas.checkAndShowServiceSurvey) {
       for (const type of serviceTypes) {
         try {
           const shown = await window.Encuestas.checkAndShowServiceSurvey(type, ctx);
           if (shown) {
-            console.log('[App] ✅ Survey shown for:', type);
+
             return;
           }
         } catch (err) {
@@ -2375,7 +2439,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       }
     } else {
-      console.warn('[App] Service surveys unavailable, continuing with general blocking surveys only.');
+
     }
 
     // C. Check General Blocking Surveys
@@ -2383,7 +2447,7 @@ document.addEventListener('DOMContentLoaded', () => {
       try {
         const shown = await window.Encuestas.checkAndShowBlockingSurvey(ctx);
         if (shown) {
-          console.log('[App] ✅ Blocking survey shown.');
+
           return;
         }
       } catch (err) {
@@ -2449,7 +2513,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Permisos públicos: rutas vocacionales accesibles sin importar auth
     if (viewId === 'view-test-vocacional' || viewId === 'view-vocacional-test-active') {
-      console.log('[showView] Ruta publica vocacional:', viewId);
 
       // 1. Ocultar landingView si está visible (usuario no loggeado)
       const _lv = document.querySelector('sia-landing-view') || document.getElementById('landing-view');
@@ -2470,7 +2533,6 @@ document.addEventListener('DOMContentLoaded', () => {
       const _pubTarget = document.getElementById(viewId);
       if (_pubTarget) {
         _pubTarget.classList.remove('d-none');
-        console.log('[showView] Vista publica visible:', viewId);
 
         // Forzar refresh del componente vocacional-landing si no tiene contenido
         if (viewId === 'view-test-vocacional') {
@@ -2532,7 +2594,6 @@ document.addEventListener('DOMContentLoaded', () => {
       */
       if (!isAllowed && !isProfile) {
         const redirectTarget = getHomeViewForProfile(currentUserProfile);
-        console.warn(`[Access] ⛔ Bloqueado acceso a ${viewId} para rol ${role}. Redirigiendo a ${redirectTarget}`);
 
         if (viewId !== redirectTarget) {
           setTimeout(() => navigate(redirectTarget, true, true), 0);
@@ -2573,7 +2634,7 @@ document.addEventListener('DOMContentLoaded', () => {
         setTimeout(resetScroll, 50);
       });
     } else {
-      console.log(`📝 [Scroll] Respetando scroll guardado para ${viewId} (${hasSavedState.scrollPosition}px)`);
+
     }
 
     // Haptics (Phase 2 UI/UX) - Safe Wrap
@@ -2711,7 +2772,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if (viewId === 'view-quejas') {
-      console.log("[DEBUG] Navigation to view-quejas. Checking Quejas module...", typeof Quejas);
+
       if (typeof Quejas !== 'undefined') {
         Quejas.init(getCtx());
       } else {
@@ -2994,7 +3055,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const effectiveViews = getEffectiveAllowedViews(currentUserProfile);
     if (isAdminWorkspaceProfile(currentUserProfile) && effectiveViews.length > 1) {
 
-      console.log("[Dashboard] 🏢 Renderizando Dashboard Departamental para:", currentUserProfile.role);
 
       const dashStandard = document.getElementById('view-dashboard');
       const dashSuper = document.getElementById('view-superadmin-dashboard');
@@ -3311,7 +3371,6 @@ document.addEventListener('DOMContentLoaded', () => {
     deferredPrompt = e;
     window.SIA = window.SIA || {};
     window.SIA.deferredPrompt = e;
-    console.log("📱 PWA Install Prompt capturado.");
 
     // Mostrar banner si corresponde
     checkAndShowPWABanner();
@@ -3319,7 +3378,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Detectar cuando la app es instalada
   window.addEventListener('appinstalled', () => {
-    console.log('🎉 PWA instalada exitosamente!');
+
     deferredPrompt = null;
     const banner = document.getElementById('sia-pwa-banner');
     if (banner) banner.remove();
@@ -3448,10 +3507,9 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       deferredPrompt.prompt();
       const { outcome } = await deferredPrompt.userChoice;
-      console.log(`📱 PWA Install choice: ${outcome}`);
 
       if (outcome === 'accepted') {
-        console.log('✅ Usuario aceptó instalar la PWA');
+
         deferredPrompt = null;
         window.SIA.deferredPrompt = null;
         const banner = document.getElementById('sia-pwa-banner');
@@ -3461,7 +3519,7 @@ document.addEventListener('DOMContentLoaded', () => {
           showToast("¡App instalada con éxito! 🎉", "success");
         }
       } else {
-        console.log('❌ Usuario rechazó instalar la PWA');
+
       }
     } catch (err) {
       console.error('Error al intentar instalar PWA:', err);
@@ -4065,7 +4123,7 @@ document.addEventListener('DOMContentLoaded', () => {
           document.head.appendChild(s);
         });
       } catch (e) {
-        console.warn('[Stories] Could not load ' + globalName + ':', e);
+
       }
     }
 
@@ -4261,7 +4319,7 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     } catch (e) {
       if (!_canCommitDashboardStoriesRender(renderVersion, container)) return;
-      console.warn('[Stories] Error loading stories:', e);
+
       _showNoNewsPlaceholder(container);
     }
   }
@@ -4790,7 +4848,7 @@ document.addEventListener('DOMContentLoaded', () => {
           })
           .filter(Boolean);
       } catch (err) {
-        console.warn('[Dashboard] Aula tasks skipped class:', clase.id, err?.code || err?.message || err);
+
         return [];
       }
     }));
@@ -4865,7 +4923,7 @@ document.addEventListener('DOMContentLoaded', () => {
         state: _dashState
       }));
     } catch (err) {
-      console.warn('[Dashboard] No se pudo cachear estado:', err);
+
     }
   }
 
@@ -4905,7 +4963,7 @@ document.addEventListener('DOMContentLoaded', () => {
       _renderDashboardFromState();
       return true;
     } catch (err) {
-      console.warn('[Dashboard] No se pudo restaurar cache:', err);
+
       if (options.resetIfMissing) _resetStudentDashboardState({ clearDom: true, clearFreshness: true });
       return false;
     }
@@ -5903,7 +5961,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!_canCommitDashboardActivityRender(renderVersion, uid, strip)) return;
 
     } catch (e) {
-      console.warn("Error cargando actividades semanales:", e);
+
     }
 
     const colorMap = {
@@ -6481,7 +6539,7 @@ document.addEventListener('DOMContentLoaded', () => {
           window.Avisos.refresh();
         }
       } catch (error) {
-        console.warn('[Avisos] Error registrando visualizacion:', error);
+
       }
     }, 1200);
   }

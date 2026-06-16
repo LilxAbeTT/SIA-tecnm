@@ -1,4 +1,4 @@
-﻿// modules/medi/student-experience.js
+// modules/medi/student-experience.js
 window.Medi = window.Medi || {};
 window.Medi.Factories = window.Medi.Factories || {};
 
@@ -7,7 +7,7 @@ window.Medi.Factories.studentExperience = function(scope) {
   function _ensureStudentArray(items, label = 'items') {
     if (Array.isArray(items)) return items;
     if (items == null) return [];
-    console.warn(`[Medi] ${label} llego con formato inesperado en experiencia estudiante:`, items);
+
     return [];
   }
 
@@ -32,7 +32,7 @@ window.Medi.Factories.studentExperience = function(scope) {
         </div>`;
     } catch (e) {
       // Silently fail - index might not exist
-      console.warn('Queue position unavailable:', e.message);
+
     }
   }
 
@@ -634,7 +634,7 @@ window.Medi.Factories.studentExperience = function(scope) {
         }
       }
     } catch (e) {
-      console.warn("Error check medi tutorial DB prefs", e);
+
       return;
     }
 
@@ -1255,11 +1255,11 @@ window.Medi.Factories.studentExperience = function(scope) {
     } else if (!isOpenMed && !isOpenPsi && !_isShiftEnabledForService(cfg, 'Medico') && !psiMorningEnabled && !psiEveningEnabled) {
       nextOpen = 'Agenda no disponible por el momento';
     } else if (!isOpenMed && !isOpenPsi && h < 15 && psiEveningEnabled && !psiMorningEnabled) {
-      nextOpen = 'PsicologÃ­a disponible desde las 15:00';
+      nextOpen = 'Psicología disponible desde las 15:00';
     } else if (h >= end) {
       nextOpen = now.getDay() === 5
         ? `Reabre el lunes a las ${pad(start)}:00`
-        : `Reabre maÃ±ana a las ${pad(start)}:00`;
+        : `Reabre mañana a las ${pad(start)}:00`;
     } else if (h < start) {
       nextOpen = `Abre hoy a las ${pad(start)}:00`;
     }
@@ -1273,8 +1273,8 @@ window.Medi.Factories.studentExperience = function(scope) {
               <span class="fw-bold small ${statusColor}">${statusText}</span>
             </div>
             <div class="d-flex gap-2 align-items-center">
-              ${isOpenMed ? '<span class="badge bg-info-subtle text-info border" style="font-size:.65rem;"><i class="bi bi-bandaid me-1"></i>MÃ©dico</span>' : ''}
-              ${isOpenPsi ? '<span class="badge bg-primary-subtle text-primary border" style="font-size:.65rem;"><i class="bi bi-chat-heart me-1"></i>PsicologÃ­a</span>' : ''}
+              ${isOpenMed ? '<span class="badge bg-info-subtle text-info border" style="font-size:.65rem;"><i class="bi bi-bandaid me-1"></i>Médico</span>' : ''}
+              ${isOpenPsi ? '<span class="badge bg-primary-subtle text-primary border" style="font-size:.65rem;"><i class="bi bi-chat-heart me-1"></i>Psicología</span>' : ''}
             </div>
           </div>
           <div class="text-muted mt-1" style="font-size:.7rem;">
@@ -1913,7 +1913,7 @@ window.Medi.Factories.studentExperience = function(scope) {
           </button>
           <div class="d-flex gap-2 mt-2">
             <button class="btn btn-sm btn-outline-secondary rounded-pill flex-grow-1" style="font-size:.7rem;" onclick="Medi._dismissFollowUp('later')">
-              <i class="bi bi-clock-history me-1"></i>Recordar despuÃ©s
+              <i class="bi bi-clock-history me-1"></i>Recordar después
             </button>
             <button class="btn btn-sm btn-outline-secondary rounded-pill flex-grow-1" style="font-size:.7rem;" onclick="Medi._dismissFollowUp('forever')">
               <i class="bi bi-x-circle me-1"></i>No volver a mostrar
@@ -1979,7 +1979,7 @@ window.Medi.Factories.studentExperience = function(scope) {
       }
       if (!pendingSurvey) return;
     } catch (error) {
-      console.warn('[Medi Survey] No se pudo validar encuesta pendiente:', error);
+
       return;
     }
 
@@ -1987,8 +1987,8 @@ window.Medi.Factories.studentExperience = function(scope) {
     container.innerHTML = `
       <div class="card border-0 shadow-sm rounded-4 border-start border-4 border-success">
         <div class="card-body p-3">
-          <div class="fw-bold small mb-1"><i class="bi bi-star-fill text-warning me-2"></i>Â¿CÃ³mo fue tu consulta con ${escapeHtml(profName)}?</div>
-          <p class="text-muted mb-2" style="font-size:.75rem;">Tu opiniÃ³n nos ayuda a mejorar el servicio.</p>
+          <div class="fw-bold small mb-1"><i class="bi bi-star-fill text-warning me-2"></i>¿Cómo fue tu consulta con ${escapeHtml(profName)}?</div>
+          <p class="text-muted mb-2" style="font-size:.75rem;">Tu opinión nos ayuda a mejorar el servicio.</p>
           <div class="d-flex gap-2 mb-2" id="medi-survey-stars">
             ${[1, 2, 3, 4, 5].map((n) => `<i class="bi bi-star-fill medi-star" data-val="${n}" onclick="Medi._setSurveyRating(${n})" id="medi-star-${n}"></i>`).join('')}
           </div>
@@ -2043,7 +2043,7 @@ window.Medi.Factories.studentExperience = function(scope) {
         await EncuestasServicioService.recordSurveySkip(_buildStudentSurveyContext(), serviceType);
       }
     } catch (error) {
-      console.warn('[Medi Survey] No se pudo registrar omision:', error);
+
     }
 
     localStorage.setItem(storageKey, 'skip');
@@ -2057,7 +2057,7 @@ window.Medi.Factories.studentExperience = function(scope) {
 
   async function _submitSurvey(storageKey, serviceTypeOrProfName, profNameEncoded, tipoServicioEncoded = '') {
     const rating = parseInt(document.getElementById('medi-survey-stars')?.dataset.selected || 0, 10);
-    if (!rating) return showToast('Selecciona una calificaciÃ³n con las estrellas', 'warning');
+    if (!rating) return showToast('Selecciona una calificación con las estrellas', 'warning');
 
     const comment = document.getElementById('medi-survey-comment')?.value || '';
     const hasLegacySignature = typeof tipoServicioEncoded === 'undefined' || tipoServicioEncoded === '';
@@ -2086,12 +2086,12 @@ window.Medi.Factories.studentExperience = function(scope) {
         });
       }
     } catch (error) {
-      console.warn('[Medi Survey] Error al guardar la encuesta en Firestore, usando localStorage:', error);
+
     }
 
     localStorage.setItem(storageKey, JSON.stringify({ rating, comment, date: new Date().toISOString(), serviceType }));
     document.getElementById('medi-postconsult-survey')?.classList.add('d-none');
-    showToast('Gracias por tu calificaciÃ³n.', 'success');
+    showToast('Gracias por tu calificación.', 'success');
   }
 
   function showFullHistory() {

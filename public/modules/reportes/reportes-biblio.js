@@ -4,7 +4,6 @@
  * Tabs: Visitas, Préstamos, Catálogo
  */
 if (!window.Reportes) window.Reportes = {};
-console.log('[SIA] reportes-biblio.js cargado, window.Reportes keys:', Object.keys(window.Reportes));
 
 window.Reportes.Biblio = (function () {
     'use strict';
@@ -441,7 +440,7 @@ window.Reportes.Biblio = (function () {
                 tab,
                 tabLabel: tabMeta?.label || 'Prestamos',
                 supported: true,
-                records: source.filter((item) => item.subarea === 'PrÃ©stamos')
+                records: source.filter((item) => item.subarea === 'Préstamos')
             };
         }
 
@@ -485,7 +484,7 @@ window.Reportes.Biblio = (function () {
         const filtered = applyCurrentDemoFilters(allData);
         const tabRecords = context.tab === 'visitas'
             ? filtered.filter((item) => item.subarea === 'Visitas')
-            : filtered.filter((item) => item.subarea === 'PrÃ©stamos');
+            : filtered.filter((item) => item.subarea === 'Préstamos');
 
         return {
             period: range.period,

@@ -119,17 +119,16 @@ exports.sendPushOnNewNotification = onDocumentCreated(
     const notifData = event.data?.data();
 
     if (!notifData) {
-      console.log(`[Push] Notificacion ${notifId} vacia, ignorando.`);
+
       return null;
     }
 
     if (notifData?.meta?.skipPushTrigger) {
-      console.log(`[Push] Notificacion ${notifId} marcada para omitir trigger push.`);
+
       return null;
     }
 
     const { titulo, mensaje, tipo = 'info', link } = notifData;
-    console.log(`[Push] Nueva notificacion para ${uid}: "${titulo}"`);
 
     const db = getFirestore();
     let tokenSnap;
@@ -157,7 +156,7 @@ exports.sendPushOnNewNotification = onDocumentCreated(
       .filter(Boolean);
 
     if (tokenEntries.length === 0) {
-      console.log(`[Push] Usuario ${uid} no tiene tokens push registrados.`);
+
       return null;
     }
 
@@ -187,7 +186,7 @@ exports.sendPushOnNewNotification = onDocumentCreated(
 
       const err = result.reason;
       if (isInvalidTokenError(err)) {
-        console.warn(`[Push] Token invalido para ${uid} (${entry.id}), eliminando...`);
+
         invalidRefs.push(entry.ref);
       } else {
         console.error(`[Push] Error enviando push a ${uid} (${entry.id}):`, err);
@@ -198,7 +197,7 @@ exports.sendPushOnNewNotification = onDocumentCreated(
       await Promise.all(invalidRefs.map((ref) => ref.delete().catch(() => null)));
     }
 
-    console.log(`[Push] Enviado a ${uid}: ${okCount}/${tokenEntries.length} token(s) OK.`);
+
     return null;
   }
 );

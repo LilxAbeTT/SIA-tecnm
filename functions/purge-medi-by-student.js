@@ -137,7 +137,7 @@ async function chunkDelete(db, refs, batchSize) {
     chunk.forEach((ref) => batch.delete(ref));
     await batch.commit();
     deleted += chunk.length;
-    console.log(`[purge-medi] Lote confirmado: ${deleted}/${refs.length}`);
+
   }
   return deleted;
 }
@@ -204,18 +204,17 @@ async function main() {
   const { refs, preview, counts } = await collectTargets(db, args.uid, args.includeLegacyRoot);
 
   console.table(preview);
-  console.log('[purge-medi] UID objetivo:', args.uid);
-  console.log('[purge-medi] includeLegacyRoot:', args.includeLegacyRoot);
-  console.log('[purge-medi] Conteo por tipo:', counts);
-  console.log('[purge-medi] Total refs:', refs.length);
+
+
+
 
   if (args.dryRun) {
-    console.log('[purge-medi] DRY RUN. No se borro nada.');
+
     return;
   }
 
   const deleted = await chunkDelete(db, refs, args.batchSize);
-  console.log('[purge-medi] Borrado finalizado:', deleted);
+
 }
 
 main().catch((error) => {

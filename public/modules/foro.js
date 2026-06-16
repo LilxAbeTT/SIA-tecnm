@@ -1,7 +1,6 @@
 // public/modules/foro.js
 // Student entrypoint/orchestrator for Foro
 
-console.log('[LOAD] modules/foro.js loaded');
 
 if (!window.Foro) {
     const shared = window.ForoModule?.Shared;

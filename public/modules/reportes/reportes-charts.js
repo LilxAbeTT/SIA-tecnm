@@ -11,7 +11,6 @@
  * ============================================================
  */
 if (!window.Reportes) window.Reportes = {};
-console.log('[SIA] reportes-charts.js cargado');
 
 window.Reportes.Charts = (function () {
     'use strict';
@@ -458,7 +457,7 @@ window.Reportes.Charts = (function () {
         try {
             return canvas.toDataURL('image/png');
         } catch (e) {
-            console.warn('[Reportes.Charts] Error capturando imagen:', e);
+
             return null;
         }
     }

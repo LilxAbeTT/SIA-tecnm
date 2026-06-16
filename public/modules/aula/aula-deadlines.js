@@ -98,7 +98,7 @@
           const tareas = await Promise.all(tareaPromises);
           todas.push(...tareas.filter(Boolean));
         } catch (err) {
-          console.warn('[AulaDeadlines] skipped class:', clase.id, err?.code || err?.message || err);
+
         }
       });
 

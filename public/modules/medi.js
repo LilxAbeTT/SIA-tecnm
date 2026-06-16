@@ -301,7 +301,7 @@ var Medi = (function () {
       try {
         blockingAppointment = await MediService.checkActiveAppointment(_ctx, _ctx.user.uid);
       } catch (error) {
-        console.warn('[Medi] No se pudo validar la cita activa del alumno:', error);
+
       }
     }
 
@@ -2372,7 +2372,6 @@ var Medi = (function () {
     if (vStu) vStu.classList.remove('d-none');
     if (vAdm) vAdm.classList.add('d-none');
 
-    console.log("[Medi] Cargando datos para Estudiante:", user.email);
 
     try {
       // Cargar configuración de horarios desde el servicio
@@ -3578,7 +3577,7 @@ onclick = "Medi.showConsultationQuickDetail('${encoded}')" >
   // 2. Quick Detail Modal
   function showConsultationQuickDetail(encoded) {
     try {
-      console.log("[QuickDetail] Opening...");
+
       const c = JSON.parse(decodeURIComponent(encoded));
       const modalId = 'modalQuickDetail';
 
@@ -3813,4 +3812,3 @@ onclick = "Medi.showConsultationQuickDetail('${encoded}')" >
 })();
 
 window.Medi = Object.assign(window.Medi || {}, Medi);
-console.log("[Medi] Module Loaded & Globalized");

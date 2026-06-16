@@ -78,7 +78,7 @@
                 const strongMatch = pathSegments.find(isLikelyUserQuery);
                 if (strongMatch) return strongMatch;
             } catch (error) {
-                console.warn('[ScannerService] No se pudo interpretar URL de escaneo:', error);
+
             }
         }
 

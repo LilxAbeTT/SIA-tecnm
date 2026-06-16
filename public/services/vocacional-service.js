@@ -84,7 +84,7 @@ const VocacionalService = (function () {
                     }
                 }
             } catch (fsErr) {
-                console.warn("Firestore read failed, falling back to local JSON:", fsErr);
+
             }
 
             // Fallback locally
@@ -95,10 +95,10 @@ const VocacionalService = (function () {
             // Attempt to seed data silently without breaking if guest
             try {
                 await docRef.set({ blocks: data, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
-                console.log("Vocacional test data imported to Firestore");
+
             } catch (seedErr) {
                 // Ignore silent seed error for guests
-                console.log("Could not seed data to Firestore (probably guest permissions), continuing with local data.");
+
             }
 
         } catch (error) {
@@ -341,7 +341,7 @@ const VocacionalService = (function () {
             }
 
             // 2. Si necesita refresh (no existe o expiró), calculamos desde la base de datos
-            console.log("Generando nueva caché de Estadísticas del CRM Vocacional...");
+
             const snapshot = await getDb().collection(COLLECTION_NAME).get();
             const total = snapshot.docs.length;
             let completed = 0;
@@ -380,7 +380,7 @@ const VocacionalService = (function () {
                     lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
                 });
             } catch (err) {
-                console.warn("No se pudo guardar la caché de vocacional (quizás reglas de seguridad), devolviendo datos en vivo:", err);
+
             }
 
             return stats;
@@ -390,11 +390,11 @@ const VocacionalService = (function () {
                 const staleSnap = await cacheRef.get();
                 const staleStats = staleSnap.exists ? staleSnap.data()?.stats : null;
                 if (staleStats) {
-                    console.warn("Usando cache vocacional previa por error al refrescar estadisticas:", error);
+
                     return staleStats;
                 }
             } catch (cacheError) {
-                console.warn("No se pudo recuperar la cache vocacional tras error de refresco:", cacheError);
+
             }
             console.error("Error al obtener estadísticas del CRM:", error);
             throw error;

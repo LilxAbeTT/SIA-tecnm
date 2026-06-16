@@ -18,7 +18,6 @@ const messaging = firebase.messaging();
 
 // Manejo de mensajes push cuando la app está cerrada o en background
 messaging.onBackgroundMessage((payload) => {
-  console.log('[FCM SW] Mensaje en background:', payload);
 
   const { title, body } = payload.notification || {};
   const data = payload.data || {};

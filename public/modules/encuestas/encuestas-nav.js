@@ -429,7 +429,7 @@ window.Encuestas.Nav = (function () {
         return;
       }
     } catch (error) {
-      console.warn('[Encuestas] No se pudieron leer preferencias del tutorial:', error);
+
       return;
     }
 
@@ -468,7 +468,7 @@ window.Encuestas.Nav = (function () {
       try {
         await window.SIA?.updateUserPreferences?.(uid, { encuestas_admin_tour_v1: true });
       } catch (error) {
-        console.warn('[Encuestas] No se pudieron guardar preferencias del tutorial:', error);
+
       }
     };
 

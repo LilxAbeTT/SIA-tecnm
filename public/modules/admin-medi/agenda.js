@@ -478,7 +478,7 @@ window.AdminMedi.Agenda = (function () {
     }
 
     if (conflicts.length > 1) {
-      console.warn('[Medi] Se detectaron varias citas confirmadas en el mismo horario para el mismo espacio operativo.', conflicts);
+
     }
     const antiguaCitaId = conflicts[0]?.id || null;
 
@@ -733,7 +733,7 @@ window.AdminMedi.Agenda = (function () {
       grid.classList.remove('d-none');
 
     }).catch(err => {
-      console.warn('Fallback slots sin verificacion:', err);
+
       let html = `
         <div class="shift-banner w-100 p-2 mb-3">
           <span class="fw-bold text-warning" style="font-size:.8rem;">${shiftLabel} - ${rangeLabel}</span>

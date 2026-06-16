@@ -295,7 +295,7 @@ export class Router {
         }
 
         if (!Store.user && viewId !== 'landing' && !skipAuthCheck) {
-            console.warn("Navegación bloqueada: Usuario no autenticado.");
+
             this.ui.showLanding();
             return;
         }
@@ -304,7 +304,7 @@ export class Router {
 
         // Security Check (Fixed)
         if (!skipAuthCheck && Store.user && !this._canAccess(viewId, role)) {
-            console.warn(`Acceso denegado a ${viewId} para rol ${role}`);
+
             const defaultView = this._getDefaultView(role);
             if (viewId !== defaultView) {
                 this.navigate(defaultView, true, true);
@@ -393,6 +393,8 @@ export class Router {
                     '/modules/admin-biblio/devoluciones.js',
                     '/modules/admin-biblio/historial.js',
                     '/modules/admin-biblio/inventario.js',
+                    '/modules/admin-biblio/buscador.js',
+                    '/modules/admin-biblio/buscador-usuarios.js',
                     '/modules/admin-biblio/reportes.js',
                     '/modules/admin.biblio.js'
                 ] : ['/modules/biblio.js'])
@@ -567,7 +569,7 @@ export class Router {
             script.async = false;
 
             script.onload = () => {
-                console.log(`[Router] Loaded: ${src}`);
+
                 resolve();
             };
 
@@ -678,7 +680,7 @@ export class Router {
         }
 
         if (viewId === 'view-lactario') {
-            console.log('[Router] Attempting to init Lactario. window.Lactario exists:', !!window.Lactario);
+
             if (window.Lactario && window.Lactario.init) {
                 window.Lactario.init(ctx);
             } else {

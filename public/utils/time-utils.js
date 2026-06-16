@@ -19,7 +19,7 @@ const TimeUtils = {
             try {
                 return input.toDate();
             } catch (e) {
-                console.warn("[TimeUtils] Error convirtiendo Timestamp:", e);
+
                 return null;
             }
         }

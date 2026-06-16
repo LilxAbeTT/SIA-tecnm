@@ -1155,11 +1155,26 @@
 
 /* NUEVAS CLASES PARA REESTRUCTURACIÓN DE ADMISIONES (MAY 2026) */
 
+.adm-topic-container { display: flex; flex-direction: column; gap: 1.25rem; max-width: 800px; margin: 0 auto; width: 100%; }
+.adm-topic-phases { display: flex; flex-direction: column; gap: 1rem; width: 100%; }
+
 .adm-lesson-card.is-phase1 .adm-coverage-pills { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1rem; }
 .adm-lesson-card.is-phase1 .adm-pill { background: var(--adm-surface-2); color: var(--adm-ink); padding: 0.25rem 0.75rem; border-radius: 100px; font-size: 0.875rem; border: 1px solid var(--adm-line); }
 
 .adm-lesson-card.is-phase2 .adm-concept-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.5rem; margin-top: 1rem; }
 .adm-lesson-card.is-phase2 .adm-concept-card { padding: 0.75rem; border: 1px solid var(--adm-line); border-radius: 0.5rem; font-size: 0.875rem; background: #ffffff; color: var(--adm-ink); }
+
+.adm-lesson-card.is-course .adm-subtopic-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 0.75rem; margin-top: 1rem; }
+.adm-lesson-card.is-course .adm-subtopic-card { background: #ffffff; border: 1px solid var(--adm-line); border-radius: 0.75rem; padding: 1rem; color: var(--adm-ink); }
+.adm-lesson-card.is-course .adm-subtopic-card h3 { margin: 0 0 0.45rem; font-size: 1rem; color: var(--adm-blue); }
+.adm-lesson-card.is-course .adm-subtopic-card p { margin: 0; }
+.adm-lesson-card.is-course .adm-subtopic-card ul { margin: 0.75rem 0 0; padding-left: 1.15rem; color: var(--adm-muted); }
+.adm-rule-box,
+.adm-application-box { margin-top: 1rem; padding: 1rem; border-radius: 0.75rem; border: 1px solid var(--adm-line); background: var(--adm-surface-2); color: var(--adm-ink); }
+.adm-rule-box ul,
+.adm-application-box ul { margin: 0.65rem 0 0; padding-left: 1.15rem; }
+.adm-rule-box strong,
+.adm-application-box strong { display: inline-flex; align-items: center; gap: 0.45rem; }
 
 .adm-lesson-card.is-phase3 .adm-examples-carousel { display: flex; flex-direction: column; gap: 1rem; margin-top: 1rem; }
 .adm-lesson-card.is-phase3 .adm-example-item { background: #ffffff; padding: 1rem; border-radius: 0.5rem; border: 1px solid var(--adm-line); color: var(--adm-ink); }

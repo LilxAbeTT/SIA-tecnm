@@ -3,7 +3,6 @@
  * Soporta ambas areas a partir de Reportes.getState().currentArea.
  */
 if (!window.Reportes) window.Reportes = {};
-console.log('[SIA] reportes-medico.js cargado, window.Reportes keys:', Object.keys(window.Reportes));
 
 window.Reportes.Medico = (function () {
     'use strict';

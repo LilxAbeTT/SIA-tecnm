@@ -502,7 +502,7 @@ var Reportes = (function () {
             const landingPob = document.getElementById('landing-stat-POBLACION');
             if (landingPob) landingPob.textContent = `${size} usuarios registrados`;
         } catch (e) {
-            console.warn('[Reportes] Error cargando usuarios:', e);
+
             const el = document.getElementById('kpi-usuarios');
             if (el) el.textContent = '--';
         }
@@ -519,7 +519,7 @@ var Reportes = (function () {
             const landingBiblio = document.getElementById('landing-stat-BIBLIO');
             if (landingBiblio) landingBiblio.textContent = `${size} visitas hoy`;
         } catch (e) {
-            console.warn('[Reportes] Error cargando visitas:', e);
+
             const el = document.getElementById('kpi-visitas');
             if (el) el.textContent = '--';
         }
@@ -536,7 +536,7 @@ var Reportes = (function () {
             const landingMedico = document.getElementById('landing-stat-MEDICO');
             if (landingMedico) landingMedico.textContent = `${size} consultas hoy`;
         } catch (e) {
-            console.warn('[Reportes] Error cargando consultas:', e);
+
             const el = document.getElementById('kpi-consultas');
             if (el) el.textContent = '--';
         }
@@ -595,7 +595,7 @@ var Reportes = (function () {
         } catch (e) {
             if (requestId !== _landingRequestSeq || _currentView !== 'landing') return;
 
-            console.warn('[Reportes] Error cargando KPIs de landing:', e);
+
             ['kpi-usuarios', 'kpi-visitas', 'kpi-consultas', 'landing-stat-VOCACIONAL'].forEach((id) => {
                 const el = document.getElementById(id);
                 if (el) el.textContent = '--';
@@ -973,7 +973,7 @@ var Reportes = (function () {
 
                 const sub2 = { BIBLIO: R2.Biblio, MEDICO: R2.Medico, PSICOPEDAGOGICO: R2.Medico, POBLACION: R2.Poblacion, VOCACIONAL: R2.Vocacional }[_currentArea];
                 if (sub2 && typeof sub2.render === 'function') {
-                    console.log('[Reportes] Sub-modulo cargado dinamicamente:', _currentArea);
+
                     sub2.render(container);
                 } else {
                     console.error('[Reportes] Fallo carga dinamica. window.Reportes keys:', Object.keys(window.Reportes || {}));
@@ -2186,8 +2186,8 @@ var Reportes = (function () {
             highlights: [
                 { label: 'Atenciones', value: records.length.toLocaleString('es-MX'), hint: 'Citas exportadas' },
                 { label: 'Pacientes unicos', value: _exportCountUnique(records, (item) => item._uid || item.matricula || item.usuario).toLocaleString('es-MX'), hint: 'Personas distintas atendidas' },
-                { label: 'Medicas', value: records.filter((item) => item.tipo === 'Consulta Médica' || item.tipo === 'Consulta MÃ©dica').length.toLocaleString('es-MX'), hint: 'Consulta medica general' },
-                { label: 'Psicopedagogicas', value: records.filter((item) => item.tipo === 'Consulta Psicopedagógica' || item.tipo === 'Consulta PsicopedagÃ³gica' || item.tipo === 'Consulta Psicológica' || item.tipo === 'Consulta PsicolÃ³gica').length.toLocaleString('es-MX'), hint: 'Atencion psicopedagogica' },
+                { label: 'Medicas', value: records.filter((item) => item.tipo === 'Consulta Médica').length.toLocaleString('es-MX'), hint: 'Consulta medica general' },
+                { label: 'Psicopedagogicas', value: records.filter((item) => item.tipo === 'Consulta Psicopedagógica' || item.tipo === 'Consulta Psicológica').length.toLocaleString('es-MX'), hint: 'Atencion psicopedagogica' },
                 { label: 'Cerradas', value: closedRecords.length.toLocaleString('es-MX'), hint: 'Con estado final' },
                 { label: 'Diag. agrupados', value: Object.keys(diagnosticMap).length.toLocaleString('es-MX'), hint: 'Categorias clinicas detectadas' }
             ],
@@ -2450,7 +2450,7 @@ var Reportes = (function () {
             try {
                 return await window.VocacionalService.getCRMStats();
             } catch (e) {
-                console.warn('[Reportes] No se pudieron cargar estadisticas vocacionales via VocacionalService:', e);
+
             }
         }
 
@@ -3338,4 +3338,3 @@ var Reportes = (function () {
 })();
 
 window.Reportes = Reportes;
-console.log('[SIA] reportes.js cargado, API:', Object.keys(Reportes));

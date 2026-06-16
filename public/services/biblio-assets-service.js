@@ -185,7 +185,7 @@ const BiblioAssetsService = (function () {
                 reservationLeadMinutes: Math.max(5, Number(perks.reservationLeadMinutes) || 15)
             };
         } catch (error) {
-            console.warn('[BIBLIO] No se pudieron leer perks de reserva:', error);
+
             return { maxDailyReservations: 1, reservationLeadMinutes: 15 };
         }
     }
@@ -318,7 +318,7 @@ const BiblioAssetsService = (function () {
             const totalTables = allTablesSnap.size;
 
             if (totalTables < 8) {
-                console.log(`[ASSETS] Found ${totalTables} tables. Initializing up to 8...`);
+
                 await initializeDefaultTables(ctx, totalTables + 1);
                 freeTablesSnap = await assetsRef.where('tipo', '==', 'mesa').where('status', '==', 'disponible').limit(8).get();
             }
@@ -460,9 +460,55 @@ const BiblioAssetsService = (function () {
 
         if (liberados.length > 0) {
             await batch.commit();
-            console.log(`[ASSETS] Auto-liberados: ${liberados.join(', ')}`);
+
         }
         return liberados;
+    }
+
+    async function liberarTodosActivos(ctx) {
+        const snap = await ctx.db.collection(ASSETS_COLL)
+            .where('status', '==', 'ocupado')
+            .get();
+
+        if (snap.empty) return [];
+
+        const batch = ctx.db.batch();
+        const liberados = [];
+
+        snap.docs.forEach(doc => {
+            const data = doc.data();
+            batch.update(doc.ref, {
+                status: 'disponible',
+                ...CLEAR_OCCUPANCY
+            });
+            liberados.push(data.nombre);
+        });
+
+        if (liberados.length > 0) {
+            await batch.commit();
+        }
+        return liberados;
+    }
+
+    async function extenderTiempoActivo(ctx, assetId, horas = 1) {
+        const assetRef = ctx.db.collection(ASSETS_COLL).doc(assetId);
+        await ctx.db.runTransaction(async t => {
+            const doc = await t.get(assetRef);
+            if (!doc.exists) throw new Error("El activo no existe.");
+            const data = doc.data() || {};
+            if (data.status !== 'ocupado') {
+                throw new Error("El activo no está ocupado.");
+            }
+
+            const currentExpiryMs = getAssetExpiryMillis(data);
+            if (!currentExpiryMs) throw new Error("No hay tiempo que extender.");
+
+            const newExpiryMs = currentExpiryMs + (horas * 60 * 60 * 1000);
+
+            t.update(assetRef, {
+                expiresAt: firebase.firestore.Timestamp.fromMillis(newExpiryMs)
+            });
+        });
     }
 
     return {
@@ -481,7 +527,9 @@ const BiblioAssetsService = (function () {
         liberarActivo,
         liberarActivoDeUsuario,
         liberarActivosExpirados,
-        initializeDefaultTables
+        liberarTodosActivos,
+        initializeDefaultTables,
+        extenderTiempoActivo
     };
 })();
 window.BiblioAssetsService = BiblioAssetsService;

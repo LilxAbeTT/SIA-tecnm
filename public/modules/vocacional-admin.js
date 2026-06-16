@@ -126,7 +126,7 @@ window.AdminVocacional = (function () {
             try {
                 chart.destroy();
             } catch (e) {
-                console.warn('[AdminVocacional] No se pudo destruir grafica previa:', e);
+
             }
         });
         dashboardCharts = [];
@@ -428,7 +428,7 @@ window.AdminVocacional = (function () {
                     try {
                         crmStats = await VocacionalService.getCRMStats();
                     } catch (statsError) {
-                        console.warn('[AdminVocacional] No se pudieron refrescar stats para configuracion:', statsError);
+
                     }
                 }
                 updateExportButtonState();

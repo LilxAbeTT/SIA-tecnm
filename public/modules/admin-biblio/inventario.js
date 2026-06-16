@@ -7,6 +7,7 @@ window.AdminBiblio.Inventario = (function () {
     let _inventoryCatalogSummary = null;
     let _inventoryFoundEntries = [];
     let _inventoryMissingEntries = [];
+    let _inventoryListsHydrated = false;
     let _inventoryLookupResults = [];
     let _inventorySelectedBook = null;
     let _inventoryAssociateMode = false;
@@ -26,6 +27,7 @@ window.AdminBiblio.Inventario = (function () {
     let _inventoryDuplicateSearch = false;
     let _inventoryUnregisteredMode = 'new';
     let _inventoryUnregisteredCopyBase = null;
+    let _inventoryCategories = [];
     let _inventoryReviewPage = 1;
     let _inventoryReviewEditingId = '';
     let _inventoryReviewDraftQuantity = 0;
@@ -36,6 +38,10 @@ window.AdminBiblio.Inventario = (function () {
     let _inventoryReviewKnownCopies = [];
     let _inventoryReviewCopiesLoading = false;
     let _inventorySearchQuery = '';
+    let _inventoryHistoryList = [];
+    let _inventoryHistoryLoading = false;
+    let _inventoryHistoryPage = 1;
+    let _inventoryReactivating = false;
 
     function syncFromState() {
         _ctx = state.ctx;
@@ -43,6 +49,7 @@ window.AdminBiblio.Inventario = (function () {
         _inventoryCatalogSummary = state.inventoryCatalogSummary || null;
         _inventoryFoundEntries = Array.isArray(state.inventoryFoundEntries) ? state.inventoryFoundEntries.slice() : [];
         _inventoryMissingEntries = Array.isArray(state.inventoryMissingEntries) ? state.inventoryMissingEntries.slice() : [];
+        _inventoryListsHydrated = state.inventoryListsHydrated === true;
         _inventoryLookupResults = Array.isArray(state.inventoryLookupResults) ? state.inventoryLookupResults.slice() : [];
         _inventorySelectedBook = state.inventorySelectedBook || null;
         _inventoryAssociateMode = state.inventoryAssociateMode === true;
@@ -80,6 +87,7 @@ window.AdminBiblio.Inventario = (function () {
         state.inventoryCatalogSummary = _inventoryCatalogSummary || null;
         state.inventoryFoundEntries = Array.isArray(_inventoryFoundEntries) ? _inventoryFoundEntries.slice() : [];
         state.inventoryMissingEntries = Array.isArray(_inventoryMissingEntries) ? _inventoryMissingEntries.slice() : [];
+        state.inventoryListsHydrated = _inventoryListsHydrated === true;
         state.inventoryLookupResults = Array.isArray(_inventoryLookupResults) ? _inventoryLookupResults.slice() : [];
         state.inventorySelectedBook = _inventorySelectedBook || null;
         state.inventoryAssociateMode = _inventoryAssociateMode === true;
@@ -136,6 +144,7 @@ window.AdminBiblio.Inventario = (function () {
     function encodeItemPayload(...args) { return shared.encodeItemPayload(...args); }
     function decodeItemPayload(...args) { return shared.decodeItemPayload(...args); }
     function showConfirmModal(...args) { return shared.showConfirmModal(...args); }
+    function showPromptModal(...args) { return shared.showPromptModal(...args); }
 
     function getAdminModalConfig() {
         const modalEl = document.getElementById('modal-admin-action');
@@ -170,7 +179,7 @@ window.AdminBiblio.Inventario = (function () {
                             : activeSession;
                     }
                 } catch (error) {
-                    console.warn('[BiblioAdmin] No se pudo pausar automaticamente el inventario al cerrar el modal:', error);
+
                 }
                 try {
                     window.AdminBiblio._cleanupBackdrop?.();
@@ -399,6 +408,7 @@ window.AdminBiblio.Inventario = (function () {
         const nextEntries = (_inventoryFoundEntries || []).filter((item) => String(item?.id || '') !== String(entry.id || ''));
         nextEntries.unshift(entry);
         _inventoryFoundEntries = sortLocalInventoryEntries(nextEntries);
+        _inventoryListsHydrated = true;
     }
 
     function upsertInventoryMissingEntry(entry = null) {
@@ -406,6 +416,7 @@ window.AdminBiblio.Inventario = (function () {
         const nextEntries = (_inventoryMissingEntries || []).filter((item) => String(item?.id || '') !== String(entry.id || ''));
         nextEntries.unshift(entry);
         _inventoryMissingEntries = sortLocalInventoryEntries(nextEntries);
+        _inventoryListsHydrated = true;
     }
 
     function findLocalInventoryObservedEntry(book = null) {
@@ -418,9 +429,15 @@ window.AdminBiblio.Inventario = (function () {
 
     function buildInventorySummary(session = {}, foundEntries = [], missingEntries = [], catalogSummary = null) {
         const systemTotal = Number(catalogSummary?.totalCopies) || 0;
-        const registeredCatalog = sumInventoryObserved(foundEntries);
+
+        const catalogFound = (foundEntries || []).filter(e => e.type !== 'material');
+        const materialFound = (foundEntries || []).filter(e => e.type === 'material');
+
+        const registeredCatalog = sumInventoryObserved(catalogFound);
         const outsideCatalog = sumInventoryObserved(missingEntries);
-        const totalCaptured = Number(session?.totalObserved) || (registeredCatalog + outsideCatalog);
+        const extraMaterials = sumInventoryObserved(materialFound);
+
+        const totalCaptured = Number(session?.totalObserved) || (registeredCatalog + outsideCatalog + extraMaterials);
         const estimatedMissing = Math.max(systemTotal - registeredCatalog, 0);
         const progress = systemTotal > 0
             ? Math.min(100, Math.max(0, Math.round((registeredCatalog / systemTotal) * 100)))
@@ -430,6 +447,7 @@ window.AdminBiblio.Inventario = (function () {
             systemTotal,
             registeredCatalog,
             outsideCatalog,
+            extraMaterials,
             totalCaptured,
             estimatedMissing,
             progress
@@ -442,14 +460,22 @@ window.AdminBiblio.Inventario = (function () {
     }
 
     function formatInventorySummaryBadges(summary = {}) {
+        // Bug fix: systemTotal can be 0 if catalog lookup wasn't cached; use observed totals instead
+        const registered = Number(summary.registeredCatalog) || 0;
+        const outside = Number(summary.outsideCatalog) || 0;
+        const materials = Number(summary.extraMaterials) || 0;
+        const total = Number(summary.totalCaptured) || (registered + outside + materials);
+
         const badges = [
-            `<span class="badge text-bg-light border">${Number(summary.systemTotal) || 0} sistema</span>`,
-            `<span class="badge text-bg-light border">${Number(summary.registeredCatalog) || 0} registrados</span>`,
-            `<span class="badge text-bg-warning border">${Number(summary.estimatedMissing) || 0} faltan</span>`
+            `<span class="badge text-bg-success-subtle border border-success-subtle text-success-emphasis">${total} total observado</span>`,
+            `<span class="badge text-bg-light border">${registered} en catalogo</span>`
         ];
 
-        if (Number(summary.outsideCatalog) > 0) {
-            badges.push(`<span class="badge text-bg-light border">${Number(summary.outsideCatalog) || 0} fuera de sistema</span>`);
+        if (outside > 0) {
+            badges.push(`<span class="badge text-bg-light border">${outside} fuera de sistema</span>`);
+        }
+        if (materials > 0) {
+            badges.push(`<span class="badge text-bg-light border">${materials} otros materiales</span>`);
         }
 
         return badges.join('');
@@ -887,8 +913,7 @@ window.AdminBiblio.Inventario = (function () {
 
         try {
             const lookup = await BiblioService.findInventoryBookByCode(_ctx, {
-                code: entry.catalogAdquisicion || entry.adquisicion || '',
-                sessionId: _inventorySession?.id || ''
+                code: entry.catalogAdquisicion || entry.adquisicion || ''
             });
             const baseCode = getInventoryReviewEntryBaseCode(entry);
             const relatedCodes = [...new Set((Array.isArray(lookup?.relatedAdquisiciones) ? lookup.relatedAdquisiciones : [])
@@ -912,7 +937,7 @@ window.AdminBiblio.Inventario = (function () {
                 .filter((code) => code && code !== baseCode)
                 .sort(compareInventoryAcquisitionCodes);
         } catch (error) {
-            console.warn('[BiblioAdmin] No se pudieron cargar las copias del registro en revision:', error);
+
             _inventoryReviewKnownCopies = [];
         } finally {
             _inventoryReviewCopiesLoading = false;
@@ -1102,9 +1127,6 @@ window.AdminBiblio.Inventario = (function () {
             resetInventoryReviewEditor();
             renderInventorySessionContent();
             renderInventoryReviewModalBody();
-            void ensureInventoryCatalogSummary(true)
-                .then(() => renderInventorySessionContent())
-                .catch((error) => console.warn('[BiblioAdmin] No se pudo refrescar el resumen del catalogo tras editar revision:', error));
             showToast('Registro actualizado.', 'success');
         } catch (error) {
             _inventoryFoundEntries = previousEntries;
@@ -1189,7 +1211,7 @@ window.AdminBiblio.Inventario = (function () {
         }
 
         if (!_inventoryCopyLookupResults.length) {
-            resultsEl.innerHTML = '<div class="small text-muted">Busca por titulo, autor o adquisicion del libro base.</div>';
+            resultsEl.innerHTML = '<div class="small text-muted">Ingresa el No. de adquisicion del libro base.</div>';
             return;
         }
 
@@ -1240,8 +1262,11 @@ window.AdminBiblio.Inventario = (function () {
                     <div class="card border-0 shadow-sm rounded-4">
                         <div class="card-body p-4 text-center">
                             <div class="small text-muted mb-2">Sin sesion activa</div>
-                            <button type="button" class="btn btn-primary rounded-pill fw-bold w-100" onclick="AdminBiblio.startInventorySession()">
+                            <button type="button" class="btn btn-primary rounded-pill fw-bold w-100 mb-2" onclick="AdminBiblio.startInventorySession()">
                                 <i class="bi bi-play-circle me-2"></i>Iniciar
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary rounded-pill fw-semibold w-100" onclick="AdminBiblio.openInventoryHistoryModal()">
+                                <i class="bi bi-clock-history me-2"></i>Historial de inventarios
                             </button>
                             <div class="small text-muted mt-3">Todo se guarda automaticamente.</div>
                         </div>
@@ -1294,6 +1319,11 @@ window.AdminBiblio.Inventario = (function () {
                                     <div id="inventory-search-feedback" class="small text-muted">Ingresa el No. de adquisicion y presiona Buscar.</div>
                                 </div>
                                 <div id="inventory-selection-card"></div>
+                                <div class="mt-4 border-top pt-3 text-center">
+                                    <button type="button" class="btn btn-outline-secondary rounded-pill fw-semibold" onclick="AdminBiblio.openOtherMaterialsModal()">
+                                        <i class="bi bi-collection me-2"></i>Agregar otro material...
+                                    </button>
+                                </div>
                                 <div id="inventory-missing-wrap" class="card border-0 shadow-sm rounded-4 d-none">
                                     <div class="card-body p-3">
                                         <div class="small text-danger fw-bold text-uppercase mb-2">No localizado</div>
@@ -1317,7 +1347,7 @@ window.AdminBiblio.Inventario = (function () {
                                             <div class="col-12 ${_inventoryAssociateMode ? '' : 'd-none'}" id="inventory-copy-association-wrap">
                                                 <div class="rounded-4 border bg-primary-subtle p-3 mt-2">
                                                     <div class="input-group mb-2">
-                                                        <input type="search" class="form-control" id="inventory-copy-search-input" placeholder="Libro base" onkeydown="if(event.key === 'Enter'){ event.preventDefault(); AdminBiblio.searchInventoryCopyBase(); }">
+                                                        <input type="search" class="form-control" id="inventory-copy-search-input" placeholder="No. adquisicion base" onkeydown="if(event.key === 'Enter'){ event.preventDefault(); AdminBiblio.searchInventoryCopyBase(); }">
                                                         <button type="button" class="btn btn-primary" onclick="AdminBiblio.searchInventoryCopyBase()">Buscar</button>
                                                     </div>
                                                     <div id="inventory-copy-results" class="d-grid gap-2 mb-2"></div>
@@ -1336,17 +1366,35 @@ window.AdminBiblio.Inventario = (function () {
                         </div>
                     </div>
                 ` : `
-                    <div class="card border-0 shadow-sm rounded-4">
+                    <div class="card border-0 shadow-sm rounded-4 mb-3">
                         <div class="card-body p-3 p-md-4">
-                            <div class="fw-semibold text-dark mb-1">Inventario cerrado</div>
-                            <div class="small text-muted mb-3">Resumen rapido sin listado detallado.</div>
+                            <div class="d-flex align-items-center gap-2 mb-3">
+                                <div class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0 bg-success-subtle" style="width:40px;height:40px;">
+                                    <i class="bi bi-check-circle-fill text-success fs-5"></i>
+                                </div>
+                                <div>
+                                    <div class="fw-bold text-dark lh-sm">Inventario cerrado</div>
+                                    <div class="small text-muted">${formatInventoryDate(_inventorySession.finishedAt || _inventorySession.updatedAt)}</div>
+                                </div>
+                            </div>
                             <div class="d-flex flex-wrap gap-2 mb-3">
                                 ${formatInventorySummaryBadges(finalSummary)}
                             </div>
-                            <div class="small text-muted mb-3">Avance final: ${Number(finalSummary.progress) || 0}% del catalogo confirmado.</div>
-                            <div class="d-grid">
-                                <button type="button" class="btn btn-dark rounded-pill fw-bold" onclick="AdminBiblio.downloadInventorySummaryPdf()">
-                                    <i class="bi bi-file-earmark-pdf me-2"></i>Descargar PDF
+                            <div class="mb-3">
+                                <div class="d-flex justify-content-between small text-muted mb-1">
+                                    <span>Avance final</span>
+                                    <span class="fw-semibold">${Number(finalSummary.progress) || 0}%</span>
+                                </div>
+                                <div class="rounded-pill bg-light overflow-hidden" style="height:8px;">
+                                    <div class="rounded-pill bg-success h-100" style="width:${Number(finalSummary.progress) || 0}%;"></div>
+                                </div>
+                            </div>
+                            <div class="d-grid gap-2">
+                                <button type="button" class="btn btn-dark rounded-pill fw-bold" onclick="AdminBiblio.openInventoryPdfOptionsModal('${_inventorySession.id}')">
+                                    <i class="bi bi-file-earmark-pdf me-2"></i>Exportar PDF
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary rounded-pill fw-semibold" onclick="AdminBiblio.openInventoryHistoryModal()">
+                                    <i class="bi bi-clock-history me-2"></i>Ver historial de inventarios
                                 </button>
                             </div>
                         </div>
@@ -1374,9 +1422,11 @@ window.AdminBiblio.Inventario = (function () {
         if (includeLists) {
             _inventoryFoundEntries = Array.isArray(details.foundEntries) ? details.foundEntries : [];
             _inventoryMissingEntries = Array.isArray(details.missingEntries) ? details.missingEntries : [];
+            _inventoryListsHydrated = true;
         } else if (!_inventorySession) {
             _inventoryFoundEntries = [];
             _inventoryMissingEntries = [];
+            _inventoryListsHydrated = false;
         }
         renderInventorySessionContent();
         if (_inventorySession?.status !== 'finished') {
@@ -1410,7 +1460,6 @@ window.AdminBiblio.Inventario = (function () {
 
         try {
             await ensureInventoryCatalogSummary(true);
-            await BiblioService.preloadInventoryLookup(_ctx);
 
             if (forceNewSession) {
                 const current = await BiblioService.getCurrentInventorySession(_ctx);
@@ -1433,8 +1482,13 @@ window.AdminBiblio.Inventario = (function () {
 
     async function startInventorySession() {
         try {
-            await BiblioService.startInventorySession(_ctx);
-            await refreshInventorySession(true);
+            const details = await BiblioService.startInventorySession(_ctx);
+            _inventorySession = details?.session || null;
+            _inventoryFoundEntries = [];
+            _inventoryMissingEntries = [];
+            _inventoryListsHydrated = true;
+            renderInventorySessionContent();
+            focusInventorySearchInput();
             showToast('Sesion de inventario iniciada.', 'success');
         } catch (error) {
             showToast(error.message || 'No se pudo iniciar el inventario.', 'danger');
@@ -1444,8 +1498,9 @@ window.AdminBiblio.Inventario = (function () {
     async function pauseInventorySession() {
         if (!_inventorySession?.id) return;
         try {
-            await BiblioService.pauseInventorySession(_ctx, _inventorySession.id);
-            await refreshInventorySession(true);
+            const details = await BiblioService.pauseInventorySession(_ctx, _inventorySession.id);
+            _inventorySession = { ...(_inventorySession || {}), ...(details?.session || {}) };
+            renderInventorySessionContent();
             showToast('Inventario pausado. Puedes retomarlo despues.', 'warning');
         } catch (error) {
             showToast(error.message || 'No se pudo pausar el inventario.', 'danger');
@@ -1455,8 +1510,10 @@ window.AdminBiblio.Inventario = (function () {
     async function resumeInventorySession() {
         if (!_inventorySession?.id) return;
         try {
-            await BiblioService.resumeInventorySession(_ctx, _inventorySession.id);
-            await refreshInventorySession(true);
+            const details = await BiblioService.resumeInventorySession(_ctx, _inventorySession.id);
+            _inventorySession = { ...(_inventorySession || {}), ...(details?.session || {}) };
+            renderInventorySessionContent();
+            focusInventorySearchInput();
             showToast('Inventario reanudado.', 'success');
         } catch (error) {
             showToast(error.message || 'No se pudo reanudar el inventario.', 'danger');
@@ -1477,110 +1534,13 @@ window.AdminBiblio.Inventario = (function () {
                 _inventorySession = details.session;
                 _inventoryFoundEntries = Array.isArray(details.foundEntries) ? details.foundEntries : [];
                 _inventoryMissingEntries = Array.isArray(details.missingEntries) ? details.missingEntries : [];
+                _inventoryListsHydrated = true;
                 renderInventorySessionContent();
                 showToast('Inventario finalizado.', 'success');
             }
         });
     }
 
-    async function downloadInventorySummaryPdf(sessionId = '') {
-        try {
-            const { session, summary } = await resolveInventorySummaryForPdf(sessionId);
-            if (!window.jspdf?.jsPDF) {
-                throw new Error('El exportador PDF no esta disponible.');
-            }
-
-            const { jsPDF } = window.jspdf;
-            const doc = new jsPDF('p', 'mm', 'letter');
-            const pageWidth = doc.internal.pageSize.getWidth();
-            const margin = 18;
-            const contentWidth = pageWidth - (margin * 2);
-            const title = session?.name || 'Resumen de inventario';
-            const closedAt = session?.finishedAt?.toDate?.()
-                || session?.updatedAt?.toDate?.()
-                || session?.finishedAt
-                || session?.updatedAt
-                || null;
-            const closedLabel = closedAt
-                ? new Date(closedAt).toLocaleString('es-MX', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
-                : 'Sin fecha disponible';
-
-            doc.setFillColor(33, 37, 41);
-            doc.roundedRect(margin, 14, contentWidth, 28, 4, 4, 'F');
-            doc.setTextColor(255, 255, 255);
-            doc.setFont('helvetica', 'bold');
-            doc.setFontSize(18);
-            doc.text('Inventario biblioteca', margin + 6, 25);
-            doc.setFontSize(10);
-            doc.setFont('helvetica', 'normal');
-            doc.text(title, margin + 6, 32);
-            doc.text(`Cierre: ${closedLabel}`, margin + 6, 38);
-
-            const metrics = [
-                { label: 'En sistema', value: Number(summary.systemTotal) || 0, fill: [237, 242, 247] },
-                { label: 'Registrados', value: Number(summary.registeredCatalog) || 0, fill: [224, 247, 232] },
-                { label: 'Faltantes', value: Number(summary.estimatedMissing) || 0, fill: [255, 243, 205] },
-                { label: 'Fuera de sistema', value: Number(summary.outsideCatalog) || 0, fill: [248, 249, 250] }
-            ];
-
-            const cardGap = 6;
-            const cardWidth = (contentWidth - cardGap) / 2;
-            let cursorY = 52;
-            metrics.forEach((metric, index) => {
-                const column = index % 2;
-                const row = Math.floor(index / 2);
-                const x = margin + (column * (cardWidth + cardGap));
-                const y = cursorY + (row * 28);
-                doc.setFillColor(...metric.fill);
-                doc.roundedRect(x, y, cardWidth, 22, 4, 4, 'F');
-                doc.setTextColor(60, 64, 67);
-                doc.setFontSize(9);
-                doc.setFont('helvetica', 'bold');
-                doc.text(metric.label, x + 4, y + 7);
-                doc.setFontSize(18);
-                doc.setTextColor(33, 37, 41);
-                doc.text(String(metric.value), x + 4, y + 16);
-            });
-
-            cursorY += 62;
-            const progress = Math.max(0, Math.min(100, Number(summary.progress) || 0));
-            doc.setTextColor(33, 37, 41);
-            doc.setFontSize(11);
-            doc.setFont('helvetica', 'bold');
-            doc.text('Comparacion principal', margin, cursorY);
-            doc.setFontSize(10);
-            doc.setFont('helvetica', 'normal');
-            doc.text(`${Number(summary.registeredCatalog) || 0} registrados de ${Number(summary.systemTotal) || 0} esperados`, margin, cursorY + 7);
-            doc.setFillColor(233, 236, 239);
-            doc.roundedRect(margin, cursorY + 12, contentWidth, 8, 3, 3, 'F');
-            doc.setFillColor(25, 135, 84);
-            doc.roundedRect(margin, cursorY + 12, contentWidth * (progress / 100), 8, 3, 3, 'F');
-            doc.setFontSize(10);
-            doc.setTextColor(60, 64, 67);
-            doc.text(`Avance final: ${progress}%`, margin, cursorY + 27);
-
-            cursorY += 40;
-            doc.setDrawColor(222, 226, 230);
-            doc.line(margin, cursorY, margin + contentWidth, cursorY);
-            cursorY += 10;
-            doc.setFontSize(11);
-            doc.setTextColor(33, 37, 41);
-            doc.setFont('helvetica', 'bold');
-            doc.text('Notas del resumen', margin, cursorY);
-            doc.setFontSize(10);
-            doc.setFont('helvetica', 'normal');
-            doc.setTextColor(80, 85, 90);
-            doc.text('- Registrados: ejemplares confirmados contra catalogo.', margin, cursorY + 8);
-            doc.text('- Faltantes: diferencia estimada entre sistema y confirmados.', margin, cursorY + 15);
-            doc.text('- Fuera de sistema: capturas que no existian en catalogo.', margin, cursorY + 22);
-
-            const fileDate = new Date().toISOString().slice(0, 10);
-            doc.save(`inventario-resumen-${fileDate}.pdf`);
-            showToast('PDF de inventario generado.', 'success');
-        } catch (error) {
-            showToast(error.message || 'No se pudo generar el PDF.', 'danger');
-        }
-    }
 
     async function runInventorySearch(showNotifications = true) {
         const input = document.getElementById('inventory-search-input');
@@ -1598,9 +1558,15 @@ window.AdminBiblio.Inventario = (function () {
         renderInventorySearchFeedback('Buscando en catalogo...', 'muted');
 
         try {
-            const shouldCheckRemoteDuplicates = !_inventoryFoundEntries.length && Number(_inventorySession?.matchedItems || 0) > 0;
+            const shouldHydrateSessionEntries = !_inventoryListsHydrated && Number(_inventorySession?.matchedItems || 0) > 0;
+            if (shouldHydrateSessionEntries) {
+                const details = await BiblioService.getCurrentInventorySession(_ctx, { includeLists: true });
+                _inventorySession = details?.session || _inventorySession;
+                _inventoryFoundEntries = Array.isArray(details?.foundEntries) ? details.foundEntries : [];
+                _inventoryMissingEntries = Array.isArray(details?.missingEntries) ? details.missingEntries : [];
+                _inventoryListsHydrated = true;
+            }
             _inventorySelectedBook = await BiblioService.findInventoryBookByCode(_ctx, {
-                sessionId: shouldCheckRemoteDuplicates ? _inventorySession.id : '',
                 code: query
             });
             const localObservedEntry = findLocalInventoryObservedEntry(_inventorySelectedBook);
@@ -1706,11 +1672,14 @@ window.AdminBiblio.Inventario = (function () {
         focusInventorySearchInput();
     }
 
-    function openInventoryUnregisteredModal(acquisition = '') {
+    async function openInventoryUnregisteredModal(acquisition = '') {
         const currentCode = normalizeInventoryAcquisitionCode(acquisition || document.getElementById('inventory-search-input')?.value || '');
         _inventoryUnregisteredMode = 'new';
         _inventoryUnregisteredCopyBase = null;
         document.getElementById('inventory-unregistered-modal')?.remove();
+
+        _inventoryCategories = await BiblioService.getInventoryCategories(_ctx);
+        const categoriesOptions = _inventoryCategories.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
 
         const modalHtml = `
             <div class="modal fade" id="inventory-unregistered-modal" tabindex="-1" data-bs-backdrop="static">
@@ -1719,23 +1688,30 @@ window.AdminBiblio.Inventario = (function () {
                         <div class="modal-header border-0 pb-0">
                             <div>
                                 <div class="small text-uppercase fw-bold text-warning">No registrado</div>
-                                <h6 class="mb-0 text-dark">Posible copia o libro nuevo</h6>
+                                <h6 class="mb-0 text-dark">Posible copia, documento o libro nuevo</h6>
                             </div>
                             <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                         </div>
                         <div class="modal-body pt-3">
-                            <div class="small text-muted mb-3">El codigo ${escapeHtml(currentCode || 'sin captura')} no existe en el sistema. Puede ser una copia o un libro nuevo.</div>
+                            <div class="small text-muted mb-3">El codigo ${escapeHtml(currentCode || 'sin captura')} no existe en el sistema.</div>
                             <div class="d-flex gap-2 mb-3">
-                                <button type="button" class="btn btn-primary rounded-pill fw-semibold flex-fill" id="inventory-unregistered-mode-new" onclick="AdminBiblio.setInventoryUnregisteredMode('new')">Libro nuevo</button>
-                                <button type="button" class="btn btn-outline-secondary rounded-pill fw-semibold flex-fill" id="inventory-unregistered-mode-copy" onclick="AdminBiblio.setInventoryUnregisteredMode('copy')">Es copia</button>
+                                <button type="button" class="btn btn-primary rounded-pill fw-semibold flex-fill px-2" id="inventory-unregistered-mode-new" onclick="AdminBiblio.setInventoryUnregisteredMode('new')">Nuevo registro</button>
+                                <button type="button" class="btn btn-outline-secondary rounded-pill fw-semibold flex-fill px-2" id="inventory-unregistered-mode-copy" onclick="AdminBiblio.setInventoryUnregisteredMode('copy')">Es copia</button>
                             </div>
                             <div class="d-grid gap-2">
                                 <input type="text" class="form-control" value="${escapeHtml(currentCode)}" disabled>
                             </div>
                             <div id="inventory-unregistered-new-fields" class="d-grid gap-2 mt-2">
-                                <input type="text" class="form-control" id="inventory-unregistered-title" placeholder="Nombre">
-                                <input type="text" class="form-control" id="inventory-unregistered-author" placeholder="Autor">
-                                <input type="text" class="form-control" id="inventory-unregistered-classification" placeholder="Clasificacion">
+                                <div class="input-group">
+                                    <select class="form-select" id="inventory-unregistered-category">
+                                        <option value="">Categoria (Opcional)</option>
+                                        ${categoriesOptions}
+                                    </select>
+                                    <button class="btn btn-outline-secondary" type="button" onclick="AdminBiblio.promptCreateInventoryCategory()"><i class="bi bi-plus"></i></button>
+                                </div>
+                                <input type="text" class="form-control" id="inventory-unregistered-title" placeholder="Nombre o Titulo">
+                                <input type="text" class="form-control" id="inventory-unregistered-author" placeholder="Autor (Opcional)">
+                                <input type="text" class="form-control" id="inventory-unregistered-classification" placeholder="Clasificacion (Opcional)">
                             </div>
                             <div id="inventory-unregistered-copy-fields" class="d-none mt-2">
                                 <div class="input-group mb-2">
@@ -1843,7 +1819,6 @@ window.AdminBiblio.Inventario = (function () {
 
         try {
             const match = await BiblioService.findInventoryBookByCode(_ctx, {
-                sessionId: _inventorySession?.id || '',
                 code: originalCode
             });
             if (!match?.id) {
@@ -1883,26 +1858,302 @@ window.AdminBiblio.Inventario = (function () {
                 saveBtn.textContent = 'Asociando...';
             }
 
-            await BiblioService.registerInventoryAssociatedCopy(_ctx, {
+            const details = await BiblioService.registerInventoryAssociatedCopy(_ctx, {
                 sessionId: _inventorySession.id,
                 acquisition,
                 baseBookId: _inventoryUnregisteredCopyBase.id,
                 quantity: 1
             });
 
-            await ensureInventoryCatalogSummary(true);
-            await BiblioService.preloadInventoryLookup(_ctx);
-            await refreshInventorySession(true);
+            _inventorySession = details?.session || _inventorySession;
+            if (details?.entry) {
+                upsertInventoryFoundEntry(details.entry);
+            } else {
+                await refreshInventorySession(true);
+            }
             closeInventoryUnregisteredModal();
             clearInventoryDraftUi();
             const searchInput = document.getElementById('inventory-search-input');
             if (searchInput) searchInput.value = '';
             focusInventorySearchInput();
-            showToast('Copia asociada al original y guardada en inventario.', 'success');
+            showToast('Copia asociada y guardada en inventario. Se agregara al catalogo al ajustar.', 'success');
         } catch (error) {
             showToast(error.message || 'No se pudo asociar la copia.', 'danger');
         } finally {
             _inventorySaving = false;
+        }
+    }
+
+    function getOtherMaterialsListHtml() {
+        const materialEntries = (_inventoryFoundEntries || []).filter(e => e.type === 'material');
+        if (materialEntries.length === 0) return `<div class="small text-muted mt-2">No hay materiales extra agregados.</div>`;
+        return `
+            <div class="d-grid gap-2 mt-2">
+                ${materialEntries.map(entry => `
+                    <div class="d-flex align-items-center justify-content-between p-2 rounded-3 bg-light border">
+                        <div class="min-w-0 flex-fill">
+                            <div class="small fw-bold text-dark" style="word-break: break-word;">${escapeHtml(entry.titulo)}</div>
+                        </div>
+                        <div class="d-flex align-items-center gap-2 flex-shrink-0 ms-2">
+                            <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2" onclick="AdminBiblio.Inventario.adjustInventoryOtherMaterial('${escapeHtml(entry.id)}', -1)">-</button>
+                            <span class="small fw-semibold" style="min-width: 20px; text-align: center;">${entry.totalObserved}</span>
+                            <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2" onclick="AdminBiblio.Inventario.adjustInventoryOtherMaterial('${escapeHtml(entry.id)}', 1)">+</button>
+                            <button type="button" class="btn btn-sm btn-outline-danger ms-1 py-0 px-2" onclick="AdminBiblio.Inventario.adjustInventoryOtherMaterial('${escapeHtml(entry.id)}', -${entry.totalObserved})">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    }
+
+    function refreshOtherMaterialsModal() {
+        const listWrap = document.getElementById('inventory-other-materials-list');
+        if (listWrap) {
+            listWrap.innerHTML = getOtherMaterialsListHtml();
+        }
+    }
+
+    async function adjustInventoryOtherMaterial(entryId, delta) {
+        if (_inventorySaving || !_inventorySession?.id) return;
+        const entry = (_inventoryFoundEntries || []).find(e => String(e.id) === String(entryId));
+        if (!entry) return;
+
+        const nextQuantity = Math.max(0, (Number(entry.totalObserved) || 0) + delta);
+        try {
+            _inventorySaving = true;
+            const result = await BiblioService.reviewInventoryFoundEntry(_ctx, {
+                sessionId: _inventorySession.id,
+                entryId: entry.id,
+                quantity: nextQuantity
+            });
+
+            if (result?.deleted) {
+                _inventoryFoundEntries = _inventoryFoundEntries.filter(item => String(item?.id || '') !== String(entry.id));
+            } else if (result?.entry) {
+                let replaced = false;
+                _inventoryFoundEntries = _inventoryFoundEntries.map(item => {
+                    if (String(item?.id || '') !== String(result.entryId)) return item;
+                    replaced = true;
+                    return { ...item, ...result.entry };
+                });
+                if (!replaced) _inventoryFoundEntries.unshift(result.entry);
+            }
+            if (result?.session) _inventorySession = { ..._inventorySession, ...result.session };
+
+            renderInventorySessionContent();
+            refreshOtherMaterialsModal();
+        } catch (error) {
+            showToast(error.message || 'Error al actualizar cantidad', 'danger');
+        } finally {
+            _inventorySaving = false;
+        }
+    }
+
+    async function openOtherMaterialsModal() {
+        if (!_inventorySession?.id) return;
+        document.getElementById('inventory-other-materials-modal')?.remove();
+
+        _inventoryCategories = await BiblioService.getInventoryCategories(_ctx);
+        const categoriesOptions = _inventoryCategories.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+
+        const modalHtml = `
+            <div class="modal fade" id="inventory-other-materials-modal" tabindex="-1">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content border-0 shadow-lg rounded-4">
+                        <div class="modal-header border-0 pb-0">
+                            <div>
+                                <h6 class="mb-0 text-dark"><i class="bi bi-collection me-2"></i>Otro material</h6>
+                                <div class="small text-muted">Contabiliza revistas, cds, tesis, etc.</div>
+                            </div>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body pt-3">
+                            <div class="d-grid gap-3">
+                                <div>
+                                    <label class="form-label small fw-semibold text-muted mb-1">Categoria / Tipo</label>
+                                    <div class="input-group">
+                                        <select class="form-select" id="inventory-other-category">
+                                            <option value="">Selecciona...</option>
+                                            ${categoriesOptions}
+                                        </select>
+                                        <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown"><i class="bi bi-gear"></i></button>
+                                        <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0">
+                                            <li><a class="dropdown-item py-2" href="#" onclick="event.preventDefault(); AdminBiblio.Inventario.promptCreateInventoryCategory()"><i class="bi bi-plus-circle me-2 text-primary"></i>Nueva categoría</a></li>
+                                            <li><a class="dropdown-item py-2" href="#" onclick="event.preventDefault(); AdminBiblio.Inventario.promptEditInventoryCategory()"><i class="bi bi-pencil me-2 text-secondary"></i>Editar seleccionada</a></li>
+                                            <li><hr class="dropdown-divider"></li>
+                                            <li><a class="dropdown-item py-2 text-danger" href="#" onclick="event.preventDefault(); AdminBiblio.Inventario.promptDeleteInventoryCategory()"><i class="bi bi-trash me-2"></i>Eliminar seleccionada</a></li>
+                                        </ul>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="form-label small fw-semibold text-muted mb-1">Nombre (Opcional)</label>
+                                    <input type="text" class="form-control" id="inventory-other-name" placeholder="Ej. Revista Forbes">
+                                </div>
+                                <div>
+                                    <label class="form-label small fw-semibold text-muted mb-1">Cantidad a sumar</label>
+                                    <input type="number" class="form-control" id="inventory-other-qty" value="1" min="1">
+                                </div>
+                                <button type="button" class="btn btn-primary rounded-pill fw-bold" onclick="AdminBiblio.Inventario.saveInventoryOtherMaterial()">
+                                    Agregar al inventario
+                                </button>
+
+                                <div class="mt-3 pt-3 border-top">
+                                    <div class="small fw-semibold text-muted">Materiales agregados</div>
+                                    <div id="inventory-other-materials-list">
+                                        ${getOtherMaterialsListHtml()}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+        const modalEl = document.getElementById('inventory-other-materials-modal');
+        const modal = new bootstrap.Modal(modalEl);
+        modalEl.addEventListener('shown.bs.modal', () => { syncModalScrollLock(); });
+        modalEl.addEventListener('hidden.bs.modal', () => { modalEl.remove(); syncModalScrollLock(); });
+        syncModalScrollLock();
+        modal.show();
+    }
+
+    async function saveInventoryOtherMaterial() {
+        if (_inventorySaving || !_inventorySession?.id) return;
+
+        const category = document.getElementById('inventory-other-category')?.value?.trim();
+        const name = document.getElementById('inventory-other-name')?.value?.trim();
+        const qty = parseInt(document.getElementById('inventory-other-qty')?.value) || 1;
+
+        if (!category && !name) {
+            showToast('Selecciona una categoria o escribe un nombre.', 'warning');
+            return;
+        }
+
+        const displayName = name ? (category ? `${category}: ${name}` : name) : category;
+
+        try {
+            _inventorySaving = true;
+            const details = await BiblioService.registerInventoryExtraMaterial(_ctx, {
+                sessionId: _inventorySession.id,
+                nombre: displayName,
+                quantity: qty
+            });
+
+            _inventorySession = details?.session || _inventorySession;
+            if (details?.entry) {
+                upsertInventoryFoundEntry(details.entry);
+            }
+            renderInventorySessionContent();
+
+            const nameInput = document.getElementById('inventory-other-name');
+            const qtyInput = document.getElementById('inventory-other-qty');
+            if (nameInput) nameInput.value = '';
+            if (qtyInput) qtyInput.value = '1';
+
+            refreshOtherMaterialsModal();
+            showToast(`${qty} '${displayName}' agregado(s) exitosamente.`, 'success');
+        } catch (error) {
+            showToast(error.message || 'Error al agregar material', 'danger');
+        } finally {
+            _inventorySaving = false;
+        }
+    }
+
+    async function promptCreateInventoryCategory() {
+        const result = await showPromptModal({
+            icon: 'tags',
+            iconColor: '#0d6efd',
+            title: 'Nueva Categoría',
+            message: 'Escribe el nombre de la categoria (ej. Revistas, CD-ROMs, Tesis)',
+            placeholder: 'Nombre de la categoría',
+            confirmText: 'Guardar',
+            confirmClass: 'btn-primary'
+        });
+        if (!result) return;
+        try {
+            _inventoryCategories = await BiblioService.addInventoryCategory(_ctx, result);
+            refreshCategorySelects(result);
+            showToast('Categoria creada y seleccionada', 'success');
+        } catch (error) {
+            showToast(error.message || 'Error al crear categoria', 'danger');
+        }
+    }
+
+    async function promptEditInventoryCategory() {
+        const selectEl = document.getElementById('inventory-other-category');
+        const oldCat = selectEl?.value;
+        if (!oldCat) {
+            showToast('Primero selecciona una categoria para editar.', 'warning');
+            return;
+        }
+
+        const result = await showPromptModal({
+            icon: 'pencil',
+            iconColor: '#6c757d',
+            title: 'Editar Categoría',
+            message: 'Escribe el nuevo nombre para la categoria',
+            value: oldCat,
+            placeholder: 'Nuevo nombre',
+            confirmText: 'Actualizar',
+            confirmClass: 'btn-primary'
+        });
+
+        if (!result || result === oldCat) return;
+
+        try {
+            _inventoryCategories = await BiblioService.editInventoryCategory(_ctx, oldCat, result);
+            refreshCategorySelects(result);
+            showToast('Categoria actualizada exitosamente', 'success');
+        } catch (error) {
+            showToast(error.message || 'Error al editar categoria', 'danger');
+        }
+    }
+
+    async function promptDeleteInventoryCategory() {
+        const selectEl = document.getElementById('inventory-other-category');
+        const cat = selectEl?.value;
+        if (!cat) {
+            showToast('Primero selecciona una categoria para eliminar.', 'warning');
+            return;
+        }
+
+        const confirmed = await showConfirmModal({
+            icon: 'trash',
+            iconColor: '#dc3545',
+            title: 'Eliminar Categoría',
+            message: `¿Estas seguro de que deseas eliminar la categoria <b>${escapeHtml(cat)}</b>? Esto no afectara a los materiales ya guardados en el inventario.`,
+            confirmText: 'Eliminar',
+            confirmClass: 'btn-danger'
+        });
+
+        if (!confirmed) return;
+
+        try {
+            _inventoryCategories = await BiblioService.removeInventoryCategory(_ctx, cat);
+            refreshCategorySelects('');
+            showToast('Categoria eliminada', 'success');
+        } catch (error) {
+            showToast(error.message || 'Error al eliminar categoria', 'danger');
+        }
+    }
+
+    function refreshCategorySelects(selectedValue = '') {
+        const options = _inventoryCategories.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+
+        const selectEl1 = document.getElementById('inventory-unregistered-category');
+        if (selectEl1) {
+            selectEl1.innerHTML = `<option value="">Categoria (Opcional)</option>${options}`;
+            if (selectedValue) selectEl1.value = selectedValue;
+        }
+
+        const selectEl2 = document.getElementById('inventory-other-category');
+        if (selectEl2) {
+            selectEl2.innerHTML = `<option value="">Selecciona...</option>${options}`;
+            if (selectedValue) selectEl2.value = selectedValue;
         }
     }
 
@@ -1913,13 +2164,14 @@ window.AdminBiblio.Inventario = (function () {
         const title = String(document.getElementById('inventory-unregistered-title')?.value || '').trim();
         const author = String(document.getElementById('inventory-unregistered-author')?.value || '').trim();
         const classification = String(document.getElementById('inventory-unregistered-classification')?.value || '').trim();
+        const category = String(document.getElementById('inventory-unregistered-category')?.value || '').trim();
 
         if (!acquisition) {
             showToast('Primero captura el numero de adquisicion.', 'warning');
             return;
         }
         if (!title) {
-            showToast('Escribe el nombre del libro.', 'warning');
+            showToast('Escribe el nombre del documento o libro.', 'warning');
             return;
         }
 
@@ -1937,18 +2189,21 @@ window.AdminBiblio.Inventario = (function () {
                 acquisition,
                 title,
                 author,
-                classification
+                classification,
+                categoria: category
             });
 
+            _inventorySession = details?.session || _inventorySession;
+            if (details?.entry) {
+                upsertInventoryFoundEntry(details.entry);
+            }
             closeInventoryUnregisteredModal();
             clearInventoryDraftUi();
-            await ensureInventoryCatalogSummary(true);
-            await BiblioService.preloadInventoryLookup(_ctx);
             renderInventorySessionContent();
             const searchInput = document.getElementById('inventory-search-input');
-            if (searchInput) searchInput.value = acquisition;
-            await runInventorySearch(false);
-            showToast('Libro agregado al catalogo. Ahora puedes inventariarlo.', 'success');
+            if (searchInput) searchInput.value = '';
+            focusInventorySearchInput();
+            showToast('Registro guardado en inventario. Se agregara al catalogo al ajustar el inventario final.', 'success');
         } catch (error) {
             showToast(error.message || 'No se pudo agregar el libro.', 'danger');
         } finally {
@@ -1989,17 +2244,18 @@ window.AdminBiblio.Inventario = (function () {
     async function searchInventoryCopyBase() {
         const term = document.getElementById('inventory-copy-search-input')?.value?.trim() || '';
         if (!term) {
-            showToast('Escribe el libro base para buscarlo.', 'warning');
+            showToast('Escribe el No. de adquisicion del libro base.', 'warning');
             return;
         }
 
         try {
-            _inventoryCopyLookupResults = await BiblioService.searchCatalogoAdmin(_ctx, term, 6);
+            const match = await BiblioService.findInventoryBookByCode(_ctx, { code: term });
+            _inventoryCopyLookupResults = match ? [match] : [];
             _inventorySelectedCopyBase = null;
             renderInventoryCopyResults();
             renderInventoryCopySelectedBase();
             if (!_inventoryCopyLookupResults.length) {
-                showToast('No se encontraron libros base con esa busqueda.', 'warning');
+                showToast('No se encontro un libro base con esa adquisicion.', 'warning');
             }
         } catch (error) {
             showToast(error.message || 'No se pudo buscar el libro base.', 'danger');
@@ -2030,22 +2286,25 @@ window.AdminBiblio.Inventario = (function () {
         }
 
         try {
-            await BiblioService.registerInventoryAssociatedCopy(_ctx, {
+            const details = await BiblioService.registerInventoryAssociatedCopy(_ctx, {
                 sessionId: _inventorySession.id,
                 acquisition,
                 baseBookId: _inventorySelectedCopyBase.id,
                 quantity: 1
             });
-            await ensureInventoryCatalogSummary(true);
-            await BiblioService.preloadInventoryLookup(_ctx);
-            await refreshInventorySession(true);
+            _inventorySession = details?.session || _inventorySession;
+            if (details?.entry) {
+                upsertInventoryFoundEntry(details.entry);
+            } else {
+                await refreshInventorySession(true);
+            }
             clearInventoryDraftUi();
             const searchInput = document.getElementById('inventory-search-input');
             if (searchInput) {
                 searchInput.value = '';
             }
             focusInventorySearchInput();
-            showToast('La copia fue creada, agrupada y registrada en inventario.', 'success');
+            showToast('Copia agrupada y guardada en inventario. Se agregara al catalogo al ajustar.', 'success');
         } catch (error) {
             showToast(error.message || 'No se pudo asociar la copia.', 'danger');
         }
@@ -2068,18 +2327,11 @@ window.AdminBiblio.Inventario = (function () {
         try {
             _inventorySaving = true;
             renderInventorySelectedCard();
-            let copySyncResult = null;
             if (_inventoryPendingCopyCodes.length > 0) {
-                copySyncResult = await BiblioService.syncInventoryCopyAcquisitions(_ctx, {
+                await BiblioService.syncInventoryCopyAcquisitions(_ctx, {
                     baseBookId: _inventorySelectedBook.id,
                     acquisitions: _inventoryPendingCopyCodes
                 });
-                if (_inventoryCatalogSummary && Number(copySyncResult?.created) > 0) {
-                    _inventoryCatalogSummary = {
-                        ..._inventoryCatalogSummary,
-                        totalCopies: (Number(_inventoryCatalogSummary.totalCopies) || 0) + Number(copySyncResult.created || 0)
-                    };
-                }
             }
 
             const details = await BiblioService.registerInventoryMatch(_ctx, {
@@ -2214,7 +2466,7 @@ window.AdminBiblio.Inventario = (function () {
                 return;
             }
         } catch (error) {
-            console.warn('[BiblioAdmin] Fallo lectura de codigo:', error);
+
         }
 
         queueInventoryScannerLoop();
@@ -2236,13 +2488,621 @@ window.AdminBiblio.Inventario = (function () {
         if (video) video.srcObject = null;
     }
 
+    async function openInventoryHistoryModal() {
+        document.getElementById('inventory-history-modal')?.remove();
+        const modalHtml = `
+            <div class="modal fade" id="inventory-history-modal" tabindex="-1">
+                <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg" style="max-width:min(800px,calc(100vw - 1rem));margin:.5rem auto;">
+                    <div class="modal-content border-0 shadow-lg rounded-4">
+                        <div class="modal-header border-0 bg-dark text-white px-4 py-3">
+                            <div class="d-flex align-items-center gap-2">
+                                <i class="bi bi-clock-history fs-5"></i>
+                                <h5 class="mb-0 fw-bold">Historial de Inventarios</h5>
+                            </div>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body p-3 p-md-4" id="inventory-history-modal-body">
+                            <div class="text-center text-muted py-5"><span class="spinner-border spinner-border-sm me-2"></span>Cargando...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+        const modalEl = document.getElementById('inventory-history-modal');
+        const modal = new bootstrap.Modal(modalEl);
+        modalEl.addEventListener('shown.bs.modal', async () => { syncModalScrollLock(); await _renderInventoryHistoryBody(); }, { once: true });
+        modalEl.addEventListener('hidden.bs.modal', () => { modalEl.remove(); syncModalScrollLock(); }, { once: true });
+        syncModalScrollLock();
+        modal.show();
+    }
+
+    async function _renderInventoryHistoryBody() {
+        const body = document.getElementById('inventory-history-modal-body');
+        if (!body) return;
+        let list = [];
+        try { list = await BiblioService.listInventorySessions(_ctx, { limit: 30 }); } catch (e) { list = []; }
+
+        if (!list.length) {
+            body.innerHTML = `<div class="text-center text-muted py-5"><i class="bi bi-inbox fs-2 d-block mb-2 opacity-50"></i>No hay inventarios registrados.</div>`;
+            return;
+        }
+
+        const statusBadge = (s) => {
+            if (s === 'finished') return '<span class="badge text-bg-secondary rounded-pill">Cerrado</span>';
+            if (s === 'paused') return '<span class="badge text-bg-warning text-dark rounded-pill">Pausado</span>';
+            return '<span class="badge text-bg-success rounded-pill">En curso</span>';
+        };
+
+        body.innerHTML = `<div class="d-grid gap-3">` + list.map((inv) => {
+            const id = escapeHtml(inv.id || '');
+            const nombre = escapeHtml(inv.name || 'Inventario');
+            const fecha = formatInventoryDate(inv.createdAt);
+            const cierre = inv.finishedAt ? formatInventoryDate(inv.finishedAt) : '—';
+            const reg = Number(inv.matchedItems || 0);
+            const obs = Number(inv.totalObserved || 0);
+            const isFinished = inv.status === 'finished';
+            return `
+                <div class="rounded-4 border bg-white shadow-sm p-3">
+                    <div class="d-flex align-items-start justify-content-between gap-3 flex-wrap">
+                        <div class="min-w-0">
+                            <div class="fw-semibold text-dark mb-1">${nombre} ${statusBadge(inv.status || 'active')}</div>
+                            <div class="small text-muted">Iniciado: ${fecha}</div>
+                            ${isFinished ? `<div class="small text-muted">Cerrado: ${cierre}</div>` : ''}
+                            <div class="small text-muted mt-1">
+                                <span class="badge text-bg-light border me-1">${reg} libros registrados</span>
+                                <span class="badge text-bg-light border">${obs} observados</span>
+                            </div>
+                        </div>
+                        <div class="d-flex flex-column gap-2 flex-shrink-0">
+                            <button class="btn btn-sm btn-outline-primary rounded-pill" onclick="AdminBiblio.openInventorySessionReview('${id}')">
+                                <i class="bi bi-eye me-1"></i>Revisar
+                            </button>
+                            ${isFinished ? `
+                            <button class="btn btn-sm btn-outline-dark rounded-pill" onclick="AdminBiblio.openInventoryPdfOptionsModal('${id}')">
+                                <i class="bi bi-file-earmark-pdf me-1"></i>Exportar PDF
+                            </button>
+                            <button class="btn btn-sm btn-outline-warning rounded-pill" onclick="AdminBiblio.confirmReactivateInventory('${id}')">
+                                <i class="bi bi-arrow-counterclockwise me-1"></i>Reactivar
+                            </button>` : ''}
+                        </div>
+                    </div>
+                </div>`;
+        }).join('') + `</div>`;
+    }
+
+    async function openInventorySessionReview(sessionId) {
+        document.getElementById('inventory-history-modal') && bootstrap.Modal.getInstance(document.getElementById('inventory-history-modal'))?.hide();
+        if (!sessionId) return;
+        const body = document.getElementById('modal-admin-body');
+        if (body) body.innerHTML = `<div class="modal-body text-center py-5"><span class="spinner-border spinner-border-sm me-2"></span>Cargando...</div>`;
+        ensureInventoryModalVisibility();
+        try {
+            const details = await BiblioService.getInventorySessionDetails(_ctx, sessionId, { includeLists: true });
+            if (!details?.session) { showToast('No se pudo cargar el inventario.', 'danger'); return; }
+            _inventorySession = details.session;
+            _inventoryFoundEntries = details.foundEntries || [];
+            _inventoryMissingEntries = details.missingEntries || [];
+            _inventoryListsHydrated = true;
+            renderInventorySessionContent();
+            if (details.session.status !== 'finished') focusInventorySearchInput();
+        } catch (e) {
+            showToast(e.message || 'No se pudo abrir el inventario.', 'danger');
+        }
+    }
+
+    function confirmReactivateInventory(sessionId) {
+        if (!sessionId) return;
+        document.getElementById('inventory-reactivate-modal')?.remove();
+        const sid = escapeHtml(String(sessionId));
+        const modalHtml = `
+            <div class="modal fade" id="inventory-reactivate-modal" tabindex="-1">
+                <div class="modal-dialog modal-dialog-centered modal-sm">
+                    <div class="modal-content border-0 shadow-lg rounded-4">
+                        <div class="modal-body p-4 text-center">
+                            <div class="rounded-circle bg-warning-subtle mx-auto mb-3 d-flex align-items-center justify-content-center" style="width:56px;height:56px;">
+                                <i class="bi bi-arrow-counterclockwise fs-3 text-warning"></i>
+                            </div>
+                            <div class="fw-bold text-dark mb-2">¿Reactivar inventario?</div>
+                            <div class="small text-muted mb-4">El inventario se marcara como activo nuevamente. Esta accion requiere doble confirmacion.</div>
+                            <div class="d-grid gap-2">
+                                <button class="btn btn-warning fw-bold rounded-pill" id="inventory-reactivate-confirm-btn" onclick="AdminBiblio.executeReactivateInventory('${sid}')">
+                                    Si, reactivar inventario
+                                </button>
+                                <button class="btn btn-light rounded-pill" data-bs-dismiss="modal">Cancelar</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+        const el = document.getElementById('inventory-reactivate-modal');
+        const m = new bootstrap.Modal(el);
+        el.addEventListener('hidden.bs.modal', () => { el.remove(); syncModalScrollLock(); }, { once: true });
+        syncModalScrollLock();
+        m.show();
+    }
+
+    async function executeReactivateInventory(sessionId) {
+        const btn = document.getElementById('inventory-reactivate-confirm-btn');
+        if (btn) { btn.disabled = true; btn.textContent = 'Reactivando...'; }
+        try {
+            await BiblioService.resumeInventorySession(_ctx, sessionId);
+            const details = await BiblioService.getInventorySessionDetails(_ctx, sessionId, { includeLists: true });
+            _inventorySession = details?.session || null;
+            _inventoryFoundEntries = details?.foundEntries || [];
+            _inventoryMissingEntries = details?.missingEntries || [];
+            _inventoryListsHydrated = true;
+            document.getElementById('inventory-reactivate-modal') && bootstrap.Modal.getInstance(document.getElementById('inventory-reactivate-modal'))?.hide();
+            document.getElementById('inventory-history-modal') && bootstrap.Modal.getInstance(document.getElementById('inventory-history-modal'))?.hide();
+            renderInventorySessionContent();
+            ensureInventoryModalVisibility();
+            showToast('Inventario reactivado.', 'success');
+        } catch (e) {
+            showToast(e.message || 'No se pudo reactivar.', 'danger');
+            if (btn) { btn.disabled = false; btn.textContent = 'Si, reactivar inventario'; }
+        }
+    }
+
+    async function openInventoryPdfOptionsModal(sessionId) {
+        document.getElementById('inventory-pdf-options-modal')?.remove();
+        const sid = escapeHtml(String(sessionId || _inventorySession?.id || ''));
+        const modalHtml = `
+            <div class="modal fade" id="inventory-pdf-options-modal" tabindex="-1">
+                <div class="modal-dialog modal-dialog-centered" style="max-width:min(520px,calc(100vw - 1rem));margin:.5rem auto;">
+                    <div class="modal-content border-0 shadow-lg rounded-4">
+                        <div class="modal-header border-0 pb-0">
+                            <div>
+                                <div class="small text-uppercase fw-bold text-muted mb-1">Exportar</div>
+                                <h5 class="mb-0 text-dark">Opciones del PDF</h5>
+                            </div>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body pt-3">
+                            <p class="small text-muted mb-3">El PDF incluira el resumen formal del inventario, libros por categoria, top 10 por copias, materiales extra y el listado completo de libros al final.</p>
+                            <div class="rounded-4 border bg-light p-3">
+                                <div class="fw-semibold text-dark">Listado completo incluido</div>
+                                <div class="small text-muted">Todos los libros registrados en catalogo durante el inventario se agregaran siempre en las ultimas paginas.</div>
+                            </div>
+                        </div>
+                        <div class="modal-footer border-0">
+                            <button type="button" class="btn btn-light rounded-pill" data-bs-dismiss="modal">Cancelar</button>
+                            <button type="button" class="btn btn-dark rounded-pill fw-bold px-4" id="inventory-pdf-generate-btn" onclick="AdminBiblio.generateInventoryPdf('${sid}')">
+                                <i class="bi bi-file-earmark-pdf me-2"></i>Generar PDF
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+        const el = document.getElementById('inventory-pdf-options-modal');
+        const m = new bootstrap.Modal(el);
+        el.addEventListener('hidden.bs.modal', () => { el.remove(); syncModalScrollLock(); }, { once: true });
+        syncModalScrollLock();
+        m.show();
+    }
+
+    async function generateInventoryPdf(sessionId) {
+        const btn = document.getElementById('inventory-pdf-generate-btn');
+        if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Generando...'; }
+
+        try {
+            if (!window.jspdf?.jsPDF) throw new Error('El exportador PDF no esta disponible.');
+            const sid = String(sessionId || _inventorySession?.id || '');
+            let details = sid ? await BiblioService.getInventorySessionDetails(_ctx, sid, { includeLists: true }) : null;
+            if (!details?.session) details = await BiblioService.getLatestFinishedInventorySession(_ctx, { includeLists: true });
+            if (!details?.session) throw new Error('No hay inventario cerrado para exportar.');
+
+            const foundEntries = details.foundEntries || [];
+            const bookEntries = foundEntries.filter(e => e.type !== 'material');
+            const materialEntries = foundEntries.filter(e => e.type === 'material');
+
+            const countCopies = (entries = []) => entries.reduce((sum, entry) => sum + (Number(entry?.totalObserved || entry?.cantidad || entry?.lastQuantity || 0) || 0), 0);
+            const qtyOf = (entry = {}) => Number(entry.totalObserved || entry.cantidad || entry.lastQuantity || 0) || 0;
+            const fmt = (value) => new Intl.NumberFormat('es-MX').format(Number(value) || 0);
+            const percent = (part, total) => total > 0 ? `${Math.round((part / total) * 1000) / 10}%` : '0%';
+            const clean = (value, fallback = '-') => {
+                const text = String(value || '').replace(/\s+/g, ' ').trim();
+                return text || fallback;
+            };
+            const normalizeKey = (value) => clean(value, 'Sin tipo definido').toLocaleLowerCase('es-MX');
+            const splitMaterial = (entry = {}) => {
+                const raw = clean(entry.titulo || entry.displayName || entry.nombre, 'Sin nombre');
+                const colonIndex = raw.indexOf(':');
+                if (colonIndex >= 0) {
+                    return {
+                        raw,
+                        type: clean(raw.slice(0, colonIndex), 'Sin tipo definido'),
+                        name: clean(raw.slice(colonIndex + 1), 'Sin nombre')
+                    };
+                }
+                return { raw, type: raw, name: '' };
+            };
+
+            const bookCopies = countCopies(bookEntries);
+            const materialCopies = countCopies(materialEntries);
+            const totalProducts = bookCopies + materialCopies;
+            const totalUniqueProducts = bookEntries.length + materialEntries.length;
+
+            const categoryMap = new Map();
+            bookEntries.forEach((entry) => {
+                const label = clean(entry.categoria || entry.categoriaLibro, 'Sin categoria');
+                const key = normalizeKey(label);
+                const current = categoryMap.get(key) || { label, titles: 0, copies: 0 };
+                current.titles += 1;
+                current.copies += qtyOf(entry);
+                categoryMap.set(key, current);
+            });
+            const categoryRows = Array.from(categoryMap.values()).sort((a, b) => b.copies - a.copies || a.label.localeCompare(b.label));
+
+            const topCopyRows = [...bookEntries]
+                .sort((a, b) => qtyOf(b) - qtyOf(a) || clean(a.titulo || a.displayName).localeCompare(clean(b.titulo || b.displayName)))
+                .slice(0, 10);
+
+            const materialTypeMap = new Map();
+            const magazineRows = [];
+            materialEntries.forEach((entry) => {
+                const parts = splitMaterial(entry);
+                const key = normalizeKey(parts.type);
+                const current = materialTypeMap.get(key) || { label: parts.type, records: 0, copies: 0 };
+                current.records += 1;
+                current.copies += qtyOf(entry);
+                materialTypeMap.set(key, current);
+                if (parts.type.toLocaleLowerCase('es-MX').includes('revista')) {
+                    magazineRows.push({ name: parts.name || 'Sin nombre especifico', copies: qtyOf(entry) });
+                }
+            });
+            const materialTypeRows = Array.from(materialTypeMap.values()).sort((a, b) => b.copies - a.copies || a.label.localeCompare(b.label));
+            magazineRows.sort((a, b) => b.copies - a.copies || a.name.localeCompare(b.name));
+
+            const averageCopiesPerBook = bookEntries.length > 0 ? Math.round((bookCopies / bookEntries.length) * 10) / 10 : 0;
+            const strongestCategory = categoryRows[0] || null;
+
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF('p', 'mm', 'letter');
+            const W = doc.internal.pageSize.getWidth();
+            const H = doc.internal.pageSize.getHeight();
+            const M = 16; const CW = W - M * 2;
+            let Y = 16;
+            const primary = [20, 34, 51];
+            const muted = [92, 101, 112];
+            const line = [214, 220, 228];
+            const hasAutoTable = typeof doc.autoTable === 'function';
+            const newPage = () => { doc.addPage(); Y = 18; };
+            const checkY = (n) => { if (Y + n > H - 18) newPage(); };
+            const sectionTitle = (title, subtitle = '') => {
+                checkY(subtitle ? 18 : 11);
+                doc.setDrawColor(...line);
+                doc.line(M, Y, M + CW, Y);
+                Y += 8;
+                doc.setTextColor(...primary);
+                doc.setFont('helvetica', 'bold');
+                doc.setFontSize(13);
+                doc.text(title, M, Y);
+                Y += 5;
+                if (subtitle) {
+                    doc.setTextColor(...muted);
+                    doc.setFont('helvetica', 'normal');
+                    doc.setFontSize(8.5);
+                    const lines = doc.splitTextToSize(subtitle, CW);
+                    doc.text(lines, M, Y);
+                    Y += lines.length * 4 + 2;
+                }
+            };
+            const drawMetric = (label, value, x, y, w, fill) => {
+                doc.setFillColor(...fill);
+                doc.roundedRect(x, y, w, 22, 2.5, 2.5, 'F');
+                doc.setTextColor(...muted);
+                doc.setFont('helvetica', 'bold');
+                doc.setFontSize(7.5);
+                doc.text(String(label).toUpperCase(), x + 4, y + 7);
+                doc.setTextColor(...primary);
+                doc.setFontSize(16);
+                doc.text(String(value), x + 4, y + 17);
+            };
+            const fallbackTable = (columns, rows) => {
+                const colW = CW / columns.length;
+                checkY(10);
+                doc.setFillColor(...primary);
+                doc.rect(M, Y, CW, 8, 'F');
+                doc.setTextColor(255, 255, 255);
+                doc.setFont('helvetica', 'bold');
+                doc.setFontSize(7.5);
+                columns.forEach((col, index) => doc.text(clean(col.header || col, ''), M + 2 + (colW * index), Y + 5));
+                Y += 8;
+                rows.forEach((row, rowIndex) => {
+                    checkY(8);
+                    doc.setFillColor(rowIndex % 2 === 0 ? 248 : 255, rowIndex % 2 === 0 ? 250 : 255, rowIndex % 2 === 0 ? 252 : 255);
+                    doc.rect(M, Y, CW, 7, 'F');
+                    doc.setTextColor(33, 37, 41);
+                    doc.setFont('helvetica', 'normal');
+                    doc.setFontSize(7.2);
+                    columns.forEach((col, index) => {
+                        const key = col.dataKey || col;
+                        doc.text(clean(row[key], '').slice(0, 28), M + 2 + (colW * index), Y + 4.8);
+                    });
+                    Y += 7;
+                });
+                Y += 4;
+            };
+            const table = (columns, rows, options = {}) => {
+                if (!rows.length) return;
+                if (!hasAutoTable) {
+                    fallbackTable(columns, rows);
+                    return;
+                }
+                doc.autoTable({
+                    startY: Y,
+                    margin: { left: M, right: M },
+                    columns,
+                    body: rows,
+                    theme: 'grid',
+                    styles: {
+                        font: 'helvetica',
+                        fontSize: options.fontSize || 8,
+                        cellPadding: 2.4,
+                        overflow: 'linebreak',
+                        lineColor: line,
+                        lineWidth: 0.1,
+                        textColor: [33, 37, 41],
+                        valign: 'middle'
+                    },
+                    headStyles: {
+                        fillColor: primary,
+                        textColor: [255, 255, 255],
+                        fontStyle: 'bold',
+                        fontSize: options.headFontSize || 8
+                    },
+                    alternateRowStyles: { fillColor: [248, 250, 252] },
+                    columnStyles: options.columnStyles || {},
+                    ...options.autoTable
+                });
+                Y = doc.lastAutoTable.finalY + 7;
+            };
+
+            doc.setFillColor(...primary);
+            doc.rect(0, 0, W, 44, 'F');
+            doc.setTextColor(255, 255, 255);
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(19);
+            doc.text('Reporte de Inventario Bibliotecario', M, 17);
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(9);
+            const nombre = clean(details.session.name, 'Inventario');
+            const closedAt = details.session.finishedAt?.toDate?.() || details.session.updatedAt?.toDate?.() || new Date();
+            const generatedAt = new Date();
+            doc.text(nombre, M, 25);
+            doc.text(`Cierre: ${closedAt.toLocaleString('es-MX', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`, M, 32);
+            doc.text(`Generado: ${generatedAt.toLocaleString('es-MX', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`, M, 38);
+            doc.text(`ID inventario: ${clean(details.session.id, 'S/N')}`, W - M, 38, { align: 'right' });
+            Y = 55;
+
+            // METRICAS — calculadas directamente desde las entradas del inventario
+            const cardGap = 5;
+            const cardW = (CW - cardGap * 2) / 3;
+            drawMetric('Productos inventariados', fmt(totalProducts), M, Y, cardW, [232, 246, 239]);
+            drawMetric('Libros', fmt(bookCopies), M + cardW + cardGap, Y, cardW, [235, 242, 252]);
+            drawMetric('Otros materiales', fmt(materialCopies), M + (cardW + cardGap) * 2, Y, cardW, [252, 244, 222]);
+            Y += 29;
+            drawMetric('Registros unicos', fmt(totalUniqueProducts), M, Y, cardW, [244, 246, 248]);
+            drawMetric('Categorias de libros', fmt(categoryRows.length), M + cardW + cardGap, Y, cardW, [244, 246, 248]);
+            drawMetric('Tipos de material', fmt(materialTypeRows.length), M + (cardW + cardGap) * 2, Y, cardW, [244, 246, 248]);
+            Y += 34;
+
+            sectionTitle('Resumen ejecutivo', 'Totales calculados solo con libros encontrados en catalogo y materiales extra registrados. Las capturas no registradas en catalogo no forman parte de este reporte.');
+            table(
+                [
+                    { header: 'Concepto', dataKey: 'concept' },
+                    { header: 'Registros', dataKey: 'records' },
+                    { header: 'Copias / productos', dataKey: 'copies' },
+                    { header: 'Participacion', dataKey: 'share' }
+                ],
+                [
+                    { concept: 'Libros en catalogo', records: fmt(bookEntries.length), copies: fmt(bookCopies), share: percent(bookCopies, totalProducts) },
+                    { concept: 'Otros materiales', records: fmt(materialEntries.length), copies: fmt(materialCopies), share: percent(materialCopies, totalProducts) },
+                    { concept: 'Total inventariado', records: fmt(totalUniqueProducts), copies: fmt(totalProducts), share: '100%' }
+                ],
+                {
+                    columnStyles: {
+                        concept: { cellWidth: 72 },
+                        records: { halign: 'right', cellWidth: 32 },
+                        copies: { halign: 'right', cellWidth: 42 },
+                        share: { halign: 'right', cellWidth: 28 }
+                    }
+                }
+            );
+
+            sectionTitle('Indicadores de lectura rapida');
+            [
+                `Promedio de copias por libro registrado: ${averageCopiesPerBook}`,
+                strongestCategory ? `Categoria con mayor volumen: ${strongestCategory.label} (${fmt(strongestCategory.copies)} copias)` : 'Categoria con mayor volumen: sin datos',
+                magazineRows.length > 0 ? `Revistas desglosadas por nombre: ${fmt(magazineRows.length)} registro(s)` : 'Revistas desglosadas por nombre: sin registros'
+            ].forEach((lineText) => {
+                checkY(6);
+                doc.setTextColor(...primary);
+                doc.setFont('helvetica', 'normal');
+                doc.setFontSize(9);
+                doc.text(`- ${lineText}`, M + 2, Y);
+                Y += 6;
+            });
+            Y += 3;
+
+            if (categoryRows.length > 0) {
+                sectionTitle('Libros por categoria', 'Distribucion de copias inventariadas por categoria del catalogo.');
+                table(
+                    [
+                        { header: 'Categoria', dataKey: 'category' },
+                        { header: 'Titulos', dataKey: 'titles' },
+                        { header: 'Copias', dataKey: 'copies' },
+                        { header: '% libros', dataKey: 'share' }
+                    ],
+                    categoryRows.map(row => ({
+                        category: row.label,
+                        titles: fmt(row.titles),
+                        copies: fmt(row.copies),
+                        share: percent(row.copies, bookCopies)
+                    })),
+                    {
+                        columnStyles: {
+                            category: { cellWidth: 88 },
+                            titles: { halign: 'right', cellWidth: 27 },
+                            copies: { halign: 'right', cellWidth: 29 },
+                            share: { halign: 'right', cellWidth: 30 }
+                        }
+                    }
+                );
+            }
+
+            if (topCopyRows.length > 0) {
+                sectionTitle('Top 10 libros con mas copias registradas');
+                table(
+                    [
+                        { header: '#', dataKey: 'index' },
+                        { header: 'Titulo', dataKey: 'title' },
+                        { header: 'Autor', dataKey: 'author' },
+                        { header: 'Categoria', dataKey: 'category' },
+                        { header: 'Copias', dataKey: 'copies' }
+                    ],
+                    topCopyRows.map((entry, index) => ({
+                        index: String(index + 1),
+                        title: clean(entry.titulo || entry.displayName, 'Sin titulo'),
+                        author: clean(entry.autor, '-'),
+                        category: clean(entry.categoria, 'Sin categoria'),
+                        copies: fmt(qtyOf(entry))
+                    })),
+                    {
+                        fontSize: 7.7,
+                        columnStyles: {
+                            index: { halign: 'center', cellWidth: 11 },
+                            title: { cellWidth: 66 },
+                            author: { cellWidth: 38 },
+                            category: { cellWidth: 38 },
+                            copies: { halign: 'right', cellWidth: 21 }
+                        }
+                    }
+                );
+            }
+
+            if (materialTypeRows.length > 0) {
+                sectionTitle('Otros materiales por tipo', 'Los tipos se toman del texto registrado antes de los dos puntos. Ejemplo: "Revistas: Forbes" se contabiliza como tipo "Revistas".');
+                table(
+                    [
+                        { header: 'Tipo de material', dataKey: 'type' },
+                        { header: 'Registros', dataKey: 'records' },
+                        { header: 'Total', dataKey: 'copies' },
+                        { header: '% materiales', dataKey: 'share' }
+                    ],
+                    materialTypeRows.map(row => ({
+                        type: row.label,
+                        records: fmt(row.records),
+                        copies: fmt(row.copies),
+                        share: percent(row.copies, materialCopies)
+                    })),
+                    {
+                        columnStyles: {
+                            type: { cellWidth: 88 },
+                            records: { halign: 'right', cellWidth: 30 },
+                            copies: { halign: 'right', cellWidth: 28 },
+                            share: { halign: 'right', cellWidth: 28 }
+                        }
+                    }
+                );
+            }
+
+            if (magazineRows.length > 0) {
+                sectionTitle('Desglose de revistas', 'Detalle por nombre registrado despues de los dos puntos.');
+                table(
+                    [
+                        { header: 'Nombre de revista', dataKey: 'name' },
+                        { header: 'Total', dataKey: 'copies' }
+                    ],
+                    magazineRows.map(row => ({
+                        name: row.name,
+                        copies: fmt(row.copies)
+                    })),
+                    {
+                        columnStyles: {
+                            name: { cellWidth: 145 },
+                            copies: { halign: 'right', cellWidth: 29 }
+                        }
+                    }
+                );
+            }
+
+            newPage();
+            sectionTitle('Listado completo de libros', 'Relacion completa de libros encontrados en catalogo durante el inventario. Este listado se incluye siempre.');
+            if (bookEntries.length > 0) {
+                table(
+                    [
+                        { header: '#', dataKey: 'index' },
+                        { header: 'Titulo', dataKey: 'title' },
+                        { header: 'Autor', dataKey: 'author' },
+                        { header: 'Categoria', dataKey: 'category' },
+                        { header: 'Clasificacion', dataKey: 'classification' },
+                        { header: 'Adquisicion', dataKey: 'acquisition' },
+                        { header: 'Copias', dataKey: 'copies' }
+                    ],
+                    [...bookEntries]
+                        .sort((a, b) => clean(a.titulo || a.displayName).localeCompare(clean(b.titulo || b.displayName)))
+                        .map((entry, index) => ({
+                            index: String(index + 1),
+                            title: clean(entry.titulo || entry.displayName, 'Sin titulo'),
+                            author: clean(entry.autor, '-'),
+                            category: clean(entry.categoria, 'Sin categoria'),
+                            classification: clean(entry.clasificacion, '-'),
+                            acquisition: clean(entry.adquisicion || entry.catalogAdquisicion, 'S/N'),
+                            copies: fmt(qtyOf(entry))
+                        })),
+                    {
+                        fontSize: 6.8,
+                        headFontSize: 7,
+                        columnStyles: {
+                            index: { halign: 'right', cellWidth: 9 },
+                            title: { cellWidth: 48 },
+                            author: { cellWidth: 30 },
+                            category: { cellWidth: 27 },
+                            classification: { cellWidth: 24 },
+                            acquisition: { cellWidth: 21 },
+                            copies: { halign: 'right', cellWidth: 15 }
+                        }
+                    }
+                );
+            } else {
+                doc.setTextColor(...muted);
+                doc.setFont('helvetica', 'normal');
+                doc.setFontSize(9);
+                doc.text('No hay libros de catalogo registrados en este inventario.', M, Y);
+                Y += 6;
+            }
+
+            const pageCount = doc.getNumberOfPages();
+            for (let page = 1; page <= pageCount; page += 1) {
+                doc.setPage(page);
+                doc.setDrawColor(...line);
+                doc.line(M, H - 12, W - M, H - 12);
+                doc.setFont('helvetica', 'normal');
+                doc.setFontSize(7);
+                doc.setTextColor(115, 124, 135);
+                doc.text('Reporte de Inventario Bibliotecario', M, H - 7);
+                doc.text(`Pagina ${page} de ${pageCount}`, W - M, H - 7, { align: 'right' });
+            }
+
+            const fileDate = new Date().toISOString().slice(0, 10);
+            doc.save(`inventario-${fileDate}.pdf`);
+            document.getElementById('inventory-pdf-options-modal') && bootstrap.Modal.getInstance(document.getElementById('inventory-pdf-options-modal'))?.hide();
+            showToast('PDF generado exitosamente.', 'success');
+        } catch (err) {
+            showToast(err.message || 'No se pudo generar el PDF.', 'danger');
+            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="bi bi-file-earmark-pdf me-2"></i>Generar PDF'; }
+        }
+    }
+
     const api = {
         abrirModalInventario: withState(abrirModalInventario),
         startInventorySession: withState(startInventorySession),
         pauseInventorySession: withState(pauseInventorySession),
         resumeInventorySession: withState(resumeInventorySession),
         confirmFinalizeInventorySession: withState(confirmFinalizeInventorySession),
-        downloadInventorySummaryPdf: withState(downloadInventorySummaryPdf),
+
         runInventorySearch: withState(runInventorySearch),
         openInventoryReviewModal: withState(openInventoryReviewModal),
         setInventoryReviewPage: withState(setInventoryReviewPage),
@@ -2263,6 +3123,12 @@ window.AdminBiblio.Inventario = (function () {
         clearInventoryFlow: withState(clearInventoryFlow),
         setInventoryUnregisteredMode: withState(setInventoryUnregisteredMode),
         searchInventoryUnregisteredCopyBase: withState(searchInventoryUnregisteredCopyBase),
+        promptCreateInventoryCategory: withState(promptCreateInventoryCategory),
+        promptEditInventoryCategory: withState(promptEditInventoryCategory),
+        promptDeleteInventoryCategory: withState(promptDeleteInventoryCategory),
+        adjustInventoryOtherMaterial: withState(adjustInventoryOtherMaterial),
+        openOtherMaterialsModal: withState(openOtherMaterialsModal),
+        saveInventoryOtherMaterial: withState(saveInventoryOtherMaterial),
         saveInventoryManualBook: withState(saveInventoryManualBook),
         saveInventoryUnregisteredCopy: withState(saveInventoryUnregisteredCopy),
         showInventoryMissingForm: withState(showInventoryMissingForm),
@@ -2273,7 +3139,13 @@ window.AdminBiblio.Inventario = (function () {
         registerInventoryMatch: withState(registerInventoryMatch),
         registerInventoryMissing: withState(registerInventoryMissing),
         toggleInventoryScanner: withState(toggleInventoryScanner),
-        stopInventoryScanner: withState(stopInventoryScanner)
+        stopInventoryScanner: withState(stopInventoryScanner),
+        openInventoryHistoryModal: withState(openInventoryHistoryModal),
+        openInventorySessionReview: withState(openInventorySessionReview),
+        confirmReactivateInventory: withState(confirmReactivateInventory),
+        executeReactivateInventory: withState(executeReactivateInventory),
+        openInventoryPdfOptionsModal: withState(openInventoryPdfOptionsModal),
+        generateInventoryPdf: withState(generateInventoryPdf)
     };
 
     Object.assign(window.AdminBiblio, api);

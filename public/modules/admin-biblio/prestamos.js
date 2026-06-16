@@ -98,7 +98,8 @@ window.AdminBiblio.Prestamos = (function () {
     function selectSlot(...args) { return window.AdminBiblio.selectSlot(...args); }
     function confirmarReserva(...args) { return window.AdminBiblio.confirmarReserva(...args); }
 
-    function abrirModalPrestamo() {
+    function abrirModalPrestamo(bookId = '') {
+        if (typeof bookId !== 'string') bookId = '';
         clearLiveAssetStreams();
         _currentPrestamoData = null;
         const body = document.getElementById('modal-admin-body');
@@ -121,7 +122,7 @@ window.AdminBiblio.Prestamos = (function () {
                         <label class="form-label small fw-bold text-muted"><i class="bi bi-journal-bookmark-fill me-1 text-warning"></i>Libro</label>
                         <div class="input-group">
                             <span class="input-group-text bg-warning bg-opacity-10 border-0"><i class="bi bi-upc-scan text-warning"></i></span>
-                            <input type="text" class="form-control rounded-end fw-bold font-monospace text-center border-0 bg-white shadow-sm" id="prestamo-book" placeholder="Ej: B-001"
+                            <input type="text" class="form-control rounded-end fw-bold font-monospace text-center border-0 bg-white shadow-sm" id="prestamo-book" placeholder="Ej: B-001" value="${bookId}"
                                    onkeyup="if(event.key==='Enter') AdminBiblio.consultarPrestamo()">
                         </div>
                    </div>
@@ -130,7 +131,7 @@ window.AdminBiblio.Prestamos = (function () {
                 
                 <div class="d-grid mb-4">
                     <button class="btn btn-warning rounded-pill border-0 fw-bold shadow-sm py-2" onclick="AdminBiblio.consultarPrestamo()">
-                        <i class="bi bi-search me-2"></i>Verificar Disponibilidad
+                        <i class="bi bi-search me-2"></i>Revisar
                     </button>
                 </div>
 
@@ -301,11 +302,106 @@ window.AdminBiblio.Prestamos = (function () {
         }
     }
 
+    function mostrarInfoLibroMiniModal(bookPayload) {
+        let book;
+        if (typeof bookPayload === 'string') {
+            book = AdminBiblio.decodeItemPayload(bookPayload);
+        } else {
+            book = bookPayload;
+        }
+
+        const titulo = escapeHtml(book.titulo || 'Sin título');
+        const autor = escapeHtml(book.autor || 'Sin autor');
+        const anio = escapeHtml(book.anio || book['año'] || '--');
+        const clasificacion = escapeHtml(book.clasificacion || book.categoria || '--');
+        const adquisicion = escapeHtml(book.adquisicion || 'S/N');
+        const disponibles = book.copiasDisponibles || 0;
+        const totales = book.copiasTotales || 0;
+        
+        let statusHtml = '';
+        if (book.active === false) {
+            statusHtml = `<div class="badge bg-danger rounded-pill px-3 py-2 shadow-sm d-inline-flex align-items-center gap-2"><i class="bi bi-x-circle-fill"></i> Dado de Baja</div>`;
+        } else if (disponibles <= 0) {
+            statusHtml = `<div class="badge bg-warning text-dark rounded-pill px-3 py-2 shadow-sm d-inline-flex align-items-center gap-2"><i class="bi bi-clock-history"></i> Todas las copias prestadas (${totales})</div>`;
+        } else {
+            statusHtml = `<div class="badge bg-success rounded-pill px-3 py-2 shadow-sm d-inline-flex align-items-center gap-2"><i class="bi bi-check-circle-fill"></i> Disponible (${disponibles} de ${totales})</div>`;
+        }
+
+        const modalHtml = `
+            <div class="modal fade" id="mini-book-info-modal" tabindex="-1">
+                <div class="modal-dialog modal-dialog-centered modal-sm">
+                    <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
+                        <div class="modal-header border-0 bg-warning text-dark p-3">
+                            <h6 class="fw-bold mb-0"><i class="bi bi-info-circle-fill me-2"></i>Información del Libro</h6>
+                            <button class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body p-4 text-center">
+                            <div class="bg-warning bg-opacity-10 rounded-circle d-inline-flex align-items-center justify-content-center p-3 mb-3 text-warning">
+                                <i class="bi bi-book-half" style="font-size: 2.5rem;"></i>
+                            </div>
+                            <h5 class="fw-bold text-dark mb-1">${titulo}</h5>
+                            <p class="text-muted small mb-3">${autor}</p>
+                            
+                            <div class="bg-light rounded-3 p-3 text-start mb-3 small">
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span class="text-muted fw-bold">Año</span>
+                                    <span class="fw-bold text-dark">${anio}</span>
+                                </div>
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span class="text-muted fw-bold">Clasificación</span>
+                                    <span class="fw-bold text-dark">${clasificacion}</span>
+                                </div>
+                                <div class="d-flex justify-content-between">
+                                    <span class="text-muted fw-bold">No. Adq.</span>
+                                    <span class="fw-bold text-dark">${adquisicion}</span>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-4">
+                                ${statusHtml}
+                            </div>
+                            
+                            <button class="btn btn-warning w-100 rounded-pill fw-bold shadow-sm py-2" onclick="AdminBiblio.abrirModalPrestamo('${book.id}'); bootstrap.Modal.getInstance(document.getElementById('mini-book-info-modal')).hide();">
+                                <i class="bi bi-box-arrow-up-right me-2"></i>Ir a Prestar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // Remove old if exists
+        const oldModal = document.getElementById('mini-book-info-modal');
+        if (oldModal) {
+            const m = bootstrap.Modal.getInstance(oldModal);
+            if (m) m.dispose();
+            oldModal.remove();
+        }
+
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+        const modalEl = document.getElementById('mini-book-info-modal');
+        const modal = new bootstrap.Modal(modalEl);
+        
+        modalEl.addEventListener('hidden.bs.modal', () => {
+            modalEl.remove();
+            if (document.querySelector('.modal.show')) {
+                document.body.classList.add('modal-open');
+            } else {
+                document.body.classList.remove('modal-open');
+                document.body.style.removeProperty('overflow');
+                document.body.style.removeProperty('padding-right');
+            }
+        }, { once: true });
+        
+        modal.show();
+    }
+
     // --- 3. MODAL DEVOLVER LIBRO ---
 
     return {
         abrirModalPrestamo: withState(abrirModalPrestamo),
         consultarPrestamo: withState(consultarPrestamo),
-        confirmarPrestamo: withState(confirmarPrestamo)
+        confirmarPrestamo: withState(confirmarPrestamo),
+        mostrarInfoLibroMiniModal: withState(mostrarInfoLibroMiniModal)
     };
 })();

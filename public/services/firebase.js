@@ -22,6 +22,7 @@
   const QA_CONTEXT_STORAGE_KEY = 'sia_superadmin_context';
   const QA_ACTOR_STORAGE_KEY = 'sia_superadmin_actor_map';
   const TEMP_EXTRADATA_STORAGE_KEY = 'sia_temp_extradata';
+  const MICROSOFT_REDIRECT_STORAGE_KEY = 'sia_auth_redirect_provider';
   const MICROSOFT_TENANT_ID = 'e5da4e41-4181-4acd-a7e9-3c954a086c06';
   const QA_SECRET_LOGIN_ROUTE = '';
   const QA_SECRET_LOGIN_EMAIL = '';
@@ -82,6 +83,126 @@
 
   function normalizeMatricula(value) {
     return String(value || '').trim().toUpperCase();
+  }
+
+  function createMicrosoftProvider() {
+    const provider = new firebase.auth.OAuthProvider('microsoft.com');
+    provider.setCustomParameters({
+      tenant: MICROSOFT_TENANT_ID,
+      prompt: 'select_account'
+    });
+    return provider;
+  }
+
+  function isAppleTouchBrowser() {
+    const nav = global.navigator || {};
+    const ua = String(nav.userAgent || '');
+    const platform = String(nav.platform || '');
+    return /iPad|iPhone|iPod/i.test(ua) || (platform === 'MacIntel' && Number(nav.maxTouchPoints || 0) > 1);
+  }
+
+  function shouldUseMicrosoftRedirectFlow() {
+    return false; // Desactivado para forzar Popup en todos los dispositivos y evitar errores de ITP
+  }
+
+  function markPendingMicrosoftRedirect() {
+    try {
+      sessionStorage.setItem(MICROSOFT_REDIRECT_STORAGE_KEY, 'microsoft');
+    } catch (_) { /* silencioso */ }
+  }
+
+  function clearPendingMicrosoftRedirect() {
+    try {
+      sessionStorage.removeItem(MICROSOFT_REDIRECT_STORAGE_KEY);
+    } catch (_) { /* silencioso */ }
+  }
+
+  function hasPendingMicrosoftRedirect() {
+    try {
+      return sessionStorage.getItem(MICROSOFT_REDIRECT_STORAGE_KEY) === 'microsoft';
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function clearMicrosoftAuthScratch() {
+    try {
+      localStorage.removeItem(TEMP_EXTRADATA_STORAGE_KEY);
+    } catch (_) { /* silencioso */ }
+
+    try {
+      for (let i = sessionStorage.length - 1; i >= 0; i--) {
+        const key = sessionStorage.key(i);
+        if (key && (key.includes('firebase:pendingRedirect') || key.includes('firebaseui'))) {
+          sessionStorage.removeItem(key);
+        }
+      }
+    } catch (_) { /* silencioso */ }
+  }
+
+  function normalizeMicrosoftAuthError(error) {
+    if (String(error?.message || '').toLowerCase().includes('unauthorized_client')) {
+      error.code = error.code || 'auth/microsoft-consumer-not-enabled';
+    } else if (String(error?.message || '').includes('AADSTS50194')) {
+      error.code = error.code || 'auth/microsoft-single-tenant-requires-tenant';
+    }
+    return error;
+  }
+
+  async function buildMicrosoftLoginResult(result) {
+    if (!result?.user) return null;
+
+    const profile = result.additionalUserInfo?.profile || {};
+    const microsoftProviderEmail = Array.isArray(result.user?.providerData)
+      ? String(
+        result.user.providerData.find((provider) => provider?.providerId === 'microsoft.com')?.email
+        || ''
+      ).trim()
+      : '';
+
+    const email = profile.mail || profile.userPrincipalName || microsoftProviderEmail || result.user.email || '';
+    if (!isAllowedMicrosoftLoginEmail(email)) {
+      clearPendingMicrosoftRedirect();
+      try { await auth.signOut(); } catch (_) { /* silencioso */ }
+      const deniedError = new Error('Solo se permite acceso con correo institucional.');
+      deniedError.code = 'auth/email-not-allowed';
+      deniedError.email = email;
+      throw deniedError;
+    }
+
+    const extradata = {
+      authUid: result.user.uid,
+      nombre: profile.displayName || profile.givenName || result.user.displayName || '',
+      matricula: email ? email.split('@')[0] : '',
+      emailInstitucional: email,
+      originalJobTitle: profile.jobTitle || 'Alumno',
+      role: mapJobTitleToRole(profile.jobTitle)
+    };
+
+    try {
+      localStorage.setItem(TEMP_EXTRADATA_STORAGE_KEY, JSON.stringify(extradata));
+    } catch (_) { /* silencioso */ }
+
+    clearPendingMicrosoftRedirect();
+    return { user: result.user, extradata };
+  }
+
+  let microsoftRedirectResultPromise = null;
+  async function consumeMicrosoftRedirectResult() {
+    if (!microsoftRedirectResultPromise) {
+      microsoftRedirectResultPromise = auth.getRedirectResult()
+        .then(async (result) => {
+          if (!result?.user && hasPendingMicrosoftRedirect()) {
+            clearPendingMicrosoftRedirect();
+          }
+          return buildMicrosoftLoginResult(result);
+        })
+        .catch((error) => {
+          clearPendingMicrosoftRedirect();
+          throw normalizeMicrosoftAuthError(error);
+        });
+    }
+    return microsoftRedirectResultPromise;
   }
 
   // 2. Persistencia
@@ -650,7 +771,7 @@
       const parsed = JSON.parse(raw);
       return parsed && typeof parsed === 'object' ? parsed : {};
     } catch (error) {
-      console.warn('[SIA] No se pudo leer el mapa de actores QA:', error);
+
       return {};
     }
   }
@@ -664,7 +785,7 @@
         localStorage.setItem(QA_ACTOR_STORAGE_KEY, JSON.stringify(safeMap));
       }
     } catch (error) {
-      console.warn('[SIA] No se pudo guardar el mapa de actores QA:', error);
+
     }
   }
 
@@ -710,7 +831,7 @@
       if (!key) localStorage.removeItem(QA_CONTEXT_STORAGE_KEY);
       else localStorage.setItem(QA_CONTEXT_STORAGE_KEY, String(key));
     } catch (error) {
-      console.warn('[SIA] No se pudo actualizar el contexto QA:', error);
+
     }
   }
 
@@ -951,8 +1072,14 @@
     }
 
     const permissions = profile?.permissions || {};
+    // [FIX] Only grant Admin Workspace if the permission is an actual administrative role,
+    // not just any truthy value (e.g. avoiding 'estudiante' or 'user' granting admin shell).
+    const adminRoles = ['admin', 'superadmin', 'medico', 'psicologo', 'bibliotecario', 'docente'];
     return ['medi', 'biblio', 'foro', 'comunidad', 'cafeteria', 'lactario', 'quejas', 'encuestas', 'reportes', 'vocacional', 'avisos']
-      .some((key) => permissionIsTruthy(permissions[key]));
+      .some((key) => {
+        const val = normalizeRoleText(permissions[key]);
+        return adminRoles.includes(val) || val === 'true' || val === '1';
+      });
   }
 
   function canAccessView(profile, viewId) {
@@ -1154,7 +1281,7 @@
 
     try {
       await db.collection('usuarios').doc(profileData.uid).set(dataToSave, { merge: true });
-      console.log("✅ Perfil guardado exitosamente:", profileData.uid);
+
       return dataToSave;
     } catch (e) {
       console.error("❌ Error guardando perfil:", e);
@@ -1166,76 +1293,35 @@
    * Login con Microsoft (Azure AD Institucional)
    */
   async function loginWithMicrosoft() {
-    const provider = new firebase.auth.OAuthProvider('microsoft.com');
-    provider.setCustomParameters({
-      tenant: MICROSOFT_TENANT_ID,
-      prompt: 'select_account'
-    });
+    const provider = createMicrosoftProvider();
+    const useRedirectFlow = shouldUseMicrosoftRedirectFlow();
 
     // Limpiar estado residual de popups anteriores.
-    // Después de logout + page reload no hay currentUser, así que signOut()
-    // es un no-op seguro que limpia handlers internos de Firebase.
-    // Sin esto, cambiar entre tipos de cuenta causa popup-closed-by-user.
+    // Ejecutamos signOut de forma asíncrona (sin await) para NO perder
+    // la sincronía del evento de clic del usuario, lo cual evitará
+    // que navegadores como Safari bloqueen el popup (auth/popup-blocked).
     try {
-      if (!auth.currentUser) {
-        await auth.signOut();
+      if (!auth.currentUser && !useRedirectFlow) {
+        auth.signOut().catch(() => {});
       }
     } catch (_) { /* silencioso */ }
 
-    try {
-      localStorage.removeItem(TEMP_EXTRADATA_STORAGE_KEY);
-    } catch (_) { /* silencioso */ }
+    clearMicrosoftAuthScratch();
 
-    // Limpiar items de sessionStorage que Firebase usa para rastrear popups pendientes
     try {
-      for (let i = sessionStorage.length - 1; i >= 0; i--) {
-        const key = sessionStorage.key(i);
-        if (key && (key.includes('firebase:pendingRedirect') || key.includes('firebaseui'))) {
-          sessionStorage.removeItem(key);
-        }
+      if (useRedirectFlow) {
+        markPendingMicrosoftRedirect();
+        await auth.signInWithRedirect(provider);
+        return { redirectStarted: true };
       }
-    } catch (_) { /* silencioso */ }
 
-    try {
       const result = await auth.signInWithPopup(provider);
-      const profile = result.additionalUserInfo.profile;
-      const microsoftProviderEmail = Array.isArray(result.user?.providerData)
-        ? String(
-          result.user.providerData.find((provider) => provider?.providerId === 'microsoft.com')?.email
-          || ''
-        ).trim()
-        : '';
-
-      const email = profile.mail || profile.userPrincipalName || microsoftProviderEmail || result.user.email || '';
-      if (!isAllowedMicrosoftLoginEmail(email)) {
-        try { await auth.signOut(); } catch (_) { /* silencioso */ }
-        const deniedError = new Error('Solo se permite acceso con correo institucional.');
-        deniedError.code = 'auth/email-not-allowed';
-        deniedError.email = email;
-        throw deniedError;
-      }
-      const extradata = {
-        authUid: result.user.uid,
-        nombre: profile.displayName || profile.givenName || '',
-        matricula: email ? email.split('@')[0] : '',
-        emailInstitucional: email,
-        originalJobTitle: profile.jobTitle || 'Alumno',
-        role: mapJobTitleToRole(profile.jobTitle)
-      };
-
-      try {
-        localStorage.setItem(TEMP_EXTRADATA_STORAGE_KEY, JSON.stringify(extradata));
-      } catch (_) { /* silencioso */ }
-
-      return { user: result.user, extradata };
+      return buildMicrosoftLoginResult(result);
     } catch (error) {
-      if (String(error?.message || '').toLowerCase().includes('unauthorized_client')) {
-        error.code = error.code || 'auth/microsoft-consumer-not-enabled';
-      } else if (String(error?.message || '').includes('AADSTS50194')) {
-        error.code = error.code || 'auth/microsoft-single-tenant-requires-tenant';
-      }
-      console.error("Error Microsoft Auth:", error);
-      throw error;
+      clearPendingMicrosoftRedirect();
+      const normalizedError = normalizeMicrosoftAuthError(error);
+      console.error("Error Microsoft Auth:", normalizedError);
+      throw normalizedError;
     }
   }
 
@@ -1289,6 +1375,9 @@
     checkInstitutionalEmail,
     registerUser,
     loginWithMicrosoft,
+    consumeMicrosoftRedirectResult,
+    hasPendingMicrosoftRedirect,
+    shouldUseMicrosoftRedirectFlow,
     loginWithEmailPassword,
     loginQaSecret,
     findUserByInstitutionalEmail,

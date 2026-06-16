@@ -408,7 +408,7 @@ if (!window.QuejasService) {
                     try {
                         await migrateLegacyTicket(ctx, ticket.id, ticket);
                     } catch (error) {
-                        console.warn('[QuejasService] No se pudo migrar ticket legacy:', ticket.id, error);
+
                     }
                 }
             }
@@ -437,7 +437,7 @@ if (!window.QuejasService) {
                             try {
                                 await migrateLegacyTicket(ctx, doc.id, data);
                             } catch (error) {
-                                console.warn('[QuejasService] No se pudo migrar ticket legacy en barrido:', doc.id, error);
+
                             }
                         }
                     }

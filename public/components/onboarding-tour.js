@@ -391,7 +391,7 @@ class SiaOnboardingTour extends HTMLElement {
                 localStorage.setItem(`sia_tutorial_done_${SIA_TOUR_VERSION}_${uid}`, 'true');
             }
         } catch (e) {
-            console.warn("Could not save tour completion to DB", e);
+
             try {
                 const uid = window.Store?.userProfile?.uid
                     || window.SIA?.currentUserProfile?.uid

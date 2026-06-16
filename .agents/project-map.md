@@ -7,7 +7,14 @@
 
 ---
 
-## 0. AI Agent Constraints & Global Rules (CRITICAL)
+## 0. Guía Rápida para Agentes y Reglas de Contexto (CRÍTICO)
+¡HOLA AGENTE! Si estás leyendo esto para orientarte, debes adherirte a las siguientes normas:
+1. **Eficiencia en Búsqueda:** Usa este documento para ubicar dónde está un módulo. Observa los apartados "Module Inventory" y "Service Inventory" antes de usar `grep_search` masivamente a ciegas.
+2. **Cumplir la Regla de las 3 Revisadas:** Cualquier cambio que hagas en el repositorio basándote en este mapa debe ser revisado 3 veces para evitar romper dependencias cruzadas.
+3. **Planificación:** Nunca toques código listado aquí sin antes armar tu `implementation_plan.md`.
+4. **Actualiza el Mapa:** Si al usar el flujo de `nueva_implementacion.md` agregas un módulo, componente o servicio nuevo, tu trabajo incluye agregar esa entrada a este mismo documento.
+
+## 0.1 AI Agent Constraints & Global Rules (CRITICAL)
 - **Do NOT create temporary files or browser profiles** (e.g., `chrome-*`, `.playwright-mcp`, `.tmp-edge-profile`) in the project directory.
 - **Do NOT use the `browser_subagent` tool, Puppeteer, or Playwright** to open the browser unless explicitly requested by the user.
 - **Do NOT use the `generate_image` tool** to create PNGs unless explicitly requested to create mockups or assets.

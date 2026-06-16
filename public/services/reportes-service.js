@@ -469,7 +469,7 @@ window.ReportesService = (function () {
                     cacheUserLookupEntry(doc.id, lookup, fetchedAt);
                 });
             } catch (e) {
-                console.warn('[ReportesService] Error fetching users batch:', e);
+
             }
         }
 
@@ -586,7 +586,7 @@ window.ReportesService = (function () {
                     cachedStats = cacheSnap.data()?.stats || null;
                 }
             } catch (e) {
-                console.warn('[ReportesService] No se pudo leer cache vocacional:', e);
+
             }
 
             if (cachedStats) {
@@ -615,7 +615,7 @@ window.ReportesService = (function () {
                     ofertaEducativa: []
                 };
             } catch (e) {
-                console.warn('[ReportesService] No se pudieron calcular estadisticas vocacionales en vivo:', e);
+
                 return null;
             }
         });
@@ -637,7 +637,7 @@ window.ReportesService = (function () {
                 try {
                     return await loader();
                 } catch (e) {
-                    console.warn(`[ReportesService] Error loading landing KPI (${label}):`, e);
+
                     return null;
                 }
             };
@@ -723,7 +723,7 @@ window.ReportesService = (function () {
                     };
                 });
             } catch (e) {
-                console.warn('[ReportesService] Error fetching biblio-visitas:', e);
+
                 return [];
             }
         });
@@ -792,7 +792,7 @@ window.ReportesService = (function () {
                 };
             });
         } catch (e) {
-            console.warn('[ReportesService] Error fetching prestamos-biblio:', e);
+
             return [];
         }
         });
@@ -855,12 +855,12 @@ window.ReportesService = (function () {
             try {
                 await _enrichWithConsultaDetails(ctx, results);
             } catch (enrichErr) {
-                console.warn('[ReportesService] No se pudieron enriquecer diagnósticos (índice faltante?):', enrichErr.message);
+
             }
 
             return results;
         } catch (e) {
-            console.warn('[ReportesService] Error fetching citas-medi:', e);
+
             return [];
         }
         });
@@ -986,7 +986,7 @@ window.ReportesService = (function () {
         if (!ctx.db) throw new Error("Firestore no inicializado");
 
         const minimalData = await getFromMemoryCache('poblacion-full', CACHE_TTL_POBLACION, async () => {
-            console.log('[SIA] Reconstruyendo cache de poblacion en memoria...');
+
             try {
                 const snapshot = await ctx.db.collection('usuarios').get();
                 return snapshot.docs.map(buildPoblacionRecord);
@@ -1139,16 +1139,16 @@ window.ReportesService = (function () {
             if (localCache && localMeta) {
                 const meta = JSON.parse(localMeta);
                 if (now - meta.updatedAt < TTL) {
-                    console.log(`[ReportesService] Catálogo cargado de caché local. Reads: 0`);
+
                     return JSON.parse(localCache);
                 }
             }
         } catch (e) {
-            console.warn('[ReportesService] Error leyendo caché local del catálogo', e);
+
         }
 
         try {
-            console.log(`[ReportesService] Descargando catálogo completo de BD...`);
+
             const snap = await ctx.db.collection('biblio-catalogo').get();
             const data = snap.docs.map(doc => {
                 const d = doc.data();
@@ -1166,11 +1166,11 @@ window.ReportesService = (function () {
                 localStorage.setItem(cacheKey, JSON.stringify(data));
                 localStorage.setItem(metaKey, JSON.stringify({ updatedAt: now }));
             } catch (sf) {
-                console.warn('[ReportesService] No se pudo guardar caché local del catálogo', sf);
+
             }
             return data;
         } catch (e) {
-            console.warn('[ReportesService] Error fetching biblio-catalogo:', e);
+
             return [];
         }
     }
@@ -1216,7 +1216,7 @@ window.ReportesService = (function () {
             } catch (sf) { }
             return data;
         } catch (e) {
-            console.warn('[ReportesService] Error fetching biblio-activos:', e);
+
             return [];
         }
     }
@@ -1229,7 +1229,7 @@ window.ReportesService = (function () {
     async function fetchExpedientesStats(ctx) {
         return getFromMemoryCache('expedientes-stats', CACHE_TTL_EXPEDIENTES, async () => {
             try {
-                console.log('[ReportesService] Descargando expedientes completos de BD...');
+
                 const snap = await ctx.db.collection('expedientes-clinicos').get();
                 return snap.docs.map(doc => {
                     const d = doc.data() || {};
@@ -1246,7 +1246,7 @@ window.ReportesService = (function () {
                     };
                 });
             } catch (e) {
-                console.warn('[ReportesService] Error fetching expedientes-clinicos:', e);
+
                 return [];
             }
         });

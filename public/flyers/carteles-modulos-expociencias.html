@@ -1,0 +1,1274 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Carteles 1:1 | M&oacute;dulos SIA Expociencias</title>
+  <style>
+    :root {
+      --ink: #10213f;
+      --muted: #62708b;
+      --paper: #f7f9fc;
+      --white: #ffffff;
+      --line: rgba(16, 33, 63, 0.12);
+      --shadow: 0 34px 80px rgba(16, 33, 63, 0.18);
+    }
+
+    * { box-sizing: border-box; }
+
+    @page {
+      size: 1080px 1080px;
+      margin: 0;
+    }
+
+    html,
+    body {
+      margin: 0;
+      min-height: 100%;
+      background: #e9edf4;
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    body {
+      display: grid;
+      gap: 28px;
+      justify-items: center;
+      padding: 28px;
+    }
+
+    .toolbar {
+      width: min(1080px, 100%);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 14px;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.88);
+      box-shadow: 0 12px 30px rgba(16, 33, 63, 0.08);
+    }
+
+    .toolbar strong {
+      font-size: 14px;
+      letter-spacing: 0.02em;
+    }
+
+    .toolbar nav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .toolbar a {
+      color: var(--ink);
+      text-decoration: none;
+      font-size: 12px;
+      font-weight: 800;
+      padding: 8px 11px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: #fff;
+    }
+
+    .poster {
+      position: relative;
+      width: 1080px;
+      height: 1080px;
+      overflow: hidden;
+      border-radius: 38px;
+      background: var(--paper);
+      box-shadow: var(--shadow);
+      isolation: isolate;
+    }
+
+    .poster::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      z-index: 0;
+      background:
+        linear-gradient(90deg, rgba(255,255,255,0.16) 1px, transparent 1px),
+        linear-gradient(rgba(255,255,255,0.16) 1px, transparent 1px);
+      background-size: 52px 52px;
+      opacity: 0.28;
+      mask-image: linear-gradient(135deg, rgba(0,0,0,0.72), transparent 78%);
+      pointer-events: none;
+    }
+
+    .poster::after {
+      content: "";
+      position: absolute;
+      width: 390px;
+      height: 390px;
+      right: -140px;
+      bottom: -150px;
+      border-radius: 44px;
+      transform: rotate(18deg);
+      background: rgba(255, 255, 255, 0.22);
+      border: 1px solid rgba(255, 255, 255, 0.24);
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    .poster-inner {
+      position: relative;
+      z-index: 1;
+      height: 100%;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      gap: 28px;
+      padding: 54px 62px;
+    }
+
+    .poster-header,
+    .poster-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 22px;
+    }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 14px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.78);
+      border: 1px solid rgba(255,255,255,0.72);
+      box-shadow: 0 12px 26px rgba(16, 33, 63, 0.08);
+    }
+
+    .brand img {
+      display: block;
+      object-fit: contain;
+    }
+
+    .brand .sia-logo {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: #fff;
+      padding: 5px;
+    }
+
+    .brand .tecnm-logo {
+      height: 25px;
+      width: auto;
+    }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 38px;
+      padding: 9px 13px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.72);
+      color: var(--ink);
+      border: 1px solid rgba(255,255,255,0.68);
+      font-size: 12px;
+      font-weight: 900;
+      letter-spacing: 0.13em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    .tag::before {
+      content: "";
+      width: 9px;
+      height: 9px;
+      border-radius: 999px;
+      background: var(--accent);
+      box-shadow: 0 0 0 5px color-mix(in srgb, var(--accent), transparent 78%);
+    }
+
+    .content {
+      display: grid;
+      grid-template-columns: minmax(0, 0.94fr) minmax(360px, 0.86fr);
+      gap: 42px;
+      align-items: center;
+    }
+
+    .copy {
+      min-width: 0;
+    }
+
+    .kicker {
+      display: inline-flex;
+      margin-bottom: 22px;
+      padding: 9px 13px;
+      border-radius: 999px;
+      color: var(--accent);
+      background: rgba(255,255,255,0.72);
+      border: 1px solid rgba(255,255,255,0.76);
+      font-size: 13px;
+      font-weight: 900;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0;
+      max-width: 520px;
+      font-size: 78px;
+      line-height: 0.92;
+      letter-spacing: 0;
+      color: var(--title, var(--ink));
+    }
+
+    .lead {
+      margin: 24px 0 0;
+      max-width: 510px;
+      color: var(--body, var(--muted));
+      font-size: 25px;
+      line-height: 1.3;
+      font-weight: 650;
+    }
+
+    .points {
+      display: grid;
+      gap: 12px;
+      margin: 34px 0 0;
+      padding: 0;
+      list-style: none;
+      max-width: 530px;
+    }
+
+    .points li {
+      display: grid;
+      grid-template-columns: 38px 1fr;
+      gap: 13px;
+      align-items: center;
+      min-height: 58px;
+      padding: 12px 15px;
+      border-radius: 18px;
+      background: rgba(255,255,255,0.72);
+      border: 1px solid rgba(255,255,255,0.74);
+      box-shadow: 0 14px 26px rgba(16, 33, 63, 0.07);
+      color: var(--ink);
+      font-size: 19px;
+      line-height: 1.18;
+      font-weight: 780;
+    }
+
+    .points span {
+      width: 38px;
+      height: 38px;
+      display: grid;
+      place-items: center;
+      border-radius: 13px;
+      background: color-mix(in srgb, var(--accent), white 82%);
+      color: var(--accent);
+      font-size: 16px;
+      font-weight: 950;
+    }
+
+    .visual {
+      position: relative;
+      display: grid;
+      justify-items: center;
+      align-items: center;
+      min-height: 720px;
+    }
+
+    .phone {
+      position: relative;
+      width: 382px;
+      height: 770px;
+      padding: 12px;
+      border-radius: 45px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.88), rgba(255,255,255,0.58));
+      border: 1px solid rgba(255,255,255,0.86);
+      box-shadow: 0 36px 70px rgba(16, 33, 63, 0.25);
+      transform: rotate(2deg);
+      overflow: hidden;
+    }
+
+    .phone::before {
+      content: "";
+      position: absolute;
+      top: 14px;
+      left: 50%;
+      width: 92px;
+      height: 18px;
+      transform: translateX(-50%);
+      border-radius: 999px;
+      background: rgba(16, 33, 63, 0.16);
+      z-index: 3;
+    }
+
+    .phone img,
+    .mock-screen {
+      width: 100%;
+      height: 100%;
+      display: block;
+      object-fit: cover;
+      object-position: top center;
+      border-radius: 34px;
+      background: #f7f8fb;
+    }
+
+    .floating-card {
+      position: absolute;
+      left: -18px;
+      bottom: 66px;
+      width: 230px;
+      padding: 16px 18px;
+      border-radius: 22px;
+      background: rgba(255,255,255,0.9);
+      border: 1px solid rgba(255,255,255,0.78);
+      box-shadow: 0 24px 42px rgba(16, 33, 63, 0.18);
+    }
+
+    .floating-card strong {
+      display: block;
+      margin-bottom: 4px;
+      color: var(--accent);
+      font-size: 14px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .floating-card span {
+      display: block;
+      color: var(--ink);
+      font-size: 18px;
+      line-height: 1.18;
+      font-weight: 850;
+    }
+
+    .poster-footer {
+      color: rgba(16, 33, 63, 0.62);
+      font-size: 15px;
+      font-weight: 850;
+      letter-spacing: 0.09em;
+      text-transform: uppercase;
+    }
+
+    .module-mark {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--accent);
+    }
+
+    .module-mark::before {
+      content: "";
+      width: 13px;
+      height: 13px;
+      border-radius: 4px;
+      background: var(--accent);
+      transform: rotate(45deg);
+    }
+
+    .poster--medi {
+      --accent: #0d7ef2;
+      --title: #083466;
+      --body: #405a7a;
+      background:
+        radial-gradient(circle at 82% 18%, rgba(31, 198, 255, 0.28), transparent 29%),
+        linear-gradient(135deg, #eaf6ff 0%, #f8fbff 48%, #fff1f2 100%);
+    }
+
+    .poster--landing {
+      --accent: #123a66;
+      --title: #081a31;
+      --body: #40566f;
+      background:
+        radial-gradient(circle at 82% 18%, rgba(38, 90, 130, 0.22), transparent 29%),
+        linear-gradient(135deg, #e9f6f9 0%, #f7fbff 46%, #eef3f7 100%);
+    }
+
+    .poster--aspirantes {
+      --accent: #b5124d;
+      --title: #171f3a;
+      --body: #5f6172;
+      background:
+        radial-gradient(circle at 82% 18%, rgba(181, 18, 77, 0.2), transparent 29%),
+        linear-gradient(135deg, #fff0f5 0%, #fffafd 45%, #eef8ff 100%);
+    }
+
+    .poster--vocacional {
+      --accent: #7c3aed;
+      --title: #1d2360;
+      --body: #59607b;
+      background:
+        radial-gradient(circle at 82% 18%, rgba(124, 58, 237, 0.22), transparent 29%),
+        linear-gradient(135deg, #f4f0ff 0%, #fbfaff 48%, #eaf9f6 100%);
+    }
+
+    .poster--biblio {
+      --accent: #0f8a7f;
+      --title: #10385e;
+      --body: #486075;
+      background:
+        radial-gradient(circle at 85% 22%, rgba(16, 185, 129, 0.22), transparent 30%),
+        linear-gradient(135deg, #e6fbf6 0%, #f8fffd 56%, #edf6ff 100%);
+    }
+
+    .poster--aula {
+      --accent: #573cf2;
+      --title: #1b2e6f;
+      --body: #4c5c83;
+      background:
+        radial-gradient(circle at 84% 22%, rgba(114, 86, 255, 0.22), transparent 29%),
+        linear-gradient(135deg, #f1efff 0%, #fbfcff 50%, #edf5ff 100%);
+    }
+
+    .poster--eventos {
+      --accent: #0e88b6;
+      --title: #12345f;
+      --body: #4c6179;
+      background:
+        radial-gradient(circle at 82% 20%, rgba(14, 136, 182, 0.24), transparent 29%),
+        linear-gradient(135deg, #e9f8ff 0%, #fbfdff 50%, #f2f4ff 100%);
+    }
+
+    .poster--cafeteria {
+      --accent: #f97316;
+      --title: #11315c;
+      --body: #5a6071;
+      background:
+        radial-gradient(circle at 84% 20%, rgba(249, 115, 22, 0.26), transparent 28%),
+        linear-gradient(135deg, #fff4e8 0%, #fffaf6 48%, #f1fbff 100%);
+    }
+
+    .poster--comunidad {
+      --accent: #0f9b82;
+      --title: #173463;
+      --body: #5a6882;
+      background:
+        radial-gradient(circle at 82% 18%, rgba(14, 165, 233, 0.18), transparent 28%),
+        linear-gradient(135deg, #eaf4ff 0%, #f7fbff 50%, #effaf4 100%);
+    }
+
+    .dual-chip-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 9px;
+      margin-top: 20px;
+    }
+
+    .dual-chip-row span {
+      padding: 9px 12px;
+      border-radius: 999px;
+      color: #fff;
+      background: var(--accent);
+      font-size: 13px;
+      font-weight: 900;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+      box-shadow: 0 10px 20px color-mix(in srgb, var(--accent), transparent 72%);
+    }
+
+    .mock-screen {
+      padding: 24px 20px;
+      overflow: hidden;
+      color: #183057;
+    }
+
+    .mock-hero {
+      min-height: 176px;
+      padding: 24px;
+      border-radius: 28px;
+      color: #fff;
+      background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent), #2439f3 35%));
+      box-shadow: 0 18px 34px color-mix(in srgb, var(--accent), transparent 74%);
+    }
+
+    .mock-hero small,
+    .mock-card small {
+      display: inline-flex;
+      font-size: 10px;
+      font-weight: 950;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      opacity: 0.86;
+    }
+
+    .mock-hero h2 {
+      margin: 18px 0 8px;
+      font-size: 32px;
+      line-height: 0.96;
+      letter-spacing: 0;
+    }
+
+    .mock-hero p {
+      margin: 0;
+      font-size: 15px;
+      line-height: 1.3;
+      opacity: 0.86;
+      font-weight: 700;
+    }
+
+    .mock-tabs {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin: 18px 0;
+      padding: 7px;
+      border-radius: 22px;
+      background: #fff;
+      box-shadow: 0 10px 24px rgba(16, 33, 63, 0.08);
+    }
+
+    .mock-tabs span {
+      min-height: 38px;
+      display: grid;
+      place-items: center;
+      border-radius: 16px;
+      color: #697995;
+      font-size: 11px;
+      font-weight: 850;
+    }
+
+    .mock-tabs span:first-child {
+      color: #fff;
+      background: var(--accent);
+    }
+
+    .mock-search,
+    .mock-card {
+      border-radius: 22px;
+      background: #fff;
+      box-shadow: 0 12px 26px rgba(16, 33, 63, 0.08);
+    }
+
+    .mock-search {
+      height: 54px;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      padding: 0 18px;
+      color: #8a96aa;
+      font-size: 15px;
+      font-weight: 720;
+    }
+
+    .mock-card {
+      padding: 18px;
+      margin-bottom: 13px;
+    }
+
+    .mock-card h3 {
+      margin: 9px 0 7px;
+      font-size: 18px;
+      line-height: 1.1;
+    }
+
+    .mock-card p {
+      margin: 0;
+      color: #6a7890;
+      font-size: 13px;
+      line-height: 1.35;
+      font-weight: 650;
+    }
+
+    .mock-progress {
+      display: grid;
+      gap: 8px;
+      margin: 16px 0;
+    }
+
+    .mock-progress span {
+      height: 13px;
+      border-radius: 999px;
+      background: color-mix(in srgb, var(--accent), white 80%);
+      overflow: hidden;
+    }
+
+    .mock-progress span::before {
+      content: "";
+      display: block;
+      width: var(--value, 64%);
+      height: 100%;
+      border-radius: inherit;
+      background: var(--accent);
+    }
+
+    .mock-step-list {
+      display: grid;
+      gap: 10px;
+      margin-top: 16px;
+    }
+
+    .mock-step {
+      display: grid;
+      grid-template-columns: 34px 1fr;
+      gap: 10px;
+      align-items: center;
+      padding: 12px;
+      border-radius: 18px;
+      background: #fff;
+      box-shadow: 0 10px 22px rgba(16, 33, 63, 0.07);
+    }
+
+    .mock-step b {
+      width: 34px;
+      height: 34px;
+      display: grid;
+      place-items: center;
+      border-radius: 12px;
+      background: color-mix(in srgb, var(--accent), white 82%);
+      color: var(--accent);
+      font-size: 13px;
+    }
+
+    .mock-step span {
+      color: #1b3156;
+      font-size: 13px;
+      font-weight: 850;
+      line-height: 1.18;
+    }
+
+    .mock-result {
+      margin-top: 18px;
+      padding: 18px;
+      border-radius: 24px;
+      color: #fff;
+      background: linear-gradient(135deg, var(--accent), #0f9b82);
+      box-shadow: 0 18px 30px color-mix(in srgb, var(--accent), transparent 74%);
+    }
+
+    .mock-result small {
+      color: rgba(255,255,255,0.78);
+      font-size: 10px;
+      font-weight: 950;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .mock-result h3 {
+      margin: 10px 0 6px;
+      color: #fff;
+      font-size: 24px;
+      line-height: 1;
+    }
+
+    .mock-result p {
+      margin: 0;
+      color: rgba(255,255,255,0.82);
+      font-size: 13px;
+      line-height: 1.32;
+      font-weight: 700;
+    }
+
+    .event-cover {
+      height: 126px;
+      margin: -18px -18px 15px;
+      border-radius: 22px 22px 10px 10px;
+      background:
+        linear-gradient(135deg, rgba(14,136,182,0.82), rgba(87,60,242,0.78)),
+        url("../images/foro.png") center/cover;
+    }
+
+    .mock-feed-hero {
+      padding: 22px;
+      border-radius: 28px;
+      background: linear-gradient(135deg, #cfe6ff, #eff7ff);
+      border: 1px solid rgba(13, 126, 242, 0.12);
+      box-shadow: 0 16px 30px rgba(16, 33, 63, 0.08);
+    }
+
+    .mock-feed-hero small {
+      color: #3f79d4;
+      font-size: 10px;
+      font-weight: 950;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+    }
+
+    .mock-feed-hero h2 {
+      margin: 15px 0 10px;
+      color: #18396b;
+      font-size: 30px;
+      line-height: 1;
+      letter-spacing: 0;
+    }
+
+    .mock-feed-hero p {
+      margin: 0;
+      color: #64718a;
+      font-size: 14px;
+      line-height: 1.34;
+      font-weight: 650;
+    }
+
+    .mock-post {
+      margin-top: 18px;
+      padding: 18px;
+      border-radius: 26px;
+      background: #fff;
+      box-shadow: 0 14px 28px rgba(16, 33, 63, 0.09);
+      border-left: 5px solid #2563eb;
+    }
+
+    .mock-author {
+      display: grid;
+      grid-template-columns: 44px 1fr;
+      gap: 12px;
+      align-items: center;
+      margin-bottom: 13px;
+    }
+
+    .avatar {
+      width: 44px;
+      height: 44px;
+      border-radius: 14px;
+      background: linear-gradient(135deg, #f97316, #0f9b82);
+    }
+
+    .mock-author strong,
+    .mock-author span {
+      display: block;
+    }
+
+    .mock-author strong {
+      font-size: 13px;
+      line-height: 1.1;
+    }
+
+    .mock-author span {
+      margin-top: 3px;
+      color: #71809b;
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .mock-post h3 {
+      margin: 0 0 11px;
+      font-size: 21px;
+      color: #1c3970;
+    }
+
+    .mock-media {
+      height: 122px;
+      border-radius: 18px;
+      background:
+        linear-gradient(90deg, rgba(15, 155, 130, 0.78), rgba(37, 99, 235, 0.72)),
+        url("../images/comunidad.png") center/cover;
+    }
+
+    body.single {
+      padding: 0;
+      background: #fff;
+      display: block;
+    }
+
+    body.single .toolbar,
+    body.single .poster:not(.is-selected) {
+      display: none;
+    }
+
+    body.single .poster {
+      border-radius: 0;
+      box-shadow: none;
+    }
+
+    @media (max-width: 1120px) {
+      body {
+        padding: 14px;
+      }
+
+      .poster {
+        width: min(100vw - 28px, 1080px);
+        height: auto;
+        aspect-ratio: 1;
+      }
+    }
+
+    @media print {
+      body {
+        display: block;
+        padding: 0;
+        background: #fff;
+      }
+
+      .toolbar {
+        display: none;
+      }
+
+      .poster {
+        width: 1080px;
+        height: 1080px;
+        border-radius: 0;
+        box-shadow: none;
+        page-break-after: always;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header class="toolbar" aria-label="Navegacion de carteles">
+    <strong>Carteles 1:1 de m&oacute;dulos SIA para Expociencias</strong>
+    <nav>
+      <a href="#poster=landing-sia">Landing SIA</a>
+      <a href="#poster=aspirantes">Aspirantes</a>
+      <a href="#poster=test-vocacional">Test Vocacional</a>
+      <a href="#poster=servicios-medicos">M&eacute;dicos</a>
+      <a href="#poster=biblioteca">Biblioteca</a>
+      <a href="#poster=aula">Aula</a>
+      <a href="#poster=eventos">Eventos</a>
+      <a href="#poster=cafeteria">Cafeter&iacute;a</a>
+      <a href="#poster=comunidad">Comunidad</a>
+    </nav>
+  </header>
+
+  <article class="poster poster--landing" data-poster="landing-sia">
+    <div class="poster-inner">
+      <header class="poster-header">
+        <div class="brand">
+          <img class="sia-logo" src="../images/logo-sia.png" alt="SIA">
+          <img class="tecnm-logo" src="../images/tecnm-logo-claro.png" alt="TecNM">
+        </div>
+        <div class="tag">Landing SIA</div>
+      </header>
+      <main class="content">
+        <section class="copy">
+          <div class="kicker">Portal principal</div>
+          <h1>Todo tu campus, en un solo portal.</h1>
+          <p class="lead">SIA concentra acceso acad&eacute;mico, servicios, avisos y rutas p&uacute;blicas para aspirantes y visitantes.</p>
+          <ul class="points">
+            <li><span>01</span> Entrada clara para estudiantes, aspirantes y visitantes.</li>
+            <li><span>02</span> Acceso r&aacute;pido a m&oacute;dulos clave desde una misma vista.</li>
+            <li><span>03</span> Experiencia adaptable para celular, navegador e instalaci&oacute;n como app.</li>
+          </ul>
+          <div class="dual-chip-row">
+            <span>Campus</span>
+            <span>Servicios</span>
+            <span>Aspirantes</span>
+          </div>
+        </section>
+        <section class="visual" aria-label="Vista del landing de SIA">
+          <div class="phone">
+            <img src="assets/modulos-expociencias/landing-sia-mobile.png" alt="Captura del landing de SIA">
+          </div>
+          <div class="floating-card">
+            <strong>Primera entrada</strong>
+            <span>La plataforma se presenta como punto &uacute;nico del campus.</span>
+          </div>
+        </section>
+      </main>
+      <footer class="poster-footer">
+        <span>SIA TecNM Campus Los Cabos</span>
+        <span class="module-mark">Portal integral</span>
+      </footer>
+    </div>
+  </article>
+
+  <article class="poster poster--aspirantes" data-poster="aspirantes">
+    <div class="poster-inner">
+      <header class="poster-header">
+        <div class="brand">
+          <img class="sia-logo" src="../images/logo-sia.png" alt="SIA">
+          <img class="tecnm-logo" src="../images/tecnm-logo-claro.png" alt="TecNM">
+        </div>
+        <div class="tag">Aspirantes</div>
+      </header>
+      <main class="content">
+        <section class="copy">
+          <div class="kicker">Admisiones y preparaci&oacute;n</div>
+          <h1>Tu ruta de ingreso, paso a paso.</h1>
+          <p class="lead">El m&oacute;dulo orienta al aspirante antes de crear una cuenta institucional.</p>
+          <ul class="points">
+            <li><span>01</span> Proceso de admisi&oacute;n con pasos, fechas y soporte.</li>
+            <li><span>02</span> Ruta por carrera para ordenar temas y bloques.</li>
+            <li><span>03</span> Pr&aacute;ctica EVALUATEC con reactivos did&aacute;cticos de SIA.</li>
+          </ul>
+        </section>
+        <section class="visual" aria-label="Representaci&oacute;n del m&oacute;dulo Aspirantes">
+          <div class="phone">
+            <div class="mock-screen">
+              <div class="mock-hero">
+                <small>Aspirantes ITES</small>
+                <h2>Bienvenido aspirante</h2>
+                <p>Elige carrera, practica y consulta el proceso de admisi&oacute;n.</p>
+              </div>
+              <div class="mock-tabs">
+                <span>Inicio</span>
+                <span>Ruta</span>
+                <span>Proceso</span>
+              </div>
+              <div class="mock-step-list">
+                <div class="mock-step"><b>1</b><span>Elige la carrera que quieres estudiar.</span></div>
+                <div class="mock-step"><b>2</b><span>Revisa bloques y temas de tu ruta.</span></div>
+                <div class="mock-step"><b>3</b><span>Practica por &aacute;rea antes del examen.</span></div>
+              </div>
+              <div class="mock-card">
+                <small>Proceso sin vueltas</small>
+                <h3>Ficha, pago, examen y proped&eacute;utico</h3>
+                <p>Consulta lo esencial para no perder fechas importantes.</p>
+              </div>
+            </div>
+          </div>
+          <div class="floating-card">
+            <strong>Ruta guiada</strong>
+            <span>Informaci&oacute;n p&uacute;blica para decidir y prepararse.</span>
+          </div>
+        </section>
+      </main>
+      <footer class="poster-footer">
+        <span>SIA TecNM Campus Los Cabos</span>
+        <span class="module-mark">Ingreso guiado</span>
+      </footer>
+    </div>
+  </article>
+
+  <article class="poster poster--vocacional" data-poster="test-vocacional">
+    <div class="poster-inner">
+      <header class="poster-header">
+        <div class="brand">
+          <img class="sia-logo" src="../images/logo-sia.png" alt="SIA">
+          <img class="tecnm-logo" src="../images/tecnm-logo-claro.png" alt="TecNM">
+        </div>
+        <div class="tag">Test Vocacional</div>
+      </header>
+      <main class="content">
+        <section class="copy">
+          <div class="kicker">Afinidad y decisi&oacute;n</div>
+          <h1>Elige carrera con m&aacute;s contexto.</h1>
+          <p class="lead">El test analiza intereses, aptitudes y antecedentes t&eacute;cnicos para sugerir afinidad.</p>
+          <ul class="points">
+            <li><span>01</span> Registro ligero para guardar y retomar progreso.</li>
+            <li><span>02</span> Bloques de preguntas orientados al perfil de ingreso.</li>
+            <li><span>03</span> Resultado con carrera sugerida, afinidad y reporte descargable.</li>
+          </ul>
+        </section>
+        <section class="visual" aria-label="Representaci&oacute;n del Test Vocacional">
+          <div class="phone">
+            <div class="mock-screen">
+              <div class="mock-hero">
+                <small>Perfil vocacional</small>
+                <h2>Analiza tu afinidad</h2>
+                <p>Intereses, aptitudes y antecedentes t&eacute;cnicos en una sola ruta.</p>
+              </div>
+              <div class="mock-card">
+                <small>Progreso del test</small>
+                <h3>Bloque 3 de 5</h3>
+                <div class="mock-progress">
+                  <span style="--value: 68%"></span>
+                </div>
+                <p>Tu avance se guarda para continuar despu&eacute;s.</p>
+              </div>
+              <div class="mock-result">
+                <small>Resultado</small>
+                <h3>Alta afinidad t&eacute;cnica</h3>
+                <p>Contrasta tu perfil con carreras del TecNM Campus Los Cabos.</p>
+              </div>
+              <div class="mock-card">
+                <small>Reporte</small>
+                <h3>An&aacute;lisis descargable</h3>
+                <p>Incluye recomendaci&oacute;n, fechas y contactos de admisi&oacute;n.</p>
+              </div>
+            </div>
+          </div>
+          <div class="floating-card">
+            <strong>Decisi&oacute;n informada</strong>
+            <span>Ayuda al aspirante a elegir con evidencia.</span>
+          </div>
+        </section>
+      </main>
+      <footer class="poster-footer">
+        <span>SIA TecNM Campus Los Cabos</span>
+        <span class="module-mark">Orientaci&oacute;n vocacional</span>
+      </footer>
+    </div>
+  </article>
+
+  <article class="poster poster--medi" data-poster="servicios-medicos">
+    <div class="poster-inner">
+      <header class="poster-header">
+        <div class="brand">
+          <img class="sia-logo" src="../images/logo-sia.png" alt="SIA">
+          <img class="tecnm-logo" src="../images/tecnm-logo-claro.png" alt="TecNM">
+        </div>
+        <div class="tag">Servicios M&eacute;dicos + Lactancia</div>
+      </header>
+      <main class="content">
+        <section class="copy">
+          <div class="kicker">Atenci&oacute;n y cuidado en campus</div>
+          <h1>Salud escolar, sin perder tiempo.</h1>
+          <p class="lead">Agenda citas, consulta tu expediente y accede a apoyo inmediato desde SIA.</p>
+          <ul class="points">
+            <li><span>01</span> Nueva cita, historial y mensajes con el &aacute;rea m&eacute;dica.</li>
+            <li><span>02</span> Carnet de emergencia para alergias y datos cr&iacute;ticos.</li>
+            <li><span>03</span> Sala de lactancia: reserva, acceso QR y seguimiento del uso.</li>
+          </ul>
+          <div class="dual-chip-row">
+            <span>Expediente</span>
+            <span>Urgencias</span>
+            <span>Lactario</span>
+          </div>
+        </section>
+        <section class="visual" aria-label="Vista del m&oacute;dulo Servicios M&eacute;dicos">
+          <div class="phone">
+            <img src="assets/modulos-expociencias/servicios-medicos.png" alt="Captura de Servicios M&eacute;dicos en SIA">
+          </div>
+          <div class="floating-card">
+            <strong>M&oacute;dulo integrado</strong>
+            <span>Servicios m&eacute;dicos y sala de lactancia en una ruta.</span>
+          </div>
+        </section>
+      </main>
+      <footer class="poster-footer">
+        <span>SIA TecNM Campus Los Cabos</span>
+        <span class="module-mark">Cuidado digital</span>
+      </footer>
+    </div>
+  </article>
+
+  <article class="poster poster--biblio" data-poster="biblioteca">
+    <div class="poster-inner">
+      <header class="poster-header">
+        <div class="brand">
+          <img class="sia-logo" src="../images/logo-sia.png" alt="SIA">
+          <img class="tecnm-logo" src="../images/tecnm-logo-claro.png" alt="TecNM">
+        </div>
+        <div class="tag">Biblioteca</div>
+      </header>
+      <main class="content">
+        <section class="copy">
+          <div class="kicker">Acervo, pr&eacute;stamos y actividad</div>
+          <h1>Encuentra recursos para estudiar mejor.</h1>
+          <p class="lead">Explora el cat&aacute;logo, revisa tu actividad y solicita t&iacute;tulos que faltan.</p>
+          <ul class="points">
+            <li><span>01</span> B&uacute;squeda por t&iacute;tulo, autor, c&oacute;digo o categor&iacute;a.</li>
+            <li><span>02</span> Historial, reservas y actividad del estudiante.</li>
+            <li><span>03</span> Misiones y logros para motivar el uso del acervo.</li>
+          </ul>
+        </section>
+        <section class="visual" aria-label="Vista del m&oacute;dulo Biblioteca">
+          <div class="phone">
+            <img src="assets/modulos-expociencias/biblioteca-explorar.png" alt="Captura de Biblioteca en SIA">
+          </div>
+          <div class="floating-card">
+            <strong>Enfoque</strong>
+            <span>B&uacute;squeda r&aacute;pida y acceso a recursos acad&eacute;micos.</span>
+          </div>
+        </section>
+      </main>
+      <footer class="poster-footer">
+        <span>SIA TecNM Campus Los Cabos</span>
+        <span class="module-mark">Acervo conectado</span>
+      </footer>
+    </div>
+  </article>
+
+  <article class="poster poster--aula" data-poster="aula">
+    <div class="poster-inner">
+      <header class="poster-header">
+        <div class="brand">
+          <img class="sia-logo" src="../images/logo-sia.png" alt="SIA">
+          <img class="tecnm-logo" src="../images/tecnm-logo-claro.png" alt="TecNM">
+        </div>
+        <div class="tag">Aula Virtual</div>
+      </header>
+      <main class="content">
+        <section class="copy">
+          <div class="kicker">Aprendizaje y tareas</div>
+          <h1>Tu espacio acad&eacute;mico en el celular.</h1>
+          <p class="lead">Clases, tareas p&uacute;blicas y comunidad de carrera en una experiencia ligera.</p>
+          <ul class="points">
+            <li><span>01</span> Unirse a clase y consultar cursos activos.</li>
+            <li><span>02</span> Tareas p&uacute;blicas visibles para la carrera.</li>
+            <li><span>03</span> Entregas, materiales y seguimiento del aprendizaje.</li>
+          </ul>
+        </section>
+        <section class="visual" aria-label="Vista del m&oacute;dulo Aula Virtual">
+          <div class="phone">
+            <img src="assets/modulos-expociencias/aula-virtual.png" alt="Captura de Aula Virtual en SIA">
+          </div>
+          <div class="floating-card">
+            <strong>Acad&eacute;mico</strong>
+            <span>Organiza clase, comunidad y tareas desde SIA.</span>
+          </div>
+        </section>
+      </main>
+      <footer class="poster-footer">
+        <span>SIA TecNM Campus Los Cabos</span>
+        <span class="module-mark">Aula conectada</span>
+      </footer>
+    </div>
+  </article>
+
+  <article class="poster poster--eventos" data-poster="eventos">
+    <div class="poster-inner">
+      <header class="poster-header">
+        <div class="brand">
+          <img class="sia-logo" src="../images/logo-sia.png" alt="SIA">
+          <img class="tecnm-logo" src="../images/tecnm-logo-claro.png" alt="TecNM">
+        </div>
+        <div class="tag">Eventos</div>
+      </header>
+      <main class="content">
+        <section class="copy">
+          <div class="kicker">Cartelera institucional</div>
+          <h1>Inscripci&oacute;n y asistencia en un solo flujo.</h1>
+          <p class="lead">La comunidad descubre eventos, genera su pase y conserva su historial.</p>
+          <ul class="points">
+            <li><span>01</span> Cartelera con b&uacute;squeda y filtros por tipo de evento.</li>
+            <li><span>02</span> Ticket QR para entrada y control de asistencia.</li>
+            <li><span>03</span> Historial, recursos y constancias posteriores.</li>
+          </ul>
+        </section>
+        <section class="visual" aria-label="Representaci&oacute;n del m&oacute;dulo Eventos">
+          <div class="phone">
+            <div class="mock-screen">
+              <div class="mock-hero">
+                <small>Eventos ITES</small>
+                <h2>Cartelera del campus</h2>
+                <p>Inscr&iacute;bete, guarda tu pase y confirma asistencia.</p>
+              </div>
+              <div class="mock-tabs">
+                <span>Cartelera</span>
+                <span>Tickets</span>
+                <span>Historial</span>
+              </div>
+              <div class="mock-search">Buscar evento...</div>
+              <div class="mock-card">
+                <div class="event-cover"></div>
+                <small>Acad&eacute;mico</small>
+                <h3>ExpoCiencias: presentaci&oacute;n de proyectos</h3>
+                <p>Registro abierto, pase QR y recursos del evento.</p>
+              </div>
+              <div class="mock-card">
+                <small>Seguimiento</small>
+                <h3>Asistencia confirmada</h3>
+                <p>Constancias y calendario disponibles despu&eacute;s del evento.</p>
+              </div>
+            </div>
+          </div>
+          <div class="floating-card">
+            <strong>Vista conceptual</strong>
+            <span>Flujo visual del m&oacute;dulo Foro/Eventos.</span>
+          </div>
+        </section>
+      </main>
+      <footer class="poster-footer">
+        <span>SIA TecNM Campus Los Cabos</span>
+        <span class="module-mark">Eventos medibles</span>
+      </footer>
+    </div>
+  </article>
+
+  <article class="poster poster--cafeteria" data-poster="cafeteria">
+    <div class="poster-inner">
+      <header class="poster-header">
+        <div class="brand">
+          <img class="sia-logo" src="../images/logo-sia.png" alt="SIA">
+          <img class="tecnm-logo" src="../images/tecnm-logo-claro.png" alt="TecNM">
+        </div>
+        <div class="tag">Cafeter&iacute;a</div>
+      </header>
+      <main class="content">
+        <section class="copy">
+          <div class="kicker">Men&uacute; y pedidos</div>
+          <h1>Ordena antes y recoge m&aacute;s r&aacute;pido.</h1>
+          <p class="lead">Consulta productos, arma tu carrito y da seguimiento a tus pedidos.</p>
+          <ul class="points">
+            <li><span>01</span> Men&uacute; por categor&iacute;as, b&uacute;squeda y ordenamiento.</li>
+            <li><span>02</span> Carrito, pedidos activos y estado de preparaci&oacute;n.</li>
+            <li><span>03</span> Rese&ntilde;as para mejorar la experiencia del servicio.</li>
+          </ul>
+        </section>
+        <section class="visual" aria-label="Vista del m&oacute;dulo Cafeter&iacute;a">
+          <div class="phone">
+            <img src="assets/modulos-expociencias/cafeteria-menu.png" alt="Captura de Cafeter&iacute;a en SIA">
+          </div>
+          <div class="floating-card">
+            <strong>Operacion diaria</strong>
+            <span>Menos filas y mejor planeaci&oacute;n de la demanda.</span>
+          </div>
+        </section>
+      </main>
+      <footer class="poster-footer">
+        <span>SIA TecNM Campus Los Cabos</span>
+        <span class="module-mark">Servicio agil</span>
+      </footer>
+    </div>
+  </article>
+
+  <article class="poster poster--comunidad" data-poster="comunidad">
+    <div class="poster-inner">
+      <header class="poster-header">
+        <div class="brand">
+          <img class="sia-logo" src="../images/logo-sia.png" alt="SIA">
+          <img class="tecnm-logo" src="../images/tecnm-logo-claro.png" alt="TecNM">
+        </div>
+        <div class="tag">Comunidad</div>
+      </header>
+      <main class="content">
+        <section class="copy">
+          <div class="kicker">Campus social</div>
+          <h1>Lo que pasa en el campus, en un feed claro.</h1>
+          <p class="lead">Publicaciones, avisos, preguntas, ventas y objetos perdidos con filtros.</p>
+          <ul class="points">
+            <li><span>01</span> Novedades y tendencias para enterarse r&aacute;pido.</li>
+            <li><span>02</span> Publicaciones con imagenes, reacciones y comentarios.</li>
+            <li><span>03</span> Mensajes privados y reportes para moderaci&oacute;n.</li>
+          </ul>
+        </section>
+        <section class="visual" aria-label="Representaci&oacute;n del m&oacute;dulo Comunidad">
+          <div class="phone">
+            <div class="mock-screen">
+              <div class="mock-feed-hero">
+                <small>Comunidad del campus</small>
+                <h2>Explora lo que est&aacute; pasando</h2>
+                <p>Novedades, preguntas, avisos, ventas y objetos perdidos.</p>
+              </div>
+              <div class="mock-tabs">
+                <span>Novedades</span>
+                <span>Tendencias</span>
+                <span>Explorar</span>
+              </div>
+              <div class="mock-post">
+                <div class="mock-author">
+                  <div class="avatar"></div>
+                  <div>
+                    <strong>Estudiante ITES</strong>
+                    <span>Ingenier&iacute;a en Sistemas Computacionales</span>
+                  </div>
+                </div>
+                <h3>Desarrollando SIA</h3>
+                <div class="mock-media"></div>
+              </div>
+              <div class="mock-card">
+                <small>Interacci&oacute;n</small>
+                <h3>Me gusta, comentarios y compartir</h3>
+                <p>Participaci&oacute;n estudiantil con moderaci&oacute;n integrada.</p>
+              </div>
+            </div>
+          </div>
+          <div class="floating-card">
+            <strong>Campus vivo</strong>
+            <span>Informaci&oacute;n social organizada para estudiantes.</span>
+          </div>
+        </section>
+      </main>
+      <footer class="poster-footer">
+        <span>SIA TecNM Campus Los Cabos</span>
+        <span class="module-mark">Comunidad digital</span>
+      </footer>
+    </div>
+  </article>
+
+  <script>
+    (function () {
+      var params = new URLSearchParams(window.location.search);
+      var selected = params.get("poster");
+      if (!selected && window.location.hash.indexOf("poster=") !== -1) {
+        selected = new URLSearchParams(window.location.hash.slice(1)).get("poster");
+      }
+      if (!selected) return;
+      document.body.classList.add("single");
+      document.querySelectorAll(".poster").forEach(function (poster) {
+        if (poster.dataset.poster === selected) poster.classList.add("is-selected");
+      });
+    }());
+  </script>
+</body>
+</html>

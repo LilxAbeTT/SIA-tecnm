@@ -86,7 +86,7 @@ if (!window.Quejas) {
 
         // --- INIT ---
         async function init(ctx) {
-            console.log("[Quejas] Init started", ctx);
+
             _ctx = ctx;
             _profile = ctx.profile;
 
@@ -214,7 +214,6 @@ if (!window.Quejas) {
                 return fileOrBlob; // No need to compress
             }
 
-            console.log(`[Compression] Original: ${(fileOrBlob.size / 1024 / 1024).toFixed(2)}MB`);
 
             return new Promise((resolve, reject) => {
                 const img = new Image();
@@ -247,7 +246,7 @@ if (!window.Quejas) {
 
                     // Export compressed
                     canvas.toBlob(blob => {
-                        console.log(`[Compression] Compressed: ${(blob.size / 1024 / 1024).toFixed(2)}MB`);
+
                         resolve(blob);
                     }, 'image/jpeg', 0.7);
                 };
@@ -723,7 +722,7 @@ if (!window.Quejas) {
                 if (_isAdmin && !_legacyMigrationSweepStarted && window.QuejasService?.migrateAllLegacyTickets) {
                     _legacyMigrationSweepStarted = true;
                     QuejasService.migrateAllLegacyTickets(_ctx).catch(error => {
-                        console.warn('[Quejas] Barrido de migracion legacy pendiente:', error);
+
                     });
                 }
 
@@ -764,7 +763,7 @@ if (!window.Quejas) {
 
                 if (tickets.length && _isAdmin && window.QuejasService?.migrateLegacyTickets) {
                     QuejasService.migrateLegacyTickets(_ctx, tickets).catch(error => {
-                        console.warn('[Quejas] Migracion legacy pendiente:', error);
+
                     });
                 }
             } catch (e) {

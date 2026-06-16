@@ -168,16 +168,16 @@ async function createPrivateCafeteriaDemandSurvey() {
     const duplicated = (existing || []).find((survey) => survey.title === payload.title && survey.status !== 'archived');
 
     if (duplicated) {
-      console.warn('[Encuestas] Ya existe una encuesta con este titulo:', duplicated.id);
+
       return duplicated;
     }
 
     const created = await window.EncuestasService.createSurvey(ctx, payload);
-    console.log('[Encuestas] Encuesta creada en borrador:', created?.id || created);
-    console.log('[Encuestas] Titulo:', payload.title);
-    console.log('[Encuestas] Audiencia:', payload.audience.join(', '));
-    console.log('[Encuestas] Privada:', !payload.isPublic);
-    console.log('[Encuestas] Estado:', payload.status);
+
+
+
+
+
     return created;
   } catch (error) {
     console.error('[Encuestas] No se pudo crear la encuesta de cafeteria:', error);
@@ -185,12 +185,11 @@ async function createPrivateCafeteriaDemandSurvey() {
   }
 }
 
-console.log('');
-console.log('============================================================');
-console.log('  SCRIPT: ENCUESTA PRIVADA DE DEMANDA PARA CAFETERIA');
-console.log('============================================================');
-console.log('1. Inicia sesion como admin de encuestas.');
-console.log('2. Abre el modulo /encuestas para cargar EncuestasService.');
-console.log('3. Ejecuta: createPrivateCafeteriaDemandSurvey()');
-console.log('============================================================');
-console.log('');
+
+
+
+
+
+
+
+

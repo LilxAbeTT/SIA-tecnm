@@ -302,7 +302,7 @@ window.AdminBiblio.Historial = (function () {
                         }
                     });
                 } catch (err) {
-                    console.warn("Could not fetch user/book details for history", err);
+
                 }
             }
 

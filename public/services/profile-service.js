@@ -61,7 +61,7 @@ const ProfileService = (function () {
             if (isAllowedField(normalizedKey)) {
                 safeUpdates[normalizedKey] = updates[key];
             } else {
-                console.warn(`[ProfileService] Campo bloqueado: "${key}" — no está permitido.`);
+
             }
         }
 
@@ -162,7 +162,7 @@ const ProfileService = (function () {
             await storageRef.delete(); // Puede fallar si no existe
         } catch (e) {
             // Si el objeto no existe en storage, continuamos limpiando auth y firestore
-            console.log("No existía foto previa en Storage o no se pudo eliminar", e);
+
         }
 
         // Remover de Auth

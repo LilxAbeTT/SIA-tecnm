@@ -1629,7 +1629,7 @@ if (!window.SuperAdmin) {
                     groupsTextarea.value = JSON.stringify(panicGroups || getDefaultPanicGroupsConfig(), null, 2);
                 }
             } catch (error) {
-                console.warn('[SuperAdmin] No se pudo cargar la configuración de panic:', error);
+
             }
 
             // Stream notices

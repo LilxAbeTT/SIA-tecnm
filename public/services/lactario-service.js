@@ -150,7 +150,7 @@ const LactarioService = (function () {
                 spaces = [defaultSpace];
             }
         } catch (e) {
-            console.warn('[LactarioService] Warn loading config:', e);
+
             // Emergency fallback memory-only
             if (spaces.length === 0) spaces = [{ id: 'cubiculo-1', name: 'Cubículo 1', active: true }];
         }
@@ -207,10 +207,10 @@ const LactarioService = (function () {
                 for (const citaId of linkedAppointmentsToCancel) {
                     await cancelLinkedMedicalAppointment(ctx, citaId, 'No-show en reserva de lactario');
                 }
-                console.log(`[Lactario] Marked ${updates} bookings as no-show.`);
+
             }
         } catch (e) {
-            console.warn("[Lactario] Cleanup error:", e);
+
         }
     }
 

@@ -56,7 +56,7 @@ window.AdminMedi.Tools = (function () {
       if (!snap.exists) return student;
       return { ...snap.data(), ...student, id: uid, uid };
     } catch (err) {
-      console.warn('Error fetching full patient profile:', err);
+
       return student;
     }
   }
@@ -361,7 +361,7 @@ window.AdminMedi.Tools = (function () {
       renderInsightList('medi-patients-recent', insights.recent || [], 'recent');
       renderInsightList('medi-patients-frequent', insights.frequent || [], 'frequent');
     } catch (err) {
-      console.warn('Error loading patient insights:', err);
+
       if (recentEl) recentEl.innerHTML = '<div class="text-muted small text-center py-4">No se pudieron cargar pacientes recientes.</div>';
       if (frequentEl) frequentEl.innerHTML = '<div class="text-muted small text-center py-4">No se pudieron cargar pacientes frecuentes.</div>';
     }
@@ -901,7 +901,7 @@ window.AdminMedi.Tools = (function () {
       }
 
     } catch (e) {
-      console.warn("Error fetching patient stats", e);
+
       const consCount = document.getElementById('modal-patient-consultas-count');
       const citasCount = document.getElementById('modal-patient-citas-count');
       const lastVisitEl = document.getElementById('modal-patient-last-visit');
@@ -1029,7 +1029,7 @@ window.AdminMedi.Tools = (function () {
       _loadFollowUps();
       renderPriorityActions();
     } catch (err) {
-      console.warn('[medi] loadDayMetrics error:', err);
+
       resetFollowUpsStat(0);
       container.innerHTML = '<div class="text-center py-3 text-muted small">No se pudieron cargar metricas</div>';
     }
@@ -1096,7 +1096,7 @@ window.AdminMedi.Tools = (function () {
     } catch (e) {
       AdminMedi.State.followUpItems = [];
       resetFollowUpsStat(0);
-      console.warn('Follow-ups load error:', e);
+
     }
   }
 
@@ -1285,7 +1285,7 @@ window.AdminMedi.Tools = (function () {
 
       renderFilteredFollowUps('all');
     } catch (err) {
-      console.warn('Follow-ups modal error:', err);
+
       body.innerHTML = '<div class="text-center py-4 text-muted">No se pudo cargar la lista de seguimientos.</div>';
     }
   }
@@ -1296,7 +1296,7 @@ window.AdminMedi.Tools = (function () {
       if (!AdminMedi.State.ctx.config) AdminMedi.State.ctx.config = {};
       AdminMedi.State.ctx.config.medi = cfg;
     } catch (e) {
-      console.warn("Error loading config for modal:", e);
+
     }
 
     const operational = getOperationalContext();
@@ -1693,7 +1693,7 @@ window.AdminMedi.Tools = (function () {
         const profile = await MediService.getShiftProfile(AdminMedi.State.ctx, AdminMedi.State.myRole, AdminMedi.State.currentShift);
         if (profile && profile.name) {
           // PROFILE EXISTS -> LOAD IT
-          console.log(`[Medi] Loaded Shift Profile: ${profile.name} `);
+
           _profesionalName = profile.name;
           AdminMedi.State.profesionalCedula = profile.cedula;
           AdminMedi.State.currentProfile = {
@@ -1714,7 +1714,7 @@ window.AdminMedi.Tools = (function () {
           showToast(`Bienvenid @, ${_profesionalName} `, 'success');
         } else {
           // PROFILE MISSING -> FORCE SETUP
-          console.warn("[Medi] No profile for this shift. Prompting setup...");
+
           showShiftSetupModal(AdminMedi.State.myRole, AdminMedi.State.currentShift);
           return; // STOP INIT until setup is done
         }

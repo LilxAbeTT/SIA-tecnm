@@ -246,7 +246,7 @@ function buildTrail(viewId, options = {}) {
 }
 
 function buildState(viewId, options = {}) {
-    const trail = cloneTrail(options.trail?.length ? options.trail : buildTrail(viewId, options));
+    const trail = cloneTrail(Array.isArray(options.trail) ? options.trail : buildTrail(viewId, options));
     const lastCrumb = trail[trail.length - 1] || null;
     const meta = getMeta(viewId);
 

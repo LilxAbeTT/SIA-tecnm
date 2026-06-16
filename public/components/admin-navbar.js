@@ -29,11 +29,7 @@ const QUICK_ACTIONS = {
       <i class="bi bi-plus-circle me-1"></i> Nueva Consulta
     </button>
   `,
-    'view-biblio': `
-    <button class="btn btn-sm btn-warning rounded-pill px-3 fw-bold shadow-sm text-dark" onclick="if(window.Biblio) window.Biblio.openScanner()">
-      <i class="bi bi-upc-scan me-1"></i> Escanear
-    </button>
-  `,
+    'view-biblio': ``,
     'view-aula': `
     <button class="btn btn-sm btn-primary rounded-pill px-3 fw-bold shadow-sm" onclick="if(window.Aula) window.Aula.crearCurso()">
       <i class="bi bi-journal-plus me-1"></i> Nuevo Curso
@@ -116,9 +112,80 @@ class SiaAdminNavbar extends HTMLElement {
             if (actionsContainer) {
                 const actionHtml = QUICK_ACTIONS[viewId] || '';
                 actionsContainer.innerHTML = actionHtml;
+
+                if (viewId === 'view-biblio') {
+                    this._setupBiblioSearch(actionsContainer);
+                }
             }
         };
         window.addEventListener('sia-view-changed', this._viewChangedHandler);
+    }
+
+    _setupBiblioSearch(container) {
+        const input = container.querySelector('#admin-biblio-search-input');
+        const resultsContainer = container.querySelector('#admin-biblio-search-results');
+        if (!input || !resultsContainer) return;
+
+        let debounceTimeout;
+
+        input.addEventListener('input', (e) => {
+            const query = e.target.value.trim();
+            clearTimeout(debounceTimeout);
+
+            if (query.length < 3) {
+                resultsContainer.style.display = 'none';
+                return;
+            }
+
+            debounceTimeout = setTimeout(async () => {
+                if (!window.BiblioService || !window.firebase) return;
+                
+                try {
+                    const ctx = { db: window.firebase.firestore() };
+                    const results = await window.BiblioService.searchCatalogoAdmin(ctx, query, 6);
+                    
+                    if (results.length === 0) {
+                        resultsContainer.innerHTML = '<div class="px-3 py-2 text-muted small text-center">No se encontraron coincidencias</div>';
+                        resultsContainer.style.display = 'block';
+                        return;
+                    }
+
+                    resultsContainer.innerHTML = results.map(book => {
+                        const disponibles = book.copiasDisponibles || 0;
+                        const statusColor = disponibles > 0 ? 'text-success' : 'text-danger';
+                        const statusText = disponibles > 0 ? `${disponibles} disponible(s)` : 'Sin copias';
+                        
+                        return `
+                            <button class="dropdown-item py-2 px-3 border-bottom d-flex justify-content-between align-items-center" style="white-space: normal;" type="button" onclick="if(window.AdminBiblio) window.AdminBiblio.mostrarInfoLibroMiniModal('${encodeURIComponent(JSON.stringify(book)).replace(/'/g, "%27")}')">
+                                <div class="me-3" style="flex: 1;">
+                                    <div class="fw-bold small" style="line-height: 1.2;">${book.titulo || 'Sin título'}</div>
+                                    <div class="text-muted mt-1" style="font-size: 0.7rem;">${book.autor || 'Sin autor'}</div>
+                                </div>
+                                <span class="badge bg-light ${statusColor} border shadow-sm" style="white-space: nowrap;">${statusText}</span>
+                            </button>
+                        `;
+                    }).join('');
+                    resultsContainer.style.display = 'block';
+
+                } catch (error) {
+                    console.error('[BIBLIO SEARCH]', error);
+                    resultsContainer.innerHTML = '<div class="px-3 py-2 text-danger small text-center">Error al buscar</div>';
+                    resultsContainer.style.display = 'block';
+                }
+            }, 100);
+        });
+
+        document.addEventListener('click', (e) => {
+            if (!container.contains(e.target)) {
+                resultsContainer.style.display = 'none';
+            }
+        });
+        
+        input.addEventListener('focus', () => {
+             if (input.value.trim().length >= 3 && resultsContainer.innerHTML.trim() !== '') {
+                 resultsContainer.style.display = 'block';
+             }
+        });
     }
 
     updateUser(data) {
@@ -199,7 +266,7 @@ class SiaAdminNavbar extends HTMLElement {
 
     render() {
         this.innerHTML = `
-      <div class="d-none d-md-block container-fluid sticky-top pb-2 pt-2 px-3 px-lg-4">
+      <div class="d-none d-md-block container-fluid sticky-top pb-2 pt-2 px-3 px-lg-4" style="z-index: 1050;">
         <nav class="navbar sia-admin-navbar sticky-top bg-white border rounded-4 shadow-sm" style="padding: 0.5rem 1.25rem;">
           <div class="d-flex align-items-center justify-content-between w-100 flex-nowrap gap-3">
             
@@ -207,18 +274,8 @@ class SiaAdminNavbar extends HTMLElement {
             <div class="d-flex align-items-center gap-3">
               <a class="navbar-brand d-flex align-items-center me-0" href="#">
                 <img src="/assets/icons/sia.ico" width="32" height="32" alt="SIA">
-                <div class="ms-2 d-none d-lg-block lh-1">
-                  <span class="fw-bold desktop-brand-text d-block" style="color: var(--nav-text); letter-spacing: -0.5px;">SIA Admin</span>
-                  <span class="text-muted" style="font-size: 0.65rem; letter-spacing: 0.5px;">WORKSPACE</span>
-                </div>
               </a>
 
-              <div class="vr opacity-25 d-none d-md-block" style="height: 24px;"></div>
-              
-              <button class="btn btn-light rounded-circle p-2 d-flex align-items-center justify-content-center" 
-                      id="btn-admin-home" title="Inicio / Dashboard" style="width: 36px; height: 36px;">
-                <i class="bi bi-house-door-fill text-secondary"></i>
-              </button>
 
               <span class="badge rounded-pill fw-bold fw-medium shadow-sm d-none" id="admin-nav-context-pill"
                 style="padding: 6px 12px; font-size: 0.7rem; transition: all 0.2s ease;">Dashboard</span>

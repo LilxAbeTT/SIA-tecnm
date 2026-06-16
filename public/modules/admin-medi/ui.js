@@ -2282,7 +2282,7 @@ onclick="AdminMedi.renderConsultationDetail(this,'${safeItem}')">
         }
       }
     }).catch((error) => {
-      console.warn('[AdminMedi] No se pudieron cargar las notas privadas del expediente:', error);
+
     });
   }
 

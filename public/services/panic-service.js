@@ -278,7 +278,7 @@
         }
         emitState();
       }, (error) => {
-        console.warn('[PanicService] Error suscribiendo alerta activa:', error);
+
         state.trackingError = error?.message || 'No se pudo sincronizar la alerta activa.';
         emitState();
       });
@@ -308,7 +308,7 @@
     }
 
     loadConfig().catch((error) => {
-      console.warn('[PanicService] No se pudo cargar la configuracion:', error);
+
     });
     subscribeToActiveAlert(nextUid);
     emitState();

@@ -5,11 +5,10 @@
 // y que EncuestasServicioService esté cargado
 
 async function registerServiceSurveys() {
-  console.log('🚀 Iniciando registro de encuestas de servicio...');
 
   try {
     // ========== ENCUESTA DE SERVICIO MÉDICO ==========
-    console.log('📋 Registrando encuesta de Servicio Médico...');
+
     await EncuestasServicioService.createServiceSurvey(window.appContext, 'servicio-medico', {
       title: 'Encuesta de Satisfacción - Servicio Médico',
       description: '¡Hola! Nos gustaría conocer tu experiencia. Ayúdanos a mejorar la calidad de nuestro servicio médico.',
@@ -126,10 +125,9 @@ async function registerServiceSurveys() {
         maxSkips: 2
       }
     });
-    console.log('✅ Encuesta de Servicio Médico registrada');
 
     // ========== ENCUESTA DE PSICOLOGÍA ==========
-    console.log('📋 Registrando encuesta de Psicología...');
+
     await EncuestasServicioService.createServiceSurvey(window.appContext, 'psicologia', {
       title: 'Encuesta de Satisfacción - Atención Psicopedagógica',
       description: '¡Hola! Tu opinión es muy valiosa para nosotros y nos ayuda a mejorar el servicio de apoyo psicopedagógico.',
@@ -254,10 +252,9 @@ async function registerServiceSurveys() {
         maxSkips: 2
       }
     });
-    console.log('✅ Encuesta de Psicología registrada');
 
     // ========== ENCUESTA DE BIBLIOTECA ==========
-    console.log('📋 Registrando encuesta de Biblioteca...');
+
     await EncuestasServicioService.createServiceSurvey(window.appContext, 'biblioteca', {
       title: 'Encuesta de Satisfacción - Biblioteca',
       description: '¡Hola! Compártenos tu experiencia para ayudarnos a mejorar los servicios de la biblioteca.',
@@ -332,15 +329,13 @@ async function registerServiceSurveys() {
         maxSkips: 2
       }
     });
-    console.log('✅ Encuesta de Biblioteca registrada');
 
-    console.log('');
-    console.log('🎉 ¡Todas las encuestas de servicio han sido registradas exitosamente!');
-    console.log('');
-    console.log('📌 Próximos pasos:');
-    console.log('1. Ve a la sección "Encuestas de Servicio" en el panel de administración');
-    console.log('2. Configura la frecuencia y habilita las encuestas que desees');
-    console.log('3. Las encuestas comenzarán a mostrarse automáticamente a los usuarios');
+
+
+
+
+
+
 
   } catch (error) {
     console.error('❌ Error al registrar encuestas:', error);
@@ -349,15 +344,14 @@ async function registerServiceSurveys() {
 }
 
 // Instrucciones de uso
-console.log('');
-console.log('═══════════════════════════════════════════════════════════');
-console.log('  SCRIPT DE REGISTRO DE ENCUESTAS DE SERVICIO');
-console.log('═══════════════════════════════════════════════════════════');
-console.log('');
-console.log('Para ejecutar este script:');
-console.log('1. Asegúrate de estar autenticado como administrador');
-console.log('2. Verifica que window.appContext esté disponible');
-console.log('3. Ejecuta: registerServiceSurveys()');
-console.log('');
-console.log('═══════════════════════════════════════════════════════════');
-console.log('');
+
+
+
+
+
+
+
+
+
+
+

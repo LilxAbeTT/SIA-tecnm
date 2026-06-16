@@ -40,7 +40,7 @@ self.addEventListener('activate', event => {
       return Promise.all(
         cacheNames.map(cacheName => {
           if (cacheName !== CACHE_NAME) {
-            console.log('[SW] Eliminando caché obsoleto:', cacheName);
+
             return caches.delete(cacheName);
           }
         })
@@ -77,7 +77,7 @@ self.addEventListener('push', event => {
       data = { ...data, ...parsed };
     }
   } catch (e) {
-    console.warn('[SW] Payload push no es JSON válido.');
+
   }
 
   // Ícono según tipo de notificación

@@ -541,7 +541,7 @@
       try {
         await ctx.db.collection(CLASES).doc(clase.id).update({ miembrosCount: fv.increment(1) });
       } catch (e) {
-        console.warn('[AulaService] miembrosCount update skipped:', e.code);
+
       }
 
       invalidateCache('clases_');
@@ -593,7 +593,7 @@
         try {
           await ctx.db.collection(CLASES).doc(clase.id).update({ miembrosCount: fv.increment(1) });
         } catch (e) {
-          console.warn('[AulaService] miembrosCount update skipped:', e.code);
+
         }
       }
 
@@ -1514,7 +1514,7 @@
               claseId: clase.id
             }));
           } catch (err) {
-            console.warn('[AulaService] getComunidadRecientes skipped class:', clase.id, err?.code || err?.message || err);
+
             return [];
           }
         });

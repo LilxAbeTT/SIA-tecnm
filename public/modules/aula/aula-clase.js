@@ -1287,7 +1287,7 @@
           if (global.AulaEntregas?.openSubmitModal) {
             global.AulaEntregas.openSubmitModal(ctx, _claseId, entBtn.dataset.pubId);
           } else {
-            console.warn('[AulaClase] AulaEntregas.openSubmitModal no disponible');
+
             toast('No se pudo abrir el formulario de entrega', 'danger');
           }
           return;
@@ -1302,7 +1302,7 @@
                 toast('No se pudieron abrir las entregas de esta tarea', 'danger');
               });
           } else {
-            console.warn('[AulaClase] AulaEntregas.openGradeView no disponible');
+
             toast('El modulo de entregas no esta disponible en este momento', 'danger');
           }
           return;
@@ -1608,7 +1608,7 @@
           }
         }
       } catch (err) {
-        console.warn('[AulaClase] _loadHeaderStats error:', err);
+
       }
     }
 
@@ -1768,7 +1768,7 @@
           if (elPend) elPend.classList.remove('d-none');
         }
       } catch (err) {
-        console.warn('[AulaClase] _loadStudentHeaderStats error:', err);
+
       }
     }
 
@@ -1853,7 +1853,7 @@
           _setTabBadge('aula-tab-badge-tareas', pendientes, 'aula-tab-badge--primary');
         }
       } catch (err) {
-        console.warn('[AulaClase] _loadTabBadges error:', err);
+
       }
     }
 
@@ -1901,7 +1901,7 @@
           } catch (_) {}
         }));
       } catch (err) {
-        console.warn('[AulaClase] _loadEntregaStatus error:', err);
+
       }
     }
 
@@ -1930,7 +1930,7 @@
           } catch (_) {}
         }));
       } catch (err) {
-        console.warn('[AulaClase] _loadEntregaProgreso error:', err);
+
       }
     }
 

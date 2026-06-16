@@ -5,7 +5,9 @@
 (function () {
     'use strict';
 
-    const COLLECTION = 'avisos';
+    function _getCollection() {
+        return localStorage.getItem('sia_dev_mode') === 'true' ? 'avisos_dev' : 'avisos';
+    }
     const USER_VIEWS_SUBCOLLECTION = 'avisoViews';
     const DEFAULT_LIMIT = 40;
     const SEEN_TTL_MS = 90 * 24 * 60 * 60 * 1000;
@@ -180,7 +182,7 @@
             viewCount: 0
         };
 
-        const ref = await db.collection(COLLECTION).add(doc);
+        const ref = await db.collection(_getCollection()).add(doc);
         return ref.id;
     }
 
@@ -209,14 +211,14 @@
         delete updates.viewCount;
         delete updates.effectiveStatus;
 
-        await db.collection(COLLECTION).doc(id).update(updates);
+        await db.collection(_getCollection()).doc(id).update(updates);
     }
 
     async function deleteAviso(ctx, id) {
         const db = _getDb();
         if (!db) throw new Error('Firestore no disponible');
         if (!_canManageAvisos(ctx)) throw new Error('Sin permisos para eliminar avisos');
-        await db.collection(COLLECTION).doc(id).delete();
+        await db.collection(_getCollection()).doc(id).delete();
     }
 
     async function duplicateAviso(ctx, id) {
@@ -224,7 +226,7 @@
         if (!db) throw new Error('Firestore no disponible');
         if (!_canManageAvisos(ctx)) throw new Error('Sin permisos para duplicar avisos');
 
-        const snap = await db.collection(COLLECTION).doc(id).get();
+        const snap = await db.collection(_getCollection()).doc(id).get();
         if (!snap.exists) throw new Error('Aviso no encontrado');
 
         const source = snap.data() || {};
@@ -245,7 +247,7 @@
 
         delete payload.effectiveStatus;
 
-        const ref = await db.collection(COLLECTION).add(payload);
+        const ref = await db.collection(_getCollection()).add(payload);
         return ref.id;
     }
 
@@ -254,12 +256,12 @@
         if (!db) throw new Error('Firestore no disponible');
         if (!_canManageAvisos(ctx)) throw new Error('Sin permisos para cambiar estado');
 
-        const doc = await db.collection(COLLECTION).doc(id).get();
+        const doc = await db.collection(_getCollection()).doc(id).get();
         if (!doc.exists) throw new Error('Aviso no encontrado');
 
         const current = doc.data()?.status || 'active';
         const newStatus = current === 'active' ? 'paused' : 'active';
-        await db.collection(COLLECTION).doc(id).update({
+        await db.collection(_getCollection()).doc(id).update({
             status: newStatus,
             updatedAt: _now()
         });
@@ -270,7 +272,7 @@
         const db = _getDb();
         if (!db) throw new Error('Firestore no disponible');
         if (!_canManageAvisos(ctx)) throw new Error('Sin permisos para archivar avisos');
-        await db.collection(COLLECTION).doc(id).update({
+        await db.collection(_getCollection()).doc(id).update({
             status: 'archived',
             updatedAt: _now()
         });
@@ -281,7 +283,7 @@
         if (!db) return [];
 
         const limit = Number(options?.limit) || 80;
-        const snap = await db.collection(COLLECTION)
+        const snap = await db.collection(_getCollection())
             .orderBy('createdAt', 'desc')
             .limit(limit)
             .get();

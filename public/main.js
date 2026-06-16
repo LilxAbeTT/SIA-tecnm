@@ -519,7 +519,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const acc = await LactarioService.checkAccess(user.profile || user);
             showLactario = acc.allowed;
         } else {
-            console.warn('[SIA Main] LactarioService not loaded yet.');
+
         }
 
         const btnLactario = document.getElementById('smart-card-lactario-wrapper');

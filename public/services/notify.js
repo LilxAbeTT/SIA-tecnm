@@ -51,7 +51,7 @@ const Notify = {
     this._uid = uid;
 
     if (!uid) {
-      console.warn('[Notify] No UID provided for initialization.');
+
       return;
     }
 
@@ -83,11 +83,11 @@ const Notify = {
             : PushService.getPermissionState();
           if (permission !== 'granted') return;
 
-          console.log('[Notify] Permiso concedido; refrescando token FCM en background...');
+
           const ok = await PushService.requestAndSubscribe(uid);
-          console.log('[Notify] Token FCM auto-refresh:', ok ? 'OK' : 'fallo');
+
         } catch (e) {
-          console.warn('[Notify] Token FCM auto-refresh error:', e);
+
         }
       }, 2000);
     }
@@ -213,7 +213,7 @@ const Notify = {
 
       if (count > 0) promises.push(batch.commit());
       await Promise.all(promises);
-      console.log(`[Notify] Enviado a ${snapshot.size} usuarios con rol '${role}'.`);
+
     } catch (e) {
       console.error('[Notify] Error en sendToRole:', e);
     }

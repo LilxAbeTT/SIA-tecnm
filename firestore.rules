@@ -1247,6 +1247,9 @@ function isEncuestasAdmin() {
 
     
 
+
+    
+
     // ==== AVISOS INSTITUCIONALES ====
     function isAvisosAdmin() {
         let data = userDoc(request.auth.uid).data;
@@ -1262,6 +1265,11 @@ function isEncuestasAdmin() {
       allow create, update, delete: if isAvisosAdmin() || isSuperAdmin();
     }
     
+    // ==== AVISOS (SANDBOX MODO DEV) ====
+    match /avisos_dev/{avisoId} {
+      allow read, create, update, delete: if isSignedIn();
+    }
+
     // ==== TEST VOCACIONAL (DIFUSIÓN) ====
     function isDifusionAdmin() {
         let data = userDoc(request.auth.uid).data;
@@ -1276,7 +1284,6 @@ function isEncuestasAdmin() {
     match /aspirantes-registros/{aspiranteId} {
         // Cualquiera puede crear un perfil temporal
         allow create: if !aspiranteId.matches('^[0-9+()\\-\\s]{7,}$');
-        // Solo el aspirante que conoce su ID exacto (guardado en LocalStorage) puede leer/actualizar su propio documento.
         // No permitimos un "list" (getDocs) público para evitar que alguien descargue toda la base.
         // El admin de difusión sí puede hacer todo.
         allow get, update: if !aspiranteId.matches('^[0-9+()\\-\\s]{7,}$') || isDifusionAdmin();

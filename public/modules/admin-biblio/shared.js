@@ -8,7 +8,7 @@ window.AdminBiblio.Shared = (function () {
         try {
             await taskFn();
         } catch (error) {
-            console.warn(`[BiblioAdmin] ${taskLabel} failed:`, error);
+
             warnings.push(taskLabel);
         }
     }
@@ -46,7 +46,7 @@ window.AdminBiblio.Shared = (function () {
         try {
             return JSON.parse(decodeURIComponent(payload || ''));
         } catch (error) {
-            console.warn('[BiblioAdmin] Invalid item payload:', error);
+
             return null;
         }
     }

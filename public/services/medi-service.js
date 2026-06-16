@@ -118,13 +118,13 @@ const MediService = (function () {
             if (snap.exists) {
                 const data = snap.data();
                 config = { ...config, ...data };
-                console.log('✅ [MediService] Config cargada:', config);
+
             } else {
-                console.log('⚠️ [MediService] No hay config en Firestore, usando defaults (Silencioso)');
+
             }
         } catch (e) {
             if (e.code === 'permission-denied') {
-                console.warn('⚠️ [MediService] Sin permisos para leer config (usando defaults).');
+
             } else {
                 console.error('❌ [MediService] Error cargando config:', e);
             }
@@ -223,7 +223,7 @@ const MediService = (function () {
     }
 
     function getPauseUntilKeyForContext(role, shiftTag = null, profileId = null) {
-        return getScopedConfigKeys('pauseUntil', role, shiftTag, profileId)[0] || 'pauseUntil_MÃ©dico';
+        return getScopedConfigKeys('pauseUntil', role, shiftTag, profileId)[0] || 'pauseUntil_Médico';
     }
 
     function getPauseUntilForContext(cfg = config, role, shiftTag = null, profileId = null) {
@@ -482,14 +482,14 @@ const MediService = (function () {
                 };
             }
         } catch (shiftProfileErr) {
-            console.warn('[MediService] Shift profile resolution failed, using matricula fallback.', shiftProfileErr);
+
         }
 
         try {
             // A. Find Main User Account by Matricula
             const q = await ctx.db.collection('usuarios').where('matricula', '==', targetMatricula).limit(1).get();
             if (q.empty) {
-                console.warn(`[MediService] Alert: No account found for matricula: ${targetMatricula}`);
+
                 return null;
             }
 
@@ -522,13 +522,13 @@ const MediService = (function () {
                             const pData = match.data();
                             result.profileId = match.id;
                             result.displayName = pData.shortName || pData.displayName || result.displayName;
-                            console.log(`[MediService] Resolved Profile for Booking: ${result.displayName} (${targetShift})`);
+
                         }
                     }
                 } catch (profileErr) {
                     // Student callers can't read the profiles subcollection (Firestore rules).
                     // Gracefully continue — the appointment will use mainUid without a specific profileId.
-                    console.warn('[MediService] Could not read psicólogo profiles (expected for student callers):', profileErr.code);
+
                 }
             }
 
@@ -662,7 +662,6 @@ const MediService = (function () {
         const h = date.getHours();
         const computedShift = h < 15 ? 'Matutino' : 'Vespertino';
 
-        console.log(`[MediService] Reservando cita para ${user.email} (${tipo}) — Sistema de Cola`);
 
         // 1. Contar citas activas a esa hora+tipo (fuera de transacción para evitar conflictos de índice)
         const slotStart = new Date(date);
@@ -838,7 +837,7 @@ const MediService = (function () {
         try {
             resolvedProfesional = await resolveProfessionalForBooking(ctx, nextTipo, nextDate);
         } catch (e) {
-            console.warn("[MediService] No se pudo resolver el profesional al reagendar:", e);
+
         }
 
         const hasConfirmed = otherActive.some((doc) => doc.data().estado === 'confirmada');
@@ -903,7 +902,7 @@ const MediService = (function () {
         const unsubCitas = ctx.db.collection(C_CITAS)
             .where('studentId', '==', uid)
             .onSnapshot(snap => {
-                console.log(`[MediService] Stream Citas Update: ${snap.size} docs found for ${uid}`);
+
                 const citas = snap.docs.map(d => {
                     const data = d.data();
                     return {
@@ -949,7 +948,7 @@ const MediService = (function () {
 
     function streamSalaEspera(ctx, role, shiftTag, callback) {
         const normalizedRole = normalizeServiceRole(role);
-        console.log(`[MediService] Abriendo Sala de Espera para area: ${normalizedRole} [Shift: ${shiftTag || 'All'}]`);
+
         const todayStart = ts(startOfDay());
 
         // Base Query
@@ -1030,7 +1029,7 @@ const MediService = (function () {
                 .get();
 
             if (q.empty) {
-                console.log('[MediService] No hay citas en cola para promover.');
+
                 return null;
             }
 
@@ -1068,7 +1067,7 @@ const MediService = (function () {
                 });
             }
 
-            console.log(`[MediService] Cita ${nextInLine.id} promovida a confirmada (auto-promoción de cola).`);
+
             return nextInLine.id;
 
         } catch (e) {
@@ -1326,7 +1325,7 @@ const MediService = (function () {
         const snap = await profilesRef.get();
 
         if (snap.empty) {
-            console.log("Seeding initial profiles for:", uid);
+
             const batch = ctx.db.batch();
             const pinMatutinoHash = await hashPinValue('2024');
             const pinVespertinoHash = await hashPinValue('2025');
@@ -1452,7 +1451,7 @@ const MediService = (function () {
 
             return note;
         } catch (e) {
-            console.warn('[MediService] Error reading private consultation note:', e);
+
             return '';
         }
     }
@@ -1487,7 +1486,7 @@ const MediService = (function () {
 
             return true;
         } catch (e) {
-            console.warn('[MediService] Error migrating private consultation note:', e);
+
             return false;
         }
     }
@@ -1697,7 +1696,7 @@ const MediService = (function () {
             if (err.code === 'permission-denied') {
                 if (window.showToast) showToast("Error de permisos: No puedes leer las citas agendadas.", "danger");
             } else if (err.code === 'failed-precondition') {
-                console.warn("Falta Índice en Firestore para Citas confirmadas.");
+
                 if (window.showToast) showToast("Error de Base de Datos (Falta Índice). Revisa la consola.", "danger");
             }
         });
@@ -1796,7 +1795,7 @@ const MediService = (function () {
             });
 
         } catch (e) {
-            console.warn("Error leyendo nueva estructura:", e);
+
         }
 
         docs.sort((a, b) => (b.safeDate || 0) - (a.safeDate || 0));
@@ -1869,7 +1868,7 @@ const MediService = (function () {
     // [NEW] DASHBOARD HELPER (STREAM)
     function streamRecentConsultations(ctx, role, uid, profileId, limit = 5, callback, shiftTag = null) {
         try {
-            console.log(`[MediService] Stream Recent Request -> Role: ${role}, UID: ${uid}, Profile: ${profileId}`);
+
             const effectiveUid = uid || (ctx.auth.currentUser ? ctx.auth.currentUser.uid : null);
             if (!effectiveUid) {
                 console.error("[MediService] UID missing/null for streamRecentConsultations - Aborting query.");
@@ -1896,7 +1895,7 @@ const MediService = (function () {
                     return () => { };
                 }
 
-                console.log(`[MediService] Filtering by autorId: ${effectiveUid}`);
+
                 q = q;
             }
 
@@ -1908,7 +1907,7 @@ const MediService = (function () {
             q = q.orderBy('createdAt', 'desc').limit(snapshotLimit);
 
             const unsubscribe = q.onSnapshot(async (snap) => {
-                console.log(`[MediService] Stream Recent Update: ${snap.size} docs found.`);
+
                 const scopedDocs = snap.docs
                     .map((doc) => ({ id: doc.id, data: doc.data() }))
                     .filter(({ data }) => matchesConsultationScope(data, normalizedRole, effectiveUid, shiftTag, profileId));
@@ -2108,7 +2107,7 @@ const MediService = (function () {
                 profileId
             );
         } catch (err) {
-            console.warn('[MediService] Error loading patient operational history:', err);
+
         }
 
         const lastConsultation = history[0] || null;
@@ -2135,7 +2134,7 @@ const MediService = (function () {
                 }
             });
         } catch (err) {
-            console.warn('[MediService] Error loading patient appointment snapshot:', err);
+
         }
 
         const followUpDate = safeDate(pendingFollowUp?.followUp?.date);
@@ -2234,7 +2233,7 @@ const MediService = (function () {
 
             return results;
         } catch (err) {
-            console.warn('[MediService] Error building patient insights:', err);
+
             return results;
         }
     }

@@ -1,4 +1,4 @@
-﻿if (!window.AdminBiblio) window.AdminBiblio = {};
+if (!window.AdminBiblio) window.AdminBiblio = {};
 window.AdminBiblio.State = window.AdminBiblio.State || {};
 window.AdminBiblio.Catalogo = (function () {
     const state = window.AdminBiblio.State;
@@ -12,6 +12,7 @@ window.AdminBiblio.Catalogo = (function () {
     let _holidayPointerActive = false;
     let _holidayPointerMode = 'add';
     let _holidayLastPointerDate = '';
+    let _labelsPrintQueue = [];
 
     function syncFromState() {
         _ctx = state.ctx;
@@ -21,6 +22,7 @@ window.AdminBiblio.Catalogo = (function () {
         _holidayBlockedDates = Array.isArray(state.holidayBlockedDates) ? state.holidayBlockedDates.slice() : [];
         _holidaySelectionAnchor = state.holidaySelectionAnchor;
         _holidayCalendarMeta = state.holidayCalendarMeta;
+        _labelsPrintQueue = Array.isArray(state.labelsPrintQueue) ? state.labelsPrintQueue.slice() : [];
     }
 
     function syncToState() {
@@ -31,6 +33,7 @@ window.AdminBiblio.Catalogo = (function () {
         state.holidayBlockedDates = Array.isArray(_holidayBlockedDates) ? _holidayBlockedDates.slice() : [];
         state.holidaySelectionAnchor = _holidaySelectionAnchor;
         state.holidayCalendarMeta = _holidayCalendarMeta;
+        state.labelsPrintQueue = Array.isArray(_labelsPrintQueue) ? _labelsPrintQueue.slice() : [];
     }
 
     function withState(fn) {
@@ -170,23 +173,46 @@ window.AdminBiblio.Catalogo = (function () {
     }
 
     function formatInventoryStatusSummary(summary = {}) {
-        const systemTotal = Number(summary.systemTotal) || 0;
         const registeredCatalog = Number(summary.registeredCatalog) || 0;
         const outsideCatalog = Number(summary.outsideCatalog) || 0;
-        const estimatedMissing = Number(summary.estimatedMissing) || 0;
+        const extraMaterials = Number(summary.extraMaterials) || 0;
+        const totalCaptured = registeredCatalog + outsideCatalog + extraMaterials || Number(summary.totalCaptured) || 0;
 
         return `
             <div class="d-flex flex-wrap gap-2 mb-3">
-                <span class="badge text-bg-light border">${systemTotal} en sistema</span>
-                <span class="badge text-bg-light border">${registeredCatalog} registrados</span>
-                <span class="badge text-bg-warning border">${estimatedMissing} faltantes</span>
-                ${outsideCatalog > 0 ? `<span class="badge text-bg-light border">${outsideCatalog} fuera de sistema</span>` : ''}
+                <span class="badge text-bg-light border">${totalCaptured} observados</span>
+                <span class="badge text-bg-light border">${registeredCatalog} en catalogo</span>
+                ${outsideCatalog > 0 ? `<span class="badge text-bg-warning border">${outsideCatalog} fuera de sistema</span>` : ''}
+                ${extraMaterials > 0 ? `<span class="badge text-bg-info text-white border">${extraMaterials} otros materiales</span>` : ''}
             </div>
         `;
     }
 
     function sumInventoryStatusObserved(entries = []) {
         return (entries || []).reduce((total, entry) => total + (Number(entry?.totalObserved || entry?.cantidad || entry?.lastQuantity || 0) || 0), 0);
+    }
+
+    function buildInventoryBackupFilename(session = {}) {
+        const rawName = String(session?.name || session?.id || 'inventario')
+            .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+            .replace(/[^a-zA-Z0-9_-]+/g, '-')
+            .replace(/^-+|-+$/g, '')
+            .slice(0, 80) || 'inventario';
+        const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+        return `respaldo-biblio-${rawName}-${stamp}.json`;
+    }
+
+    function downloadJsonBackup(payload, filename) {
+        const json = JSON.stringify(payload, null, 2);
+        const blob = new Blob([json], { type: 'application/json;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 30000);
     }
 
     function buildGestionLibrosInventoryStatusHtml(currentState, catalogSummary, latestFinished) {
@@ -215,11 +241,9 @@ window.AdminBiblio.Catalogo = (function () {
 
         const finishedSession = latestFinished?.session || null;
         const summary = finishedSession?.summary || (finishedSession ? {
-            systemTotal: Number(catalogSummary?.totalCopies) || 0,
-            registeredCatalog: sumInventoryStatusObserved(latestFinished?.foundEntries),
-            outsideCatalog: sumInventoryStatusObserved(latestFinished?.missingEntries),
-            estimatedMissing: Math.max((Number(catalogSummary?.totalCopies) || 0) - sumInventoryStatusObserved(latestFinished?.foundEntries), 0),
-            totalCaptured: sumInventoryStatusObserved(latestFinished?.foundEntries) + sumInventoryStatusObserved(latestFinished?.missingEntries)
+            registeredCatalog: sumInventoryStatusObserved((latestFinished?.foundEntries || []).filter(e => e.type !== 'material')),
+            outsideCatalog: sumInventoryStatusObserved((latestFinished?.missingEntries || []).filter(e => e.type !== 'material')),
+            extraMaterials: sumInventoryStatusObserved([...(latestFinished?.foundEntries || []), ...(latestFinished?.missingEntries || [])].filter(e => e.type === 'material'))
         } : null);
         if (finishedSession && summary) {
             return `
@@ -227,8 +251,11 @@ window.AdminBiblio.Catalogo = (function () {
                 <div class="small text-muted mb-2">${escapeHtml(finishedSession.name || 'Resumen final listo')}</div>
                 ${formatInventoryStatusSummary(summary)}
                 <div class="d-grid gap-2">
-                    <button class="btn btn-dark rounded-pill fw-bold" type="button" onclick="AdminBiblio.downloadInventorySummaryPdf('${escapeJsString(finishedSession.id || '')}')">
-                        <i class="bi bi-file-earmark-pdf me-2"></i>Descargar PDF
+                    <button class="btn btn-dark rounded-pill fw-bold" type="button" onclick="AdminBiblio.openInventoryPdfOptionsModal('${escapeJsString(finishedSession.id || '')}')">
+                        <i class="bi bi-file-earmark-pdf me-2"></i>Exportar PDF
+                    </button>
+                    <button class="btn btn-outline-dark rounded-pill fw-bold" type="button" onclick="AdminBiblio.downloadInventoryAdjustmentBackupFromGestion('${escapeJsString(finishedSession.id || '')}')">
+                        <i class="bi bi-download me-2"></i>Descargar respaldo
                     </button>
                     <button class="btn btn-outline-warning rounded-pill fw-bold" type="button" onclick="AdminBiblio.confirmAdjustFinishedInventoryFromGestion('${escapeJsString(finishedSession.id || '')}')">
                         <i class="bi bi-arrow-repeat me-2"></i>Ajustar inventario
@@ -340,7 +367,8 @@ window.AdminBiblio.Catalogo = (function () {
                         <div class="fw-semibold text-dark mb-2">Total inventariado real: ${Number(summary.totalCaptured || summary.registeredCatalog || 0)}</div>
                         ${formatInventoryStatusSummary(summary)}
                         <div class="small text-muted mb-2">Este ajuste tomara el inventario cerrado como referencia real para actualizar el catalogo.</div>
-                        <div class="small text-muted mb-2">Se activaran solo los ejemplares inventariados y el excedente quedara fuera del catalogo activo.</div>
+                        <div class="small text-muted mb-2">Se activaran solo los ejemplares inventariados; el excedente quedara fuera del catalogo activo, sin borrarse.</div>
+                        <div class="small text-muted mb-2">Los libros y copias capturados durante el inventario se agregaran al catalogo en este ajuste.</div>
                         <div class="small text-muted">Si hay ejemplares con prestamos activos, se conservaran temporalmente para no romper el stock.</div>
                         ${Number(summary.outsideCatalog) > 0 ? `<div class="small text-warning mt-2">Hay ${Number(summary.outsideCatalog) || 0} captura(s) fuera de sistema. Solo se ajustaran automaticamente los libros catalogados o ya asociados.</div>` : ''}
                     </div>
@@ -348,14 +376,39 @@ window.AdminBiblio.Catalogo = (function () {
                 confirmText: 'Confirmar ajuste',
                 confirmClass: 'btn-warning',
                 onConfirm: async () => {
+                    showToast('Generando respaldo antes del ajuste...', 'info');
+                    const backup = await BiblioService.createInventoryAdjustmentBackup(_ctx, session.id);
+                    downloadJsonBackup(backup, buildInventoryBackupFilename(session));
                     await BiblioService.applyFinishedInventoryToCatalog(_ctx, session.id);
                     state.inventoryCatalogSummary = null;
                     await refreshGestionLibrosInventoryStatus();
-                    showToast('Catalogo ajustado al inventario real.', 'success');
+                    showToast('Respaldo descargado y catalogo ajustado al inventario real.', 'success');
                 }
             });
         } catch (error) {
             showToast(error.message || 'No se pudo ajustar el catalogo.', 'danger');
+        }
+    }
+
+    async function downloadInventoryAdjustmentBackupFromGestion(sessionId = '') {
+        if (!_ctx) return;
+
+        try {
+            const details = sessionId
+                ? await BiblioService.getInventorySessionDetails(_ctx, sessionId)
+                : await BiblioService.getLatestFinishedInventorySession(_ctx);
+            const session = details?.session || null;
+            if (!session?.id) {
+                showToast('No hay un inventario cerrado para respaldar.', 'warning');
+                return;
+            }
+
+            showToast('Generando respaldo de catalogo e inventario...', 'info');
+            const backup = await BiblioService.createInventoryAdjustmentBackup(_ctx, session.id);
+            downloadJsonBackup(backup, buildInventoryBackupFilename(session));
+            showToast('Respaldo descargado.', 'success');
+        } catch (error) {
+            showToast(error.message || 'No se pudo generar el respaldo.', 'danger');
         }
     }
 
@@ -428,57 +481,41 @@ window.AdminBiblio.Catalogo = (function () {
                 </div>
                 <button class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body p-3 p-md-4 pb-5" style="padding-bottom:calc(5rem + env(safe-area-inset-bottom));">
+            <div class="modal-body p-3 p-md-4 pb-5 bg-light" style="padding-bottom:calc(5rem + env(safe-area-inset-bottom));">
                 
                 <div class="row g-4">
-                    <div class="col-12 col-lg-6">
-                        <div class="card border-0 shadow-sm rounded-4 h-100">
-                            <div class="card-body p-3 p-md-4">
-                                <div class="d-flex align-items-center gap-3 mb-3">
-                                    <div class="bg-success bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center" style="width:56px;height:56px;">
-                                        <i class="bi bi-journal-plus fs-4 text-success"></i>
-                                    </div>
-                                    <div>
-                                        <div class="small text-uppercase fw-bold text-muted">Agregar / editar</div>
-                                        <h5 class="mb-0 text-dark">Catalogo de libros</h5>
-                                    </div>
+                    <div class="col-12 col-md-4">
+                        <div class="card border-0 shadow-sm rounded-4 h-100" style="cursor: pointer;" onclick="AdminBiblio.abrirSubmodalGestionarLibros()">
+                            <div class="card-body p-4 text-center">
+                                <div class="bg-success bg-opacity-10 rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style="width:64px;height:64px;">
+                                    <i class="bi bi-journals fs-3 text-success"></i>
                                 </div>
-                                <div class="d-grid gap-2 mb-3">
-                                    <button class="btn btn-success rounded-pill fw-bold" type="button" onclick="AdminBiblio.renderBookForm()">
-                                        <i class="bi bi-plus-circle me-2"></i>Agregar nuevo libro
-                                    </button>
-                                    <button class="btn btn-outline-warning rounded-pill fw-bold" type="button" onclick="AdminBiblio.renderBookEditSearch()">
-                                        <i class="bi bi-pencil-square me-2"></i>Editar libro existente
-                                    </button>
-                                </div>
-                                <div class="small fw-bold text-muted text-uppercase mb-2">Ultimo agregado</div>
-                                <div id="gestion-libros-last-book" class="rounded-4 border bg-light p-3 text-muted small">
-                                    <span class="spinner-border spinner-border-sm me-2"></span>Cargando referencia...
-                                </div>
+                                <h5 class="fw-bold text-dark mb-2">Gestionar libros</h5>
+                                <p class="small text-muted mb-0">Agregar, editar o dar de baja ejemplares en el catalogo.</p>
                             </div>
                         </div>
                     </div>
-                    <div class="col-12 col-lg-6">
-                        <div class="card border-0 shadow-sm rounded-4 h-100 bg-danger-subtle">
-                            <div class="card-body p-3 p-md-4">
-                                <div class="d-flex align-items-center gap-3 mb-3">
-                                    <div class="bg-white rounded-circle d-flex align-items-center justify-content-center text-danger shadow-sm" style="width:56px;height:56px;">
-                                        <i class="bi bi-clipboard2-data fs-4"></i>
-                                    </div>
-                                    <div>
-                                        <div class="small text-uppercase fw-bold text-danger-emphasis">Inventario</div>
-                                        <h5 class="mb-0 text-dark">Conteo y faltantes</h5>
-                                    </div>
+                    
+                    <div class="col-12 col-md-4">
+                        <div class="card border-0 shadow-sm rounded-4 h-100" style="cursor: pointer;" onclick="AdminBiblio.abrirSubmodalEtiquetas()">
+                            <div class="card-body p-4 text-center">
+                                <div class="bg-primary bg-opacity-10 rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style="width:64px;height:64px;">
+                                    <i class="bi bi-tags fs-3 text-primary"></i>
                                 </div>
-                                <div class="d-grid gap-2 mb-3">
-                                    <button class="btn btn-danger rounded-pill fw-bold" type="button" onclick="AdminBiblio.abrirModalInventario()">
-                                        <i class="bi bi-play-circle me-2"></i>Abrir inventario
-                                    </button>
+                                <h5 class="fw-bold text-dark mb-2">Generar etiquetas</h5>
+                                <p class="small text-muted mb-0">Impresion de codigos de barras y lomos.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-12 col-md-4">
+                        <div class="card border-0 shadow-sm rounded-4 h-100" style="cursor: pointer;" onclick="AdminBiblio.abrirSubmodalInventario()">
+                            <div class="card-body p-4 text-center">
+                                <div class="bg-danger bg-opacity-10 rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style="width:64px;height:64px;">
+                                    <i class="bi bi-clipboard2-data fs-3 text-danger"></i>
                                 </div>
-                                <div class="small fw-bold text-muted text-uppercase mb-2">Sesion actual</div>
-                                <div id="gestion-libros-inventory-status" class="rounded-4 border bg-white p-3 text-muted small">
-                                    <span class="spinner-border spinner-border-sm me-2"></span>Revisando estado...
-                                </div>
+                                <h5 class="fw-bold text-dark mb-2">Inventario Semestral</h5>
+                                <p class="small text-muted mb-0">Auditoria del catalogo de la biblioteca.</p>
                             </div>
                         </div>
                     </div>
@@ -492,6 +529,325 @@ window.AdminBiblio.Catalogo = (function () {
 
         modalEl.removeEventListener('hidden.bs.modal', _cleanupBackdrop);
         modalEl.addEventListener('hidden.bs.modal', _cleanupBackdrop);
+    }
+
+    function abrirSubmodalEtiquetas() {
+        const body = document.getElementById('modal-admin-body');
+        body.innerHTML = `
+            <div class="modal-header border-0 bg-primary text-white p-4">
+                <div>
+                    <h3 class="fw-bold mb-1"><i class="bi bi-tags me-3"></i>Generar Etiquetas</h3>
+                    <div class="small text-white-50">Busca libros y genera etiquetas de códigos de barras.</div>
+                </div>
+                <button class="btn-close btn-close-white" onclick="AdminBiblio.abrirModalGestionLibros()"></button>
+            </div>
+            <div class="modal-body p-4 pb-5 bg-light" style="padding-bottom:calc(5rem + env(safe-area-inset-bottom));">
+                <div class="input-group mb-4 shadow-sm">
+                    <input type="text" class="form-control border-0 p-3" id="label-search-input" placeholder="Ingresa No. Adquisicion (Ej: 00001)" onkeydown="if(event.key === 'Enter') AdminBiblio.handleLabelSearch()">
+                    <button class="btn btn-primary px-4 fw-bold" onclick="AdminBiblio.handleLabelSearch()">
+                        <i class="bi bi-search"></i>
+                    </button>
+                </div>
+                
+                <div id="label-search-result" class="mb-4"></div>
+
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div class="fw-bold text-muted text-uppercase small">Lista de Impresión</div>
+                    <button class="btn btn-sm btn-outline-danger" onclick="AdminBiblio.clearLabelsQueue()">Limpiar Lista</button>
+                </div>
+                
+                <div id="labels-queue-container" class="list-group shadow-sm mb-4">
+                    <!-- Lista de etiquetas a imprimir -->
+                </div>
+                
+                <div class="d-grid">
+                    <button class="btn btn-dark rounded-pill fw-bold p-3" id="btn-export-labels" onclick="AdminBiblio.exportLabelsPdf()" disabled>
+                        <i class="bi bi-file-earmark-pdf me-2"></i>Exportar Etiquetas a PDF (Hoja Carta)
+                    </button>
+                </div>
+            </div>
+        `;
+        renderLabelsQueue();
+    }
+
+    async function handleLabelSearch() {
+        const q = document.getElementById('label-search-input').value.trim();
+        if (!q) return showToast("Ingresa un número de adquisición", "warning");
+
+        const container = document.getElementById('label-search-result');
+        container.innerHTML = '<div class="text-center py-4 text-muted"><span class="spinner-border spinner-border-sm"></span> Buscando ejemplares...</div>';
+
+        try {
+            const searchedBook = await BiblioService.getBookByAdquisicion(_ctx, q.toUpperCase());
+            if (!searchedBook) {
+                container.innerHTML = '<div class="alert alert-warning border-0 shadow-sm"><i class="bi bi-exclamation-triangle me-2"></i>No se encontró el libro.</div>';
+                return;
+            }
+
+            const copiesSnap = await _ctx.db.collection('biblio-catalogo')
+                .where('titulo', '==', searchedBook.titulo)
+                .get();
+
+            let copies = [];
+            copiesSnap.forEach(doc => {
+                const data = doc.data();
+                if (data.autor === searchedBook.autor) {
+                    copies.push({ id: doc.id, ...data });
+                }
+            });
+
+            copies.sort((a, b) => a.adquisicion.localeCompare(b.adquisicion));
+
+            copies = copies.map((c, index) => {
+                c.copyTag = `ITES Ej. ${index + 1}`;
+                return c;
+            });
+
+            let html = `
+                <div class="card border-0 shadow-sm rounded-4 mb-3">
+                    <div class="card-body">
+                        <h6 class="fw-bold mb-1">${escapeHtml(searchedBook.titulo)}</h6>
+                        <div class="small text-muted mb-3">${escapeHtml(searchedBook.autor)} | ${copies.length} ejemplar(es) encontrado(s)</div>
+                        <ul class="list-group list-group-flush mb-3">
+            `;
+
+            copies.forEach(c => {
+                const isSearched = c.adquisicion === searchedBook.adquisicion;
+                const inQueue = _labelsPrintQueue.some(item => item.adquisicion === c.adquisicion);
+                const badgeClass = isSearched ? 'bg-primary' : 'bg-secondary';
+                html += `
+                    <li class="list-group-item d-flex flex-column gap-2 px-0 py-3">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <div class="fw-semibold">${c.adquisicion} <span class="badge ${badgeClass} ms-1">${c.copyTag}</span></div>
+                                <div class="small text-muted">Clasificación: ${escapeHtml(c.clasificacion || 'N/A')}</div>
+                            </div>
+                            <button class="btn btn-sm ${inQueue ? 'btn-success disabled' : 'btn-outline-primary'}" 
+                                onclick="AdminBiblio.addLabelToQueue('${escapeJsString(c.adquisicion)}', '${escapeJsString(c.clasificacion || '')}', '${escapeJsString(c.copyTag)}')">
+                                ${inQueue ? '<i class="bi bi-check-circle me-1"></i>Añadido' : '<i class="bi bi-plus-lg me-1"></i>Añadir'}
+                            </button>
+                        </div>
+                    </li>
+                `;
+            });
+
+            html += `
+                        </ul>
+                        <div class="d-grid">
+                            <button class="btn btn-outline-dark btn-sm rounded-pill fw-bold" onclick="AdminBiblio.addAllLabelsToQueue('${escapeJsString(encodeURIComponent(JSON.stringify(copies)))}')">
+                                Añadir todos a la lista
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            container.innerHTML = html;
+        } catch (error) {
+            console.error(error);
+            container.innerHTML = '<div class="alert alert-danger border-0 shadow-sm"><i class="bi bi-x-circle me-2"></i>Error al buscar ejemplares.</div>';
+        }
+    }
+
+    function addLabelToQueue(adquisicion, clasificacion, copyTag) {
+        if (!_labelsPrintQueue.some(i => i.adquisicion === adquisicion)) {
+            _labelsPrintQueue.push({ adquisicion, clasificacion, copyTag });
+            showToast(`Añadido ${adquisicion}`, 'success');
+            renderLabelsQueue();
+            const q = document.getElementById('label-search-input')?.value;
+            if (q) handleLabelSearch();
+        }
+    }
+
+    function addAllLabelsToQueue(encodedCopies) {
+        try {
+            const copies = JSON.parse(decodeURIComponent(encodedCopies));
+            let addedCount = 0;
+            copies.forEach(c => {
+                if (!_labelsPrintQueue.some(i => i.adquisicion === c.adquisicion)) {
+                    _labelsPrintQueue.push({ 
+                        adquisicion: c.adquisicion, 
+                        clasificacion: c.clasificacion || '', 
+                        copyTag: c.copyTag 
+                    });
+                    addedCount++;
+                }
+            });
+            if (addedCount > 0) {
+                showToast(`Se añadieron ${addedCount} etiquetas a la lista`, 'success');
+                renderLabelsQueue();
+                handleLabelSearch();
+            } else {
+                showToast(`Las etiquetas ya estaban en la lista`, 'info');
+            }
+        } catch(e) {
+            console.error(e);
+        }
+    }
+
+    function removeLabelFromQueue(index) {
+        _labelsPrintQueue.splice(index, 1);
+        renderLabelsQueue();
+        const q = document.getElementById('label-search-input')?.value;
+        if (q) handleLabelSearch();
+    }
+
+    function clearLabelsQueue() {
+        if (_labelsPrintQueue.length === 0) return;
+        showConfirmModal({
+            icon: 'trash-fill',
+            iconColor: '#dc3545',
+            title: 'Limpiar Lista',
+            message: '¿Estás seguro de que deseas vaciar la lista de impresión?',
+            confirmText: 'Limpiar',
+            confirmClass: 'btn-danger',
+            onConfirm: () => {
+                _labelsPrintQueue = [];
+                renderLabelsQueue();
+                const q = document.getElementById('label-search-input')?.value;
+                if (q) handleLabelSearch();
+            }
+        });
+    }
+
+    function renderLabelsQueue() {
+        const container = document.getElementById('labels-queue-container');
+        const btnExport = document.getElementById('btn-export-labels');
+        if (!container) return;
+
+        if (_labelsPrintQueue.length === 0) {
+            container.innerHTML = '<div class="list-group-item text-center py-4 text-muted border-0 bg-transparent">La lista de impresión está vacía.</div>';
+            if (btnExport) btnExport.disabled = true;
+            return;
+        }
+
+        let html = '';
+        _labelsPrintQueue.forEach((item, index) => {
+            html += `
+                <div class="list-group-item d-flex justify-content-between align-items-center p-3">
+                    <div class="d-flex align-items-center">
+                        <div class="bg-primary bg-opacity-10 text-primary rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 40px; height: 40px;">
+                            <i class="bi bi-upc-scan"></i>
+                        </div>
+                        <div>
+                            <div class="fw-bold">${item.adquisicion}</div>
+                            <div class="small text-muted">${item.clasificacion} &bull; ${item.copyTag}</div>
+                        </div>
+                    </div>
+                    <button class="btn btn-sm btn-outline-danger border-0" onclick="AdminBiblio.removeLabelFromQueue(${index})">
+                        <i class="bi bi-x-lg"></i>
+                    </button>
+                </div>
+            `;
+        });
+        container.innerHTML = html;
+        if (btnExport) btnExport.disabled = false;
+    }
+
+    function exportLabelsPdf() {
+        if (_labelsPrintQueue.length === 0) return showToast('No hay etiquetas para imprimir', 'warning');
+        
+        const btn = document.getElementById('btn-export-labels');
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Generando PDF...';
+        }
+
+        try {
+            PDFGenerator.generateLabelsReport(_labelsPrintQueue);
+            showToast('PDF generado correctamente.', 'success');
+        } catch(e) {
+            console.error(e);
+            showToast('Error al generar PDF de etiquetas.', 'danger');
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-file-earmark-pdf me-2"></i>Exportar Etiquetas a PDF (Hoja Carta)';
+            }
+        }
+    }
+
+    function abrirSubmodalInventario() {
+        const body = document.getElementById('modal-admin-body');
+        body.innerHTML = `
+            <div class="modal-header border-0 bg-danger text-white p-4">
+                <div>
+                    <h3 class="fw-bold mb-1"><i class="bi bi-clipboard2-data me-3"></i>Inventario Semestral</h3>
+                    <div class="small text-white-50">Auditoria del catalogo de la biblioteca.</div>
+                </div>
+                <button class="btn-close btn-close-white" onclick="AdminBiblio.abrirModalGestionLibros()"></button>
+            </div>
+            <div class="modal-body p-4 pb-5 bg-light" style="padding-bottom:calc(5rem + env(safe-area-inset-bottom));">
+                <div class="card border-0 shadow-sm rounded-4 bg-danger-subtle mb-4">
+                    <div class="card-body p-4 text-center">
+                        <h5 class="fw-bold text-dark mb-3">Iniciar Sesion de Inventario</h5>
+                        <p class="small text-muted mb-4">Abre el escaner y comienza a contar libros o ajusta el inventario pendiente.</p>
+                        <button class="btn btn-danger rounded-pill fw-bold w-100 px-4" type="button" onclick="AdminBiblio.abrirModalInventario()">
+                            <i class="bi bi-play-circle me-2"></i>Abrir inventario
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="small fw-bold text-muted text-uppercase mb-2 text-start">Estado de Sesion actual</div>
+                <div id="gestion-libros-inventory-status" class="rounded-4 border bg-white shadow-sm p-4 text-muted small text-start">
+                    <span class="spinner-border spinner-border-sm me-2"></span>Revisando estado...
+                </div>
+            </div>
+        `;
+        void refreshGestionLibrosInventoryStatus();
+    }
+
+    function abrirSubmodalGestionarLibros() {
+        const body = document.getElementById('modal-admin-body');
+        body.innerHTML = `
+            <div class="modal-header border-0 bg-success text-white p-4">
+                <div>
+                    <h3 class="fw-bold mb-1"><i class="bi bi-journals me-3"></i>Gestionar libros</h3>
+                    <div class="small text-white-50">Administra el catalogo de ejemplares.</div>
+                </div>
+                <button class="btn-close btn-close-white" onclick="AdminBiblio.abrirModalGestionLibros()"></button>
+            </div>
+            <div class="modal-body p-4 pb-5 bg-light" style="padding-bottom:calc(5rem + env(safe-area-inset-bottom));">
+                <div class="d-flex flex-column gap-3 mb-4">
+                    <button class="btn btn-white border shadow-sm rounded-pill p-3 text-start d-flex align-items-center" onclick="AdminBiblio.renderBookForm()">
+                        <div class="bg-success bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center me-3" style="width:40px;height:40px;">
+                            <i class="bi bi-plus-lg text-success"></i>
+                        </div>
+                        <div>
+                            <div class="fw-bold text-dark">Agregar nuevo libro</div>
+                            <div class="small text-muted">Registrar un ejemplar que no existe en el sistema.</div>
+                        </div>
+                        <i class="bi bi-chevron-right ms-auto text-muted"></i>
+                    </button>
+                    
+                    <button class="btn btn-white border shadow-sm rounded-pill p-3 text-start d-flex align-items-center" onclick="AdminBiblio.renderBookEditSearch()">
+                        <div class="bg-warning bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center me-3" style="width:40px;height:40px;">
+                            <i class="bi bi-pencil-square text-warning"></i>
+                        </div>
+                        <div>
+                            <div class="fw-bold text-dark">Modificar libro</div>
+                            <div class="small text-muted">Editar informacion de un ejemplar existente.</div>
+                        </div>
+                        <i class="bi bi-chevron-right ms-auto text-muted"></i>
+                    </button>
+
+                    <button class="btn btn-white border shadow-sm rounded-pill p-3 text-start d-flex align-items-center" onclick="AdminBiblio.renderBookStatusSearch()">
+                        <div class="bg-danger bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center me-3" style="width:40px;height:40px;">
+                            <i class="bi bi-power text-danger"></i>
+                        </div>
+                        <div>
+                            <div class="fw-bold text-dark">Habilitar / Deshabilitar</div>
+                            <div class="small text-muted">Dar de baja ejemplares o reactivarlos.</div>
+                        </div>
+                        <i class="bi bi-chevron-right ms-auto text-muted"></i>
+                    </button>
+                </div>
+
+                <div class="small fw-bold text-muted text-uppercase mb-2">Ultimo agregado</div>
+                <div id="gestion-libros-last-book" class="rounded-4 border bg-white shadow-sm p-3 text-muted small">
+                    <span class="spinner-border spinner-border-sm me-2"></span>Cargando referencia...
+                </div>
+            </div>
+        `;
 
         void (async () => {
             try {
@@ -512,10 +868,7 @@ window.AdminBiblio.Catalogo = (function () {
                 console.error(error);
             }
         })();
-
-        void refreshGestionLibrosInventoryStatus();
     }
-
 
     function _cleanupBackdrop() {
         const backdrops = document.querySelectorAll('.modal-backdrop');
@@ -525,12 +878,221 @@ window.AdminBiblio.Catalogo = (function () {
         }
     }
 
+    async function getNextSequentialAdquisicion(baseAdq) {
+        const inUse = new Set();
+        const mainInput = document.getElementById('bf-adq');
+        if (mainInput && mainInput.value && mainInput.value !== 'Generando...') inUse.add(mainInput.value.trim().toUpperCase());
+        
+        const copyInputs = document.querySelectorAll('.copy-adq-input');
+        if (copyInputs) {
+            copyInputs.forEach(input => {
+                if (input.value && input.value !== 'Generando...') {
+                    inUse.add(input.value.trim().toUpperCase());
+                }
+            });
+        }
 
-    async function renderBookForm(bookToEdit = null) {
-        // Validation: If adding new, fields empty. If editing, pre-fill.
-        const isEdit = !!bookToEdit;
-        const title = isEdit ? 'Modificar Libro' : 'Agregar Nuevo Libro';
-        const btnText = isEdit ? 'Actualizar Libro' : 'Guardar Libro';
+        if (!baseAdq) {
+            let num;
+            let attempts = 0;
+            while(attempts < 50) {
+                num = String(Math.floor(10000 + Math.random() * 90000));
+                if (!inUse.has(num)) {
+                    try {
+                        const book = await BiblioService.getBookByAdquisicion(_ctx, num);
+                        if (!book) return num;
+                    } catch(e) {}
+                }
+                attempts++;
+            }
+            return String(Math.floor(10000 + Math.random() * 90000));
+        }
+        
+        const match = baseAdq.match(/^([a-zA-Z\-]*)(\d+)$/);
+        if (match) {
+            const prefix = match[1];
+            let numStr = match[2];
+            let num = parseInt(numStr, 10);
+            
+            let exists = true;
+            let attempts = 0;
+            while (exists && attempts < 50) {
+                num++;
+                let newNumStr = String(num).padStart(numStr.length, '0');
+                let newAdq = prefix + newNumStr;
+                let newAdqUpper = newAdq.toUpperCase();
+                
+                if (inUse.has(newAdqUpper)) {
+                    attempts++;
+                    continue;
+                }
+                
+                try {
+                    const book = await BiblioService.getBookByAdquisicion(_ctx, newAdq);
+                    exists = !!book;
+                    if (!exists) return newAdq;
+                } catch (e) { exists = true; }
+                attempts++;
+            }
+        }
+        
+        return String(Math.floor(10000 + Math.random() * 90000));
+    }
+
+    async function generateRandomAdquisicion(inputId, inputElement = null) {
+        const el = inputElement || document.getElementById(inputId);
+        if (!el) return;
+        
+        el.disabled = true;
+        const originalValue = el.value;
+        el.value = 'Generando...';
+        
+        try {
+            let baseAdq = '';
+            const mainInput = document.getElementById('bf-adq');
+            if (mainInput && mainInput.value && mainInput.value !== 'Generando...' && mainInput !== el) {
+                baseAdq = mainInput.value.trim();
+            } else if (originalValue) {
+                baseAdq = originalValue.trim();
+            }
+
+            let adq = await getNextSequentialAdquisicion(baseAdq);
+            el.value = adq;
+        } catch (e) {
+            el.value = originalValue;
+            showToast('Error autogenerando numero.', 'danger');
+        } finally {
+            el.disabled = false;
+        }
+    }
+
+    function addCopyRow() {
+        const container = document.getElementById('copies-container');
+        const id = 'copy-' + Date.now();
+        const div = document.createElement('div');
+        div.className = 'd-flex gap-2 copy-row align-items-center mb-2';
+        div.id = id;
+        div.innerHTML = `
+            <div class="input-group input-group-sm">
+                <span class="input-group-text bg-light text-muted">Copia</span>
+                <input type="text" class="form-control copy-adq-input" required placeholder="No. Adquisicion">
+                <button class="btn btn-outline-secondary" type="button" onclick="AdminBiblio.generateRandomAdquisicion(null, this.previousElementSibling)" title="Generar numero secuencial">
+                    <i class="bi bi-magic"></i>
+                </button>
+            </div>
+            <button class="btn btn-outline-danger btn-sm" type="button" onclick="document.getElementById('${id}').remove()">
+                <i class="bi bi-trash"></i>
+            </button>
+        `;
+        container.appendChild(div);
+        
+        const allInputs = container.querySelectorAll('.copy-adq-input');
+        if (allInputs.length > 0) {
+            const input = allInputs[allInputs.length - 1];
+            AdminBiblio.generateRandomAdquisicion(null, input);
+        }
+    }
+
+    function renderCopySearch() {
+        const body = document.getElementById('modal-admin-body');
+        body.innerHTML = `
+            <div class="modal-header border-0 bg-primary text-white px-4 py-3">
+                <h5 class="fw-bold mb-0"><i class="bi bi-files me-2"></i>Agregar Copia Existente</h5>
+                <button class="btn-close btn-close-white" onclick="AdminBiblio.renderBookForm()"></button>
+            </div>
+            <div class="modal-body p-4 pb-5" style="padding-bottom:calc(5rem + env(safe-area-inset-bottom));">
+                <div class="small text-muted mb-3">Busca el libro o una de sus copias por su numero de adquisicion para copiar sus datos.</div>
+                <div class="input-group mb-4 shadow-sm">
+                    <input type="text" class="form-control border-0 p-3" id="copy-search-input" placeholder="Ingresa No. Adquisicion (Ej: 00001)" onkeydown="if(event.key === 'Enter') AdminBiblio.handleCopySearch()">
+                    <button class="btn btn-primary px-4 fw-bold" onclick="AdminBiblio.handleCopySearch()">
+                        <i class="bi bi-search"></i>
+                    </button>
+                </div>
+                <div id="copy-search-result" class="card border-0 shadow-sm">
+                    <div class="text-center py-4 text-muted"><i class="bi bi-info-circle mb-2 fs-3 d-block"></i>Ingresa un codigo para buscar.</div>
+                </div>
+            </div>
+        `;
+    }
+
+    async function handleCopySearch() {
+        const q = document.getElementById('copy-search-input').value.trim();
+        if (!q) return showToast("Ingresa un numero de adquisicion", "warning");
+
+        const container = document.getElementById('copy-search-result');
+        container.innerHTML = '<div class="text-center py-4 text-muted"><span class="spinner-border spinner-border-sm"></span> Buscando...</div>';
+
+        try {
+            const bookByCode = await BiblioService.getBookByAdquisicion(_ctx, q.toUpperCase());
+                
+            if (!bookByCode) {
+                container.innerHTML = '<div class="p-4 text-center text-muted">No se encontro el libro.</div>';
+                return;
+            }
+            
+            const book = bookByCode;
+            const bookPayload = encodeItemPayload(book);
+            const titulo = escapeHtml(book.titulo || 'Sin titulo');
+            const autor = escapeHtml(book.autor || 'Desconocido');
+
+            let maxAdqStr = book.adquisicion;
+            if (book.titulo) {
+                try {
+                    const titleSnap = await _ctx.db.collection('biblio-catalogo')
+                        .where('titulo', '==', book.titulo)
+                        .get();
+                        
+                    let maxNum = -1;
+                    titleSnap.forEach(doc => {
+                        const adq = doc.data().adquisicion;
+                        if (adq) {
+                            const match = adq.match(/^([a-zA-Z\-]*)(\d+)$/);
+                            if (match) {
+                                const num = parseInt(match[2], 10);
+                                if (num > maxNum) {
+                                    maxNum = num;
+                                    maxAdqStr = adq;
+                                }
+                            }
+                        }
+                    });
+                } catch (err) {
+                    console.error("Error buscando copias por titulo:", err);
+                }
+            }
+
+            const nextAdq = await getNextSequentialAdquisicion(maxAdqStr);
+            book.adquisicion = nextAdq; 
+            const nextPayload = encodeItemPayload(book);
+
+            container.innerHTML = `
+                <div class="card-body p-4">
+                    <div class="d-flex align-items-center gap-3 mb-3">
+                        <div class="bg-primary bg-opacity-10 p-3 rounded-3 text-primary">
+                            <i class="bi bi-book fs-3"></i>
+                        </div>
+                        <div class="flex-grow-1 overflow-hidden">
+                            <h6 class="fw-bold mb-1 text-truncate">${titulo}</h6>
+                            <small class="text-muted d-block text-truncate">${autor}</small>
+                        </div>
+                    </div>
+                    <div class="alert alert-info py-2 px-3 small d-flex flex-column gap-2 mb-0">
+                        <span>Sugerencia autogenerada para la nueva copia: <strong>${nextAdq}</strong></span>
+                        <button class="btn btn-sm btn-primary rounded-pill px-3 fw-bold w-100" onclick="AdminBiblio.renderBookForm(AdminBiblio.decodeItemPayload('${nextPayload}'), true)">
+                            Usar datos y continuar <i class="bi bi-arrow-right ms-1"></i>
+                        </button>
+                    </div>
+                </div>
+            `;
+        } catch (e) {
+            container.innerHTML = `<div class="p-4 text-center text-danger">Error: ${e.message}</div>`;
+        }
+    }
+
+    async function renderBookForm(bookToEdit = null, isCopyMode = false) {
+        const isEdit = !!bookToEdit && !isCopyMode;
+        const title = isEdit ? 'Modificar Libro' : (isCopyMode ? 'Agregar Copia' : 'Agregar Nuevo Libro');
+        const btnText = isEdit ? 'Actualizar Libro' : (isCopyMode ? 'Guardar Copia' : 'Guardar Libro(s)');
         const btnColor = isEdit ? 'btn-warning' : 'btn-success';
 
         const body = document.getElementById('modal-admin-body');
@@ -538,39 +1100,51 @@ window.AdminBiblio.Catalogo = (function () {
             <div class="modal-header border-0 ${isEdit ? 'bg-warning' : 'bg-success'} text-white px-4 py-3">
                 <div>
                     <h5 class="fw-bold mb-1"><i class="bi ${isEdit ? 'bi-pencil-square' : 'bi-plus-circle'} me-2"></i>${title}</h5>
-                    <div class="small ${isEdit ? 'text-dark-emphasis' : 'text-white-50'}">${isEdit ? 'Ajusta el registro localizado antes de guardar.' : 'Captura los datos base para darlo de alta en el catalogo.'}</div>
+                    <div class="small ${isEdit ? 'text-dark-emphasis' : 'text-white-50'}">${isEdit ? 'Ajusta el registro localizado antes de guardar.' : 'Captura los datos para darlo de alta en el catalogo.'}</div>
                 </div>
-                <button class="btn-close btn-close-white" onclick="AdminBiblio.abrirModalGestionLibros()"></button>
+                <button class="btn-close btn-close-white" onclick="AdminBiblio.abrirSubmodalGestionarLibros()"></button>
             </div>
             <div class="modal-body p-4 pb-5" style="padding-bottom:calc(5rem + env(safe-area-inset-bottom));">
+                ${!isEdit && !isCopyMode ? `
+                    <div class="d-flex justify-content-end mb-3">
+                        <button class="btn btn-outline-primary btn-sm rounded-pill fw-bold" onclick="AdminBiblio.renderCopySearch()">
+                            <i class="bi bi-files me-1"></i>Agregar una copia existente
+                        </button>
+                    </div>
+                ` : ''}
+                
                 <div class="alert alert-light border rounded-4 shadow-sm mb-4">
-                    <div class="small text-muted mb-0">${isEdit ? 'El numero de adquisicion permanece fijo para evitar cambiar la referencia del ejemplar.' : 'Si despues necesitas corregir datos, podras ubicarlo desde el panel lateral de actualizacion.'}</div>
+                    <div class="small text-muted mb-0">${isEdit ? 'El numero de adquisicion permanece fijo para evitar cambiar la referencia del ejemplar.' : (isCopyMode ? 'Se copiaron los detalles del libro original. Confirma el numero de adquisicion nuevo y guarda.' : 'Llena los campos para el libro principal. Podras agregar copias extra al final si lo deseas.')}</div>
                 </div>
-                <form id="book-form" onsubmit="event.preventDefault(); AdminBiblio.saveBook('${bookToEdit?.id || ''}')">
+                <form id="book-form" onsubmit="event.preventDefault(); AdminBiblio.saveBook('${isEdit ? (bookToEdit?.id || '') : ''}', ${isCopyMode})">
                     <div class="row g-3">
-                        <div class="col-md-4">
+                        <div class="col-md-5">
                             <label class="form-label small fw-bold text-muted">No. Adquisicion *</label>
-                            <input type="text" class="form-control rounded-3" id="bf-adq" required placeholder="Ej. 000123" value="${escapeHtml(bookToEdit?.adquisicion || '')}" ${isEdit ? 'readonly' : ''}>
+                            <div class="input-group">
+                                <input type="text" class="form-control rounded-start" id="bf-adq" required placeholder="Ej. 01542" value="${escapeHtml(bookToEdit?.adquisicion || '')}" ${isEdit ? 'readonly' : ''}>
+                                ${!isEdit ? `
+                                <button class="btn btn-secondary" type="button" onclick="AdminBiblio.generateRandomAdquisicion('bf-adq')" title="Generar numero secuencial">
+                                    <i class="bi bi-magic"></i>
+                                </button>
+                                ` : ''}
+                            </div>
                         </div>
-                        <div class="col-md-8">
+                        <div class="col-md-7">
                             <label class="form-label small fw-bold text-muted">Titulo del Libro *</label>
-                            <input type="text" class="form-control rounded-3" id="bf-titulo" required placeholder="Nombre del libro" value="${escapeHtml(bookToEdit?.titulo || '')}">
+                            <input type="text" class="form-control rounded-3" id="bf-titulo" required placeholder="Nombre del libro" value="${escapeHtml(bookToEdit?.titulo || '')}" ${isCopyMode ? 'readonly' : ''}>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label small fw-bold text-muted">Autor *</label>
-                            <input type="text" class="form-control rounded-3" id="bf-autor" required placeholder="Autor principal" value="${escapeHtml(bookToEdit?.autor || '')}">
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label small fw-bold text-muted">Anio</label>
-                            <input type="text" class="form-control rounded-3" id="bf-anio" placeholder="2024" value="${escapeHtml(bookToEdit?.anio ?? bookToEdit?.['año'] ?? '')}">
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label small fw-bold text-muted">Copias Totales *</label>
-                            <input type="number" class="form-control rounded-3" id="bf-copias" required min="1" value="${bookToEdit?.copiasTotales ?? bookToEdit?.copiasDisponibles ?? 1}">
+                            <input type="text" class="form-control rounded-3" id="bf-autor" required placeholder="Autor principal" value="${escapeHtml(bookToEdit?.autor || '')}" ${isCopyMode ? 'readonly' : ''}>
                         </div>
                         <div class="col-md-6">
+                            <label class="form-label small fw-bold text-muted">Anio</label>
+                            <input type="text" class="form-control rounded-3" id="bf-anio" placeholder="2024" value="${escapeHtml(bookToEdit?.anio ?? bookToEdit?.['año'] ?? '')}" ${isCopyMode ? 'readonly' : ''}>
+                        </div>
+                        
+                        <div class="col-md-6">
                             <label class="form-label small fw-bold text-muted">Categoria *</label>
-                            <select class="form-select rounded-3" id="bf-cat" required>
+                            <select class="form-select rounded-3" id="bf-cat" required ${isCopyMode ? 'disabled' : ''}>
                                 <option value="">Selecciona...</option>
                                 <option value="Administracion">Administracion</option>
                                 <option value="Arquitectura">Arquitectura</option>
@@ -582,11 +1156,25 @@ window.AdminBiblio.Catalogo = (function () {
                         </div>
                         <div class="col-md-6">
                             <label class="form-label small fw-bold text-muted">Clasificacion / Ubicacion</label>
-                            <input type="text" class="form-control rounded-3" id="bf-clasif" placeholder="Ej: HM251 W46" value="${escapeHtml(bookToEdit?.clasificacion || '')}">
+                            <input type="text" class="form-control rounded-3" id="bf-clasif" placeholder="Ej: HM251 W46" value="${escapeHtml(bookToEdit?.clasificacion || '')}" ${isCopyMode ? 'readonly' : ''}>
                         </div>
                     </div>
+                    
+                    ${!isEdit && !isCopyMode ? `
+                    <div class="mt-4 pt-3 border-top">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <label class="form-label small fw-bold text-muted mb-0">¿Este libro viene con copias extra?</label>
+                            <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill" onclick="AdminBiblio.addCopyRow()">
+                                <i class="bi bi-plus-lg me-1"></i> Agregar copia
+                            </button>
+                        </div>
+                        <div id="copies-container" class="d-flex flex-column gap-2">
+                        </div>
+                    </div>
+                    ` : ''}
+
                     <div class="d-grid mt-4">
-                        <button type="submit" class="btn ${btnColor} py-2 rounded-pill fw-bold shadow-sm">
+                        <button type="submit" class="btn ${btnColor} py-2 rounded-pill fw-bold shadow-sm" id="btn-save-book">
                             <i class="bi bi-check-lg me-2"></i>${btnText}
                         </button>
                     </div>
@@ -594,52 +1182,98 @@ window.AdminBiblio.Catalogo = (function () {
             </div>
         `;
 
-        // Retrieve and set category if editing
         if (bookToEdit?.categoria) {
             const sel = document.getElementById('bf-cat');
             if (sel) sel.value = bookToEdit.categoria;
         }
     }
 
+    async function saveBook(editId, isCopyMode = false) {
+        const adqInput = document.getElementById('bf-adq');
+        const adqBase = adqInput ? adqInput.value.trim().toUpperCase() : '';
+        const titulo = document.getElementById('bf-titulo').value.trim();
+        const autor = document.getElementById('bf-autor').value.trim();
+        const anio = document.getElementById('bf-anio').value.trim();
+        const catInput = document.getElementById('bf-cat');
+        const categoria = catInput ? catInput.value : '';
+        const clasificacion = document.getElementById('bf-clasif').value.trim();
 
-    async function saveBook(editId) {
-        const data = {
-            adquisicion: document.getElementById('bf-adq').value.trim().toUpperCase(),
-            titulo: document.getElementById('bf-titulo').value.trim(),
-            autor: document.getElementById('bf-autor').value.trim(),
-            anio: document.getElementById('bf-anio').value.trim(),
-            copiasTotales: parseInt(document.getElementById('bf-copias').value, 10),
-            categoria: document.getElementById('bf-cat').value,
-            clasificacion: document.getElementById('bf-clasif').value.trim(),
-            ubicacion: 'Estanteria' // Default
-        };
-
-        if (!data.adquisicion || !data.titulo || !data.autor || !data.categoria) {
+        if (!adqBase || !titulo || !autor || (!isCopyMode && !categoria)) {
             return showToast("Completa los campos obligatorios (*)", "warning");
         }
 
+        const btnSave = document.getElementById('btn-save-book');
+        if (btnSave) {
+            btnSave.disabled = true;
+            btnSave.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Guardando...';
+        }
+
         try {
+            const dataBase = {
+                adquisicion: adqBase,
+                titulo,
+                autor,
+                anio,
+                copiasTotales: 1, 
+                categoria: isCopyMode && catInput && catInput.disabled && catInput.querySelector('option[selected]') ? catInput.querySelector('option[selected]').value : categoria,
+                clasificacion,
+                ubicacion: 'Estanteria'
+            };
+            
+            // Si estaba disabled, categoria no agarra el value bien. Vamos a forzarlo.
+            if (isCopyMode && !dataBase.categoria) {
+                // we have to get it from the bookToEdit if possible. Wait, the select maintains its value even if disabled, but let's be safe.
+                if (catInput) dataBase.categoria = catInput.value;
+            }
+
             if (editId) {
-                await BiblioService.updateLibro(_ctx, editId, data);
+                await BiblioService.updateLibro(_ctx, editId, dataBase);
                 showToast("Libro actualizado correctamente", "success");
             } else {
-                // Check dup adquisicion? usually service handles or just allow.
-                await BiblioService.addLibro(_ctx, data);
-                showToast("Libro registrado exitosamente", "success");
+                await BiblioService.addLibro(_ctx, dataBase);
+                let savedCount = 1;
+
+                if (!isCopyMode) {
+                    const copiesContainer = document.getElementById('copies-container');
+                    if (copiesContainer) {
+                        const copyInputs = copiesContainer.querySelectorAll('.copy-adq-input');
+                        const copiesData = [];
+                        copyInputs.forEach(input => {
+                            const val = input.value.trim().toUpperCase();
+                            if (val && val !== adqBase) {
+                                copiesData.push({ ...dataBase, adquisicion: val });
+                            }
+                        });
+
+                        for (const copyData of copiesData) {
+                            try {
+                                await BiblioService.addLibro(_ctx, copyData);
+                                savedCount++;
+                            } catch (err) {
+                                console.error('Error saving copy', copyData.adquisicion, err);
+                                showToast(`Error al guardar copia ${copyData.adquisicion}`, 'danger');
+                            }
+                        }
+                    }
+                }
+                showToast(`Se ${savedCount === 1 ? 'guardo 1 ejemplar' : 'guardaron ' + savedCount + ' ejemplares'} exitosamente`, "success");
             }
-            AdminBiblio.abrirModalGestionLibros(); // Go back
+            AdminBiblio.abrirSubmodalGestionarLibros(); 
         } catch (e) {
             showToast("Error al guardar: " + e.message, "danger");
+            if (btnSave) {
+                btnSave.disabled = false;
+                btnSave.innerHTML = '<i class="bi bi-check-lg me-2"></i>Guardar';
+            }
         }
     }
-
 
     async function renderBookEditSearch() {
         const body = document.getElementById('modal-admin-body');
         body.innerHTML = `
             <div class="modal-header border-0 bg-warning text-dark px-4 py-3">
                 <h5 class="fw-bold mb-0"><i class="bi bi-search me-2"></i>Buscar para Modificar</h5>
-                <button class="btn-close" onclick="AdminBiblio.abrirModalGestionLibros()"></button>
+                <button class="btn-close" onclick="AdminBiblio.abrirSubmodalGestionarLibros()"></button>
             </div>
             <div class="modal-body p-4 pb-5" style="padding-bottom:calc(5rem + env(safe-area-inset-bottom));">
                 <div class="input-group mb-4 shadow-sm">
@@ -649,20 +1283,18 @@ window.AdminBiblio.Catalogo = (function () {
                     </button>
                 </div>
                 
-                    <h6 class="fw-bold text-muted small mb-3 text-uppercase ls-1">Ultimo Agregado / Resultado</h6>
+                <h6 class="fw-bold text-muted small mb-3 text-uppercase ls-1">Ultimo Agregado / Resultado</h6>
                 <div id="edit-search-result" class="card border-0 shadow-sm">
                     <div class="text-center py-4 text-muted"><span class="spinner-border spinner-border-sm"></span> Cargando ultimo registro...</div>
                 </div>
             </div>
         `;
 
-        // Load default (last added)
         try {
             const lastBook = await BiblioService.getLastAddedBook(_ctx);
             renderEditBookCard(lastBook);
         } catch (e) { console.error(e); }
     }
-
 
     async function handleEditSearch() {
         const q = document.getElementById('edit-search-input').value.trim();
@@ -672,13 +1304,33 @@ window.AdminBiblio.Catalogo = (function () {
         container.innerHTML = '<div class="text-center py-4 text-muted"><span class="spinner-border spinner-border-sm"></span> Buscando...</div>';
 
         try {
-            const book = await BiblioService.getBookByAdquisicion(_ctx, q);
+            const bookByCode = await BiblioService.getBookByAdquisicion(_ctx, q.toUpperCase());
+            
+            if (!bookByCode) {
+                container.innerHTML = '<div class="p-4 text-center text-muted">No se encontro el libro.</div>';
+                return;
+            }
+            const book = bookByCode;
+            
+            if (book.active === false) {
+                container.innerHTML = `
+                    <div class="p-4 text-center">
+                        <i class="bi bi-exclamation-circle text-danger fs-3 d-block mb-2"></i>
+                        <h6 class="fw-bold text-dark">Libro Dado de Baja</h6>
+                        <p class="small text-muted mb-3">Este ejemplar se encuentra deshabilitado en el sistema.</p>
+                        <button class="btn btn-sm btn-outline-warning rounded-pill px-3 fw-bold" onclick="AdminBiblio.renderBookForm(AdminBiblio.decodeItemPayload('${encodeItemPayload(book)}'))">
+                            Modificar de todos modos
+                        </button>
+                    </div>
+                `;
+                return;
+            }
+            
             renderEditBookCard(book, true);
         } catch (e) {
             container.innerHTML = `<div class="p-4 text-center text-danger">Error: ${e.message}</div>`;
         }
     }
-
 
     function renderEditBookCard(book, isSearch = false) {
         const container = document.getElementById('edit-search-result');
@@ -689,7 +1341,7 @@ window.AdminBiblio.Catalogo = (function () {
 
         const bookPayload = encodeItemPayload(book);
         const adquisicion = escapeHtml(book.adquisicion || 'S/N');
-            const titulo = escapeHtml(book.titulo || 'Sin titulo');
+        const titulo = escapeHtml(book.titulo || 'Sin titulo');
         const autor = escapeHtml(book.autor || 'Desconocido');
 
         container.innerHTML = `
@@ -709,7 +1361,90 @@ window.AdminBiblio.Catalogo = (function () {
         `;
     }
 
-    // --- 5. CONFIGURACION ---
+    function renderBookStatusSearch() {
+        const body = document.getElementById('modal-admin-body');
+        body.innerHTML = `
+            <div class="modal-header border-0 bg-danger text-white px-4 py-3">
+                <h5 class="fw-bold mb-0"><i class="bi bi-power me-2"></i>Habilitar / Deshabilitar</h5>
+                <button class="btn-close btn-close-white" onclick="AdminBiblio.abrirSubmodalGestionarLibros()"></button>
+            </div>
+            <div class="modal-body p-4 pb-5" style="padding-bottom:calc(5rem + env(safe-area-inset-bottom));">
+                <div class="input-group mb-4 shadow-sm">
+                    <input type="text" class="form-control border-0 p-3" id="status-search-input" placeholder="Ingresa No. Adquisicion (Ej: 00001)">
+                    <button class="btn btn-danger px-4 fw-bold" onclick="AdminBiblio.handleStatusSearch()">
+                        <i class="bi bi-search"></i>
+                    </button>
+                </div>
+                
+                <h6 class="fw-bold text-muted small mb-3 text-uppercase ls-1">Resultado de busqueda</h6>
+                <div id="status-search-result" class="card border-0 shadow-sm">
+                    <div class="text-center py-4 text-muted"><i class="bi bi-info-circle mb-2 fs-3 d-block"></i>Busca un libro para cambiar su estado.</div>
+                </div>
+            </div>
+        `;
+    }
+
+    async function handleStatusSearch() {
+        const q = document.getElementById('status-search-input').value.trim();
+        if (!q) return showToast("Ingresa un numero de adquisicion", "warning");
+
+        const container = document.getElementById('status-search-result');
+        container.innerHTML = '<div class="text-center py-4 text-muted"><span class="spinner-border spinner-border-sm"></span> Buscando...</div>';
+
+        try {
+            const bookByCode = await BiblioService.getBookByAdquisicion(_ctx, q.toUpperCase());
+                
+            if (!bookByCode) {
+                container.innerHTML = '<div class="p-4 text-center text-muted">No se encontro el libro.</div>';
+                return;
+            }
+            
+            const book = bookByCode;
+            renderStatusBookCard(book);
+        } catch (e) {
+            container.innerHTML = `<div class="p-4 text-center text-danger">Error: ${e.message}</div>`;
+        }
+    }
+
+    function renderStatusBookCard(book) {
+        const container = document.getElementById('status-search-result');
+        if (!book) return;
+
+        const isActive = book.active !== false;
+        const adquisicion = escapeHtml(book.adquisicion || 'S/N');
+        const titulo = escapeHtml(book.titulo || 'Sin titulo');
+        const autor = escapeHtml(book.autor || 'Desconocido');
+        const statusBadge = isActive 
+            ? '<span class="badge bg-success mb-1">Activo</span>' 
+            : '<span class="badge bg-danger mb-1">Dado de baja</span>';
+            
+        const btnAction = isActive 
+            ? `<button class="btn btn-sm btn-outline-danger rounded-pill px-3 fw-bold mt-2" onclick="AdminBiblio.toggleBookStatusFromSearch('${book.id}', false)"><i class="bi bi-x-circle me-1"></i>Dar de baja</button>`
+            : `<button class="btn btn-sm btn-outline-success rounded-pill px-3 fw-bold mt-2" onclick="AdminBiblio.toggleBookStatusFromSearch('${book.id}', true)"><i class="bi bi-check-circle me-1"></i>Reactivar</button>`;
+
+        container.innerHTML = `
+            <div class="card-body p-4 text-center">
+                <div class="mb-3">
+                    ${statusBadge}
+                    <div class="badge bg-dark text-white mb-1 ms-1">${adquisicion}</div>
+                </div>
+                <h5 class="fw-bold mb-1">${titulo}</h5>
+                <p class="text-muted small mb-3">${autor}</p>
+                ${btnAction}
+            </div>
+        `;
+    }
+
+    async function toggleBookStatusFromSearch(bookId, isActive) {
+        try {
+            await BiblioService.toggleLibroStatus(_ctx, bookId, isActive);
+            showToast(isActive ? 'Libro reactivado' : 'Libro dado de baja', 'success');
+            AdminBiblio.handleStatusSearch();
+        } catch (e) {
+            showToast("Error al cambiar estado: " + e.message, "danger");
+        }
+    }
+
 
     function abrirModalConfig() {
         clearLiveAssetStreams();
@@ -1261,12 +1996,23 @@ window.AdminBiblio.Catalogo = (function () {
         refreshGestionLibrosInventoryStatus: withState(refreshGestionLibrosInventoryStatus),
         confirmFinalizeInventoryFromGestion: withState(confirmFinalizeInventoryFromGestion),
         confirmAdjustFinishedInventoryFromGestion: withState(confirmAdjustFinishedInventoryFromGestion),
+        downloadInventoryAdjustmentBackupFromGestion: withState(downloadInventoryAdjustmentBackupFromGestion),
         _cleanupBackdrop: withState(_cleanupBackdrop),
         renderBookForm: withState(renderBookForm),
         saveBook: withState(saveBook),
         renderBookEditSearch: withState(renderBookEditSearch),
         handleEditSearch: withState(handleEditSearch),
         renderEditBookCard: withState(renderEditBookCard),
+        abrirSubmodalEtiquetas: withState(abrirSubmodalEtiquetas),
+        abrirSubmodalInventario: withState(abrirSubmodalInventario),
+        abrirSubmodalGestionarLibros: withState(abrirSubmodalGestionarLibros),
+        addCopyRow: withState(addCopyRow),
+        generateRandomAdquisicion: withState(generateRandomAdquisicion),
+        renderCopySearch: withState(renderCopySearch),
+        handleCopySearch: withState(handleCopySearch),
+        renderBookStatusSearch: withState(renderBookStatusSearch),
+        handleStatusSearch: withState(handleStatusSearch),
+        toggleBookStatusFromSearch: withState(toggleBookStatusFromSearch),
         abrirModalConfig: withState(abrirModalConfig),
         abrirModalDiasInhabiles: withState(abrirModalDiasInhabiles),
         cambiarMesDiasInhabiles: withState(cambiarMesDiasInhabiles),
@@ -1282,6 +2028,13 @@ window.AdminBiblio.Catalogo = (function () {
         openAddAssetModal: withState(openAddAssetModal),
         createAsset: withState(createAsset),
         confirmDeleteAsset: withState(confirmDeleteAsset),
-        toggleAssetStatus: withState(toggleAssetStatus)
+        toggleAssetStatus: withState(toggleAssetStatus),
+        handleLabelSearch: withState(handleLabelSearch),
+        addLabelToQueue: withState(addLabelToQueue),
+        addAllLabelsToQueue: withState(addAllLabelsToQueue),
+        removeLabelFromQueue: withState(removeLabelFromQueue),
+        clearLabelsQueue: withState(clearLabelsQueue),
+        exportLabelsPdf: withState(exportLabelsPdf),
+        renderLabelsQueue: withState(renderLabelsQueue)
     };
 })();

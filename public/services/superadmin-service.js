@@ -37,7 +37,7 @@ if (!window.SuperAdminService) {
                     timestamp: firebase.firestore.FieldValue.serverTimestamp()
                 });
             } catch (e) {
-                console.warn('[SuperAdminService] Error al registrar log:', e);
+
             }
         }
 
@@ -243,7 +243,7 @@ if (!window.SuperAdminService) {
                     return { totalUsers, roleDistribution: distribution };
                 }
             } catch (e) {
-                console.warn('[SuperAdminService] Caché no disponible, usando fallback limitado:', e);
+
             }
 
             // Fallback: conteo limitado (nunca iterar toda la colección)

@@ -107,7 +107,7 @@
           const status = await getCapacitorPushPlugin().checkPermissions();
           this._nativePermissionState = normalizePermissionState(status?.receive);
         } catch (err) {
-          console.warn('[PushService] No se pudo consultar el permiso nativo:', err);
+
         }
         return this._nativePermissionState;
       }
@@ -116,7 +116,7 @@
 
     async requestAndSubscribe(uid) {
       if (!uid) {
-        console.warn('[PushService] UID requerido.');
+
         return false;
       }
       if (this._subscriptionPromise) return this._subscriptionPromise;
@@ -159,7 +159,7 @@
           ...options
         });
       } catch (err) {
-        console.warn('[PushService] Error mostrando notificacion local:', err);
+
       }
     },
 
@@ -170,7 +170,6 @@
 
       plugin.addListener('registration', (token) => {
         const value = normalizeToken(token?.value);
-        console.log('[PushService] Token nativo recibido:', value ? `${value.substring(0, 20)}...` : '(vacio)');
 
         if (this._pendingNativeRegistration) {
           if (value) {
@@ -191,7 +190,7 @@
       });
 
       plugin.addListener('pushNotificationReceived', (notification) => {
-        console.log('[PushService] Push nativo recibido:', notification?.title || notification);
+
       });
 
       plugin.addListener('pushNotificationActionPerformed', (action) => {
@@ -212,7 +211,7 @@
 
     async _requestNativeAndSubscribe(uid) {
       if (!this.isNativeSupported()) {
-        console.warn('[PushService] Push nativo no disponible.');
+
         return false;
       }
 
@@ -231,7 +230,7 @@
       }
 
       if (permission !== 'granted') {
-        console.log('[PushService] Permiso nativo denegado o ignorado.');
+
         return false;
       }
 
@@ -247,7 +246,7 @@
             sound: 'default'
           });
         } catch (err) {
-          console.warn('[PushService] No se pudo crear el canal Android:', err);
+
         }
       }
 
@@ -269,7 +268,7 @@
 
       token = normalizeToken(token);
       if (!token) {
-        console.warn('[PushService] Token nativo vacio.');
+
         return false;
       }
 
@@ -282,7 +281,7 @@
 
     async _requestWebAndSubscribe(uid) {
       if (!this.isWebSupported()) {
-        console.warn('[PushService] Push web no soportado en este entorno.');
+
         return false;
       }
 
@@ -295,7 +294,7 @@
       }
 
       if (permission !== 'granted') {
-        console.log('[PushService] Permiso web denegado o ignorado.');
+
         return false;
       }
 
@@ -330,7 +329,7 @@
 
       token = normalizeToken(token);
       if (!token) {
-        console.warn('[PushService] Token web vacio.');
+
         return false;
       }
 
@@ -374,7 +373,7 @@
     async _saveTokenToFirestore(uid, token, meta = {}) {
       const db = getDb();
       if (!db) {
-        console.warn('[PushService] SIA.db no disponible para guardar token.');
+
         return false;
       }
 
@@ -395,7 +394,7 @@
             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
           }, { merge: true });
 
-        console.log(`[PushService] Token guardado en Firestore como ${docId}.`);
+
         return true;
       } catch (err) {
         console.error('[PushService] Error guardando token en Firestore:', err);
@@ -416,7 +415,7 @@
           .collection('pushTokens').doc(docId).delete();
         return true;
       } catch (err) {
-        console.warn('[PushService] No se pudo eliminar token:', err);
+
         return false;
       }
     }

@@ -276,7 +276,7 @@ const SIA_Register = (() => {
                 localStorage.setItem(key, JSON.stringify(payload));
                 updateDraftStatus('Borrador guardado automáticamente', 'success');
             } catch (error) {
-                console.warn('[Register] No se pudo guardar borrador:', error);
+
                 updateDraftStatus('No se pudo guardar el borrador', 'warning');
             }
         }, 250);
@@ -288,7 +288,7 @@ const SIA_Register = (() => {
         try {
             localStorage.removeItem(key);
         } catch (error) {
-            console.warn('[Register] No se pudo limpiar borrador:', error);
+
         }
     };
 
@@ -360,7 +360,7 @@ const SIA_Register = (() => {
 
             updateDraftStatus('Borrador restaurado', 'success');
         } catch (error) {
-            console.warn('[Register] No se pudo restaurar borrador:', error);
+
             updateDraftStatus('Guardado automático activo', 'success');
         }
     };
@@ -489,8 +489,8 @@ const SIA_Register = (() => {
     };
 
     const init = (user, extraData) => {
-        console.log("[Register] Iniciando flujo de registro para:", user ? user.email : 'null');
-        console.log("[Register] extraData recibido:", JSON.stringify(extraData));
+
+
         _userCandidate = user;
         _extraData = extraData || {};
 
@@ -574,7 +574,7 @@ const SIA_Register = (() => {
     // --- FLUJO ESTUDIANTE / GENERAL (WIZARD) ---
 
     const startStudentWizard = () => {
-        console.log("[Register] Iniciando Wizard Estudiante");
+
         showStep(0);
 
         // Pre-llenar datos conocidos
@@ -896,7 +896,7 @@ const SIA_Register = (() => {
                 } else {
                     finalEmail = rawMatricula.toLowerCase().trim();
                 }
-                console.log("[Register] Reconstructed missing email from matricula:", finalEmail);
+
             }
 
             const rawProfileData = {

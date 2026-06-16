@@ -554,7 +554,7 @@ window.AdminMedi.Chat = (function () {
 
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
-          console.log(`[Medi] Opening admin conversation for ${studentName}(convId: ${conv.id})`);
+
           openAdminConversation(conv.id, studentName, studentId);
         });
       });

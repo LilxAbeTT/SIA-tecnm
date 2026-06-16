@@ -75,9 +75,9 @@ class VocacionalLanding extends HTMLElement {
     }
 
     connectedCallback() {
-        console.log('[VocacionalLanding] connectedCallback - esperando VocacionalService...');
+
         if (typeof VocacionalService !== 'undefined' && VocacionalService.VOCACIONAL_CATALOGS) {
-            console.log('[VocacionalLanding] VocacionalService ya disponible, renderizando.');
+
             this.render();
             this.setupEventListeners();
         } else {

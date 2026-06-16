@@ -15,12 +15,14 @@ const BiblioService = (function () {
     const CATALOG_STATE_DOC_ID = 'catalog-state';
     const CATALOG_STORAGE_KEY = 'sia_biblio_catalog';
     const CATALOG_META_STORAGE_KEY = 'sia_biblio_catalog_meta';
-    const CATALOG_STATE_CHECK_TTL = 60 * 1000;
-    const CATALOG_CACHE_MAX_AGE = 12 * 60 * 60 * 1000;
+    const USUARIOS_STORAGE_KEY = 'sia_biblio_usuarios';
+    const USUARIOS_META_STORAGE_KEY = 'sia_biblio_usuarios_meta';
+    const CATALOG_STATE_CHECK_TTL = 3 * 24 * 60 * 60 * 1000;
+    const CATALOG_CACHE_MAX_AGE = 7 * 24 * 60 * 60 * 1000;
 
     const ACTIVE_LOAN_STATES = new Set(['pendiente', 'pendiente_entrega', 'entregado']);
     const CACHE_SCHEMA_VERSION = 2;
-    const LOCAL_CACHE_TTL = 5 * 60 * 1000;
+    const LOCAL_CACHE_TTL = 3 * 24 * 60 * 60 * 1000;
     const HOLIDAY_CACHE_TTL = 5 * 60 * 1000;
     const HOLIDAY_STORAGE_KEY = 'sia_biblio_holiday_calendar_v1';
     const SEARCH_TEXT_MIN_CHARS = 3;
@@ -187,11 +189,18 @@ const BiblioService = (function () {
                 const snap = await queryRef.count().get();
                 return snap?.data?.().count ?? snap?.data().count ?? null;
             } catch (error) {
-                console.warn('[BIBLIO] No se pudo obtener conteo agregado.', error);
+
                 return null;
             }
         }
-        return null;
+
+        try {
+            const snap = await queryRef.get();
+            return snap.size;
+        } catch (error) {
+
+            return null;
+        }
     }
 
     function getBookCategory(source) {
@@ -322,7 +331,7 @@ const BiblioService = (function () {
                 updatedBy: snapshot?.updatedBy || ''
             }));
         } catch (error) {
-            console.warn('[BIBLIO] No se pudo persistir calendario inhábil:', error);
+
         }
     }
 
@@ -333,7 +342,7 @@ const BiblioService = (function () {
             if (!raw) return createHolidayCalendarSnapshot();
             return createHolidayCalendarSnapshot(raw);
         } catch (error) {
-            console.warn('[BIBLIO] No se pudo leer calendario inhábil local:', error);
+
             return createHolidayCalendarSnapshot();
         }
     }
@@ -374,7 +383,7 @@ const BiblioService = (function () {
                 updatedAtMs: now
             });
         } catch (error) {
-            console.warn('[BIBLIO] No se pudo cargar calendario inhábil:', error);
+
             return getHolidayCalendarSnapshot();
         }
     }
@@ -1347,7 +1356,7 @@ const BiblioService = (function () {
             if (hasWrites) {
                 await batch.commit();
                 if (closedVisits.length > 0) {
-                    console.log(`[BIBLIO] Visitas auto-cerradas: ${closedVisits.map((item) => `${item.studentName} (${item.matricula})`).join(', ')}`);
+
                 }
             }
 
@@ -1366,12 +1375,15 @@ const BiblioService = (function () {
         const variants = getCaseVariants(adq);
         if (variants.length === 0) return [];
 
-        const snap = await ctx.db.collection(CAT_COLL)
-            .where('adquisicion', 'in', variants)
-            .limit(limit)
-            .get();
-
-        return snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const cache = await _loadCatalogCache(ctx);
+        const matches = [];
+        for (const book of cache) {
+            if (variants.includes(book.adquisicion)) {
+                matches.push(book);
+                if (matches.length >= limit) break;
+            }
+        }
+        return matches;
     }
 
     async function resolveBookForAdminFlow(ctx, rawCode, allowSearchFallback = true) {
@@ -1406,6 +1418,99 @@ const BiblioService = (function () {
 
     function getInventoryMetaRef(ctx) {
         return ctx.db.collection(BIBLIO_CONFIG_COLL).doc(INVENTORY_META_DOC_ID);
+    }
+
+    let _inventoryCategoriesCache = null;
+    let _inventoryCategoriesCacheTime = 0;
+
+    function getInventoryCategoriesRef(ctx) {
+        return ctx.db.collection(BIBLIO_CONFIG_COLL).doc('inventory-categories');
+    }
+
+    async function getInventoryCategories(ctx) {
+        const now = Date.now();
+        if (Array.isArray(_inventoryCategoriesCache) && (now - _inventoryCategoriesCacheTime) < CACHE_TTL) {
+            return _inventoryCategoriesCache.slice();
+        }
+
+        try {
+            const snap = await getInventoryCategoriesRef(ctx).get();
+            if (snap.exists) {
+                _inventoryCategoriesCache = Array.isArray(snap.data().categories) ? snap.data().categories : [];
+                _inventoryCategoriesCacheTime = now;
+                return _inventoryCategoriesCache.slice();
+            }
+            _inventoryCategoriesCache = [];
+            _inventoryCategoriesCacheTime = now;
+            return [];
+        } catch (e) {
+            console.error('[BIBLIO] Error al obtener categorias de inventario:', e);
+            return [];
+        }
+    }
+
+    async function addInventoryCategory(ctx, categoryName) {
+        const ref = getInventoryCategoriesRef(ctx);
+        const name = String(categoryName || '').trim();
+        if (!name) throw new Error('El nombre de la categoria es invalido.');
+        
+        const snap = await ref.get();
+        let categories = [];
+        if (snap.exists) {
+            categories = snap.data().categories || [];
+        }
+        
+        if (!categories.includes(name)) {
+            categories.push(name);
+            categories.sort();
+            await ref.set({ categories }, { merge: true });
+        }
+        _inventoryCategoriesCache = categories.slice();
+        _inventoryCategoriesCacheTime = Date.now();
+        return categories;
+    }
+
+    async function removeInventoryCategory(ctx, categoryName) {
+        const ref = getInventoryCategoriesRef(ctx);
+        const name = String(categoryName || '').trim();
+        if (!name) throw new Error('El nombre de la categoria es invalido.');
+        
+        const snap = await ref.get();
+        let categories = [];
+        if (snap.exists) {
+            categories = snap.data().categories || [];
+        }
+        
+        categories = categories.filter(c => c !== name);
+        await ref.set({ categories }, { merge: true });
+        
+        _inventoryCategoriesCache = categories.slice();
+        _inventoryCategoriesCacheTime = Date.now();
+        return categories;
+    }
+
+    async function editInventoryCategory(ctx, oldName, newName) {
+        const ref = getInventoryCategoriesRef(ctx);
+        const oldN = String(oldName || '').trim();
+        const newN = String(newName || '').trim();
+        if (!oldN || !newN) throw new Error('Los nombres de categoria son invalidos.');
+        
+        const snap = await ref.get();
+        let categories = [];
+        if (snap.exists) {
+            categories = snap.data().categories || [];
+        }
+        
+        const index = categories.indexOf(oldN);
+        if (index !== -1) {
+            categories[index] = newN;
+            categories.sort();
+            await ref.set({ categories }, { merge: true });
+        }
+        
+        _inventoryCategoriesCache = categories.slice();
+        _inventoryCategoriesCacheTime = Date.now();
+        return categories;
     }
 
     function summarizeInventorySession(id, data = {}) {
@@ -1494,6 +1599,205 @@ const BiblioService = (function () {
         return normalized || `sin-nombre-${Date.now()}`;
     }
 
+    function normalizeInventoryAcquisitionList(values = []) {
+        return [...new Set((Array.isArray(values) ? values : [values])
+            .map((value) => String(value || '').trim().toUpperCase())
+            .filter(Boolean))];
+    }
+
+    function buildInventoryCatalogPayloadFromEntry(entry = {}, acquisition = '', baseBook = {}, options = {}) {
+        const pendingData = entry?.pendingCatalogData || {};
+        const source = Object.keys(baseBook || {}).length > 0 ? baseBook : pendingData;
+        const cleanAcquisition = String(acquisition || entry?.adquisicion || '').trim().toUpperCase();
+        const title = source.titulo || source.title || entry.titulo || 'Sin titulo';
+        const author = source.autor || source.author || entry.autor || '';
+        const category = source.categoria || source.category || entry.categoria || '';
+        const classification = source.clasificacion || source.classification || entry.clasificacion || '';
+        const parentAcquisition = options.parentAdquisicion || source.adquisicion || entry.catalogAdquisicion || '';
+
+        return {
+            adquisicion: cleanAcquisition,
+            titulo: title,
+            autor: author,
+            anio: getBookYear(source) || getBookYear(entry) || '',
+            categoria: category,
+            clasificacion: classification,
+            ubicacion: source.ubicacion || entry.ubicacion || 'Estanteria',
+            active: true,
+            inventoryGroupKey: options.groupKey || entry.groupKey || '',
+            catalogParentId: options.catalogParentId || source.id || '',
+            parentAdquisicion: parentAcquisition,
+            isCatalogCopy: options.isCatalogCopy === true,
+            inventoryCreatedFromSession: options.sessionId || '',
+            inventorySourceEntryId: entry.id || '',
+            tituloSearch: norm(title),
+            autorSearch: norm(author),
+            copiasTotales: 1,
+            copiasDisponibles: 1,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        };
+    }
+
+    function serializeFirestoreBackupValue(value) {
+        if (value == null) return value;
+        if (typeof value?.toDate === 'function') {
+            const date = value.toDate();
+            return {
+                __type: 'timestamp',
+                seconds: Number(value.seconds) || 0,
+                nanoseconds: Number(value.nanoseconds) || 0,
+                iso: Number.isNaN(date.getTime()) ? '' : date.toISOString()
+            };
+        }
+        if (value instanceof Date) {
+            return { __type: 'date', iso: value.toISOString() };
+        }
+        if (Array.isArray(value)) {
+            return value.map(serializeFirestoreBackupValue);
+        }
+        if (typeof value === 'object') {
+            if (typeof value.path === 'string' && typeof value.id === 'string') {
+                return { __type: 'documentReference', path: value.path, id: value.id };
+            }
+            return Object.fromEntries(
+                Object.entries(value).map(([key, entryValue]) => [key, serializeFirestoreBackupValue(entryValue)])
+            );
+        }
+        return value;
+    }
+
+    function serializeFirestoreDocForBackup(doc) {
+        return {
+            id: doc.id,
+            path: doc.ref?.path || '',
+            data: serializeFirestoreBackupValue(doc.data() || {})
+        };
+    }
+
+    function normalizeCatalogDocForCache(doc) {
+        const data = doc.data ? doc.data() : (doc.data || doc || {});
+        return {
+            id: doc.id,
+            titulo: data.titulo,
+            autor: data.autor,
+            adquisicion: data.adquisicion,
+            inventoryGroupKey: data.inventoryGroupKey || '',
+            catalogParentId: data.catalogParentId || '',
+            isCatalogCopy: data.isCatalogCopy === true,
+            copiasDisponibles: data.copiasDisponibles,
+            copiasTotales: data.copiasTotales,
+            active: data.active,
+            categoria: data.categoria || '',
+            clasificacion: data.clasificacion || '',
+            anio: getBookYear(data),
+            tituloSearch: data.tituloSearch || '',
+            autorSearch: data.autorSearch || ''
+        };
+    }
+
+    async function listInventorySessions(ctx, { limit = 20 } = {}) {
+        try {
+            const snap = await ctx.db
+                .collection(INVENTORY_COLL)
+                .orderBy('createdAtMs', 'desc')
+                .limit(limit)
+                .get();
+            if (snap.empty) return [];
+            return snap.docs.map((doc) => summarizeInventorySession(doc.id, doc.data() || {}));
+        } catch (e) {
+
+            return [];
+        }
+    }
+
+    async function getTopBooksBySemester(ctx, { limit: topLimit = 10 } = {}) {
+        // Préstamos desde el 1 de enero del año actual hasta hoy
+        const now = new Date();
+        const semesterStart = new Date(now.getFullYear(), 0, 1, 0, 0, 0, 0); // 1 enero año actual
+        const semesterStartMs = semesterStart.getTime();
+
+        try {
+            const snap = await ctx.db
+                .collection(PRES_COLL)
+                .where('fechaSolicitudMs', '>=', semesterStartMs)
+                .orderBy('fechaSolicitudMs', 'desc')
+                .limit(500)
+                .get();
+
+            const counts = {};
+            snap.docs.forEach((d) => {
+                const data = d.data();
+                const lid = data.libroId;
+                if (!lid) return;
+                if (!counts[lid]) counts[lid] = { libroId: lid, titulo: data.tituloLibro || '', count: 0 };
+                counts[lid].count++;
+            });
+
+            const ranked = Object.values(counts).sort((a, b) => b.count - a.count).slice(0, topLimit);
+            const rankedIds = ranked.map((item) => item.libroId).filter(Boolean);
+            const booksMap = {};
+
+            for (let i = 0; i < rankedIds.length; i += 10) {
+                const chunk = rankedIds.slice(i, i + 10);
+                if (!chunk.length) continue;
+                try {
+                    const bookSnaps = await ctx.db
+                        .collection(CAT_COLL)
+                        .where(firebase.firestore.FieldPath.documentId(), 'in', chunk)
+                        .get();
+                    bookSnaps.forEach((doc) => { booksMap[doc.id] = doc.data(); });
+                } catch (e) {
+
+                }
+            }
+
+            return ranked.map((item) => {
+                const bookData = booksMap[item.libroId];
+                return {
+                    id: item.libroId,
+                    titulo: bookData?.titulo || item.titulo || 'Sin título',
+                    autor: bookData?.autor || '',
+                    categoria: bookData?.categoriaLibro || bookData?.categoria || '',
+                    adquisicion: bookData?.adquisicion || '',
+                    prestamos: item.count
+                };
+            });
+        } catch (e) {
+
+            // Fallback sin filtro de fecha si el índice no existe
+            try {
+                const snap2 = await ctx.db.collection(PRES_COLL)
+                    .orderBy('fechaSolicitud', 'desc')
+                    .limit(300)
+                    .get();
+                const counts2 = {};
+                snap2.docs.forEach((d) => {
+                    const data = d.data();
+                    // Filtrar manualmente por semestre
+                    const fechaMs = data.fechaSolicitudMs || (data.fechaSolicitud?.toMillis?.()) || 0;
+                    if (fechaMs < semesterStartMs) return;
+                    const lid = data.libroId;
+                    if (!lid) return;
+                    if (!counts2[lid]) counts2[lid] = { libroId: lid, titulo: data.tituloLibro || '', count: 0 };
+                    counts2[lid].count++;
+                });
+                const ranked2 = Object.values(counts2).sort((a, b) => b.count - a.count).slice(0, topLimit);
+                return ranked2.map((item) => ({
+                    id: item.libroId,
+                    titulo: item.titulo || 'Sin título',
+                    autor: '',
+                    categoria: '',
+                    adquisicion: '',
+                    prestamos: item.count
+                }));
+            } catch (e2) {
+
+                return [];
+            }
+        }
+    }
+
     async function getInventorySessionDetails(ctx, sessionId, { includeLists = false } = {}) {
         const rawSessionId = String(sessionId || '').trim();
         if (!rawSessionId) return { session: null, foundEntries: [], missingEntries: [] };
@@ -1570,6 +1874,44 @@ const BiblioService = (function () {
         };
     }
 
+    async function createInventoryAdjustmentBackup(ctx, sessionId) {
+        const rawSessionId = String(sessionId || '').trim();
+        if (!rawSessionId) throw new Error('No hay inventario para respaldar.');
+
+        const details = await getInventorySessionDetails(ctx, rawSessionId, { includeLists: true });
+        if (!details?.session) throw new Error('La sesion de inventario no existe.');
+
+        const catalogSnap = await ctx.db.collection(CAT_COLL).get();
+        const catalog = catalogSnap.docs.map(serializeFirestoreDocForBackup);
+        _catalogCache = catalogSnap.docs.map(normalizeCatalogDocForCache);
+        _catalogCacheTime = Date.now();
+        _inventoryLookupCache = buildInventoryLookupCache(_catalogCache);
+        _inventoryLookupCacheTime = _catalogCacheTime;
+        const generatedAt = new Date();
+
+        return {
+            schema: 'sia-biblio-inventory-adjustment-backup-v1',
+            generatedAt: generatedAt.toISOString(),
+            generatedAtMs: generatedAt.getTime(),
+            generatedBy: ctx?.auth?.currentUser?.uid || '',
+            collections: {
+                catalog: CAT_COLL,
+                inventory: INVENTORY_COLL
+            },
+            counts: {
+                catalog: catalog.length,
+                foundEntries: Array.isArray(details.foundEntries) ? details.foundEntries.length : 0,
+                missingEntries: Array.isArray(details.missingEntries) ? details.missingEntries.length : 0
+            },
+            inventory: {
+                session: serializeFirestoreBackupValue(details.session),
+                foundEntries: serializeFirestoreBackupValue(details.foundEntries || []),
+                missingEntries: serializeFirestoreBackupValue(details.missingEntries || [])
+            },
+            catalog
+        };
+    }
+
     async function applyFinishedInventoryToCatalog(ctx, sessionId) {
         const rawSessionId = String(sessionId || '').trim();
         if (!rawSessionId) throw new Error('No hay un inventario cerrado para ajustar.');
@@ -1579,23 +1921,41 @@ const BiblioService = (function () {
         if (details.session.status !== 'finished') throw new Error('Primero cierra oficialmente el inventario.');
 
         const foundEntries = Array.isArray(details.foundEntries) ? details.foundEntries : [];
-        const allBooks = await _loadCatalogCache(ctx);
+        const [allBooks, activeLoanCountsByBook] = await Promise.all([
+            _loadCatalogCache(ctx),
+            getActiveLoanCountsByBook(ctx)
+        ]);
         const groups = new Map();
         const foundByGroup = new Map();
+        const catalogByAcquisition = new Map();
+        const observedGroupByAcquisition = new Map();
 
         foundEntries.forEach((entry) => {
             const groupKey = String(entry?.groupKey || '').trim();
             if (groupKey) {
+                const previous = foundByGroup.get(groupKey) || {
+                    totalObserved: 0,
+                    observedAcquisitions: [],
+                    entries: []
+                };
+                const observedAcquisitions = normalizeInventoryAcquisitionList(entry?.observedAcquisitions);
+                observedAcquisitions.forEach((acquisition) => observedGroupByAcquisition.set(acquisition, groupKey));
                 foundByGroup.set(groupKey, {
-                    totalObserved: Number(entry?.totalObserved) || 0,
-                    observedAcquisitions: Array.isArray(entry?.observedAcquisitions)
-                        ? entry.observedAcquisitions.map((value) => String(value || '').trim().toUpperCase()).filter(Boolean)
-                        : []
+                    totalObserved: previous.totalObserved + (Number(entry?.totalObserved) || observedAcquisitions.length || 0),
+                    observedAcquisitions: normalizeInventoryAcquisitionList([
+                        ...previous.observedAcquisitions,
+                        ...observedAcquisitions
+                    ]),
+                    entries: [...previous.entries, entry]
                 });
             }
         });
 
         allBooks.forEach((book) => {
+            const acquisition = String(book?.adquisicion || '').trim().toUpperCase();
+            if (acquisition && !catalogByAcquisition.has(acquisition)) {
+                catalogByAcquisition.set(acquisition, book);
+            }
             const groupKey = buildInventoryGroupKey(book);
             if (!groups.has(groupKey)) groups.set(groupKey, []);
             groups.get(groupKey).push(book);
@@ -1607,6 +1967,9 @@ const BiblioService = (function () {
         let activeCopies = 0;
         let inactiveCopies = 0;
         let forcedByLoans = 0;
+        let createdCopies = 0;
+        let relinkedCopies = 0;
+        const handledBookIds = new Set();
         let batch = ctx.db.batch();
         let opCount = 0;
         const commitBatchIfNeeded = async (force = false) => {
@@ -1617,10 +1980,14 @@ const BiblioService = (function () {
             }
         };
 
-        for (const [groupKey, members] of groups.entries()) {
-            const foundMeta = foundByGroup.get(groupKey) || { totalObserved: 0, observedAcquisitions: [] };
+        const groupKeys = new Set([...groups.keys(), ...foundByGroup.keys()]);
+        for (const groupKey of groupKeys) {
+            const members = groups.get(groupKey) || [];
+            const foundMeta = foundByGroup.get(groupKey) || { totalObserved: 0, observedAcquisitions: [], entries: [] };
+            const observedAcquisitions = normalizeInventoryAcquisitionList(foundMeta.observedAcquisitions);
+            const observedSet = new Set(observedAcquisitions);
             const observedOrder = new Map(
-                (foundMeta.observedAcquisitions || []).map((value, index) => [String(value || '').trim().toUpperCase(), index])
+                observedAcquisitions.map((value, index) => [String(value || '').trim().toUpperCase(), index])
             );
             const sortedMembers = [...members].sort((left, right) => {
                 const leftObservedIndex = observedOrder.has(String(left?.adquisicion || '').trim().toUpperCase())
@@ -1637,16 +2004,28 @@ const BiblioService = (function () {
             });
 
             const targetCount = Math.max(0, Number(foundMeta.totalObserved) || 0);
-            let remainingActive = targetCount;
+            let remainingImplicitActive = Math.max(0, targetCount - observedSet.size);
+            const baseBook = sortedMembers.find((member) => observedSet.has(String(member?.adquisicion || '').trim().toUpperCase()))
+                || sortedMembers.find((member) => String(member?.id || '') === String(foundMeta.entries?.[0]?.representativeId || foundMeta.entries?.[0]?.bookId || ''))
+                || sortedMembers[0]
+                || {};
+            let firstCreatedRef = null;
+            let firstCreatedAcquisition = '';
             adjustedGroups += 1;
 
             for (const member of sortedMembers) {
-                const activeLoans = await countActiveLoansForBook(ctx, member.id);
-                const mustStayActive = activeLoans > 0;
-                const shouldStayActive = mustStayActive || remainingActive > 0;
+                if (handledBookIds.has(member.id)) continue;
+                const memberAcquisition = String(member?.adquisicion || '').trim().toUpperCase();
+                const observedInOtherGroup = observedGroupByAcquisition.get(memberAcquisition);
+                if (observedInOtherGroup && observedInOtherGroup !== groupKey) continue;
 
-                if (remainingActive > 0) {
-                    remainingActive -= 1;
+                const activeLoans = activeLoanCountsByBook.get(member.id) || 0;
+                const mustStayActive = activeLoans > 0;
+                const explicitlyObserved = observedSet.has(memberAcquisition);
+                let shouldStayActive = mustStayActive || explicitlyObserved;
+                if (!shouldStayActive && remainingImplicitActive > 0) {
+                    shouldStayActive = true;
+                    remainingImplicitActive -= 1;
                 }
 
                 if (mustStayActive && targetCount === 0) {
@@ -1666,6 +2045,57 @@ const BiblioService = (function () {
                     copiasDisponibles: shouldStayActive ? Math.max(0, 1 - activeLoans) : 0,
                     updatedAt: firebase.firestore.FieldValue.serverTimestamp()
                 }, { merge: true });
+                handledBookIds.add(member.id);
+                opCount += 1;
+                await commitBatchIfNeeded();
+            }
+
+            for (const acquisition of observedAcquisitions) {
+                const existingBook = catalogByAcquisition.get(acquisition);
+                if (existingBook?.id && !handledBookIds.has(existingBook.id)) {
+                    const activeLoans = activeLoanCountsByBook.get(existingBook.id) || 0;
+                    batch.set(ctx.db.collection(CAT_COLL).doc(existingBook.id), {
+                        active: true,
+                        inventoryGroupKey: groupKey,
+                        catalogParentId: baseBook?.id || existingBook.catalogParentId || '',
+                        parentAdquisicion: baseBook?.adquisicion || existingBook.parentAdquisicion || '',
+                        isCatalogCopy: existingBook.id !== baseBook?.id,
+                        copiasTotales: Math.max(1, activeLoans || 1),
+                        copiasDisponibles: Math.max(0, 1 - activeLoans),
+                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    }, { merge: true });
+                    handledBookIds.add(existingBook.id);
+                    activeCopies += 1;
+                    relinkedCopies += 1;
+                    opCount += 1;
+                    await commitBatchIfNeeded();
+                    continue;
+                }
+
+                if (existingBook?.id) continue;
+
+                const sourceEntry = (foundMeta.entries || []).find((entry) => {
+                    const entryAcquisitions = normalizeInventoryAcquisitionList(entry?.observedAcquisitions);
+                    return entryAcquisitions.includes(acquisition);
+                }) || foundMeta.entries?.[0] || {};
+                const newBookRef = ctx.db.collection(CAT_COLL).doc();
+                const isFirstPendingOriginal = !baseBook?.id && !firstCreatedRef;
+                if (isFirstPendingOriginal) {
+                    firstCreatedRef = newBookRef;
+                    firstCreatedAcquisition = acquisition;
+                }
+                const payload = buildInventoryCatalogPayloadFromEntry(sourceEntry, acquisition, baseBook, {
+                    groupKey,
+                    sessionId: rawSessionId,
+                    catalogParentId: baseBook?.id || (isFirstPendingOriginal ? '' : firstCreatedRef?.id || ''),
+                    parentAdquisicion: baseBook?.adquisicion || (isFirstPendingOriginal ? '' : firstCreatedAcquisition),
+                    isCatalogCopy: Boolean(baseBook?.id) || !isFirstPendingOriginal
+                });
+                batch.set(newBookRef, payload);
+                catalogByAcquisition.set(acquisition, { id: newBookRef.id, ...payload });
+                handledBookIds.add(newBookRef.id);
+                activeCopies += 1;
+                createdCopies += 1;
                 opCount += 1;
                 await commitBatchIfNeeded();
             }
@@ -1691,8 +2121,26 @@ const BiblioService = (function () {
             activeCopies,
             inactiveCopies,
             forcedByLoans,
+            createdCopies,
+            relinkedCopies,
             summary: details.session.summary || buildInventorySessionSummary(details.session, details.foundEntries, details.missingEntries, await getInventoryCatalogSummary(ctx))
         };
+    }
+
+    async function getCopiesByTitleAndAuthorAdmin(ctx, titulo, autor) {
+        try {
+            const allBooks = await _loadCatalogCache(ctx);
+            const tituloNorm = (titulo || '').trim().toLowerCase();
+            const autorNorm = (autor || '').trim().toLowerCase();
+            
+            return allBooks.filter(b => 
+                (b.titulo || '').trim().toLowerCase() === tituloNorm &&
+                (b.autor || '').trim().toLowerCase() === autorNorm
+            );
+        } catch (error) {
+            console.error('[BIBLIO] Error en getCopiesByTitleAndAuthorAdmin:', error);
+            return [];
+        }
     }
 
     async function searchCatalogoAdmin(ctx, term, limit = 10) {
@@ -1712,19 +2160,24 @@ const BiblioService = (function () {
         };
 
         try {
-            const exactDoc = await ctx.db.collection(CAT_COLL).doc(rawTerm).get();
-            if (exactDoc.exists) {
-                pushUnique([{ id: exactDoc.id, ...exactDoc.data() }]);
+            const allBooks = await _loadCatalogCache(ctx);
+
+            const exactDoc = allBooks.find(b => b.id === rawTerm);
+            if (exactDoc) {
+                pushUnique([{ ...exactDoc }]);
             }
 
-            const byAcquisition = await findBooksByAdquisicion(ctx, rawTerm, limit);
-            pushUnique(byAcquisition);
+            const variants = getCaseVariants(rawTerm);
+            if (variants.length > 0) {
+                const byAcquisition = allBooks.filter(b => variants.includes(b.adquisicion));
+                pushUnique(byAcquisition.slice(0, limit));
+            }
 
             if (normalizedTerm.length >= SEARCH_TEXT_MIN_CHARS) {
-                const allBooks = await _loadCatalogCache(ctx);
+                const groupedBooks = _groupBooks(allBooks);
                 const words = normalizedTerm.split(/\s+/).filter((word) => word.length >= 2);
 
-                const scored = allBooks
+                const scored = groupedBooks
                     .map((book) => {
                         if (!book?.id || seen.has(book.id)) return null;
 
@@ -1776,6 +2229,23 @@ const BiblioService = (function () {
             const data = doc.data() || {};
             return total + (isLoanStillActive(data) ? 1 : 0);
         }, 0);
+    }
+
+    async function getActiveLoanCountsByBook(ctx) {
+        const counts = new Map();
+        const snap = await ctx.db.collection(PRES_COLL)
+            .where('estado', 'in', Array.from(ACTIVE_LOAN_STATES))
+            .get();
+
+        snap.docs.forEach((doc) => {
+            const data = doc.data() || {};
+            if (!isLoanStillActive(data)) return;
+            const bookId = String(data.libroId || '').trim();
+            if (!bookId) return;
+            counts.set(bookId, (counts.get(bookId) || 0) + 1);
+        });
+
+        return counts;
     }
 
     async function buildCatalogStockPayload(ctx, id, data) {
@@ -1901,11 +2371,9 @@ const BiblioService = (function () {
 
     async function findBookByCode(ctx, code) {
         try {
-            const doc = await ctx.db.collection(CAT_COLL).doc(code).get();
-            if (doc.exists) {
-                return { id: doc.id, ...doc.data() };
-            }
-            return null;
+            const cache = await _loadCatalogCache(ctx);
+            const book = cache.find(b => b.id === code);
+            return book || null;
         } catch (e) {
             console.error("Book not found", e);
             return null;
@@ -1920,8 +2388,16 @@ const BiblioService = (function () {
     let _catalogCacheVersion = '';
     let _inventoryLookupCache = null;
     let _inventoryLookupCacheTime = 0;
+    let _inventoryCatalogSummaryCache = null;
+    let _inventoryCatalogSummaryCacheTime = 0;
     let _catalogStateCache = null;
     let _catalogStateCacheTime = 0;
+    
+    // Cache local de usuarios
+    let _usuariosCache = null;
+    let _usuariosCacheTime = 0;
+    let _usuariosCacheVersion = '';
+    
     const CACHE_TTL = LOCAL_CACHE_TTL;
 
     function getCatalogStateRef(ctx) {
@@ -1961,7 +2437,7 @@ const BiblioService = (function () {
 
             return { books, meta };
         } catch (error) {
-            console.warn('[BIBLIO] Error leyendo cache local del catálogo', error);
+
             return { books: null, meta: null };
         }
     }
@@ -1979,7 +2455,7 @@ const BiblioService = (function () {
                 stateUpdatedAtMs: Number(meta?.stateUpdatedAtMs) || 0
             }));
         } catch (error) {
-            console.warn('[BIBLIO] No se pudo guardar el catálogo en LocalStorage (posible exceso de cuota)', error);
+
         }
     }
 
@@ -1998,7 +2474,7 @@ const BiblioService = (function () {
             _catalogStateCacheTime = now;
             return _catalogStateCache;
         } catch (error) {
-            console.warn('[BIBLIO] No se pudo leer el estado del catálogo:', error);
+
             return _catalogStateCache;
         }
     }
@@ -2022,7 +2498,7 @@ const BiblioService = (function () {
             _catalogStateCacheTime = nowMs;
             return _catalogStateCache;
         } catch (error) {
-            console.warn('[BIBLIO] No se pudo actualizar la versión del catálogo:', error);
+
             return _catalogStateCache;
         }
     }
@@ -2059,30 +2535,10 @@ const BiblioService = (function () {
             }
         }
 
-        console.log('[BIBLIO] Descargando catálogo completo de Firebase (reads: N)...');
+
         const snap = await ctx.db.collection(CAT_COLL).get();
 
-        _catalogCache = snap.docs.map((d) => {
-            const data = d.data();
-            // Retornar solo lo vital para búsqueda para no saturar LocalStorage (límite de 5MB)
-            return {
-                id: d.id,
-                titulo: data.titulo,
-                autor: data.autor,
-                adquisicion: data.adquisicion,
-                inventoryGroupKey: data.inventoryGroupKey || '',
-                catalogParentId: data.catalogParentId || '',
-                isCatalogCopy: data.isCatalogCopy === true,
-                copiasDisponibles: data.copiasDisponibles,
-                copiasTotales: data.copiasTotales,
-                active: data.active,
-                categoria: data.categoria || '',
-                clasificacion: data.clasificacion || '',
-                anio: getBookYear(data),
-                tituloSearch: data.tituloSearch || '',
-                autorSearch: data.autorSearch || ''
-            };
-        });
+        _catalogCache = snap.docs.map(normalizeCatalogDocForCache);
         _catalogCacheVersion = String(serverState?.versionTag || `snapshot:${now}`).trim();
         _catalogCacheTime = now;
 
@@ -2093,6 +2549,152 @@ const BiblioService = (function () {
         });
 
         return _catalogCache;
+    }
+
+    // --- CACHE DE USUARIOS ---
+    function readUsuariosCacheFromStorage() {
+        if (typeof window === 'undefined' || !window.localStorage) {
+            return { users: null, meta: null };
+        }
+        try {
+            const rawUsers = window.localStorage.getItem(USUARIOS_STORAGE_KEY);
+            const rawMeta = window.localStorage.getItem(USUARIOS_META_STORAGE_KEY);
+            if (!rawUsers || !rawMeta) return { users: null, meta: null };
+            const meta = JSON.parse(rawMeta);
+            const users = JSON.parse(rawUsers);
+            if (!Array.isArray(users)) return { users: null, meta: null };
+            return { users, meta };
+        } catch (error) {
+            return { users: null, meta: null };
+        }
+    }
+
+    function persistUsuariosCacheToStorage(users = [], meta = {}) {
+        if (typeof window === 'undefined' || !window.localStorage) return;
+        try {
+            window.localStorage.setItem(USUARIOS_STORAGE_KEY, JSON.stringify(Array.isArray(users) ? users : []));
+            window.localStorage.setItem(USUARIOS_META_STORAGE_KEY, JSON.stringify({
+                fetchedAtMs: Number(meta?.fetchedAtMs) || Date.now(),
+                version: String(meta?.version || '').trim()
+            }));
+        } catch (error) { }
+    }
+
+    async function _loadUsuariosCache(ctx) {
+        const now = Date.now();
+        if (_usuariosCache && (now - _usuariosCacheTime) < CACHE_TTL) return _usuariosCache;
+
+        const storageSnapshot = readUsuariosCacheFromStorage();
+        if (!_usuariosCache && Array.isArray(storageSnapshot.users) && storageSnapshot.users.length > 0) {
+            _usuariosCache = storageSnapshot.users;
+            _usuariosCacheVersion = String(storageSnapshot.meta?.version || '').trim();
+        }
+
+        const cachedUsers = Array.isArray(_usuariosCache) ? _usuariosCache : [];
+        const cachedFetchedAt = Number(storageSnapshot.meta?.fetchedAtMs || 0);
+        const cacheIsFreshEnough = cachedFetchedAt > 0 && (now - cachedFetchedAt) < CACHE_TTL;
+
+        if (cachedUsers.length > 0 && cacheIsFreshEnough) {
+            _usuariosCacheTime = now;
+            return cachedUsers;
+        }
+
+        try {
+            const snap = await ctx.db.collection(USERS_COLL).get();
+            _usuariosCache = snap.docs.map(doc => {
+                const data = doc.data() || {};
+                return {
+                    id: doc.id,
+                    nombre: data.displayName || (data.nombre ? `${data.nombre} ${data.apellido || ''}` : 'Usuario'),
+                    matricula: data.matricula || '',
+                    email: data.email || '',
+                    carrera: data.carrera || data.programa || '',
+                    turno: data.turno || '',
+                    tipoUsuario: data.tipoUsuario || data.role || 'estudiante',
+                    profile_pic: data.photoURL || data.profile_pic || ''
+                };
+            });
+            _usuariosCacheTime = now;
+            _usuariosCacheVersion = `snapshot:${now}`;
+
+            persistUsuariosCacheToStorage(_usuariosCache, {
+                fetchedAtMs: now,
+                version: _usuariosCacheVersion
+            });
+            return _usuariosCache;
+        } catch (error) {
+            console.error('[BIBLIO] Error cargando cache de usuarios:', error);
+            return cachedUsers;
+        }
+    }
+
+    async function searchUsuariosAdmin(ctx, query, limit = 20) {
+        const q = (query || '').toString().trim();
+        if (!q) return [];
+        const normalizedQ = norm(q);
+        
+        try {
+            const allUsers = await _loadUsuariosCache(ctx);
+            const words = normalizedQ.split(/\\s+/).filter(w => w.length >= 2);
+            
+            const results = allUsers.map(u => {
+                const nombreNorm = norm(u.nombre);
+                const matNorm = norm(u.matricula);
+                let score = 0;
+                
+                if (matNorm === normalizedQ) score += 200;
+                else if (matNorm.includes(normalizedQ)) score += 100;
+                
+                if (nombreNorm.startsWith(normalizedQ)) score += 100;
+                else if (nombreNorm.includes(normalizedQ)) score += 50;
+                
+                words.forEach(word => {
+                    if (nombreNorm.includes(word)) score += 10;
+                });
+                
+                if (score > 0) return { ...u, _score: score };
+                return null;
+            }).filter(Boolean);
+            
+            return results.sort((a, b) => b._score - a._score).slice(0, limit).map(({ _score, ...u }) => u);
+        } catch (error) {
+            console.error('[BIBLIO] Error buscando usuarios:', error);
+            return [];
+        }
+    }
+
+    function _groupBooks(books) {
+        const groups = new Map();
+        
+        books.forEach(book => {
+            const tNorm = book.tituloSearch || norm(book.titulo || '');
+            const aNorm = book.autorSearch || norm(book.autor || '');
+            const legacyKey = tNorm + '|' + aNorm;
+            
+            if (!groups.has(legacyKey)) {
+                groups.set(legacyKey, {
+                    ...book,
+                    _isBase: !book.isCatalogCopy,
+                    copiasTotales: Number(book.copiasTotales) || 1,
+                    copiasDisponibles: book.copiasDisponibles !== undefined ? Number(book.copiasDisponibles) : 1
+                });
+            } else {
+                const existing = groups.get(legacyKey);
+                existing.copiasTotales += (Number(book.copiasTotales) || 1);
+                existing.copiasDisponibles += (book.copiasDisponibles !== undefined ? Number(book.copiasDisponibles) : 1);
+                
+                if (!book.isCatalogCopy && existing._isBase === false) {
+                    const sumTotales = existing.copiasTotales;
+                    const sumDisponibles = existing.copiasDisponibles;
+                    Object.assign(existing, book);
+                    existing._isBase = true;
+                    existing.copiasTotales = sumTotales;
+                    existing.copiasDisponibles = sumDisponibles;
+                }
+            }
+        });
+        
+        return Array.from(groups.values());
     }
 
     function buildInventoryLookupCache(books = []) {
@@ -2183,22 +2785,66 @@ const BiblioService = (function () {
         return true;
     }
 
-    async function getInventoryCatalogSummary(ctx) {
-        const lookup = await getInventoryLookupCache(ctx);
-        return { ...(lookup?.summary || { totalTitles: 0, totalCopies: 0 }) };
+    async function getInventoryCatalogSummary(ctx, { allowFullScan = false } = {}) {
+        const now = Date.now();
+        if (_inventoryLookupCache && (now - _inventoryLookupCacheTime) < CACHE_TTL) {
+            return { ...(_inventoryLookupCache.summary || { totalTitles: 0, totalCopies: 0 }) };
+        }
+        if (_inventoryCatalogSummaryCache && (now - _inventoryCatalogSummaryCacheTime) < CACHE_TTL) {
+            return { ..._inventoryCatalogSummaryCache };
+        }
+        if (allowFullScan) {
+            const lookup = await getInventoryLookupCache(ctx);
+            _inventoryCatalogSummaryCache = { ...(lookup?.summary || { totalTitles: 0, totalCopies: 0 }) };
+            _inventoryCatalogSummaryCacheTime = now;
+            return { ..._inventoryCatalogSummaryCache };
+        }
+
+        try {
+            if (typeof ctx.db.collection(CAT_COLL).count === 'function') {
+                const snap = await ctx.db.collection(CAT_COLL).count().get();
+                const total = Number(snap.data()?.count) || 0;
+                _inventoryCatalogSummaryCache = { totalTitles: total, totalCopies: total, approximate: true };
+                _inventoryCatalogSummaryCacheTime = now;
+                return { ..._inventoryCatalogSummaryCache };
+            }
+        } catch (error) {
+
+        }
+
+        return { totalTitles: 0, totalCopies: 0, approximate: true };
     }
 
     async function findInventoryBookByCode(ctx, { code, sessionId = '' } = {}) {
         const rawCode = String(code || '').trim();
         if (!rawCode) return null;
 
-        const lookup = await getInventoryLookupCache(ctx);
-        let match = lookup.byDocId.get(rawCode) || null;
+        const now = Date.now();
+        let match = null;
+        if (_inventoryLookupCache && (now - _inventoryLookupCacheTime) < CACHE_TTL) {
+            match = _inventoryLookupCache.byDocId.get(rawCode) || null;
+            for (const variant of getCaseVariants(rawCode)) {
+                if (match) break;
+                match = _inventoryLookupCache.byAcquisition.get(variant) || null;
+            }
+        }
 
         if (!match) {
-            for (const variant of getCaseVariants(rawCode)) {
-                match = lookup.byAcquisition.get(variant) || null;
-                if (match) break;
+            const acquisitionMatches = await findBooksByAdquisicion(ctx, rawCode, 5);
+            const activeAcquisitionMatches = acquisitionMatches.filter((book) => book.active !== false);
+            if (activeAcquisitionMatches.length > 0) {
+                const baseBook = activeAcquisitionMatches[0];
+                const members = await getInventoryGroupMembersForBook(ctx, baseBook);
+                match = buildInventoryLookupResultFromMembers(rawCode, members);
+            }
+        }
+
+        if (!match) {
+            const exactDoc = await findBookByCode(ctx, rawCode);
+            if (exactDoc && exactDoc.active !== false) {
+                const baseBook = exactDoc;
+                const members = await getInventoryGroupMembersForBook(ctx, baseBook);
+                match = buildInventoryLookupResultFromMembers(rawCode, members);
             }
         }
 
@@ -2244,8 +2890,32 @@ const BiblioService = (function () {
             localStorage.removeItem(CATALOG_META_STORAGE_KEY);
             localStorage.removeItem(CATALOG_STORAGE_KEY);
         } catch (e) {
-            console.warn('[BIBLIO] No se pudo invalidar cachÃ© local del catÃ¡logo', e);
+
         }
+    }
+
+    function addBookToCacheLocal(bookId, bookData) {
+        if (!Array.isArray(_catalogCache)) return;
+        
+        // Remove if it exists (update scenario)
+        const idx = _catalogCache.findIndex(b => b.id === bookId);
+        if (idx !== -1) {
+            _catalogCache.splice(idx, 1);
+        }
+        
+        const newBook = normalizeCatalogDocForCache({
+            id: bookId,
+            data: () => bookData
+        });
+        
+        _catalogCache.push(newBook);
+        
+        // Update local storage
+        persistCatalogCacheToStorage(_catalogCache, {
+            fetchedAtMs: _catalogCacheTime,
+            catalogVersion: _catalogCacheVersion,
+            stateUpdatedAtMs: Date.now()
+        });
     }
 
     async function searchCatalogo(ctx, term) {
@@ -2254,52 +2924,62 @@ const BiblioService = (function () {
         const t = norm(rawTerm);
 
         try {
-            // 1. Direct ID Search (Best for barcodes/ids)
-            const idRef = ctx.db.collection(CAT_COLL).doc(rawTerm);
-            const idSnap = await idRef.get();
-            if (idSnap.exists && idSnap.data().active) {
-                return [{ id: idSnap.id, ...idSnap.data() }];
+            const allBooks = (await _loadCatalogCache(ctx))
+                .filter(book => book.active !== false);
+
+            const results = [];
+            const seen = new Set();
+            const pushUnique = (items) => {
+                items.forEach((item) => {
+                    if (!item?.id || seen.has(item.id)) return;
+                    seen.add(item.id);
+                    results.push(item);
+                });
+            };
+
+            // 1. Direct ID Search
+            const exactMatch = allBooks.find(b => b.id === rawTerm);
+            if (exactMatch) {
+                pushUnique([{ ...exactMatch }]);
             }
 
             // 2. Search by acquisition number
-            const acqBooks = (await findBooksByAdquisicion(ctx, rawTerm, 5))
-                .filter(book => book.active !== false);
+            const variants = getCaseVariants(rawTerm);
+            if (variants.length > 0) {
+                const byAcquisition = allBooks.filter(b => variants.includes(b.adquisicion));
+                pushUnique(byAcquisition.slice(0, 5));
+            }
 
-            if (acqBooks.length > 0) {
-                return acqBooks;
+            if (results.length > 0 && t.length < SEARCH_TEXT_MIN_CHARS) {
+                return results;
             }
 
             if (t.length < SEARCH_TEXT_MIN_CHARS) return [];
 
             // 3. Busqueda por titulo/autor usando cache local
-            // Firestore no soporta busqueda "contains" - usamos cache client-side
-            const allBooks = (await _loadCatalogCache(ctx))
-                .filter(book => book.active !== false);
+            const groupedBooks = _groupBooks(allBooks);
             const words = t.split(/\s+/).filter(w => w.length >= 2);
 
-            const scored = allBooks
+            const scored = groupedBooks
                 .map(book => {
-                    // Usar campos pre-indexados si existen, sino normalizar
+                    if (!book?.id || seen.has(book.id)) return null;
                     const tNorm = book.tituloSearch || norm(book.titulo);
                     const aNorm = book.autorSearch || norm(book.autor);
                     let score = 0;
 
-                    // Match exacto al inicio del titulo (mejor resultado)
                     if (tNorm.startsWith(t)) score += 100;
-                    // Titulo contiene el termino completo
                     else if (tNorm.includes(t)) score += 50;
-                    // Autor contiene el termino
                     if (aNorm.includes(t)) score += 30;
 
-                    // Match por palabras individuales
                     words.forEach(w => {
                         if (tNorm.includes(w)) score += 10;
                         if (aNorm.includes(w)) score += 5;
                     });
 
+                    if (score <= 0) return null;
                     return { ...book, _score: score };
                 })
-                .filter(b => b._score > 0)
+                .filter(Boolean)
                 .sort((a, b) => {
                     if (b._score !== a._score) return b._score - a._score;
                     if ((b.copiasDisponibles || 0) !== (a.copiasDisponibles || 0)) {
@@ -2310,7 +2990,8 @@ const BiblioService = (function () {
                 .slice(0, 15)
                 .map(({ _score, ...clean }) => clean);
 
-            return scored;
+            pushUnique(scored);
+            return results.slice(0, 15);
         } catch (e) {
             console.error("Error en busqueda:", e);
             return [];
@@ -2362,7 +3043,7 @@ const BiblioService = (function () {
             snap = await query.get();
         } catch (error) {
             if (error?.code !== 'failed-precondition') throw error;
-            console.warn('[BIBLIO] Faltó índice para limpieza optimizada; usando fallback temporal.', error);
+
             let fallbackQuery = ctx.db.collection(PRES_COLL)
                 .where('estado', 'in', ['pendiente', 'pendiente_entrega']);
             if (uid) fallbackQuery = fallbackQuery.where('studentId', '==', uid);
@@ -2386,7 +3067,7 @@ const BiblioService = (function () {
                 });
                 cleanedCount += 1;
             } catch (error) {
-                console.warn('[BIBLIO] No se pudo liberar solicitud expirada:', doc.id, error);
+
             }
         }
 
@@ -2468,6 +3149,14 @@ const BiblioService = (function () {
             userData.biblioBlocked = shouldBlock;
         }
 
+        let totalVisitas = 0;
+        try {
+            const visitasSnap = await ctx.db.collection(VISITAS_COLL).where('studentId', '==', uid).get();
+            totalVisitas = visitasSnap.size || visitasSnap.docs?.length || 0;
+        } catch (error) {
+            console.warn('[BIBLIO] No se pudo contar visitas', error);
+        }
+
         return {
             uid: uid,
             nombre: nombreCompleto,
@@ -2497,7 +3186,8 @@ const BiblioService = (function () {
             solicitados,
             recogidos,
             adeudos,
-            historial
+            historial,
+            totalVisitas
         };
     }
 
@@ -2799,7 +3489,6 @@ const BiblioService = (function () {
                     });
                 } catch (error) {
                     if (!isPermissionDeniedError(error)) throw error;
-                    console.warn('[BIBLIO] Lock de visitas no disponible por permisos; usando validacion legacy.', error);
 
                     const existingVisit = await findLegacyActiveVisit(ctx, { uid: tempUid, matricula: visitData.matricula });
                     if (existingVisit) {
@@ -2912,7 +3601,6 @@ const BiblioService = (function () {
             });
         } catch (error) {
             if (!isPermissionDeniedError(error)) throw error;
-            console.warn('[BIBLIO] Lock de visitas no disponible por permisos; usando validacion legacy.', error);
 
             const existingVisit = await findLegacyActiveVisit(ctx, { uid, matricula });
             if (existingVisit) {
@@ -3410,7 +4098,6 @@ const BiblioService = (function () {
             });
         } catch (error) {
             if (!isPermissionDeniedError(error)) throw error;
-            console.warn('[BIBLIO] Lock de visitas no disponible por permisos; usando validacion legacy para grupo.', error);
 
             for (const u of validUsers) {
                 const existingVisit = await findLegacyActiveVisit(ctx, { uid: u.uid, matricula: u.matricula });
@@ -3485,7 +4172,7 @@ const BiblioService = (function () {
             });
         } catch (error) {
             if (!isPermissionDeniedError(error)) throw error;
-            console.warn('[BIBLIO] No se pudo liberar lock de visita por permisos; cerrando visita sin lock.', error);
+
             await visitRef.update({
                 salida: firebase.firestore.FieldValue.serverTimestamp(),
                 status: 'finalizada'
@@ -3725,33 +4412,200 @@ const BiblioService = (function () {
         const title = String(data.title || data.titulo || '').trim();
         const author = String(data.author || data.autor || '').trim();
         const classification = String(data.classification || data.clasificacion || '').trim();
+        const category = String(data.categoria || data.category || '').trim();
 
         if (!sessionId) throw new Error('No hay una sesion de inventario activa.');
         if (!acquisition) throw new Error('Falta el numero de adquisicion.');
         if (!title) throw new Error('Escribe el nombre del libro.');
 
         await ensureUniqueAdquisicion(ctx, acquisition);
-        const sessionSnap = await ctx.db.collection(INVENTORY_COLL).doc(sessionId).get();
-        if (!sessionSnap.exists) throw new Error('La sesion de inventario ya no existe.');
-        if ((sessionSnap.data()?.status || '') === 'finished') {
-            throw new Error('La sesion ya fue finalizada. Inicia una nueva para continuar.');
-        }
-
-        const newBookRef = await addLibro(ctx, {
+        const nowMs = Date.now();
+        const actorId = ctx?.auth?.currentUser?.uid || '';
+        const sessionRef = ctx.db.collection(INVENTORY_COLL).doc(sessionId);
+        const stagedBook = {
             adquisicion: acquisition,
             titulo: title,
             autor: author,
             clasificacion: classification,
-            categoria: '',
-            ubicacion: 'Estanteria',
-            copiasTotales: 1,
-            copiasDisponibles: 1
+            categoria: category,
+            ubicacion: 'Estanteria'
+        };
+        const groupKey = buildInventoryGroupKey(stagedBook);
+        const entryId = `manual-${buildInventoryMissingKey(acquisition)}`;
+        const foundRef = sessionRef.collection(INVENTORY_FOUND_SUBCOLL).doc(entryId);
+        let resultSession = null;
+        let resultEntry = null;
+
+        await ctx.db.runTransaction(async (transaction) => {
+            const [sessionSnap, foundSnap] = await Promise.all([
+                transaction.get(sessionRef),
+                transaction.get(foundRef)
+            ]);
+
+            if (!sessionSnap.exists) throw new Error('La sesion de inventario ya no existe.');
+
+            const sessionData = sessionSnap.data() || {};
+            if (sessionData.status === 'finished') {
+                throw new Error('La sesion ya fue finalizada. Inicia una nueva para continuar.');
+            }
+
+            const previousEntry = foundSnap.exists ? (foundSnap.data() || {}) : null;
+            const previousObservedAcquisitions = Array.isArray(previousEntry?.observedAcquisitions)
+                ? previousEntry.observedAcquisitions
+                : [];
+            const nextObservedAcquisitions = normalizeInventoryAcquisitionList([
+                ...previousObservedAcquisitions,
+                acquisition
+            ]);
+            const nextTotal = Math.max(Number(previousEntry?.totalObserved) || 0, 0) + 1;
+            const nextSessionTotal = (Number(sessionData.totalObserved) || 0) + 1;
+            const nextMatchedItems = (Number(sessionData.matchedItems) || 0) + (previousEntry ? 0 : 1);
+            const nextLastEntry = {
+                type: 'catalogo',
+                titulo: title,
+                adquisicion: acquisition,
+                cantidad: 1,
+                systemTotal: 0,
+                query: acquisition,
+                atMs: nowMs
+            };
+
+            transaction.set(foundRef, {
+                bookId: '',
+                representativeId: '',
+                groupKey,
+                titulo: title,
+                autor: author,
+                adquisicion: acquisition,
+                catalogAdquisicion: '',
+                categoria: category,
+                clasificacion: classification,
+                active: true,
+                systemTotal: 0,
+                groupSize: 0,
+                totalObserved: nextTotal,
+                observedAcquisitions: nextObservedAcquisitions,
+                lastQuantity: 1,
+                lastQuery: acquisition,
+                pendingCatalogCreate: true,
+                pendingCatalogData: stagedBook,
+                updatedBy: actorId,
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                updatedAtMs: nowMs,
+                ...(previousEntry ? {} : {
+                    createdBy: actorId,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    createdAtMs: nowMs
+                })
+            }, { merge: true });
+
+            transaction.set(sessionRef, {
+                status: 'active',
+                matchedItems: nextMatchedItems,
+                totalObserved: nextSessionTotal,
+                updatedBy: actorId,
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                updatedAtMs: nowMs,
+                lastEntry: nextLastEntry
+            }, { merge: true });
+
+            resultEntry = {
+                id: entryId,
+                groupKey,
+                titulo: title,
+                autor: author,
+                adquisicion: acquisition,
+                catalogAdquisicion: '',
+                categoria: category,
+                clasificacion: classification,
+                active: true,
+                systemTotal: 0,
+                groupSize: 0,
+                totalObserved: nextTotal,
+                observedAcquisitions: nextObservedAcquisitions,
+                lastQuantity: 1,
+                lastQuery: acquisition,
+                pendingCatalogCreate: true,
+                pendingCatalogData: stagedBook,
+                updatedBy: actorId,
+                updatedAtMs: nowMs
+            };
+            resultSession = {
+                id: sessionId,
+                ...sessionData,
+                status: 'active',
+                matchedItems: nextMatchedItems,
+                totalObserved: nextSessionTotal,
+                updatedBy: actorId,
+                updatedAtMs: nowMs,
+                lastEntry: nextLastEntry
+            };
         });
 
+        await getInventoryMetaRef(ctx).set({
+            sessionId,
+            status: 'active',
+            updatedBy: actorId,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            updatedAtMs: nowMs
+        }, { merge: true });
+
         return {
-            bookId: newBookRef.id,
-            acquisition
+            session: resultSession,
+            entry: resultEntry,
+            bookId: '',
+            acquisition,
+            staged: true
         };
+    }
+
+    function buildInventoryLookupResultFromMembers(rawCode = '', members = []) {
+        const activeMembers = (members || []).filter((book) => book?.id && book.active !== false);
+        if (!activeMembers.length) return null;
+
+        const sortedMembers = [...activeMembers].sort((left, right) => {
+            const leftKey = norm(left?.adquisicion || left?.id);
+            const rightKey = norm(right?.adquisicion || right?.id);
+            return leftKey.localeCompare(rightKey);
+        });
+        const representative = sortedMembers[0] || {};
+        const groupKey = buildInventoryGroupKey(representative);
+        const systemTotal = sortedMembers.reduce((sum, member) => sum + getInventorySystemCopiesFromBook(member), 0);
+        const availableTotal = sortedMembers.reduce((sum, member) => {
+            const available = Number(member?.copiasDisponibles);
+            return sum + (Number.isFinite(available) && available > 0 ? available : 0);
+        }, 0);
+
+        return {
+            id: representative.id,
+            representativeId: representative.id,
+            groupKey,
+            titulo: representative.titulo || 'Sin titulo',
+            autor: representative.autor || '',
+            categoria: representative.categoria || '',
+            clasificacion: representative.clasificacion || '',
+            anio: getBookYear(representative),
+            adquisicion: representative.adquisicion || '',
+            systemTotal,
+            availableTotal,
+            groupSize: sortedMembers.length,
+            memberIds: sortedMembers.map((member) => member.id).filter(Boolean),
+            relatedAdquisiciones: sortedMembers
+                .map((member) => String(member.adquisicion || '').trim())
+                .filter(Boolean),
+            matchedAcquisition: rawCode,
+            registeredObserved: 0
+        };
+    }
+
+    async function getInventoryGroupMembersForBook(ctx, book = {}) {
+        const normalizedGroupKey = String(book?.inventoryGroupKey || '').trim();
+        if (!normalizedGroupKey) return [book];
+
+        const cache = await _loadCatalogCache(ctx);
+        const members = cache.filter(b => b.inventoryGroupKey === normalizedGroupKey);
+        
+        return members.length ? members : [book];
     }
 
     async function registerInventoryAssociatedCopy(ctx, data = {}) {
@@ -3768,28 +4622,19 @@ const BiblioService = (function () {
         const actorId = ctx?.auth?.currentUser?.uid || '';
         const sessionRef = ctx.db.collection(INVENTORY_COLL).doc(sessionId);
         const baseBookRef = ctx.db.collection(CAT_COLL).doc(baseBookId);
-        const variants = getCaseVariants(acquisition);
-        const duplicateQuery = variants.length > 0
-            ? ctx.db.collection(CAT_COLL).where('adquisicion', 'in', variants).limit(1)
-            : null;
-        const newBookRef = ctx.db.collection(CAT_COLL).doc();
+        let resultSession = null;
+        let resultEntry = null;
 
         await ctx.db.runTransaction(async (transaction) => {
             const reads = [
                 transaction.get(sessionRef),
                 transaction.get(baseBookRef)
             ];
-            if (duplicateQuery) {
-                reads.push(transaction.get(duplicateQuery));
-            }
 
-            const [sessionSnap, baseBookSnap, duplicateSnap] = await Promise.all(reads);
+            const [sessionSnap, baseBookSnap] = await Promise.all(reads);
 
             if (!sessionSnap.exists) throw new Error('La sesion de inventario ya no existe.');
             if (!baseBookSnap.exists) throw new Error('El libro base ya no existe en catalogo.');
-            if (duplicateSnap && !duplicateSnap.empty) {
-                throw new Error(`Ya existe un libro con el No. de adquisicion ${acquisition}.`);
-            }
 
             const sessionData = sessionSnap.data() || {};
             if (sessionData.status === 'finished') {
@@ -3806,28 +4651,6 @@ const BiblioService = (function () {
                 ? sessionRef.collection(INVENTORY_FOUND_SUBCOLL).doc(existingFoundDoc.id)
                 : sessionRef.collection(INVENTORY_FOUND_SUBCOLL).doc(baseBookId);
             const previousEntry = existingFoundDoc ? (existingFoundDoc.data() || {}) : null;
-            const cleanData = {
-                adquisicion: acquisition,
-                titulo: baseBookData.titulo || 'Sin titulo',
-                autor: baseBookData.autor || '',
-                anio: getBookYear(baseBookData) || '',
-                categoria: baseBookData.categoria || '',
-                clasificacion: baseBookData.clasificacion || '',
-                ubicacion: baseBookData.ubicacion || 'Estanteria',
-                active: true,
-                inventoryGroupKey: groupKey,
-                catalogParentId: baseBookId,
-                parentAdquisicion: baseBookData.adquisicion || '',
-                isCatalogCopy: true,
-                tituloSearch: norm(baseBookData.titulo),
-                autorSearch: norm(baseBookData.autor),
-                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-                copiasTotales: 1,
-                copiasDisponibles: 1
-            };
-
-            transaction.set(newBookRef, cleanData);
             const previousObservedAcquisitions = Array.isArray(previousEntry?.observedAcquisitions)
                 ? previousEntry.observedAcquisitions
                 : [];
@@ -3840,17 +4663,21 @@ const BiblioService = (function () {
                 bookId: previousEntry?.bookId || baseBookId,
                 representativeId: previousEntry?.representativeId || baseBookId,
                 groupKey,
-                titulo: previousEntry?.titulo || cleanData.titulo,
-                autor: previousEntry?.autor || cleanData.autor,
+                titulo: previousEntry?.titulo || baseBookData.titulo || 'Sin titulo',
+                autor: previousEntry?.autor || baseBookData.autor || '',
                 adquisicion: previousEntry?.adquisicion || baseBookData.adquisicion || acquisition,
                 catalogAdquisicion: previousEntry?.catalogAdquisicion || baseBookData.adquisicion || '',
-                categoria: previousEntry?.categoria || cleanData.categoria,
-                clasificacion: previousEntry?.clasificacion || cleanData.clasificacion,
+                categoria: previousEntry?.categoria || baseBookData.categoria || '',
+                clasificacion: previousEntry?.clasificacion || baseBookData.clasificacion || '',
                 active: true,
-                systemTotal: Math.max(Number(previousEntry?.systemTotal) || 0, 1),
+                systemTotal: Math.max(Number(previousEntry?.systemTotal) || 0, getInventorySystemCopiesFromBook(baseBookData)),
                 groupSize: Math.max(Number(previousEntry?.groupSize) || 0, 1),
                 totalObserved: (Number(previousEntry?.totalObserved) || 0) + quantity,
                 observedAcquisitions: nextObservedAcquisitions,
+                pendingCopyAcquisitions: normalizeInventoryAcquisitionList([
+                    ...(Array.isArray(previousEntry?.pendingCopyAcquisitions) ? previousEntry.pendingCopyAcquisitions : []),
+                    acquisition
+                ]),
                 lastQuantity: quantity,
                 lastQuery: acquisition,
                 updatedBy: actorId,
@@ -3873,7 +4700,7 @@ const BiblioService = (function () {
                 lastEntry: {
                     type: 'catalogo',
                     bookId: previousEntry?.bookId || baseBookId,
-                    titulo: cleanData.titulo,
+                    titulo: baseBookData.titulo || 'Sin titulo',
                     adquisicion: acquisition,
                     cantidad: quantity,
                     systemTotal: Math.max(Number(previousEntry?.systemTotal) || 0, 1),
@@ -3881,6 +4708,51 @@ const BiblioService = (function () {
                     atMs: nowMs
                 }
             }, { merge: true });
+
+            resultEntry = {
+                id: foundRef.id,
+                bookId: previousEntry?.bookId || baseBookId,
+                representativeId: previousEntry?.representativeId || baseBookId,
+                groupKey,
+                titulo: previousEntry?.titulo || baseBookData.titulo || 'Sin titulo',
+                autor: previousEntry?.autor || baseBookData.autor || '',
+                adquisicion: previousEntry?.adquisicion || baseBookData.adquisicion || acquisition,
+                catalogAdquisicion: previousEntry?.catalogAdquisicion || baseBookData.adquisicion || '',
+                categoria: previousEntry?.categoria || baseBookData.categoria || '',
+                clasificacion: previousEntry?.clasificacion || baseBookData.clasificacion || '',
+                active: true,
+                systemTotal: Math.max(Number(previousEntry?.systemTotal) || 0, getInventorySystemCopiesFromBook(baseBookData)),
+                groupSize: Math.max(Number(previousEntry?.groupSize) || 0, 1),
+                totalObserved: (Number(previousEntry?.totalObserved) || 0) + quantity,
+                observedAcquisitions: nextObservedAcquisitions,
+                pendingCopyAcquisitions: normalizeInventoryAcquisitionList([
+                    ...(Array.isArray(previousEntry?.pendingCopyAcquisitions) ? previousEntry.pendingCopyAcquisitions : []),
+                    acquisition
+                ]),
+                lastQuantity: quantity,
+                lastQuery: acquisition,
+                updatedBy: actorId,
+                updatedAtMs: nowMs
+            };
+            resultSession = {
+                id: sessionId,
+                ...sessionData,
+                status: 'active',
+                matchedItems: (Number(sessionData.matchedItems) || 0) + (previousEntry ? 0 : 1),
+                totalObserved: (Number(sessionData.totalObserved) || 0) + quantity,
+                updatedBy: actorId,
+                updatedAtMs: nowMs,
+                lastEntry: {
+                    type: 'catalogo',
+                    bookId: previousEntry?.bookId || baseBookId,
+                    titulo: baseBookData.titulo || 'Sin titulo',
+                    adquisicion: acquisition,
+                    cantidad: quantity,
+                    systemTotal: Math.max(Number(previousEntry?.systemTotal) || 0, 1),
+                    query: acquisition,
+                    atMs: nowMs
+                }
+            };
         });
 
         await getInventoryMetaRef(ctx).set({
@@ -3891,11 +4763,13 @@ const BiblioService = (function () {
             updatedAtMs: nowMs
         }, { merge: true });
 
-        await markCatalogStructureChanged(ctx);
         return {
-            bookId: newBookRef.id,
+            session: resultSession,
+            entry: resultEntry,
+            bookId: baseBookId,
             acquisition,
-            baseBookId
+            baseBookId,
+            staged: true
         };
     }
 
@@ -3919,12 +4793,12 @@ const BiblioService = (function () {
 
         const baseBookData = baseBookSnap.data() || {};
         const baseAcquisition = String(baseBookData.adquisicion || '').trim().toUpperCase();
-        const groupKey = buildInventoryGroupKey({ id: baseBookId, ...baseBookData });
-        const actorNow = firebase.firestore.FieldValue.serverTimestamp();
 
         let created = 0;
         let linked = 0;
         let skipped = 0;
+        let staged = 0;
+        let existingMatches = 0;
 
         for (const acquisition of normalizedAcquisitions) {
             if (!acquisition || acquisition === baseAcquisition) {
@@ -3938,45 +4812,20 @@ const BiblioService = (function () {
             }
 
             if (matches.length === 1) {
-                const existing = matches[0];
-                if (existing.id === baseBookId) {
+                const existingBook = matches[0];
+                if (existingBook.id === baseBookId) {
                     skipped += 1;
                     continue;
                 }
 
-                await ctx.db.collection(CAT_COLL).doc(existing.id).set({
-                    inventoryGroupKey: groupKey,
-                    catalogParentId: baseBookId,
-                    parentAdquisicion: baseBookData.adquisicion || '',
-                    isCatalogCopy: true,
-                    updatedAt: actorNow
-                }, { merge: true });
                 linked += 1;
+                existingMatches += 1;
                 continue;
             }
 
-            await addLibro(ctx, {
-                adquisicion: acquisition,
-                titulo: baseBookData.titulo || 'Sin titulo',
-                autor: baseBookData.autor || '',
-                anio: getBookYear(baseBookData) || '',
-                categoria: baseBookData.categoria || '',
-                clasificacion: baseBookData.clasificacion || '',
-                ubicacion: baseBookData.ubicacion || 'Estanteria',
-                inventoryGroupKey: groupKey,
-                catalogParentId: baseBookId,
-                parentAdquisicion: baseBookData.adquisicion || '',
-                isCatalogCopy: true,
-                copiasTotales: 1,
-                copiasDisponibles: 1
-            });
-            created += 1;
+            staged += 1;
         }
-
-        if (created > 0 || linked > 0) {
-            await markCatalogStructureChanged(ctx);
-        }
-        return { created, linked, skipped };
+        return { created, linked, skipped, staged, existing: existingMatches };
     }
 
     async function toggleLibroStatus(ctx, id, isActive) {
@@ -4284,15 +5133,18 @@ const BiblioService = (function () {
         const previousEntry = foundSnap.data() || {};
         const baseBookId = String(previousEntry.representativeId || previousEntry.bookId || '').trim();
         const baseAcquisition = String(previousEntry.catalogAdquisicion || previousEntry.adquisicion || '').trim().toUpperCase();
-        let syncResult = { created: 0, linked: 0, skipped: 0 };
         let resultSession = null;
         let resultEntry = null;
         let deleted = false;
-        if (addedAcquisitions.length > 0) {
-            syncResult = await syncInventoryCopyAcquisitions(ctx, {
+        if (addedAcquisitions.length > 0 && baseBookId) {
+            await syncInventoryCopyAcquisitions(ctx, {
                 baseBookId,
                 acquisitions: addedAcquisitions
             });
+        } else if (addedAcquisitions.length > 0) {
+            for (const acquisition of addedAcquisitions) {
+                await ensureUniqueAdquisicion(ctx, acquisition);
+            }
         }
 
         await ctx.db.runTransaction(async (transaction) => {
@@ -4308,8 +5160,8 @@ const BiblioService = (function () {
             const liveEntry = liveFoundSnap.data() || {};
             const previousTotal = Number(liveEntry.totalObserved) || 0;
             const delta = nextQuantity - previousTotal;
-            const nextSystemTotal = Math.max(Number(liveEntry.systemTotal) || 0, 1) + Number(syncResult.created || 0) + Number(syncResult.linked || 0);
-            const nextGroupSize = Math.max(Number(liveEntry.groupSize) || 0, 1) + Number(syncResult.created || 0) + Number(syncResult.linked || 0);
+            const nextSystemTotal = Math.max(Number(liveEntry.systemTotal) || 0, 1);
+            const nextGroupSize = Math.max(Number(liveEntry.groupSize) || 0, 1);
             const nextSessionTotal = Math.max(0, (Number(sessionData.totalObserved) || 0) + delta);
             const nextMatchedItems = Math.max(0, (Number(sessionData.matchedItems) || 0) + (nextQuantity <= 0 ? -1 : 0));
             const nextObservedAcquisitions = nextQuantity <= 0
@@ -4319,7 +5171,7 @@ const BiblioService = (function () {
                     baseAcquisition || ''
                 ].map((value) => String(value || '').trim().toUpperCase()).filter(Boolean))];
             const nextLastEntry = {
-                type: 'catalogo',
+                type: liveEntry.type || 'catalogo',
                 bookId: String(liveEntry.bookId || baseBookId || ''),
                 titulo: liveEntry.titulo || 'Sin titulo',
                 adquisicion: liveEntry.adquisicion || liveEntry.catalogAdquisicion || '',
@@ -4337,6 +5189,10 @@ const BiblioService = (function () {
                 transaction.set(foundRef, {
                     totalObserved: nextQuantity,
                     observedAcquisitions: nextObservedAcquisitions,
+                    pendingCopyAcquisitions: normalizeInventoryAcquisitionList([
+                        ...(Array.isArray(liveEntry.pendingCopyAcquisitions) ? liveEntry.pendingCopyAcquisitions : []),
+                        ...addedAcquisitions
+                    ]),
                     lastQuantity: delta !== 0 ? Math.abs(delta) : Number(liveEntry.lastQuantity) || nextQuantity,
                     systemTotal: nextSystemTotal,
                     groupSize: nextGroupSize,
@@ -4349,6 +5205,10 @@ const BiblioService = (function () {
                     ...liveEntry,
                     totalObserved: nextQuantity,
                     observedAcquisitions: nextObservedAcquisitions,
+                    pendingCopyAcquisitions: normalizeInventoryAcquisitionList([
+                        ...(Array.isArray(liveEntry.pendingCopyAcquisitions) ? liveEntry.pendingCopyAcquisitions : []),
+                        ...addedAcquisitions
+                    ]),
                     lastQuantity: delta !== 0 ? Math.abs(delta) : Number(liveEntry.lastQuantity) || nextQuantity,
                     systemTotal: nextSystemTotal,
                     groupSize: nextGroupSize,
@@ -4381,6 +5241,94 @@ const BiblioService = (function () {
             entryId,
             deleted
         };
+    }
+
+    async function registerInventoryExtraMaterial(ctx, data = {}) {
+        const sessionId = String(data.sessionId || '').trim();
+        const displayName = String(data.nombre || '').trim();
+        const quantity = Math.max(1, Number(data.quantity) || 1);
+
+        if (!sessionId) throw new Error('No hay una sesion de inventario activa.');
+        if (!displayName) throw new Error('Escribe el nombre del material.');
+
+        const nowMs = Date.now();
+        const actorId = ctx?.auth?.currentUser?.uid || '';
+        const entryId = `mat-${buildInventoryMissingKey(displayName)}`;
+        const sessionRef = ctx.db.collection(INVENTORY_COLL).doc(sessionId);
+        const foundRef = sessionRef.collection(INVENTORY_FOUND_SUBCOLL).doc(entryId);
+        let resultSession = null;
+        let resultEntry = null;
+
+        await ctx.db.runTransaction(async (transaction) => {
+            const [sessionSnap, foundSnap] = await Promise.all([
+                transaction.get(sessionRef),
+                transaction.get(foundRef)
+            ]);
+
+            if (!sessionSnap.exists) throw new Error('La sesion de inventario ya no existe.');
+            const sessionData = sessionSnap.data() || {};
+            if (sessionData.status === 'finished') throw new Error('La sesion ya fue finalizada.');
+
+            const previousEntry = foundSnap.exists ? (foundSnap.data() || {}) : null;
+            const nextTotal = (Number(previousEntry?.totalObserved) || 0) + quantity;
+            const nextSessionTotal = (Number(sessionData.totalObserved) || 0) + quantity;
+            const nextLastEntry = {
+                type: 'material',
+                titulo: displayName,
+                cantidad: quantity,
+                query: 'MATERIAL',
+                atMs: nowMs
+            };
+
+            transaction.set(foundRef, {
+                type: 'material',
+                titulo: displayName,
+                adquisicion: '',
+                totalObserved: nextTotal,
+                lastQuantity: quantity,
+                query: 'MATERIAL',
+                updatedBy: actorId,
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                updatedAtMs: nowMs,
+                ...(previousEntry ? {} : {
+                    createdBy: actorId,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    createdAtMs: nowMs
+                })
+            }, { merge: true });
+
+            transaction.set(sessionRef, {
+                status: 'active',
+                totalObserved: nextSessionTotal,
+                updatedBy: actorId,
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                updatedAtMs: nowMs,
+                lastEntry: nextLastEntry
+            }, { merge: true });
+
+            resultEntry = {
+                id: entryId,
+                type: 'material',
+                titulo: displayName,
+                adquisicion: '',
+                totalObserved: nextTotal,
+                lastQuantity: quantity,
+                query: 'MATERIAL',
+                updatedBy: actorId,
+                updatedAtMs: nowMs
+            };
+            resultSession = {
+                id: sessionId,
+                ...sessionData,
+                status: 'active',
+                totalObserved: nextSessionTotal,
+                updatedBy: actorId,
+                updatedAtMs: nowMs,
+                lastEntry: nextLastEntry
+            };
+        });
+
+        return { session: resultSession, entry: resultEntry };
     }
 
     async function registerInventoryMissing(ctx, data = {}) {
@@ -4588,7 +5536,7 @@ const BiblioService = (function () {
                     biblioSuggestionCount: firebase.firestore.FieldValue.increment(1)
                 }, { merge: true });
             } catch (error) {
-                console.warn('[BIBLIO] No se pudo actualizar contador de sugerencias:', error);
+
             }
         }
 
@@ -4627,7 +5575,7 @@ const BiblioService = (function () {
                 })
                 .sort((a, b) => (toMillisSafe(b.addedAt) || 0) - (toMillisSafe(a.addedAt) || 0));
         } catch (error) {
-            console.warn('[BIBLIO] No se pudo cargar wishlist:', error);
+
             return [];
         }
     }
@@ -4701,7 +5649,7 @@ const BiblioService = (function () {
                 })
                 .sort((a, b) => (toMillisSafe(b.joinedAt) || 0) - (toMillisSafe(a.joinedAt) || 0));
         } catch (error) {
-            console.warn('[BIBLIO] No se pudo cargar la lista de espera:', error);
+
             return [];
         }
     }
@@ -4859,7 +5807,7 @@ const BiblioService = (function () {
             let nuevoEstado = 'finalizado';
 
             if (forgiveDebt && multa > 0) {
-                console.log(`[BIBLIO] Deuda de $${multa} perdonada. Motivo: ${justification}`);
+
                 multa = 0;
             }
 
@@ -5209,7 +6157,7 @@ const BiblioService = (function () {
                 });
             });
         } catch (e) {
-            console.warn("⚠️ No se pudo dar XP (Posible falta permisos rules):", e.message);
+
         }
     }
 
@@ -5239,7 +6187,7 @@ const BiblioService = (function () {
             });
             return results.slice(0, limit);
         } catch (e) {
-            console.warn('[BIBLIO] Error buscando por categoría:', e);
+
             return [];
         }
     }
@@ -5286,7 +6234,7 @@ const BiblioService = (function () {
                         booksMap[doc.id] = doc.data();
                     });
                 } catch (e) {
-                    console.warn('[BIBLIO] Error cargando lote de top books:', e);
+
                 }
             }
 
@@ -5302,7 +6250,7 @@ const BiblioService = (function () {
             _topBooksCacheTime = now;
             return results.slice(0, limit);
         } catch (e) {
-            console.warn('[BIBLIO] Error cargando top books:', e);
+
             return [];
         }
     }
@@ -5312,10 +6260,12 @@ const BiblioService = (function () {
         findBookByCode,
         searchCatalogo,
         searchCatalogoAdmin,
+        getCopiesByTitleAndAuthorAdmin,
         getTopBooks,
         getBooksByCategory,
         getLoanPolicy,
         getPerfilBibliotecario,
+        searchUsuariosAdmin,
         registrarVisita,
         registrarVisitaGrupo,
         finalizarVisita,
@@ -5365,6 +6315,7 @@ const BiblioService = (function () {
         getInventorySessionDetails,
         getLatestFinishedInventorySession,
         getInventoryClosurePreview,
+        createInventoryAdjustmentBackup,
         applyFinishedInventoryToCatalog,
         startInventorySession,
         pauseInventorySession,
@@ -5374,10 +6325,18 @@ const BiblioService = (function () {
         registerInventoryManualBook,
         registerInventoryAssociatedCopy,
         syncInventoryCopyAcquisitions,
+        registerInventoryExtraMaterial,
         registerInventoryMissing,
         finalizeInventorySession,
         getLastAddedBook, getBookByAdquisicion, // [NEW]
-        invalidateCatalogCache
+        invalidateCatalogCache,
+        addBookToCacheLocal,
+        getInventoryCategories,
+        addInventoryCategory,
+        removeInventoryCategory,
+        editInventoryCategory,
+        listInventorySessions,
+        getTopBooksBySemester
     };
 })();
 window.BiblioService = BiblioService;

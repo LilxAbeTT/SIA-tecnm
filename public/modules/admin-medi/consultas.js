@@ -938,7 +938,7 @@ window.AdminMedi.Consultas = (function () {
         document.getElementById('detail-private-notes-text').textContent = privateNotes;
       }
     }).catch((error) => {
-      console.warn('[AdminMedi] No se pudieron cargar las notas privadas de la consulta:', error);
+
     });
 
     if (document.getElementById('detail-doctor')) {

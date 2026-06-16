@@ -504,9 +504,11 @@ export class DevTools extends HTMLElement {
     const currentView = this.getCurrentView();
     const quickViews = this.getQuickViews(profile);
     const currentPreset = this.getPreset(activePresetKey);
-    const shellLabel = profile?.devSimulation?.shell === 'student'
-      ? 'Student shell'
-      : (profile ? 'Admin shell' : '--');
+    const isActuallyAdminShell = profile?.devSimulation 
+      ? profile.devSimulation.shell !== 'student'
+      : (window.SIA?.isAdminWorkspaceProfile ? window.SIA.isAdminWorkspaceProfile(profile) : false);
+    
+    const shellLabel = isActuallyAdminShell ? 'Admin shell' : (profile ? 'Student shell' : '--');
     const busy = Boolean(this.busyKey);
     const statusLabel = this.getStatusLabel(profile);
 

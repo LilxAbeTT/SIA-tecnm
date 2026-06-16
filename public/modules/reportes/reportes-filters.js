@@ -10,7 +10,6 @@
  * ============================================================
  */
 if (!window.Reportes) window.Reportes = {};
-console.log('[SIA] reportes-filters.js cargado');
 
 window.Reportes.Filters = (function () {
     'use strict';

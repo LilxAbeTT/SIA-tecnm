@@ -378,7 +378,15 @@ if (!window.Avisos) {
                 window.showToast?.(successMessage, 'success');
             } catch (error) {
                 console.error('[Avisos] Admin action error:', error);
-                window.showToast?.(error.message || 'No se pudo completar la accion', 'danger');
+                
+                const isPermissionError = error.message?.includes('Missing or insufficient permissions');
+                const isDevMode = localStorage.getItem('sia_dev_mode') === 'true';
+                
+                if (isPermissionError && isDevMode) {
+                    window.showToast?.('Acción denegada por Firestore. (Tu perfil real no tiene permisos para guardar esto). Simulación segura.', 'warning');
+                } else {
+                    window.showToast?.(error.message || 'No se pudo completar la accion', 'danger');
+                }
             } finally {
                 _saving = false;
                 render();

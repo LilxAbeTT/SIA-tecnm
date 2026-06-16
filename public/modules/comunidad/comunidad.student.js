@@ -190,7 +190,7 @@ if (!window.ComunidadModule.Student) {
                             <div>
                                 <span class="comunidad-kicker"><i class="bi bi-people-fill"></i>Comunidad del campus</span>
                                 <h2 class="comunidad-title">Explora lo que está pasando en tu campus</h2>
-                                <p class="comunidad-text">Novedades, preguntas, avisos, ventas y objetos perdidos en una vista más clara. Publicar ahora vive en un modal, no en la entrada del módulo.</p>
+                                <p class="comunidad-text">Novedades, preguntas, avisos, ventas y objetos perdidos en tu campus</p>
                                 <div class="comunidad-hero-meta">
                                     <span class="comunidad-hero-pill ${identityCfg.className}"><i class="bi ${identityCfg.icon}"></i>${shared.escapeHtml(identityCfg.label)}</span>
                                     ${careerLabel ? `<span class="comunidad-hero-pill"><i class="bi bi-mortarboard-fill"></i>${shared.escapeHtml(careerLabel)}</span>` : ''}

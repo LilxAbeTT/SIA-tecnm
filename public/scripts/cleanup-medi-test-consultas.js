@@ -81,7 +81,7 @@
       chunk.forEach((ref) => batch.delete(ref));
       await batch.commit();
       deleted += chunk.length;
-      console.log(`[cleanup-medi] Lote confirmado: ${deleted}/${refs.length}`);
+
     }
     return deleted;
   }
@@ -196,8 +196,8 @@
 
     console.group('[cleanup-medi] Preview');
     console.table(result.preview);
-    console.log('[cleanup-medi] Resumen:', result.counts);
-    console.log('[cleanup-medi] currentAuthUid:', currentAuthUid);
+
+
     console.groupEnd();
 
     if (dryRun) {
@@ -205,7 +205,7 @@
     }
 
     result.deletedRefs = await chunkedBatchDelete(db, refsToDelete, Math.max(1, Math.min(batchSize, 450)));
-    console.log('[cleanup-medi] Borrado finalizado:', result.deletedRefs);
+
     return result;
   }
 

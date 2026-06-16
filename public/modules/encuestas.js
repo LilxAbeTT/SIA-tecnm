@@ -164,7 +164,7 @@
     try {
       localStorage.setItem(getDraftKey(surveyId), JSON.stringify({ answers, updatedAt: Date.now() }));
     } catch (error) {
-      console.warn('[Encuestas] No se pudo guardar borrador:', error);
+
     }
   }
 
@@ -182,7 +182,7 @@
     try {
       localStorage.removeItem(getDraftKey(surveyId));
     } catch (error) {
-      console.warn('[Encuestas] No se pudo limpiar borrador:', error);
+
     }
   }
 
@@ -208,7 +208,7 @@
     try {
       localStorage.setItem(getReminderKey(surveyId), JSON.stringify({ used: next, updatedAt: Date.now() }));
     } catch (error) {
-      console.warn('[Encuestas] No se pudo actualizar recordatorio:', error);
+
     }
     return { used: next, max: reminder.max };
   }

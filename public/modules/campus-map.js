@@ -545,8 +545,6 @@ if (!window.CampusMap) {
         (isPublicView(_currentViewId) ? 'campus-map-page--public' : 'campus-map-page--app') +
         '">' +
         '<div class="campus-map-page__masthead">' +
-        '<div class="campus-map-page__banner-wrap">' +
-        '<img src="/images/campus-map/banner map.png" alt="Banner institucional del mapa del campus" class="campus-map-page__banner">' +
         '</div>' +
         '<button type="button" class="campus-map-page__back" data-action="go-back">' +
         '<i class="bi bi-arrow-left"></i>' +

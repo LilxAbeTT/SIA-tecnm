@@ -181,7 +181,7 @@ window.Encuestas.Responses = (function () {
         response
       };
     } catch (error) {
-      console.warn('[Encuestas] No se pudo refrescar el estado de la respuesta:', error);
+
       return {
         ...baseSurvey,
         responded: !!baseSurvey.responded,
@@ -207,7 +207,7 @@ window.Encuestas.Responses = (function () {
           state.studentFeed = await window.EncuestasService.getStudentSurveyFeed(ctx);
           modules.UI.renderStudentFeed();
         } catch (error) {
-          console.warn('[Encuestas] No se pudo sincronizar el feed del estudiante:', error);
+
         }
       }
     }

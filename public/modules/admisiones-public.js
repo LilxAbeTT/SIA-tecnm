@@ -113,7 +113,7 @@ if (!window.AdmisionesPublic) {
       try {
         return Boolean(localStorage.getItem(VOCACIONAL_STORAGE_KEY));
       } catch (error) {
-        console.warn('[AdmisionesPublic] No se pudo leer la sesion vocacional local:', error);
+
         return false;
       }
     }
@@ -131,15 +131,41 @@ if (!window.AdmisionesPublic) {
       return next;
     }
 
-    function buildOptions(correct, distractors) {
+    function normalizeOption(value) {
+      return String(value ?? '').trim();
+    }
+
+    function addUniqueOption(list, value) {
+      const option = normalizeOption(value);
+      if (!option || list.includes(option)) return;
+      list.push(option);
+    }
+
+    function buildOptions(correct, distractors = [], fallbackDistractors = []) {
+      const correctOption = normalizeOption(correct) || 'Respuesta correcta';
       const unique = [];
-      [correct, ...(distractors || [])].forEach((item) => {
-        if (!item || unique.includes(item)) return;
-        unique.push(item);
+      [...(distractors || []), ...(fallbackDistractors || [])].forEach((item) => {
+        const option = normalizeOption(item);
+        if (!option || option === correctOption) return;
+        addUniqueOption(unique, option);
       });
-      const options = shuffleList(unique).slice(0, 4);
+
+      const selectedDistractors = shuffleList(unique).slice(0, 3);
+      [
+        'No corresponde con los datos del reactivo',
+        'Contradice el procedimiento correcto',
+        'Confunde este tema con otro bloque',
+        'No responde la consigna planteada'
+      ].forEach((fallback) => {
+        if (selectedDistractors.length < 3) addUniqueOption(selectedDistractors, fallback);
+      });
+
+      const options = shuffleList([correctOption, ...selectedDistractors.slice(0, 3)]);
       const correctIndex = options.findIndex((item) => item === correct);
-      return { options, correctIndex: correctIndex >= 0 ? correctIndex : 0 };
+      return {
+        options,
+        correctIndex: correctIndex >= 0 ? correctIndex : options.findIndex((item) => item === correctOption)
+      };
     }
 
     const GuestStore = {
@@ -160,7 +186,7 @@ if (!window.AdmisionesPublic) {
             bookmarks: Array.isArray(parsed?.bookmarks) ? parsed.bookmarks : []
           };
         } catch (error) {
-          console.warn('[AdmisionesPublic] No se pudo leer el progreso local:', error);
+
           return createDefaultGuest();
         }
       },
@@ -441,6 +467,16 @@ if (!window.AdmisionesPublic) {
     }
 
     function createTopicQuestion(area, topic, practice, index = 0) {
+      const rawOptions = Array.isArray(practice?.options) ? practice.options.map(normalizeOption).filter(Boolean) : [];
+      const rawCorrectIndex = Number(practice?.correctIndex);
+      const safeCorrectIndex = Number.isInteger(rawCorrectIndex) && rawCorrectIndex >= 0 && rawCorrectIndex < rawOptions.length
+        ? rawCorrectIndex
+        : 0;
+      const correct = rawOptions[safeCorrectIndex] || practice?.answer || 'Respuesta correcta';
+      const built = rawOptions.length
+        ? buildOptions(correct, rawOptions.filter((_, optionIndex) => optionIndex !== safeCorrectIndex))
+        : buildOptions(correct, []);
+
       return {
         id: `${area.id}-${topic.id}-practice-${index}`,
         areaId: area.id,
@@ -449,16 +485,104 @@ if (!window.AdmisionesPublic) {
         topicTitle: topic.title,
         difficulty: practice?.difficulty || 'básico',
         question: practice?.question || `Repaso de ${topic.title}`,
-        options: practice?.options || ['Lo entiendo', 'Necesito repasarlo'],
-        correctIndex: Number(practice?.correctIndex || 0),
+        options: built.options,
+        correctIndex: built.correctIndex,
         explanation: practice?.explanation || topic.summary || '',
         context: buildPracticeContext(area, topic, practice),
         source: practice?.source || ''
       };
     }
 
+    function getExampleAnswerPool(topicKey) {
+      const sourceTopics = getSelectedCareer() ? getRouteTopics() : getAllTopics();
+      return shuffleList(
+        sourceTopics
+          .filter((topic) => getTopicKey(topic.areaId, topic.id) !== topicKey)
+          .flatMap((topic) => getTopicExamples(topic).map((example) => example.answer))
+          .filter(Boolean)
+      );
+    }
+
+    function createExampleQuestion(area, topic, example, index = 0) {
+      const topicKey = getTopicKey(area.id, topic.id);
+      const sameTopicDistractors = getTopicExamples(topic)
+        .filter((candidate) => candidate !== example)
+        .map((candidate) => candidate.answer)
+        .filter(Boolean);
+      const built = buildOptions(example?.answer, sameTopicDistractors, getExampleAnswerPool(topicKey));
+
+      return {
+        id: `${area.id}-${topic.id}-example-${index}`,
+        areaId: area.id,
+        areaTitle: area.title,
+        topicId: topic.id,
+        topicTitle: topic.title,
+        difficulty: example?.level || 'básico',
+        question: example?.problem || `Ejemplo de ${topic.title}`,
+        options: built.options,
+        correctIndex: built.correctIndex,
+        explanation: `${example?.answer ? `Respuesta: ${example.answer}. ` : ''}${(example?.steps || []).join(' ') || topic.summary || ''}`.trim(),
+        context: `Ejercicio de repaso basado en la lección de ${topic.title}.`,
+        formula: example?.formula,
+        diagramText: example?.diagramText,
+        table: example?.table,
+        source: 'ejemplo-sia'
+      };
+    }
+
     function getTopicQuestionPool(area, topic) {
-      return getTopicPracticeQuestions(topic).map((practice, index) => createTopicQuestion(area, topic, practice, index));
+      const manualQuestions = getTopicPracticeQuestions(topic).map((practice, index) => createTopicQuestion(area, topic, practice, index));
+      const exampleQuestions = getTopicExamples(topic).map((example, index) => createExampleQuestion(area, topic, example, index));
+      return [...manualQuestions, ...exampleQuestions];
+    }
+
+    function createMistakeQuestion(area, topic) {
+      const topicKey = getTopicKey(area.id, topic.id);
+      const correct = topic.commonMistakes?.[0] || 'Responder sin revisar la consigna completa';
+      const distractors = getPoolFromOtherTopics(topicKey, (candidate) => candidate.commonMistakes);
+      const built = buildOptions(correct, distractors);
+      return {
+        id: `${area.id}-${topic.id}-mistake`,
+        areaId: area.id,
+        areaTitle: area.title,
+        topicId: topic.id,
+        topicTitle: topic.title,
+        question: `¿Qué error debes evitar al resolver ${topic.title}?`,
+        options: built.options,
+        correctIndex: built.correctIndex,
+        explanation: `${correct} es un error frecuente en ${topic.title}; revisar la consigna y el procedimiento reduce ese riesgo.`,
+        context: `Errores comunes: ${(topic.commonMistakes || []).join(' ')}`,
+        source: 'error-comun-sia'
+      };
+    }
+
+    function createSummaryQuestion(area, topic) {
+      const topicKey = getTopicKey(area.id, topic.id);
+      const correct = topic.summary || topic.explanation || topic.title;
+      const distractors = getPoolFromOtherTopics(topicKey, (candidate) => [candidate.summary || candidate.explanation]);
+      const built = buildOptions(correct, distractors);
+      return {
+        id: `${area.id}-${topic.id}-summary`,
+        areaId: area.id,
+        areaTitle: area.title,
+        topicId: topic.id,
+        topicTitle: topic.title,
+        question: `¿Qué descripción corresponde mejor a ${topic.title}?`,
+        options: built.options,
+        correctIndex: built.correctIndex,
+        explanation: correct,
+        context: topic.lesson?.conceptIntro || topic.summary || '',
+        source: 'resumen-sia'
+      };
+    }
+
+    function getGeneratedTopicQuestions(area, topic) {
+      return [
+        createCoverageQuestion(area, topic),
+        createCheckpointQuestion(area, topic),
+        createMistakeQuestion(area, topic),
+        createSummaryQuestion(area, topic)
+      ];
     }
 
     function getAreaQuestionPool(areaId, includeGenerated = false) {
@@ -468,9 +592,8 @@ if (!window.AdmisionesPublic) {
       (area.topics || []).forEach((topic) => {
         const questions = getTopicQuestionPool(area, topic);
         pool.push(...questions);
-        if (includeGenerated || questions.length < 3) {
-          pool.push(createCoverageQuestion(area, topic));
-          pool.push(createCheckpointQuestion(area, topic));
+        if (includeGenerated || questions.length < 5) {
+          pool.push(...getGeneratedTopicQuestions(area, topic));
         }
       });
       return pool;
@@ -481,9 +604,10 @@ if (!window.AdmisionesPublic) {
       const routeAreas = getRouteAreas(career);
       return routeAreas.reduce((metrics, area) => {
         (area.topics || []).forEach((topic) => {
+          const topicQuestions = getTopicQuestionPool(area, topic);
           metrics.topics += 1;
           metrics.examples += getTopicExamples(topic).length;
-          metrics.questions += getTopicPracticeQuestions(topic).length;
+          metrics.questions += topicQuestions.length + (topicQuestions.length < 5 ? getGeneratedTopicQuestions(area, topic).length : 0);
         });
         return metrics;
       }, { topics: 0, examples: 0, questions: 0 });
@@ -609,9 +733,7 @@ if (!window.AdmisionesPublic) {
         const topic = getTopic(areaId, topicId);
         if (!area || !topic) return [];
         const questions = getTopicQuestionPool(area, topic);
-        const pool = questions.length >= 5
-          ? questions
-          : [...questions, createCoverageQuestion(area, topic), createCheckpointQuestion(area, topic)];
+        const pool = [...questions, ...getGeneratedTopicQuestions(area, topic)];
         return shuffleList(pool).slice(0, 5);
       },
 
@@ -949,7 +1071,7 @@ if (!window.AdmisionesPublic) {
                 <span class="adm-career-icon">${icon(CAREER_ICONS[career.id] || 'bi-mortarboard')}</span>
                 <span style="text-align: left;">
                   <strong>${escapeHtml(career.shortName || career.name)}</strong>
-                  <small>${escapeHtml(areaCount)} bloques de preparación</small>
+                  <small>${escapeHtml(areaCount)} bloques académicos</small>
                 </span>
               </div>
               <span style="font-size:0.875rem; color:var(--primary); display:flex; align-items:center; gap:0.25rem;">Cambiar ${icon('bi-chevron-expand')}</span>
@@ -968,7 +1090,7 @@ if (!window.AdmisionesPublic) {
                 <span class="adm-career-icon">${icon(CAREER_ICONS[career.id] || 'bi-mortarboard')}</span>
                 <span>
                   <strong>${escapeHtml(career.shortName || career.name)}</strong>
-                  <small>${escapeHtml(areaCount)} bloques de preparación</small>
+                  <small>${escapeHtml(areaCount)} bloques académicos</small>
                 </span>
                 ${active ? icon('bi-check-circle-fill') : icon('bi-chevron-right')}
               </button>
@@ -987,7 +1109,7 @@ if (!window.AdmisionesPublic) {
           <div class="adm-section-head">
             <span class="adm-kicker">Ruta personalizada</span>
             <h1>${career ? escapeHtml(career.name) : 'Primero elige tu carrera'}</h1>
-            <p>${career ? 'Estos son los bloques que debes priorizar para tu examen. Inglés es diagnóstico y también debes presentarlo.' : 'La preparación se ordena mejor cuando SIA sabe hacia qué carrera vas.'}</p>
+            <p>${career ? 'Estos son los bloques académicos asociados a tu carrera. Inglés es diagnóstico y también debes presentarlo.' : 'El temario se ordena mejor cuando SIA sabe hacia qué carrera vas.'}</p>
           </div>
           ${renderCareerPicker()}
         </section>
@@ -1118,54 +1240,47 @@ if (!window.AdmisionesPublic) {
       if (!area || !topic) return renderSectionPrompt('bi-journal', 'Tema no encontrado', 'Vuelve al temario para elegir otro tema.', 'Ver temas', 'learn');
       const progress = getTopicProgress(area.id, topic.id);
       const topicKey = getTopicKey(area.id, topic.id);
-      const practiceQuestions = getTopicPracticeQuestions(topic);
+      const practiceQuestions = getTopicQuestionPool(area, topic);
       const examples = getTopicExamples(topic);
       
       const allExamples = [...examples];
-      if (allExamples.length < 5) {
-        const extraNeeded = 5 - allExamples.length;
-        const extras = practiceQuestions.slice(3, 3 + extraNeeded).map(q => ({
-          problem: q.question,
-          steps: [q.explanation || 'Análisis de la pregunta.'],
-          answer: q.options[q.correctIndex],
-          source: 'didactico-sia'
-        }));
-        allExamples.push(...extras);
-      }
       
       const inlineQuestions = practiceQuestions.slice(0, 3);
       const correctInlineCount = inlineQuestions.filter((q, i) => _ui.microAnswers?.[`${topicKey}-${i}`] === Number(q.correctIndex)).length;
       const isLearned = progress.studied || correctInlineCount >= 2;
 
       return `
-        <section class="adm-topic-hero">
-          <button class="adm-back-link" type="button" data-action="go-screen" data-screen="learn">${icon('bi-arrow-left')} Temario</button>
-          <span class="adm-kicker">${escapeHtml(area.title)}</span>
-          <h1>${escapeHtml(topic.title)}</h1>
-          <p>${escapeHtml(topic.summary)}</p>
-          <div class="adm-cta-row">
-            <button class="adm-button is-primary" type="button" data-action="mark-topic" data-area-id="${escapeHtml(area.id)}" data-topic-id="${escapeHtml(topic.id)}">${icon(isLearned ? 'bi-check-circle-fill' : 'bi-check-circle')} ${isLearned ? 'Tema aprendido' : 'Marcar como aprendido'}</button>
-            <button class="adm-button is-soft" type="button" data-action="start-topic-practice" data-area-id="${escapeHtml(area.id)}" data-topic-id="${escapeHtml(topic.id)}">${icon('bi-ui-checks')} Práctica completa</button>
-          </div>
-        </section>
+        <div class="adm-topic-container">
+          <section class="adm-topic-hero">
+            <button class="adm-back-link" type="button" data-action="go-screen" data-screen="learn">${icon('bi-arrow-left')} Temario</button>
+            <span class="adm-kicker">${escapeHtml(area.title)}</span>
+            <h1>${escapeHtml(topic.title)}</h1>
+            <p>${escapeHtml(topic.summary)}</p>
+            <div class="adm-cta-row">
+              <button class="adm-button is-primary" type="button" data-action="mark-topic" data-area-id="${escapeHtml(area.id)}" data-topic-id="${escapeHtml(topic.id)}">${icon(isLearned ? 'bi-check-circle-fill' : 'bi-check-circle')} ${isLearned ? 'Tema aprendido' : 'Marcar como aprendido'}</button>
+              <button class="adm-button is-soft" type="button" data-action="start-topic-practice" data-area-id="${escapeHtml(area.id)}" data-topic-id="${escapeHtml(topic.id)}">${icon('bi-ui-checks')} Práctica completa</button>
+            </div>
+          </section>
 
-        <section class="adm-lesson-grid">
-          ${renderTopicPhase1(topic)}
-          ${renderTopicPhase2(topic)}
-          ${renderTopicPhase3(allExamples)}
-          ${inlineQuestions.length ? renderTopicPhase4(area, topic, inlineQuestions) : ''}
-          ${renderTopicPhase5(topic)}
-        </section>
+          <div class="adm-topic-phases">
+            ${renderTopicPhase1(topic)}
+            ${renderTopicLesson(topic)}
+            ${renderTopicPhase2(topic)}
+            ${renderTopicPhase3(allExamples)}
+            ${inlineQuestions.length ? renderTopicPhase4(area, topic, inlineQuestions) : ''}
+            ${renderTopicPhase5(topic)}
+          </div>
+        </div>
       `;
     }
 
     function renderTopicPhase1(topic) {
-      const intro = topic.learning?.intro || topic.introduction || '';
+      const intro = topic.lesson?.intro || topic.learning?.intro || topic.introduction || '';
       const coverage = topic.officialCoverage || [];
       return `
         <article class="adm-lesson-card is-phase1">
           <span class="adm-feature-icon">${icon('bi-journal-text')}</span>
-          <strong>Contexto del tema</strong>
+          <strong>Qué vas a aprender</strong>
           <p>${escapeHtml(intro)}</p>
           ${coverage.length ? `
             <div class="adm-coverage-pills">
@@ -1176,9 +1291,51 @@ if (!window.AdmisionesPublic) {
       `;
     }
 
+    function renderTopicLesson(topic) {
+      const lesson = topic.lesson || {};
+      const subtopics = Array.isArray(lesson.subtopics) ? lesson.subtopics : [];
+      const rules = Array.isArray(lesson.rules) ? lesson.rules : [];
+      const applications = Array.isArray(lesson.applications) ? lesson.applications : [];
+      if (!subtopics.length && !rules.length && !applications.length) return '';
+
+      return `
+        <article class="adm-lesson-card is-course">
+          <span class="adm-feature-icon">${icon('bi-easel2')}</span>
+          <strong>Clase rápida</strong>
+          ${subtopics.length ? `
+            <div class="adm-subtopic-list">
+              ${subtopics.map((item) => `
+                <section class="adm-subtopic-card">
+                  <h3>${escapeHtml(item.title)}</h3>
+                  <p>${escapeHtml(item.detail)}</p>
+                  ${Array.isArray(item.examples) && item.examples.length ? `
+                    <ul>
+                      ${item.examples.map((example) => `<li>${escapeHtml(example)}</li>`).join('')}
+                    </ul>
+                  ` : ''}
+                </section>
+              `).join('')}
+            </div>
+          ` : ''}
+          ${rules.length ? `
+            <div class="adm-rule-box">
+              <strong>${icon('bi-braces-asterisk')} Reglas, fórmulas o ideas esenciales</strong>
+              <ul>${rules.map((rule) => `<li>${escapeHtml(rule)}</li>`).join('')}</ul>
+            </div>
+          ` : ''}
+          ${applications.length ? `
+            <div class="adm-application-box">
+              <strong>${icon('bi-compass')} Dónde se aplica</strong>
+              <ul>${applications.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>
+            </div>
+          ` : ''}
+        </article>
+      `;
+    }
+
     function renderTopicPhase2(topic) {
       const concepts = topic.learning?.keyConcepts || topic.concepts || [];
-      const explanation = topic.explanation || '';
+      const explanation = topic.lesson?.conceptIntro || topic.summary || topic.explanation || '';
       return `
         <article class="adm-lesson-card is-phase2">
           <span class="adm-feature-icon">${icon('bi-lightbulb')}</span>
@@ -1223,7 +1380,7 @@ if (!window.AdmisionesPublic) {
         <article class="adm-lesson-card is-phase4">
           <span class="adm-feature-icon">${icon('bi-patch-question')}</span>
           <strong>Verifica lo aprendido</strong>
-          <p>Responde estos reactivos rápidos para asegurar tu comprensión.</p>
+          <p>Responde estos reactivos rápidos para comprobar tu comprensión del tema.</p>
           <div class="adm-inline-practice">
             ${questions.map((q, i) => {
               const answer = _ui.microAnswers?.[`${topicKey}-${i}`];
@@ -1862,8 +2019,9 @@ if (!window.AdmisionesPublic) {
         _ui.microAnswers = { ...(_ui.microAnswers || {}), [`${topicKey}-${qIndex}`]: value };
         
         const topic = getTopic(areaId, topicId);
-        if (topic) {
-          const inlineQuestions = getTopicPracticeQuestions(topic).slice(0, 3);
+        const area = getArea(areaId);
+        if (area && topic) {
+          const inlineQuestions = getTopicQuestionPool(area, topic).slice(0, 3);
           const correctCount = inlineQuestions.filter((q, i) => _ui.microAnswers?.[`${topicKey}-${i}`] === Number(q.correctIndex)).length;
           if (correctCount >= 2) {
             GuestStore.updateTopic(topicKey, { practiced: true, studied: true });

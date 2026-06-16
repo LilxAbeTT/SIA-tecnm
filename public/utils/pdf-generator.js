@@ -201,7 +201,7 @@ const PDFGenerator = (() => {
         doc.addImage(templateData, 'PNG', 0, 0, width, height);
       }
     } catch (error) {
-      console.warn('[PDFGenerator] No se pudo cargar la plantilla de receta:', error);
+
       doc.setFillColor(249, 242, 235);
       doc.rect(0, 0, width, height, 'F');
     }
@@ -394,7 +394,7 @@ const PDFGenerator = (() => {
    * Generador básico (Fallback)
    */
   function generateReceta(data) {
-    console.log("Legacy Generator Called", data);
+
     // Puedes mantener tu código anterior aquí si lo deseas
   }
 
@@ -556,6 +556,7 @@ const PDFGenerator = (() => {
       doc.setFontSize(10);
       doc.text(`Total Visitas: ${stats.total}`, 20, 60);
       doc.text(`H. Pico: ${stats.peakHour}:00`, 20, 66);
+      doc.text(`H. Pico: ${stats.peakHour}:00`, 20, 66);
       doc.text(`Promedio Duración: ${stats.averageDuration} min`, 20, 72);
 
       // Tables (Mockup, ideal to use autoTable)
@@ -567,11 +568,105 @@ const PDFGenerator = (() => {
       });
 
       doc.save(`Lactario_Reporte_${Date.now()}.pdf`);
+    },
+
+    generateLabelsReport: async function(items) {
+      if (!_checkLibrary()) return;
+      const { jsPDF } = window.jspdf;
+      
+      const doc = new jsPDF({ format: 'letter', unit: 'mm' });
+      
+      const cols = 3;
+      const rows = 8;
+      const labelW = 60;
+      const labelH = 30;
+      const marginX = 15;
+      const marginY = 15;
+      const gapX = 5;
+      const gapY = 2;
+
+      let count = 0;
+
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        
+        if (count > 0 && count % (cols * rows) === 0) {
+            doc.addPage();
+            count = 0;
+        }
+
+        const col = count % cols;
+        const row = Math.floor(count / cols);
+
+        const x = marginX + col * (labelW + gapX);
+        const y = marginY + row * (labelH + gapY);
+
+        // Borde guía suave (para recortar)
+        doc.setDrawColor(220);
+        doc.rect(x, y, labelW, labelH);
+
+        // Clasificación (Izquierda)
+        let clasificacionText = (item.clasificacion || '').toUpperCase();
+        let clasLines = clasificacionText.split(/\s+/).filter(Boolean);
+        if (clasLines.length === 0) clasLines = ['S/C'];
+
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(8);
+        doc.setTextColor(0, 0, 0);
+
+        let textY = y + 5;
+        clasLines.forEach(line => {
+            doc.text(line, x + 3, textY);
+            textY += 3.5;
+        });
+
+        // ITES
+        doc.setFont("helvetica", "normal");
+        textY += 2;
+        doc.text("ITES", x + 3, textY);
+        
+        // Ejemplar (Ej. 1)
+        textY += 3.5;
+        const ejMatch = item.copyTag.match(/Ej\.\s*\d+/i) || [item.copyTag];
+        doc.text(ejMatch[0], x + 3, textY);
+
+        // Código de barras (Derecha)
+        try {
+            if (typeof JsBarcode === 'function') {
+                const barcodeData = await new Promise((resolve) => {
+                    const canvas = document.createElement("canvas");
+                    JsBarcode(canvas, item.adquisicion, {
+                        format: "CODE128",
+                        displayValue: false,
+                        margin: 0,
+                        width: 2,
+                        height: 40
+                    });
+                    resolve(canvas.toDataURL("image/png"));
+                });
+                
+                doc.addImage(barcodeData, 'PNG', x + 18, y + 6, 38, 11);
+                
+                doc.setFontSize(10);
+                doc.setFont("helvetica", "bold");
+                doc.text(item.adquisicion, x + 37, y + 21, { align: 'center' });
+            } else {
+                doc.setFontSize(8);
+                doc.text("JsBarcode no cargado", x + 18, y + 15);
+            }
+        } catch(e) {
+            console.error("Error generando código de barras:", e);
+            doc.setFontSize(8);
+            doc.text("Error Código", x + 18, y + 15);
+        }
+
+        count++;
+      }
+
+      doc.save(`Etiquetas_Biblioteca_${Date.now()}.pdf`);
     }
   };
 
 })();
 
 window.PDFGenerator = PDFGenerator;
-
-// Exportaciones omitidas para compatibilidad global

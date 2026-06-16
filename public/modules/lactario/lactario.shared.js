@@ -286,7 +286,7 @@ if (!window.LactarioModule.Shared) {
                 try {
                     await state.scanner.clear();
                 } catch (error) {
-                    console.warn('[Lactario] stopScanner:', error);
+
                 }
                 state.scanner = null;
             }
@@ -459,10 +459,10 @@ if (!window.LactarioModule.Shared) {
                                 <p class="text-muted small" id="qr-helper-text">${isAdmin ? 'Escanea el QR que corresponda al recurso que deseas gestionar.' : 'Apunta tu cámara al código QR del cubículo o refrigerador.'}</p>
                                 <div id="qr-reader" style="width: 100%;"></div>
                                 <div class="input-group mt-3">
-                                    <input type="text" id="lactario-qr-manual" class="form-control" placeholder="Ingresa el cÃ³digo del QR manualmente">
+                                    <input type="text" id="lactario-qr-manual" class="form-control" placeholder="Ingresa el código del QR manualmente">
                                     <button type="button" class="btn btn-outline-maternal" id="lactario-qr-manual-btn" onclick="Lactario.submitManualQr()">Validar</button>
                                 </div>
-                                <div class="small text-muted mt-2">Si la cÃ¡mara falla, escribe el cÃ³digo impreso debajo del QR.</div>
+                                <div class="small text-muted mt-2">Si la cámara falla, escribe el código impreso debajo del QR.</div>
                                 <div id="qr-reader-results"></div>
                             </div>
                         </div>

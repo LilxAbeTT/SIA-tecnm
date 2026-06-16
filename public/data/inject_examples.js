@@ -317,4 +317,3 @@ data.areas.forEach(area => {
 });
 
 fs.writeFileSync(path, JSON.stringify(data, null, 2), 'utf8');
-console.log(`Successfully added ${addedCount} new original examples to the JSON.`);

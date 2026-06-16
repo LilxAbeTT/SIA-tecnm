@@ -1,7 +1,6 @@
 // public/modules/admin.foro.js
 // Admin entrypoint/orchestrator for Foro
 
-console.log('[LOAD] modules/admin.foro.js loaded');
 
 if (!window.AdminForo) {
     const shared = window.ForoModule?.Shared;

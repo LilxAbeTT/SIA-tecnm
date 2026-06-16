@@ -257,7 +257,7 @@ window.AdminBiblio.Reportes = (function () {
                         };
                     }
                 } catch (error) {
-                    console.warn('[BiblioAdmin] No se pudo resolver usuario de escaneo:', error);
+
                 }
             }
 
@@ -272,7 +272,7 @@ window.AdminBiblio.Reportes = (function () {
                         };
                     }
                 } catch (error) {
-                    console.warn('[BiblioAdmin] No se pudo resolver libro de escaneo:', error);
+
                 }
             }
         }
@@ -529,12 +529,18 @@ window.AdminBiblio.Reportes = (function () {
     function initAdmin() {
         const container = document.getElementById('view-biblio');
 
+        // Hide breadcrumbs for admin view
+        window.SIA?.setBreadcrumbTrail?.('view-biblio', []);
+        
+        // Failsafe: Hide via DOM manipulation
+        const breadcrumbsEl = document.querySelector('sia-shell-breadcrumbs');
+        if (breadcrumbsEl) breadcrumbsEl.classList.add('d-none');
+        
         container.innerHTML = `
             <!-- HEADER -->
             <div class="d-flex justify-content-between align-items-center mb-5 animate__animated animate__fadeIn">
                 <div class="d-flex align-items-center gap-4">
                      <div class="bg-white p-3 rounded-4 shadow-sm text-center" style="min-width: 100px;">
-                        <img src="./images/logo-sia-mob.png" class="img-fluid" style="max-height: 60px;" onerror="this.style.display='none'">
                         <img src="./images/logo-ites.png" class="img-fluid" style="max-height: 80px;" onerror="this.style.display='none'">
                      </div>
                      <div>
@@ -556,6 +562,34 @@ window.AdminBiblio.Reportes = (function () {
             <!-- DASHBOARD CONTENT -->
             <div id="admin-dashboard-content" class="container-fluid px-4 py-4">
                 
+                <!-- ADVANCED SEARCH PILLS -->
+                <div class="row justify-content-center mb-4 g-3">
+                    <div class="col-12 col-md-6 col-lg-5">
+                        <button class="btn btn-primary bg-gradient shadow-lg w-100 rounded-pill py-3 d-flex align-items-center justify-content-between px-4 border-0" 
+                                style="transition: all 0.2s;"
+                                onmouseover="this.style.boxShadow='0 0.5rem 1rem rgba(13, 110, 253, 0.4) !important'; this.style.transform='translateY(-2px)';"
+                                onmouseout="this.style.boxShadow='0 .5rem 1rem rgba(0,0,0,.15) !important'; this.style.transform='translateY(0)';"
+                                onclick="if(window.AdminBiblio && window.AdminBiblio.abrirBuscadorAvanzado) window.AdminBiblio.abrirBuscadorAvanzado()">
+                            <div class="d-flex align-items-center text-white">
+                                <i class="bi bi-search fs-5 me-3"></i>
+                                <span class="fw-bold fs-6 text-truncate" style="max-width: 250px;">Buscar libro...</span>
+                            </div>
+                        </button>
+                    </div>
+                    <div class="col-12 col-md-6 col-lg-5">
+                        <button class="btn bg-gradient shadow-lg w-100 rounded-pill py-3 d-flex align-items-center justify-content-between px-4 border-0" 
+                                style="transition: all 0.2s; background: linear-gradient(135deg, #0dcaf0 0%, #087990 100%);"
+                                onmouseover="this.style.boxShadow='0 0.5rem 1rem rgba(13, 202, 240, 0.4) !important'; this.style.transform='translateY(-2px)';"
+                                onmouseout="this.style.boxShadow='0 .5rem 1rem rgba(0,0,0,.15) !important'; this.style.transform='translateY(0)';"
+                                onclick="if(window.AdminBiblio && window.AdminBiblio.abrirBuscadorUsuarios) window.AdminBiblio.abrirBuscadorUsuarios()">
+                            <div class="d-flex align-items-center">
+                                <i class="bi bi-person-bounding-box fs-5 me-3"></i>
+                                <span class="fw-bold fs-6 text-truncate" style="max-width: 250px;">Buscar usuario...</span>
+                            </div>
+                        </button>
+                    </div>
+                </div>
+
                 <!-- ACTIONS ROW -->
                 <div class="row g-4 mb-4 row-cols-1 row-cols-md-6 justify-content-center">
                     <!-- 1. REGISTRAR VISITA -->
@@ -730,7 +764,12 @@ window.AdminBiblio.Reportes = (function () {
                                     </div>
                                     <span class="fw-bold small text-dark">Activos en uso</span>
                                 </div>
-                                <span class="badge bg-info rounded-pill" id="stat-pcs-count">0</span>
+                                <div class="d-flex align-items-center gap-2">
+                                    <button class="btn btn-sm btn-outline-danger border-0 p-1 px-2 d-flex align-items-center rounded-pill" onclick="AdminBiblio.forzarLimpiezaTotal()" title="Liberar todos los equipos ocupados" style="font-size:0.7rem;">
+                                        <i class="bi bi-unlock-fill me-1"></i> Liberar
+                                    </button>
+                                    <span class="badge bg-info rounded-pill" id="stat-pcs-count">0</span>
+                                </div>
                             </div>
                             <div id="stat-pcs-list" class="d-flex flex-column gap-2">
                                 <div class="text-center text-muted small py-2"><span class="spinner-border spinner-border-sm"></span></div>
@@ -755,6 +794,11 @@ window.AdminBiblio.Reportes = (function () {
                             <div id="stat-summary-list" class="d-flex flex-column gap-2">
                                 <div class="text-center text-muted small py-2"><span class="spinner-border spinner-border-sm"></span></div>
                             </div>
+                            <div class="mt-auto pt-2 border-top border-secondary border-opacity-25 text-center">
+                                <button class="btn btn-sm btn-secondary w-100 rounded-pill shadow-sm" onclick="AdminBiblio.abrirModalReportesTrimestrales()">
+                                    <i class="bi bi-file-earmark-pdf-fill me-1"></i> Ver reportes
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -764,7 +808,7 @@ window.AdminBiblio.Reportes = (function () {
 
             <!-- MODAL GENERICO ADMIN -->
             <div class="modal fade" id="modal-admin-action" tabindex="-1">
-                <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-xl">
+                <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
                     <div class="modal-content border-0 shadow-lg rounded-5 overflow-hidden" id="modal-admin-body">
                         <!-- Content Injected -->
                     </div>
@@ -774,6 +818,111 @@ window.AdminBiblio.Reportes = (function () {
             <div class="modal fade" id="modal-servicio-reserva" tabindex="-1">
                 <div class="modal-dialog modal-dialog-centered">
                     <div class="modal-content rounded-4 border-0 shadow-lg" id="servicio-reserva-content"></div>
+                </div>
+            </div>
+
+            <!-- MODAL REPORTES TRIMESTRALES -->
+            <div class="modal fade" id="modal-reportes-trimestrales" tabindex="-1">
+                <div class="modal-dialog modal-dialog-centered modal-md">
+                    <div class="modal-content border-0 shadow-lg rounded-5 overflow-hidden">
+                        <div class="modal-header bg-secondary text-white border-0 px-4 py-3">
+                            <div class="d-flex align-items-center gap-3">
+                                <i class="bi bi-file-earmark-pdf display-6"></i>
+                                <div>
+                                    <h5 class="modal-title fw-bold mb-0">Reportes Trimestrales</h5>
+                                    <div class="small opacity-75">Exportación de datos de biblioteca</div>
+                                </div>
+                            </div>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body p-4 bg-light">
+                            <div class="mb-4">
+                                <label class="form-label fw-bold text-muted small text-uppercase">Seleccionar Trimestre</label>
+                                <select class="form-select form-select-lg border-0 shadow-sm" id="reporte-trimestre-select">
+                                    <!-- Opciones inyectadas dinamicamente -->
+                                </select>
+                            </div>
+                            
+                            <div class="d-grid gap-3">
+                                <button class="btn btn-white text-start p-3 border-0 shadow-sm rounded-4 hover-scale d-flex align-items-center justify-content-between" onclick="AdminBiblio.prepararReporteTrimestral('visitas')">
+                                    <div class="d-flex align-items-center gap-3">
+                                        <div class="bg-primary bg-opacity-10 text-primary p-2 rounded-circle">
+                                            <i class="bi bi-person-check-fill fs-5"></i>
+                                        </div>
+                                        <div>
+                                            <div class="fw-bold text-dark">Visitas a la biblioteca</div>
+                                            <div class="small text-muted">Consultas, trabajo individual y equipo</div>
+                                        </div>
+                                    </div>
+                                    <i class="bi bi-download text-muted"></i>
+                                </button>
+
+                                <button class="btn btn-white text-start p-3 border-0 shadow-sm rounded-4 hover-scale d-flex align-items-center justify-content-between" onclick="AdminBiblio.prepararReporteTrimestral('prestamos')">
+                                    <div class="d-flex align-items-center gap-3">
+                                        <div class="bg-warning bg-opacity-10 text-warning p-2 rounded-circle">
+                                            <i class="bi bi-book-half fs-5"></i>
+                                        </div>
+                                        <div>
+                                            <div class="fw-bold text-dark">Préstamos y devoluciones</div>
+                                            <div class="small text-muted">Movimientos y detalles de retrasos</div>
+                                        </div>
+                                    </div>
+                                    <i class="bi bi-download text-muted"></i>
+                                </button>
+
+                                <button class="btn btn-white text-start p-3 border-0 shadow-sm rounded-4 hover-scale d-flex align-items-center justify-content-between" onclick="AdminBiblio.prepararReporteTrimestral('adeudos')">
+                                    <div class="d-flex align-items-center gap-3">
+                                        <div class="bg-danger bg-opacity-10 text-danger p-2 rounded-circle">
+                                            <i class="bi bi-cash-stack fs-5"></i>
+                                        </div>
+                                        <div>
+                                            <div class="fw-bold text-dark">Adeudos y condonaciones</div>
+                                            <div class="small text-muted">Totales mensuales e historial de perdones</div>
+                                        </div>
+                                    </div>
+                                    <i class="bi bi-download text-muted"></i>
+                                </button>
+
+                                <button class="btn btn-white text-start p-3 border-0 shadow-sm rounded-4 hover-scale d-flex align-items-center justify-content-between" onclick="AdminBiblio.prepararReporteTrimestral('catalogo')">
+                                    <div class="d-flex align-items-center gap-3">
+                                        <div class="bg-info bg-opacity-10 text-info p-2 rounded-circle">
+                                            <i class="bi bi-journal-album fs-5"></i>
+                                        </div>
+                                        <div>
+                                            <div class="fw-bold text-dark">Catálogo general</div>
+                                            <div class="small text-muted">Resumen de ejemplares y activos fijos</div>
+                                        </div>
+                                    </div>
+                                    <i class="bi bi-download text-muted"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- MODAL CONFIRMACION DE DETALLES -->
+            <div class="modal fade" id="modal-confirmacion-detalle-reporte" tabindex="-1">
+                <div class="modal-dialog modal-dialog-centered modal-sm">
+                    <div class="modal-content border-0 shadow-lg rounded-5 overflow-hidden">
+                        <div class="modal-body p-4 text-center">
+                            <div class="mb-3">
+                                <i class="bi bi-info-circle text-primary display-4"></i>
+                            </div>
+                            <h5 class="fw-bold mb-3">Opciones de Exportación</h5>
+                            <p class="text-muted small mb-4">¿Deseas incluir la lista completa de registros en el apartado de detalles? Esto puede generar un documento muy extenso.</p>
+                            
+                            <div class="form-check form-switch d-flex justify-content-center mb-4 pb-2">
+                                <input class="form-check-input me-2" type="checkbox" role="switch" id="switch-incluir-detalles">
+                                <label class="form-check-label text-dark fw-medium" for="switch-incluir-detalles">Incluir Detalles</label>
+                            </div>
+
+                            <div class="d-flex gap-2">
+                                <button type="button" class="btn btn-light w-50 rounded-pill fw-bold text-muted" onclick="AdminBiblio.cancelarReporteTrimestral()">Cancelar</button>
+                                <button type="button" class="btn btn-primary w-50 rounded-pill fw-bold" onclick="AdminBiblio.ejecutarReporteTrimestral()"><i class="bi bi-download me-1"></i> Exportar</button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         `;
@@ -789,8 +938,10 @@ window.AdminBiblio.Reportes = (function () {
             adminModalEl.addEventListener('hidden.bs.modal', clearLiveAssetStreams);
         }
 
-        // Refrescar expiraciones de PC cada 60 segundos
-        if (_adminStatsInterval) clearInterval(_adminStatsInterval);
+        // Auto clean on startup
+        setTimeout(() => {
+            forzarLimpiezaPCs(true);
+        }, 3000);
 
         // Contador interno para solo refrescar stats de firebase cada 5 minutos (evitar exceso de lecturas)
         let _ticks = 4;
@@ -800,12 +951,10 @@ window.AdminBiblio.Reportes = (function () {
             _ticks++;
             // Cada 5 minutos (5 ticks de 60s) recarga los stats masivos
             if (_ticks >= 5) {
+                forzarLimpiezaPCs(true);
                 loadAdminStats();
                 _ticks = 0;
             }
-
-            // *REMOVIDO* el auto-check global para evitar que relojes locales desfasados liberen PCs antes de tiempo.
-            // Ahora la limpieza es manual vía el botón "Limpiar Expirados" en el Modal de Computadoras.
         }, 15 * 60 * 1000);
     }
 
@@ -855,7 +1004,7 @@ window.AdminBiblio.Reportes = (function () {
                 </div>
             `;
         } catch (e) {
-            console.warn('[ADMIN SUMMARY] Error loading:', e);
+
             summaryEl.innerHTML = '<p class="text-muted small text-center mb-0">No se pudieron cargar las estadisticas.</p>';
         }
     }
@@ -994,7 +1143,7 @@ window.AdminBiblio.Reportes = (function () {
             }, 0);
 
         } catch (e) {
-            console.warn('[ADMIN STATS] Error loading:', e);
+
         }
     }
 
@@ -1298,15 +1447,16 @@ window.AdminBiblio.Reportes = (function () {
             </div>
             <div class="modal-body p-4 ">
                 <!-- STEP 1: INPUT -->
-                <div class="d-flex justify-content-center gap-2 mb-4">
+                <div class="d-flex justify-content-center gap-2 mb-4 align-items-center">
                     <input type="text" class="form-control form-control-lg rounded-pill fs-2 fw-bold font-monospace text-center border-3 border-primary shadow-sm" 
-                           style="max-width: 400px;"
+                           style="max-width: 400px; transition: all 0.3s;"
                            id="visita-input-matricula" placeholder="Matrícula" autofocus 
                            onkeyup="if(event.key==='Enter') AdminBiblio.verificarUsuarioVisita()">
                            
                     <button class="btn btn-lg btn-outline-secondary rounded-pill fw-bold shadow-sm d-flex align-items-center" 
-                            onclick="AdminBiblio.mostrarRegistroAnonimo()" title="Registrar sin matrícula">
-                         <i class="bi bi-person-x-fill me-2 fs-4"></i> Sin Matrícula
+                            id="btn-toggle-anonimo"
+                            onclick="AdminBiblio.toggleRegistroAnonimo()" title="Registrar sin matrícula">
+                         <i id="btn-toggle-anonimo-icon" class="bi bi-person-x-fill me-2 fs-4"></i> <span id="btn-toggle-anonimo-text">Sin Matrícula</span>
                     </button>
                 </div>
                 <div id="visit-scan-status" class="small text-center mt-2 d-none"></div>
@@ -1366,48 +1516,49 @@ window.AdminBiblio.Reportes = (function () {
 
                 <!-- NEW: UNREGISTERED VISITOR FORM -->
                 <div id="visit-unregistered-container" class="d-none animate__animated animate__fadeInUp mt-3">
-                    <div class="alert alert-warning mb-4">
+                    <div class="alert alert-warning mb-4" id="visit-unregistered-alert">
                         <i class="bi bi-exclamation-triangle-fill me-2"></i>El usuario no está en nuestra base de datos.
                     </div>
                     
-                    <h5 class="fw-bold mb-3"><i class="bi bi-person-fill-add me-2"></i>Registrar Visita Externa / Sin Cuenta</h5>
+                    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-2 border-bottom pb-2">
+                        <h5 class="fw-bold mb-2 mb-md-0 text-dark"><i class="bi bi-person-fill-add me-2"></i>Registrar Visita Sin Matrícula</h5>
+                        <span class="badge bg-danger shadow-sm"><i class="bi bi-exclamation-circle me-1"></i>Opciones Obligatorias</span>
+                    </div>
+                    <p class="small text-muted mb-4">Selecciona el <strong>Género</strong> y la <strong>Vocación</strong> para habilitar el registro.</p>
                     
-                    <div class="row g-3 mb-3">
-                        <div class="col-12 col-md-6">
-                            <label class="form-label small fw-bold">Tipo de Visitante</label>
-                            <select class="form-select" id="unreg-tipo">
-                                <option value="Estudiante Local (Sin acceso)">Estudiante Local (Olvido de credenciales)</option>
-                                <option value="Profesional Externo">Profesional / Egresado / Externo</option>
-                                <option value="Personal Docente">Docente Institucional</option>
-                                <option value="Personal Administrativo">Personal Administrativo</option>
-                                <option value="Otro">Otro Visitante</option>
-                            </select>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-primary">1. Género</label>
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-outline-secondary flex-fill unreg-genero-btn rounded-pill fw-bold" onclick="AdminBiblio.selectUnregOption('genero', 'Hombre')">Hombre</button>
+                            <button class="btn btn-outline-secondary flex-fill unreg-genero-btn rounded-pill fw-bold" onclick="AdminBiblio.selectUnregOption('genero', 'Mujer')">Mujer</button>
+                            <button class="btn btn-outline-secondary flex-fill unreg-genero-btn rounded-pill fw-bold" onclick="AdminBiblio.selectUnregOption('genero', 'Otro')">Otro</button>
                         </div>
-                        <div class="col-12 col-md-6">
-                            <label class="form-label small fw-bold">Género</label>
-                            <select class="form-select" id="unreg-genero">
-                                <option value="Masculino">Masculino</option>
-                                <option value="Femenino">Femenino</option>
-                                <option value="Prefiero no decirlo">Prefiero no decirlo</option>
-                            </select>
+                        <input type="hidden" id="unreg-genero" value="">
+                    </div>
+                    <div class="mb-4">
+                        <label class="form-label small fw-bold text-primary">2. Vocación</label>
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-outline-secondary flex-fill unreg-tipo-btn rounded-pill fw-bold" onclick="AdminBiblio.selectUnregOption('tipo', 'Estudiante')">Estudiante</button>
+                            <button class="btn btn-outline-secondary flex-fill unreg-tipo-btn rounded-pill fw-bold" onclick="AdminBiblio.selectUnregOption('tipo', 'Personal')">Personal</button>
                         </div>
+                        <input type="hidden" id="unreg-tipo" value="">
                     </div>
                     
                     <p class="text-muted small mb-2">Selecciona el motivo de su visita:</p>
                     <div class="row g-2">
                         <div class="col-4">
-                             <button class="btn btn-outline-success w-100 p-2 rounded-3 text-center" onclick="AdminBiblio.confirmarVisitaUnregistered('Consulta')">
-                                <i class="bi bi-search d-block mb-1"></i><small class="fw-bold">Consulta</small>
+                             <button class="btn btn-outline-success w-100 p-2 rounded-3 text-center unreg-action-btn" disabled onclick="AdminBiblio.confirmarVisitaUnregistered('Consulta')">
+                                <i class="bi bi-search d-block mb-1 fs-3"></i><span class="fw-bold">Consulta</span>
                              </button>
                         </div>
                         <div class="col-4">
-                             <button class="btn btn-outline-primary w-100 p-2 rounded-3 text-center" onclick="AdminBiblio.confirmarVisitaUnregistered('Trabajo Individual')">
-                                <i class="bi bi-person d-block mb-1"></i><small class="fw-bold">Individual</small>
+                             <button class="btn btn-outline-primary w-100 p-2 rounded-3 text-center unreg-action-btn" disabled onclick="AdminBiblio.confirmarVisitaUnregistered('Trabajo Individual')">
+                                <i class="bi bi-person d-block mb-1 fs-3"></i><span class="fw-bold">Individual</span>
                              </button>
                         </div>
                         <div class="col-4">
-                             <button class="btn btn-outline-warning w-100 p-2 rounded-3 text-center" onclick="AdminBiblio.confirmarVisitaUnregistered('Trabajo en Equipo')">
-                                <i class="bi bi-people d-block mb-1"></i><small class="fw-bold">Equipo...</small>
+                             <button class="btn btn-outline-warning w-100 p-2 rounded-3 text-center unreg-action-btn" disabled onclick="AdminBiblio.confirmarVisitaUnregistered('Trabajo en Equipo')">
+                                <i class="bi bi-people d-block mb-1 fs-3"></i><span class="fw-bold">Equipo...</span>
                              </button>
                         </div>
                     </div>
@@ -1461,6 +1612,13 @@ window.AdminBiblio.Reportes = (function () {
             _visitUser = null;
             syncToState();
             document.getElementById('visit-unregistered-container').classList.remove('d-none');
+            const alertBox = document.getElementById('visit-unregistered-alert');
+            if (alertBox) alertBox.classList.remove('d-none');
+            
+            // Auto select empty to disable buttons initially
+            selectUnregOption('genero', '');
+            selectUnregOption('tipo', '');
+            
             updateVisitScanStatus('El código se recibió, pero no coincide con un usuario registrado. Puedes capturarlo como visitante.', 'warning');
             input.disabled = false;
         }
@@ -1472,16 +1630,73 @@ window.AdminBiblio.Reportes = (function () {
     }
 
 
-    function mostrarRegistroAnonimo() {
-        _visitUser = null;
-        syncToState();
-        const input = document.getElementById('visita-input-matricula');
-        if (input) {
-            input.value = '';
+    function selectUnregOption(category, value) {
+        const input = document.getElementById(`unreg-${category}`);
+        if (input) input.value = value;
+        
+        const buttons = document.querySelectorAll(`.unreg-${category}-btn`);
+        buttons.forEach(btn => {
+            if (btn.innerText.trim() === value) {
+                btn.classList.add('btn-secondary', 'text-white');
+                btn.classList.remove('btn-outline-secondary');
+            } else {
+                btn.classList.remove('btn-secondary', 'text-white');
+                btn.classList.add('btn-outline-secondary');
+            }
+        });
+
+        // Check if both are selected to enable action buttons
+        const genero = document.getElementById('unreg-genero')?.value;
+        const tipo = document.getElementById('unreg-tipo')?.value;
+        const actionBtns = document.querySelectorAll('.unreg-action-btn');
+        if (genero && tipo) {
+            actionBtns.forEach(btn => btn.disabled = false);
+        } else {
+            actionBtns.forEach(btn => btn.disabled = true);
         }
-        document.getElementById('visit-error-msg')?.classList.add('d-none');
-        document.getElementById('visit-options-container')?.classList.add('d-none');
-        document.getElementById('visit-unregistered-container')?.classList.remove('d-none');
+    }
+
+    function toggleRegistroAnonimo() {
+        const inputContainer = document.getElementById('visita-input-matricula');
+        if (!inputContainer) return;
+        
+        const isHidden = inputContainer.classList.contains('d-none');
+        const btnText = document.getElementById('btn-toggle-anonimo-text');
+        const btnIcon = document.getElementById('btn-toggle-anonimo-icon');
+        const alertBox = document.getElementById('visit-unregistered-alert');
+        
+        if (!isHidden) {
+            // Switch to Sin Matricula mode
+            _visitUser = null;
+            syncToState();
+            inputContainer.value = '';
+            inputContainer.classList.add('d-none');
+            
+            if (btnText) btnText.innerText = 'Buscar matrícula';
+            if (btnIcon) btnIcon.className = 'bi bi-search me-2 fs-4';
+            
+            document.getElementById('visit-error-msg')?.classList.add('d-none');
+            document.getElementById('visit-options-container')?.classList.add('d-none');
+            
+            const unregContainer = document.getElementById('visit-unregistered-container');
+            if (unregContainer) {
+                unregContainer.classList.remove('d-none');
+                if (alertBox) alertBox.classList.add('d-none'); // Hide the "not found" alert since they clicked the button directly
+            }
+            
+            // Reset unreg selections
+            selectUnregOption('genero', '');
+            selectUnregOption('tipo', '');
+        } else {
+            // Switch back to search mode
+            inputContainer.classList.remove('d-none');
+            inputContainer.focus();
+            
+            if (btnText) btnText.innerText = 'Sin Matrícula';
+            if (btnIcon) btnIcon.className = 'bi bi-person-x-fill me-2 fs-4';
+            
+            document.getElementById('visit-unregistered-container')?.classList.add('d-none');
+        }
     }
 
     // Dynamic team member add (max 4 extras = 5 total)
@@ -1630,7 +1845,7 @@ window.AdminBiblio.Reportes = (function () {
                 try {
                     await BiblioAssetsService.asignarMesaAutomatica(_ctx, visit.uid, visit.matricula);
                 } catch (mesaErr) {
-                    console.warn('[BIBLIO ADMIN] No se pudo asignar mesa a visita sin registro:', mesaErr);
+
                 }
             }
 
@@ -1692,14 +1907,31 @@ window.AdminBiblio.Reportes = (function () {
     }
 
 
-    async function forzarLimpiezaPCs() {
+    async function forzarLimpiezaPCs(silent = false) {
         try {
             const freed = await BiblioAssetsService.liberarActivosExpirados(_ctx);
             if (freed && freed.length > 0) {
-                showToast(`🔄 Mesas/PC liberadas exitosamente: ${freed.join(', ')}`, 'success');
+                if (!silent) showToast(`🔄 Mesas/PC liberadas exitosamente: ${freed.join(', ')}`, 'success');
                 loadPCGrid(); // Refresh grid
+                loadAdminStats(); // Refresh dashboard
             } else {
-                showToast("No hay equipos expirados para limpiar.", "info");
+                if (!silent) showToast("No hay equipos expirados para limpiar.", "info");
+            }
+        } catch (e) {
+            if (!silent) showToast("Error al limpiar: " + e.message, "danger");
+        }
+    }
+
+    async function forzarLimpiezaTotal() {
+        if (!confirm("¿Estás seguro de que deseas liberar TODOS los activos ocupados, incluso los que no han expirado?")) return;
+        try {
+            const freed = await BiblioAssetsService.liberarTodosActivos(_ctx);
+            if (freed && freed.length > 0) {
+                showToast(`🔄 TODOS los activos liberados exitosamente: ${freed.length} equipos.`, 'success');
+                loadPCGrid(); // Refresh grid
+                loadAdminStats(); // Refresh dashboard
+            } else {
+                showToast("No hay equipos ocupados para limpiar.", "info");
             }
         } catch (e) {
             showToast("Error al limpiar: " + e.message, "danger");
@@ -1828,21 +2060,101 @@ window.AdminBiblio.Reportes = (function () {
         const safeNombre = escapeHtml(nombre);
         if (status === 'mantenimiento') return;
         if (status === 'ocupado') {
-            showConfirmModal({
-                icon: 'unlock-fill',
-                iconColor: '#dc3545',
-                title: `Liberar ${safeNombre}`,
-                message: `¿Deseas liberar este equipo?<br>El equipo quedará <strong>disponible</strong> para otros usuarios.`,
-                confirmText: 'Liberar Equipo',
-                confirmClass: 'btn-danger',
-                onConfirm: async () => {
-                    try {
-                        await BiblioAssetsService.liberarActivo(_ctx, id);
-                        showToast(`✅ ${nombre} liberado`, "success");
-                        loadPCGrid();
-                    } catch (e) { showToast(e.message, "danger"); }
+            const prev = document.getElementById('manage-asset-modal');
+            if (prev) {
+                const m = bootstrap.Modal.getInstance(prev);
+                if (m) m.dispose();
+                prev.remove();
+            }
+
+            const modalHtml = `
+                <div class="modal fade" id="manage-asset-modal" tabindex="-1">
+                    <div class="modal-dialog modal-dialog-centered modal-sm">
+                        <div class="modal-content border-0 shadow-lg rounded-5 overflow-hidden">
+                            <div class="modal-body text-center p-4">
+                                <div class="mb-3">
+                                    <div class="d-inline-flex align-items-center justify-content-center rounded-circle p-3" style="background:#0dcaf015; width:70px; height:70px;">
+                                        <i class="bi bi-pc-display" style="font-size:2rem; color:#0dcaf0;"></i>
+                                    </div>
+                                </div>
+                                <h5 class="fw-bold mb-2">Gestionar ${safeNombre}</h5>
+                                <div class="text-muted small mb-3">Elige la acción que deseas realizar con este equipo.</div>
+                                
+                                <div class="d-grid gap-2">
+                                    <button class="btn btn-primary rounded-pill fw-bold" id="btn-extend-time">
+                                        <i class="bi bi-clock-history me-1"></i> Extender 1 Hora
+                                    </button>
+                                    <button class="btn btn-danger rounded-pill fw-bold" id="btn-release-asset">
+                                        <i class="bi bi-unlock-fill me-1"></i> Liberar Equipo
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="modal-footer border-0 p-2 justify-content-center">
+                                <button class="btn btn-light rounded-pill btn-sm" data-bs-dismiss="modal">Cancelar</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+            
+            const modalEl = document.getElementById('manage-asset-modal');
+            const modal = new bootstrap.Modal(modalEl);
+
+            document.getElementById('btn-extend-time').onclick = async () => {
+                const btn = document.getElementById('btn-extend-time');
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+                try {
+                    await BiblioAssetsService.extenderTiempoActivo(_ctx, id, 1);
+                    showToast(`✅ Tiempo extendido para ${nombre}`, "success");
+                    loadPCGrid();
+                    if (typeof loadAdminStats === 'function') loadAdminStats();
+                    modal.hide();
+                } catch (e) {
+                    showToast(e.message, "danger");
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="bi bi-clock-history me-1"></i> Extender 1 Hora';
                 }
-            });
+            };
+
+            document.getElementById('btn-release-asset').onclick = async () => {
+                const btn = document.getElementById('btn-release-asset');
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+                try {
+                    await BiblioAssetsService.liberarActivo(_ctx, id);
+                    showToast(`✅ ${nombre} liberado`, "success");
+                    loadPCGrid();
+                    if (typeof loadAdminStats === 'function') loadAdminStats();
+                    
+                    // Close the detail modal if it's open
+                    const detailModal = document.getElementById('mini-confirm-modal');
+                    if (detailModal) {
+                        const m = bootstrap.Modal.getInstance(detailModal);
+                        if (m) m.hide();
+                    }
+                    modal.hide();
+                } catch (e) {
+                    showToast(e.message, "danger");
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="bi bi-unlock-fill me-1"></i> Liberar Equipo';
+                }
+            };
+
+            modalEl.addEventListener('hidden.bs.modal', () => {
+                modalEl.remove();
+                document.querySelectorAll('.modal-backdrop').forEach(b => b.remove());
+                if (document.querySelector('.modal.show')) {
+                    document.body.classList.add('modal-open');
+                } else {
+                    document.body.classList.remove('modal-open');
+                    document.body.style.removeProperty('overflow');
+                    document.body.style.removeProperty('padding-right');
+                }
+            }, { once: true });
+            
+            modal.show();
         } else {
             asignarPC(id, nombre);
         }
@@ -2016,8 +2328,427 @@ window.AdminBiblio.Reportes = (function () {
         }
     }
 
+    function abrirModalReportesTrimestrales() {
+        const select = document.getElementById('reporte-trimestre-select');
+        if (!select) return;
+
+        const currentYear = new Date().getFullYear();
+        const currentMonth = new Date().getMonth();
+        const currentQuarter = Math.floor(currentMonth / 3) + 1;
+
+        let optionsHtml = '';
+        for (let q = 1; q <= 4; q++) {
+            const startMonth = (q - 1) * 3;
+            const endMonth = startMonth + 2;
+            const startMonthName = new Date(currentYear, startMonth, 1).toLocaleString('es-MX', { month: 'short' });
+            const endMonthName = new Date(currentYear, endMonth, 1).toLocaleString('es-MX', { month: 'short' });
+            const isSelected = q === currentQuarter ? 'selected' : '';
+            optionsHtml += `<option value="${q}-${currentYear}" ${isSelected}>Trimestre ${q} (${startMonthName} - ${endMonthName}) - ${currentYear}</option>`;
+        }
+        
+        optionsHtml += `<option value="4-${currentYear - 1}">Trimestre 4 (oct - dic) - ${currentYear - 1}</option>`;
+        optionsHtml += `<option value="3-${currentYear - 1}">Trimestre 3 (jul - sep) - ${currentYear - 1}</option>`;
+
+        select.innerHTML = optionsHtml;
+
+        const modalEl = document.getElementById('modal-reportes-trimestrales');
+        const modal = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
+        modal.show();
+    }
+
+    let _reporteTrimestralActual = null;
+
+    function prepararReporteTrimestral(tipo) {
+        _reporteTrimestralActual = tipo;
+        const mainModalEl = document.getElementById('modal-reportes-trimestrales');
+        if (mainModalEl) {
+            const mainModal = bootstrap.Modal.getInstance(mainModalEl);
+            if (mainModal) mainModal.hide();
+        }
+
+        const confirmModalEl = document.getElementById('modal-confirmacion-detalle-reporte');
+        if (confirmModalEl) {
+            const checkbox = document.getElementById('switch-incluir-detalles');
+            if (checkbox) checkbox.checked = false;
+
+            const confirmModal = bootstrap.Modal.getInstance(confirmModalEl) || new bootstrap.Modal(confirmModalEl);
+            confirmModal.show();
+        }
+    }
+
+    function cancelarReporteTrimestral() {
+        _reporteTrimestralActual = null;
+        const confirmModalEl = document.getElementById('modal-confirmacion-detalle-reporte');
+        if (confirmModalEl) {
+            const confirmModal = bootstrap.Modal.getInstance(confirmModalEl);
+            if (confirmModal) confirmModal.hide();
+        }
+
+        const mainModalEl = document.getElementById('modal-reportes-trimestrales');
+        if (mainModalEl) {
+            const mainModal = bootstrap.Modal.getInstance(mainModalEl) || new bootstrap.Modal(mainModalEl);
+            mainModal.show();
+        }
+    }
+
+    async function ejecutarReporteTrimestral() {
+        if (!_ctx || !_ctx.db) {
+            showToast("Error de conexión.", "danger");
+            return;
+        }
+
+        const tipo = _reporteTrimestralActual;
+        if (!tipo) return;
+
+        const select = document.getElementById('reporte-trimestre-select');
+        const val = select.value.split('-');
+        const quarter = parseInt(val[0]);
+        const year = val[1] ? parseInt(val[1]) : new Date().getFullYear();
+
+        const startMonth = (quarter - 1) * 3;
+        const startDate = new Date(year, startMonth, 1);
+        const endDate = new Date(year, startMonth + 3, 0, 23, 59, 59, 999);
+        const periodLabel = `Trimestre ${quarter} (${year})`;
+        
+        const checkbox = document.getElementById('switch-incluir-detalles');
+        const incluirDetalles = checkbox ? checkbox.checked : false;
+
+        const modalEl = document.getElementById('modal-confirmacion-detalle-reporte');
+        if (modalEl) {
+            const modal = bootstrap.Modal.getInstance(modalEl);
+            if (modal) modal.hide();
+        }
+
+        showToast("Generando reporte, por favor espera...", "info");
+
+        try {
+            if (tipo === 'visitas') {
+                await generarReporteVisitasTrimestral(startDate, endDate, periodLabel, incluirDetalles);
+            } else if (tipo === 'prestamos') {
+                await generarReportePrestamosTrimestral(startDate, endDate, periodLabel, incluirDetalles);
+            } else if (tipo === 'adeudos') {
+                await generarReporteAdeudosTrimestral(startDate, endDate, periodLabel, incluirDetalles);
+            } else if (tipo === 'catalogo') {
+                await generarReporteCatalogo(periodLabel, incluirDetalles);
+            }
+        } catch (error) {
+            console.error(error);
+            showToast("Error al generar el reporte: " + error.message, "danger");
+        }
+    }
+
+    async function generarReporteVisitasTrimestral(startDate, endDate, periodLabel, incluirDetalles) {
+        const snap = await _ctx.db.collection('biblio-visitas')
+            .where('createdAtMs', '>=', startDate.getTime())
+            .where('createdAtMs', '<=', endDate.getTime())
+            .orderBy('createdAtMs', 'desc')
+            .get();
+
+        const data = [];
+        let totalConsultas = 0, totalIndividual = 0, totalEquipo = 0, totalPc = 0;
+
+        snap.forEach(doc => {
+            const v = doc.data();
+            const dateStr = v.createdAtMs ? new Date(v.createdAtMs).toLocaleString('es-MX') : '--';
+            const motive = v.motivo || 'Consulta';
+            
+            const motiveLow = motive.toLowerCase();
+            if (motiveLow.includes('consulta')) totalConsultas++;
+            else if (motiveLow.includes('individual')) totalIndividual++;
+            else if (motiveLow.includes('equipo')) totalEquipo++;
+            else if (motiveLow.includes('pc') || motiveLow.includes('computadora')) totalPc++;
+
+            data.push([
+                dateStr,
+                v.studentName || 'Usuario',
+                v.matricula || 'N/A',
+                motive,
+                v.duracionMinutos ? `${v.duracionMinutos} min` : 'N/A'
+            ]);
+        });
+
+        const payload = {
+            kind: 'generic',
+            title: 'Reporte de Visitas a Biblioteca',
+            subtitle: 'Exportación trimestral',
+            period: periodLabel,
+            filenameBase: 'Visitas_Trimestral',
+            summary: [
+                ['Total Visitas', data.length.toString()],
+                ['Consultas', totalConsultas.toString()],
+                ['Trabajo Individual', totalIndividual.toString()],
+                ['Trabajo en Equipo', totalEquipo.toString()],
+                ['Uso de PC', totalPc.toString()]
+            ],
+            columns: ['Fecha', 'Usuario', 'Matrícula', 'Motivo', 'Duración'],
+            rows: data
+        };
+
+        if (!incluirDetalles) {
+            payload.columns = [];
+            payload.rows = [];
+        }
+
+        if (window.ExportUtils && window.ExportUtils.generatePDF) {
+            await window.ExportUtils.generatePDF({ period: periodLabel }, payload, 'BIBLIO');
+            showToast("Reporte generado exitosamente", "success");
+        } else {
+            throw new Error("Módulo ExportUtils no disponible");
+        }
+    }
+
+    async function generarReportePrestamosTrimestral(startDate, endDate, periodLabel, incluirDetalles) {
+        const snap = await _ctx.db.collection('prestamos-biblio')
+            .where('fechaSolicitud', '>=', startDate)
+            .where('fechaSolicitud', '<=', endDate)
+            .orderBy('fechaSolicitud', 'desc')
+            .get();
+
+        const data = [];
+        let totalPrestamos = 0;
+        let totalDevoluciones = 0;
+        let prestamosConRetraso = 0;
+        let diasRetrasoTotales = 0;
+
+        snap.forEach(doc => {
+            const p = doc.data();
+            totalPrestamos++;
+            
+            let estado = p.estado || 'Pendiente';
+            if (estado === 'devuelto' || estado === 'condonado') {
+                totalDevoluciones++;
+            }
+
+            const reqMs = p.fechaSolicitudMs || (p.fechaSolicitud && p.fechaSolicitud.toMillis ? p.fechaSolicitud.toMillis() : 0);
+            const reqDate = reqMs ? new Date(reqMs).toLocaleDateString('es-MX') : '--';
+            const devMs = p.fechaDevolucionRealMs || (p.fechaDevolucionReal && p.fechaDevolucionReal.toMillis ? p.fechaDevolucionReal.toMillis() : 0);
+            const devDate = devMs ? new Date(devMs).toLocaleDateString('es-MX') : '--';
+            
+            const diasRetraso = p.diasRetraso || 0;
+            if (diasRetraso > 0) {
+                prestamosConRetraso++;
+                diasRetrasoTotales += diasRetraso;
+            }
+
+            const detalleRetraso = diasRetraso > 0 ? `${diasRetraso} día(s)` : 'Sin retraso';
+
+            data.push([
+                reqDate,
+                p.bookTitle || p.titulo || 'Libro',
+                p.studentName || 'Usuario',
+                estado,
+                devDate,
+                detalleRetraso
+            ]);
+        });
+
+        const payload = {
+            kind: 'generic',
+            title: 'Reporte de Préstamos y Devoluciones',
+            subtitle: 'Exportación trimestral',
+            period: periodLabel,
+            filenameBase: 'Prestamos_Trimestral',
+            summary: [
+                ['Total Préstamos (solicitados)', totalPrestamos.toString()],
+                ['Total Devueltos', totalDevoluciones.toString()],
+                ['Préstamos con retrasos registrados', prestamosConRetraso.toString()],
+                ['Total días de retraso acumulados', diasRetrasoTotales.toString()]
+            ],
+            columns: ['Fecha Solicitud', 'Libro', 'Usuario', 'Estado', 'Fecha Devolución', 'Detalle Retraso'],
+            rows: data
+        };
+
+        if (!incluirDetalles) {
+            payload.columns = [];
+            payload.rows = [];
+        }
+
+        if (window.ExportUtils && window.ExportUtils.generatePDF) {
+            await window.ExportUtils.generatePDF({ period: periodLabel }, payload, 'BIBLIO');
+            showToast("Reporte generado exitosamente", "success");
+        } else {
+            throw new Error("Módulo ExportUtils no disponible");
+        }
+    }
+
+    async function generarReporteAdeudosTrimestral(startDate, endDate, periodLabel, incluirDetalles) {
+        const snap = await _ctx.db.collection('prestamos-biblio')
+            .where('fechaSolicitud', '>=', startDate)
+            .where('fechaSolicitud', '<=', endDate)
+            .orderBy('fechaSolicitud', 'desc')
+            .get();
+
+        const data = [];
+        let totalAdeudosTrimestre = 0;
+        let totalCondonacionesTrimestre = 0;
+        
+        const mesesNombres = [];
+        for(let i=0; i<3; i++) {
+            let m = startDate.getMonth() + i;
+            mesesNombres.push(new Date(startDate.getFullYear(), m, 1).toLocaleString('es-MX', {month:'long'}));
+        }
+        const sumMes = [0, 0, 0];
+
+        snap.forEach(doc => {
+            const p = doc.data();
+            const monto = parseFloat(p.montoDeuda || 0);
+            const esCondonado = p.estado === 'condonado';
+            
+            if (monto > 0 || esCondonado) {
+                const reqMs = p.fechaSolicitudMs || (p.fechaSolicitud && p.fechaSolicitud.toMillis ? p.fechaSolicitud.toMillis() : startDate.getTime());
+                const reqDate = new Date(reqMs);
+                const reqDateStr = reqDate.toLocaleDateString('es-MX');
+                
+                const dMes = reqDate.getMonth();
+                const startM = startDate.getMonth();
+                let idxMes = dMes - startM;
+                if(idxMes < 0 || idxMes > 2) idxMes = 0;
+
+                let montoCobrado = esCondonado ? 0 : monto;
+                
+                sumMes[idxMes] += montoCobrado;
+                totalAdeudosTrimestre += montoCobrado;
+
+                let motivo = p.motivoCondonacion || (esCondonado ? 'Condonación manual' : 'N/A');
+                if (esCondonado) totalCondonacionesTrimestre++;
+
+                data.push([
+                    reqDateStr,
+                    p.studentName || 'Usuario',
+                    p.diasRetraso ? p.diasRetraso.toString() : '0',
+                    `$${monto.toFixed(2)}`,
+                    esCondonado ? 'Sí' : 'No',
+                    motivo
+                ]);
+            }
+        });
+
+        const payload = {
+            kind: 'generic',
+            title: 'Reporte de Adeudos y Condonaciones',
+            subtitle: 'Exportación trimestral',
+            period: periodLabel,
+            filenameBase: 'Adeudos_Trimestral',
+            summary: [
+                ['Total Recaudado en Trimestre', `$${totalAdeudosTrimestre.toFixed(2)}`],
+                [`Mes 1 (${mesesNombres[0]})`, `$${sumMes[0].toFixed(2)}`],
+                [`Mes 2 (${mesesNombres[1]})`, `$${sumMes[1].toFixed(2)}`],
+                [`Mes 3 (${mesesNombres[2]})`, `$${sumMes[2].toFixed(2)}`],
+                ['Total Condonaciones', totalCondonacionesTrimestre.toString()]
+            ],
+            columns: ['Fecha Solicitud', 'Usuario', 'Días Retraso', 'Monto Deuda', 'Condonado', 'Motivo'],
+            rows: data
+        };
+
+        if (!incluirDetalles) {
+            payload.columns = [];
+            payload.rows = [];
+        }
+
+        if (window.ExportUtils && window.ExportUtils.generatePDF) {
+            await window.ExportUtils.generatePDF({ period: periodLabel }, payload, 'BIBLIO');
+            showToast("Reporte generado exitosamente", "success");
+        } else {
+            throw new Error("Módulo ExportUtils no disponible");
+        }
+    }
+
+    async function generarReporteCatalogo(periodLabel, incluirDetalles) {
+        let totalPc = 0;
+        let totalMesas = 0;
+        let otrosActivos = 0;
+
+        try {
+            const assets = await window.BiblioAssetsService.getAssetsOnce(_ctx);
+            assets.forEach(a => {
+                if(a.tipo === 'pc') totalPc++;
+                else if(a.tipo === 'mesa' || a.tipo === 'cubículo') totalMesas++;
+                else otrosActivos++;
+            });
+        } catch(e) {
+
+        }
+
+        let totalLibrosTitulos = 0;
+        let totalEjemplares = 0;
+        let totalRevistas = 0;
+        let ejemplaresRevistas = 0;
+
+        try {
+            // Intentar obtener datos del último inventario cerrado
+            let details = await window.BiblioService.getLatestFinishedInventorySession(_ctx, { includeLists: true });
+            
+            if (details && details.foundEntries && details.foundEntries.length > 0) {
+                const countCopies = (entries = []) => entries.reduce((sum, entry) => sum + (Number(entry?.totalObserved || entry?.cantidad || entry?.lastQuantity || 0) || 0), 0);
+                
+                const bookEntries = details.foundEntries.filter(e => e.type !== 'material');
+                const materialEntries = details.foundEntries.filter(e => e.type === 'material');
+
+                totalLibrosTitulos = bookEntries.length;
+                totalEjemplares = countCopies(bookEntries);
+                totalRevistas = materialEntries.length;
+                ejemplaresRevistas = countCopies(materialEntries);
+            } else {
+                // Fallback: Contar desde el catálogo en vivo (sólo libros)
+                const snap = await _ctx.db.collection('biblio-catalogo').get();
+                snap.forEach(doc => {
+                    const data = doc.data();
+                    const copias = Number(data.copiasSistema || data.copias || 1);
+                    totalLibrosTitulos++;
+                    totalEjemplares += copias;
+                });
+            }
+        } catch(e) {
+
+        }
+
+        const payload = {
+            kind: 'generic',
+            title: 'Reporte de Catálogo General',
+            subtitle: 'Resumen de Inventario y Activos',
+            period: periodLabel,
+            filenameBase: 'Catalogo_Trimestral',
+            summary: [
+                ['Títulos de Libros', totalLibrosTitulos.toString()],
+                ['Total de Ejemplares (Libros)', totalEjemplares.toString()],
+                ['Revistas y Otros Documentos (Títulos)', totalRevistas.toString()],
+                ['Ejemplares (Revistas/Otros)', ejemplaresRevistas.toString()],
+                ['Computadoras (PCs)', totalPc.toString()],
+                ['Mesas/Cubículos', totalMesas.toString()],
+                ['Otros Activos Fijos', otrosActivos.toString()]
+            ],
+            sections: [
+                {
+                    title: 'Nota',
+                    headers: ['Información', 'Detalle'],
+                    rows: [
+                        ['Alcance', 'Este reporte no incluye la lista detallada de libros para ahorrar papel.'],
+                        ['Disponibilidad', 'Todos los activos mostrados corresponden al estado actual.']
+                    ]
+                }
+            ],
+            columns: [],
+            rows: []
+        };
+
+        if (!incluirDetalles) {
+            payload.columns = [];
+            payload.rows = [];
+        }
+
+        if (window.ExportUtils && window.ExportUtils.generatePDF) {
+            await window.ExportUtils.generatePDF({ period: periodLabel }, payload, 'BIBLIO');
+            showToast("Reporte generado exitosamente", "success");
+        } else {
+            throw new Error("Módulo ExportUtils no disponible");
+        }
+    }
 
     return {
+        abrirModalReportesTrimestrales: withState(abrirModalReportesTrimestrales),
+        prepararReporteTrimestral: withState(prepararReporteTrimestral),
+        cancelarReporteTrimestral: withState(cancelarReporteTrimestral),
+        ejecutarReporteTrimestral: withState(ejecutarReporteTrimestral),
         terminarVisita: withState(terminarVisita),
         initAdmin: withState(initAdmin),
         forzarRecargaCache: withState(forzarRecargaCache),
@@ -2030,13 +2761,15 @@ window.AdminBiblio.Reportes = (function () {
         renderVisitModalContent: withState(renderVisitModalContent),
         verificarUsuarioVisita: withState(verificarUsuarioVisita),
         toggleTeamForm: withState(toggleTeamForm),
-        mostrarRegistroAnonimo: withState(mostrarRegistroAnonimo),
+        toggleRegistroAnonimo: withState(toggleRegistroAnonimo),
+        selectUnregOption: withState(selectUnregOption),
         addTeamMember: withState(addTeamMember),
         confirmarVisitaDirecta: withState(confirmarVisitaDirecta),
         confirmarVisitaUnregistered: withState(confirmarVisitaUnregistered),
         applyVisitScanPayload: withState(applyVisitScanPayload),
         abrirModalComputadoras: withState(abrirModalComputadoras),
         forzarLimpiezaPCs: withState(forzarLimpiezaPCs),
+        forzarLimpiezaTotal: withState(forzarLimpiezaTotal),
         loadPCGrid: withState(loadPCGrid),
         asignarPC: withState(asignarPC),
         handleAssetClick: withState(handleAssetClick),

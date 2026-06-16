@@ -465,7 +465,7 @@ class SiaLandingView extends HTMLElement {
             <span class="sia-brand-logos">
               <img src="/images/logo-tecnm.png" alt="TecNM" class="sia-brand-logo-tecnm">
               <span class="sia-brand-divider"></span>
-              <img src="/images/logo-ites.png" alt="ITES Los Cabos" class="sia-brand-logo-ites">
+              <img src="/images/logo-sia.png" alt="SIA" class="sia-brand-logo-ites">
              </span>
             <span class="sia-brand-copy">
               <strong>Campus Los Cabos</strong>
@@ -494,70 +494,64 @@ class SiaLandingView extends HTMLElement {
 
   getHeroHtml() {
     return `
-      <main id="landing-hero" class="sia-landing-hero">
+      <main id="landing-hero" class="sia-landing-hero bento-layout">
         <div class="sia-hero-glow" aria-hidden="true"></div>
 
-        <section class="sia-hero-main" data-reveal>
-          <div class="sia-hero-kicker">
-            <i class="bi bi-buildings-fill"></i>
-            <span>TecNM Campus Los Cabos</span>
-          </div>
-
-          <h1 class="sia-hero-logo-title">
-            <img src="/images/logo-sia-mob.png" alt="SIA">
-          </h1>
-          <p class="sia-hero-subtitle">Portal de entrada para comunidad, aspirantes y visitantes del TecNM Campus Los Cabos.</p>
-
-          <div class="sia-hero-actions" aria-label="Acciones principales">
-            <button type="button" class="sia-action-primary" data-landing-login>
-              <i class="bi bi-box-arrow-in-right"></i>
-              <span>Acceder</span>
-            </button>
-            <a class="sia-action-secondary is-admissions" href="#/admisiones">
-              <i class="bi bi-journal-check"></i>
-              <span>Proceso de admisión</span>
-            </a>
-            <a class="sia-action-secondary is-map" href="#/mapa-campus">
-              <i class="bi bi-geo-alt-fill"></i>
-              <span>Mapa del campus</span>
-            </a>
-          </div>
-
-          <button type="button" class="sia-read-more" data-landing-info="que_es">
-            <span>Qué es SIA</span>
-            <i class="bi bi-arrow-right-short"></i>
-          </button>
-        </section>
-
-        <section class="sia-hero-panel" data-reveal>
-          <div class="sia-phone-shell" aria-label="Vista rápida de SIA">
-            <div class="sia-phone-top">
-              <span></span>
-            </div>
-            <div class="sia-phone-header">
-              <img src="/images/logo-sia-mob.png" alt="SIA">
-              <div>
-                <strong>Entrada SIA</strong>
-                <span>Elige tu ruta</span>
+        <section class="sia-hero-bento" data-reveal>
+          <!-- Main Bento Item: Login -->
+          <div class="bento-card bento-main">
+            <div class="bento-main-content">
+              <div class="sia-hero-kicker">
+                <i class="bi bi-buildings-fill"></i>
+                <span>TecNM Campus Los Cabos</span>
               </div>
+              <img src="/images/logo-sia-mob.png" alt="SIA" class="bento-logo">
+              <h1 class="bento-title">Todo tu campus, en un solo portal</h1>
+              <p class="bento-subtitle">Sistema de Integración Académica para comunidad, aspirantes y visitantes.</p>
             </div>
-            <div class="sia-phone-list">
-              <button type="button" class="sia-phone-row" data-landing-login>
-                <i class="bi bi-mortarboard-fill"></i>
-                <span>Comunidad ITES</span>
-                <b>Entrar</b>
+            
+            <div class="bento-main-action">
+              <button type="button" class="sia-action-primary bento-btn" data-landing-login>
+                <i class="bi bi-box-arrow-in-right"></i>
+                <span>Acceder a SIA</span>
               </button>
-              <a class="sia-phone-row" href="#/admisiones">
-                <i class="bi bi-pencil-square"></i>
-                <span>Soy aspirante</span>
-                <b>Ver</b>
-              </a>
-              <a class="sia-phone-row" href="#/mapa-campus">
-                <i class="bi bi-signpost-split-fill"></i>
-                <span>Visito el campus</span>
-                <b>Mapa</b>
-              </a>
             </div>
+          </div>
+
+          <!-- Secondary Bento Items Container -->
+          <div class="bento-side">
+            <a class="bento-card bento-secondary is-admissions" href="#/admisiones">
+               <div class="bento-icon">
+                  <i class="bi bi-journal-check"></i>
+               </div>
+               <div class="bento-text">
+                 <h3>Soy aspirante</h3>
+                 <p>Proceso de admisión</p>
+               </div>
+               <i class="bi bi-arrow-up-right bento-arrow"></i>
+            </a>
+
+            <a class="bento-card bento-secondary is-map" href="#/mapa-campus">
+               <div class="bento-icon">
+                  <i class="bi bi-geo-alt-fill"></i>
+               </div>
+               <div class="bento-text">
+                 <h3>Visito el campus</h3>
+                 <p>Ver mapa interactivo</p>
+               </div>
+               <i class="bi bi-arrow-up-right bento-arrow"></i>
+            </a>
+
+            <button type="button" class="bento-card bento-secondary is-info" data-landing-info="que_es">
+               <div class="bento-icon">
+                  <i class="bi bi-info-circle-fill"></i>
+               </div>
+               <div class="bento-text">
+                 <h3>¿Qué es SIA?</h3>
+                 <p>Conoce la plataforma</p>
+               </div>
+               <i class="bi bi-arrow-right-short bento-arrow"></i>
+            </button>
           </div>
         </section>
       </main>
@@ -760,7 +754,7 @@ class SiaLandingView extends HTMLElement {
           <span class="sia-brand-logos">
             <img src="/images/logo-tecnm.png" alt="TecNM" class="sia-brand-logo-tecnm">
             <span class="sia-brand-divider"></span>
-            <img src="/images/logo-ites.png" alt="ITES Los Cabos" class="sia-brand-logo-ites">
+            <img src="/images/logo-sia.png" alt="SIA" class="sia-brand-logo-ites">
             <span class="sia-brand-divider"></span>
             <img src="/images/logo-sia.png" alt="SIA" class="sia-brand-logo-sia">
           </span>
@@ -858,7 +852,7 @@ class SiaLandingView extends HTMLElement {
           window.setTimeout(() => setLoginLoading(false), 400);
         }
       } else {
-        console.warn('SIA.initiateMicrosoftLogin not found');
+
       }
     };
 

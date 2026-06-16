@@ -2188,7 +2188,7 @@ class SiaStudentDashboard extends HTMLElement {
       await this._persistCardOrder(null);
       window.showToast?.('Orden de módulos restablecido', 'success');
     } catch (e) {
-      console.warn('[Dashboard] Error resetting card order:', e);
+
       window.showToast?.('No se pudo restablecer el orden', 'warning');
     }
   }
@@ -2367,7 +2367,7 @@ class SiaStudentDashboard extends HTMLElement {
         }, 1000);
       }
     } catch (e) {
-      console.warn("Error checking tutorial DB preferences", e);
+
       return;
     }
   }

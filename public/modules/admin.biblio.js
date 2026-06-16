@@ -115,7 +115,7 @@ window.AdminBiblio = Object.assign(window.AdminBiblio || {}, (function () {
                 const sim = JSON.parse(simProfileJson);
                 if (sim.role) role = sim.role;
                 if (!state.ctx.profile) state.ctx.profile = sim;
-                console.log('[Biblio] Dev Mode Detectado: Rol ' + role);
+
             } catch (error) {
                 console.error(error);
             }

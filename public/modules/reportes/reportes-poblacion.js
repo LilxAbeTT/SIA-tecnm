@@ -3,7 +3,6 @@
  * Incluye dashboards y una vista ajustable tipo Biblioteca.
  */
 if (!window.Reportes) window.Reportes = {};
-console.log('[SIA] reportes-poblacion.js cargado, window.Reportes keys:', Object.keys(window.Reportes));
 
 window.Reportes.Poblacion = (function () {
     'use strict';
