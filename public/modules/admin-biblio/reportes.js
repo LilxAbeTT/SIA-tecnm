@@ -837,10 +837,12 @@ window.AdminBiblio.Reportes = (function () {
                         </div>
                         <div class="modal-body p-4 bg-light">
                             <div class="mb-4">
-                                <label class="form-label fw-bold text-muted small text-uppercase">Seleccionar Trimestre</label>
-                                <select class="form-select form-select-lg border-0 shadow-sm" id="reporte-trimestre-select">
-                                    <!-- Opciones inyectadas dinamicamente -->
-                                </select>
+                                <label class="form-label fw-bold text-muted small text-uppercase mb-2">Seleccionar Periodo</label>
+                                <div class="d-flex align-items-center gap-2 flex-wrap">
+                                    <select class="form-select border-0 shadow-sm flex-fill fw-bold text-secondary" id="reporte-mes-select" onchange="AdminBiblio.onReportPeriodChange('mes')"></select>
+                                    <select class="form-select border-0 shadow-sm flex-fill fw-bold text-secondary" id="reporte-trimestre-select" onchange="AdminBiblio.onReportPeriodChange('trimestre')"></select>
+                                    <select class="form-select border-0 shadow-sm flex-fill fw-bold text-secondary" id="reporte-semestre-select" onchange="AdminBiblio.onReportPeriodChange('semestre')"></select>
+                                </div>
                             </div>
                             
                             <div class="d-grid gap-3">
@@ -2329,27 +2331,42 @@ window.AdminBiblio.Reportes = (function () {
     }
 
     function abrirModalReportesTrimestrales() {
-        const select = document.getElementById('reporte-trimestre-select');
-        if (!select) return;
+        const selectMes = document.getElementById('reporte-mes-select');
+        const selectTrim = document.getElementById('reporte-trimestre-select');
+        const selectSem = document.getElementById('reporte-semestre-select');
+        if (!selectTrim) return;
 
-        const currentYear = new Date().getFullYear();
-        const currentMonth = new Date().getMonth();
-        const currentQuarter = Math.floor(currentMonth / 3) + 1;
+        const now = new Date();
+        const currentYear = now.getFullYear();
+        const m = now.getMonth();
+        const q = Math.floor(m / 3);
+        const s = Math.floor(m / 6);
+        const meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 
-        let optionsHtml = '';
-        for (let q = 1; q <= 4; q++) {
-            const startMonth = (q - 1) * 3;
-            const endMonth = startMonth + 2;
-            const startMonthName = new Date(currentYear, startMonth, 1).toLocaleString('es-MX', { month: 'short' });
-            const endMonthName = new Date(currentYear, endMonth, 1).toLocaleString('es-MX', { month: 'short' });
-            const isSelected = q === currentQuarter ? 'selected' : '';
-            optionsHtml += `<option value="${q}-${currentYear}" ${isSelected}>Trimestre ${q} (${startMonthName} - ${endMonthName}) - ${currentYear}</option>`;
+        let mesOpts = '<option value="">Por Mes</option>';
+        for(let i = m; i >= 0; i--) mesOpts += `<option value="${i}-${currentYear}">${meses[i]} ${currentYear}</option>`;
+
+        let trimOpts = '<option value="">Por Trimestre</option>';
+        for(let i = q; i >= 0; i--) {
+            const startMonthName = meses[i * 3].substring(0, 3).toLowerCase();
+            const endMonthName = meses[i * 3 + 2].substring(0, 3).toLowerCase();
+            trimOpts += `<option value="${i + 1}-${currentYear}">Trimestre ${i + 1} (${startMonthName} - ${endMonthName}) - ${currentYear}</option>`;
         }
-        
-        optionsHtml += `<option value="4-${currentYear - 1}">Trimestre 4 (oct - dic) - ${currentYear - 1}</option>`;
-        optionsHtml += `<option value="3-${currentYear - 1}">Trimestre 3 (jul - sep) - ${currentYear - 1}</option>`;
+        trimOpts += `<option value="4-${currentYear - 1}">Trimestre 4 (oct - dic) - ${currentYear - 1}</option>`;
+        trimOpts += `<option value="3-${currentYear - 1}">Trimestre 3 (jul - sep) - ${currentYear - 1}</option>`;
 
-        select.innerHTML = optionsHtml;
+        let semOpts = '<option value="">Por Semestre</option>';
+        for(let i = s; i >= 0; i--) semOpts += `<option value="${i + 1}-${currentYear}">Semestre ${i + 1} - ${currentYear}</option>`;
+        semOpts += `<option value="2-${currentYear - 1}">Semestre 2 - ${currentYear - 1}</option>`;
+        semOpts += `<option value="1-${currentYear - 1}">Semestre 1 - ${currentYear - 1}</option>`;
+
+        if (selectMes) selectMes.innerHTML = mesOpts;
+        if (selectTrim) selectTrim.innerHTML = trimOpts;
+        if (selectSem) selectSem.innerHTML = semOpts;
+
+        if (selectMes) selectMes.value = "";
+        if (selectSem) selectSem.value = "";
+        if (selectTrim) selectTrim.value = `${q + 1}-${currentYear}`;
 
         const modalEl = document.getElementById('modal-reportes-trimestrales');
         const modal = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
@@ -2400,15 +2417,44 @@ window.AdminBiblio.Reportes = (function () {
         const tipo = _reporteTrimestralActual;
         if (!tipo) return;
 
-        const select = document.getElementById('reporte-trimestre-select');
-        const val = select.value.split('-');
-        const quarter = parseInt(val[0]);
+        const selectMes = document.getElementById('reporte-mes-select');
+        const selectTrim = document.getElementById('reporte-trimestre-select');
+        const selectSem = document.getElementById('reporte-semestre-select');
+        
+        let activeType = null;
+        let activeValue = null;
+
+        if (selectMes && selectMes.value) { activeType = 'mes'; activeValue = selectMes.value; }
+        else if (selectTrim && selectTrim.value) { activeType = 'trimestre'; activeValue = selectTrim.value; }
+        else if (selectSem && selectSem.value) { activeType = 'semestre'; activeValue = selectSem.value; }
+
+        if (!activeType) {
+            showToast("Por favor selecciona un periodo", "warning");
+            return;
+        }
+
+        const val = activeValue.split('-');
+        const periodNum = parseInt(val[0]);
         const year = val[1] ? parseInt(val[1]) : new Date().getFullYear();
 
-        const startMonth = (quarter - 1) * 3;
-        const startDate = new Date(year, startMonth, 1);
-        const endDate = new Date(year, startMonth + 3, 0, 23, 59, 59, 999);
-        const periodLabel = `Trimestre ${quarter} (${year})`;
+        let startDate, endDate, periodLabel;
+        const meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+
+        if (activeType === 'mes') {
+            startDate = new Date(year, periodNum, 1);
+            endDate = new Date(year, periodNum + 1, 0, 23, 59, 59, 999);
+            periodLabel = `Mes: ${meses[periodNum]} (${year})`;
+        } else if (activeType === 'trimestre') {
+            const startMonth = (periodNum - 1) * 3;
+            startDate = new Date(year, startMonth, 1);
+            endDate = new Date(year, startMonth + 3, 0, 23, 59, 59, 999);
+            periodLabel = `Trimestre ${periodNum} (${year})`;
+        } else if (activeType === 'semestre') {
+            const startMonth = (periodNum - 1) * 6;
+            startDate = new Date(year, startMonth, 1);
+            endDate = new Date(year, startMonth + 6, 0, 23, 59, 59, 999);
+            periodLabel = `Semestre ${periodNum} (${year})`;
+        }
         
         const checkbox = document.getElementById('switch-incluir-detalles');
         const incluirDetalles = checkbox ? checkbox.checked : false;
@@ -2444,8 +2490,30 @@ window.AdminBiblio.Reportes = (function () {
             .orderBy('createdAtMs', 'desc')
             .get();
 
+        const uniqueUids = [...new Set(snap.docs.map(doc => doc.data().studentId).filter(Boolean))];
+        const usersMap = {};
+        
+        const chunkedPromises = [];
+        for (let i = 0; i < uniqueUids.length; i += 30) {
+            const chunk = uniqueUids.slice(i, i + 30);
+            chunkedPromises.push(_ctx.db.collection('usuarios').where(firebase.firestore.FieldPath.documentId(), 'in', chunk).get());
+        }
+        
+        if (chunkedPromises.length > 0) {
+            const userSnaps = await Promise.all(chunkedPromises);
+            userSnaps.forEach(usersSnap => {
+                usersSnap.forEach(uDoc => {
+                    usersMap[uDoc.id] = uDoc.data();
+                });
+            });
+        }
+
         const data = [];
         let totalConsultas = 0, totalIndividual = 0, totalEquipo = 0, totalPc = 0;
+        let totalHombres = 0, totalMujeres = 0, totalOtros = 0;
+        let totalEstudiantes = 0, totalPersonal = 0;
+        let totalMatutino = 0, totalVespertino = 0;
+        let conMatricula = 0, sinMatricula = 0;
 
         snap.forEach(doc => {
             const v = doc.data();
@@ -2457,6 +2525,38 @@ window.AdminBiblio.Reportes = (function () {
             else if (motiveLow.includes('individual')) totalIndividual++;
             else if (motiveLow.includes('equipo')) totalEquipo++;
             else if (motiveLow.includes('pc') || motiveLow.includes('computadora')) totalPc++;
+
+            const hour = v.createdAtMs ? new Date(v.createdAtMs).getHours() : 0;
+            if (hour < 15) totalMatutino++;
+            else totalVespertino++;
+
+            const isUnreg = v.isUnregistered === true;
+            const tipoLower = (v.tipoUsuario || '').toLowerCase();
+            const visitorTypeLower = (v.visitorType || '').toLowerCase();
+            if (tipoLower.includes('estudiante') || visitorTypeLower.includes('estudiante')) totalEstudiantes++;
+            else totalPersonal++;
+
+            const mat = (v.matricula || '').trim();
+            if (!mat || mat === 'N/A' || isUnreg) sinMatricula++;
+            else conMatricula++;
+
+            let gender = 'otros';
+            if (isUnreg) {
+                const g = (v.gender || '').toLowerCase();
+                if (g.includes('hombre') || g.includes('masculino')) gender = 'hombres';
+                else if (g.includes('mujer') || g.includes('femenino')) gender = 'mujeres';
+            } else {
+                const uData = usersMap[v.studentId];
+                if (uData) {
+                    const g = (uData.gender || uData.genero || uData.sexo || '').toLowerCase();
+                    if (g.includes('hombre') || g.includes('masculino')) gender = 'hombres';
+                    else if (g.includes('mujer') || g.includes('femenino')) gender = 'mujeres';
+                }
+            }
+
+            if (gender === 'hombres') totalHombres++;
+            else if (gender === 'mujeres') totalMujeres++;
+            else totalOtros++;
 
             data.push([
                 dateStr,
@@ -2473,12 +2573,48 @@ window.AdminBiblio.Reportes = (function () {
             subtitle: 'Exportación trimestral',
             period: periodLabel,
             filenameBase: 'Visitas_Trimestral',
+            recordCount: data.length,
             summary: [
                 ['Total Visitas', data.length.toString()],
                 ['Consultas', totalConsultas.toString()],
                 ['Trabajo Individual', totalIndividual.toString()],
                 ['Trabajo en Equipo', totalEquipo.toString()],
                 ['Uso de PC', totalPc.toString()]
+            ],
+            sections: [
+                {
+                    title: 'Por Género',
+                    headers: ['Género', 'Cantidad'],
+                    rows: [
+                        ['Hombres', totalHombres.toString()],
+                        ['Mujeres', totalMujeres.toString()],
+                        ['Otros', totalOtros.toString()]
+                    ]
+                },
+                {
+                    title: 'Por Vocación',
+                    headers: ['Vocación', 'Cantidad'],
+                    rows: [
+                        ['Estudiantes', totalEstudiantes.toString()],
+                        ['Personal / Externos', totalPersonal.toString()]
+                    ]
+                },
+                {
+                    title: 'Por Turno',
+                    headers: ['Turno', 'Cantidad'],
+                    rows: [
+                        ['Matutino', totalMatutino.toString()],
+                        ['Vespertino', totalVespertino.toString()]
+                    ]
+                },
+                {
+                    title: 'Por Matrícula',
+                    headers: ['Matrícula', 'Cantidad'],
+                    rows: [
+                        ['Con Matrícula', conMatricula.toString()],
+                        ['Sin Matrícula', sinMatricula.toString()]
+                    ]
+                }
             ],
             columns: ['Fecha', 'Usuario', 'Matrícula', 'Motivo', 'Duración'],
             rows: data
@@ -2744,11 +2880,28 @@ window.AdminBiblio.Reportes = (function () {
         }
     }
 
+    function onReportPeriodChange(active) {
+        const selectMes = document.getElementById('reporte-mes-select');
+        const selectTrim = document.getElementById('reporte-trimestre-select');
+        const selectSem = document.getElementById('reporte-semestre-select');
+        if (active === 'mes') {
+            if (selectTrim) selectTrim.value = '';
+            if (selectSem) selectSem.value = '';
+        } else if (active === 'trimestre') {
+            if (selectMes) selectMes.value = '';
+            if (selectSem) selectSem.value = '';
+        } else if (active === 'semestre') {
+            if (selectMes) selectMes.value = '';
+            if (selectTrim) selectTrim.value = '';
+        }
+    }
+
     return {
         abrirModalReportesTrimestrales: withState(abrirModalReportesTrimestrales),
         prepararReporteTrimestral: withState(prepararReporteTrimestral),
         cancelarReporteTrimestral: withState(cancelarReporteTrimestral),
         ejecutarReporteTrimestral: withState(ejecutarReporteTrimestral),
+        onReportPeriodChange: withState(onReportPeriodChange),
         terminarVisita: withState(terminarVisita),
         initAdmin: withState(initAdmin),
         forzarRecargaCache: withState(forzarRecargaCache),

@@ -181,6 +181,7 @@ window.AdminBiblio.Devoluciones = (function () {
     let _isShowingCondonados = false;
     let _debtorsPage = 0;
     const DEBTORS_PAGE_SIZE = 10;
+    let _activeFilter = { type: 'all', val: null };
 
     async function cargarListaDeudoresGlobal() {
         try {
@@ -242,15 +243,100 @@ window.AdminBiblio.Devoluciones = (function () {
         renderDebtorsTable();
     }
 
+    function getFilteredLists() {
+        const now = new Date();
+        const currentYear = now.getFullYear();
+        let startDate, endDate;
+        let periodName = 'Todos los registros';
+
+        if (_activeFilter.type === 'all') {
+            startDate = new Date(1970, 0, 1);
+            endDate = new Date(2100, 11, 31);
+        } else if (_activeFilter.type === 'month') {
+            const m = _activeFilter.val;
+            startDate = new Date(currentYear, m, 1);
+            endDate = new Date(currentYear, m + 1, 0, 23, 59, 59);
+            const meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+            periodName = meses[m];
+        } else if (_activeFilter.type === 'quarter') {
+            const q = _activeFilter.val;
+            startDate = new Date(currentYear, q * 3, 1);
+            endDate = new Date(currentYear, q * 3 + 3, 0, 23, 59, 59);
+            periodName = `Trimestre ${q + 1}`;
+        } else if (_activeFilter.type === 'semester') {
+            const s = _activeFilter.val;
+            startDate = new Date(currentYear, s * 6, 1);
+            endDate = new Date(currentYear, s * 6 + 6, 0, 23, 59, 59);
+            periodName = `Semestre ${s + 1}`;
+        }
+
+        const getMs = (dateVal) => {
+            if (!dateVal) return 0;
+            if (dateVal.toMillis) return dateVal.toMillis();
+            if (dateVal.seconds) return dateVal.seconds * 1000;
+            return new Date(dateVal).getTime() || 0;
+        };
+
+        const startMs = startDate.getTime();
+        const endMs = endDate.getTime();
+
+        const filteredDebtors = _debtorsList.map(u => {
+            const validDeudas = u.deudas.filter(d => {
+                const ms = getMs(d.fechaVencimiento);
+                return ms >= startMs && ms <= endMs;
+            });
+            return validDeudas.length > 0 ? { ...u, deudas: validDeudas, deudaTotal: validDeudas.reduce((acc, d) => acc + (Number(d.montoDeuda)||0), 0) } : null;
+        }).filter(Boolean);
+
+        const filteredCondonados = _condonadosList.map(u => {
+            const validCondon = u.condonaciones.filter(c => {
+                const ms = getMs(c.fechaDevolucionReal || c.fechaPago || c.fechaVencimiento);
+                return ms >= startMs && ms <= endMs;
+            });
+            return validCondon.length > 0 ? { ...u, condonaciones: validCondon, totalCondonado: validCondon.reduce((acc, c) => acc + (Number(c.multaOriginal) || Number(c.multaReferencia) || 0), 0) } : null;
+        }).filter(Boolean);
+
+        return { filteredDebtors, filteredCondonados, period: periodName, startDate, endDate, currentYear };
+    }
+
+    function onFilterChange(type) {
+        if(type === 'all') {
+            document.getElementById('filter-month').value = "";
+            document.getElementById('filter-quarter').value = "";
+            document.getElementById('filter-semester').value = "";
+            _activeFilter = { type: 'all', val: null };
+        } else if(type === 'month') {
+            document.getElementById('filter-quarter').value = "";
+            document.getElementById('filter-semester').value = "";
+            _activeFilter = { type: 'month', val: parseInt(document.getElementById('filter-month').value.replace('m_', '')) };
+        } else if(type === 'quarter') {
+            document.getElementById('filter-month').value = "";
+            document.getElementById('filter-semester').value = "";
+            _activeFilter = { type: 'quarter', val: parseInt(document.getElementById('filter-quarter').value.replace('q_', '')) };
+        } else if(type === 'semester') {
+            document.getElementById('filter-month').value = "";
+            document.getElementById('filter-quarter').value = "";
+            _activeFilter = { type: 'semester', val: parseInt(document.getElementById('filter-semester').value.replace('s_', '')) };
+        }
+        
+        if (type !== 'all' && isNaN(_activeFilter.val)) {
+            _activeFilter = { type: 'all', val: null };
+        }
+
+        _debtorsPage = 0;
+        renderDebtorsTable();
+    }
+
     function renderDebtorsTable() {
         const tbody = document.getElementById('condon-table-body');
         const pagination = document.getElementById('condon-pagination');
         if (!tbody || !pagination) return;
 
-        const listToUse = _isShowingCondonados ? _condonadosList : _debtorsList;
+        const { filteredDebtors, filteredCondonados } = getFilteredLists();
+        const listToUse = _isShowingCondonados ? filteredCondonados : filteredDebtors;
         
         if (listToUse.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="4" class="text-center py-4 text-muted">No hay registros para mostrar en esta categoría.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="4" class="text-center py-4 text-muted">No hay registros para mostrar en esta categoría y periodo.</td></tr>`;
             pagination.classList.add('d-none');
             return;
         }
@@ -265,11 +351,12 @@ window.AdminBiblio.Devoluciones = (function () {
         tbody.innerHTML = pageItems.map(user => {
             const isPersonal = user.tipoUsuario.toLowerCase().includes('personal') || user.tipoUsuario.toLowerCase().includes('docente');
             const badgeClass = isPersonal ? 'bg-primary bg-opacity-10 text-primary border-primary' : 'bg-secondary bg-opacity-10 text-secondary border-secondary';
+            const uidStr = escapeJsString(user.studentId || user.studentMatricula);
             
             if (_isShowingCondonados) {
                 const lastReason = user.condonaciones[0]?.motivoPerdon || 'Perdón general';
                 return `
-                    <tr>
+                    <tr class="cursor-pointer" onclick="AdminBiblio.mostrarDetallesUsuario('${uidStr}')">
                         <td class="ps-4">
                             <div class="fw-bold text-dark">${escapeHtml(user.studentName)}</div>
                             <div class="small text-muted font-monospace">${escapeHtml(user.studentMatricula)}</div>
@@ -285,19 +372,31 @@ window.AdminBiblio.Devoluciones = (function () {
                     </tr>
                 `;
             } else {
+                const hasUnreturned = user.deudas.some(d => {
+                    const status = String(d.status).toLowerCase();
+                    return !d.fechaDevolucionReal && !status.includes('devuelto') && status !== 'entregado' && status !== 'completado';
+                });
+                
+                const returnBadge = hasUnreturned 
+                    ? `<span class="badge bg-danger bg-opacity-10 text-danger border border-danger small ms-2" title="El usuario no ha devuelto todos los libros prestados"><i class="bi bi-clock-history me-1"></i>Deuda Sumando</span>` 
+                    : `<span class="badge bg-warning bg-opacity-10 text-warning border border-warning small ms-2" title="Los libros han sido devueltos, pero aún debe pagar la multa"><i class="bi bi-check-all me-1"></i>Libros Devueltos</span>`;
+
                 return `
-                    <tr>
+                    <tr class="cursor-pointer" onclick="AdminBiblio.mostrarDetallesUsuario('${uidStr}')">
                         <td class="ps-4">
                             <div class="fw-bold text-dark">${escapeHtml(user.studentName)}</div>
                             <div class="small text-muted font-monospace">${escapeHtml(user.studentMatricula)}</div>
                         </td>
                         <td><span class="badge border ${badgeClass}">${escapeHtml(user.tipoUsuario)}</span></td>
                         <td>
-                            <div class="fw-bold text-danger">$${user.deudaTotal.toFixed(2)}</div>
-                            <div class="small text-muted">${user.deudas.length} préstamo(s)</div>
+                            <div class="d-flex align-items-center">
+                                <div class="fw-bold text-danger">$${user.deudaTotal.toFixed(2)}</div>
+                                ${returnBadge}
+                            </div>
+                            <div class="small text-muted mt-1">${user.deudas.length} préstamo(s)</div>
                         </td>
                         <td class="text-end pe-4">
-                            <button class="btn btn-sm btn-outline-secondary rounded-pill fw-bold shadow-sm" onclick="AdminBiblio.iniciarCondonacionUsuario('${escapeJsString(user.studentId || user.studentMatricula)}')">
+                            <button class="btn btn-sm btn-outline-secondary rounded-pill fw-bold shadow-sm" onclick="event.stopPropagation(); AdminBiblio.iniciarCondonacionUsuario('${uidStr}')">
                                 <i class="bi bi-shield-check me-1"></i>Condonar
                             </button>
                         </td>
@@ -322,6 +421,77 @@ window.AdminBiblio.Devoluciones = (function () {
         }
     }
 
+    function mostrarDetallesUsuario(uid) {
+        let user = _debtorsList.find(u => u.studentId === uid || u.studentMatricula === uid);
+        let isCondonado = false;
+        if (!user) {
+            user = _condonadosList.find(u => u.studentId === uid || u.studentMatricula === uid);
+            isCondonado = true;
+        }
+        if (!user) return;
+
+        const parseDate = (val) => {
+            if (!val) return 0;
+            if (val.toMillis) return val.toMillis();
+            if (val.seconds) return val.seconds * 1000;
+            return new Date(val).getTime() || 0;
+        };
+
+        const formatD = (val) => val ? new Date(parseDate(val)).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' }) : '--';
+
+        const modalId = 'modal-detalles-usuario';
+        let mEl = document.getElementById(modalId);
+        if (!mEl) {
+            mEl = document.createElement('div');
+            mEl.id = modalId;
+            mEl.className = 'modal fade';
+            document.body.appendChild(mEl);
+        }
+
+        const itemsHTML = isCondonado ? user.condonaciones.map(loan => {
+            return `
+                <div class="list-group-item bg-white border-0 shadow-sm mb-2 rounded-3 p-3">
+                    <div class="fw-bold text-dark mb-1"><i class="bi bi-book me-2 text-secondary"></i>${escapeHtml(loan.tituloLibro || 'Libro')}</div>
+                    <div class="small text-muted mb-1"><i class="bi bi-calendar-check me-2"></i><strong>Vencía:</strong> ${formatD(loan.fechaVencimiento)}</div>
+                    <div class="small text-muted mb-1"><i class="bi bi-calendar-event me-2"></i><strong>Condonado:</strong> ${formatD(loan.fechaDevolucionReal || loan.fechaPago || loan.fechaSolicitud)}</div>
+                    <div class="small text-info mt-2 fst-italic"><i class="bi bi-info-circle me-1"></i>"${escapeHtml(loan.motivoPerdon || 'Perdón general')}"</div>
+                </div>
+            `;
+        }).join('') : user.deudas.map(loan => {
+            return `
+                <div class="list-group-item bg-white border-0 shadow-sm mb-2 rounded-3 p-3">
+                    <div class="fw-bold text-dark mb-1"><i class="bi bi-book me-2 text-secondary"></i>${escapeHtml(loan.tituloLibro || 'Libro')}</div>
+                    <div class="small text-muted mb-1"><i class="bi bi-calendar-plus me-2"></i><strong>Préstamo:</strong> ${formatD(loan.fechaEntrega || loan.fechaSolicitud)}</div>
+                    <div class="small text-muted mb-1"><i class="bi bi-calendar-x me-2"></i><strong>Vencía:</strong> ${formatD(loan.fechaVencimiento)}</div>
+                    <div class="small text-danger fw-bold mt-2"><i class="bi bi-exclamation-triangle me-1"></i>Retraso: ${Number(loan.diasRetraso) || 0} día(s) ($${(Number(loan.montoDeuda)||0).toFixed(2)})</div>
+                </div>
+            `;
+        }).join('');
+
+        mEl.innerHTML = `
+            <div class="modal-dialog modal-dialog-centered" style="z-index: 1060;">
+                <div class="modal-content rounded-4 border-0 shadow">
+                    <div class="modal-header border-0 ${isCondonado ? 'bg-success' : 'bg-danger'} text-white">
+                        <h5 class="fw-bold mb-0"><i class="bi bi-person-vcard me-2"></i>Detalles del Usuario</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body bg-light">
+                        <div class="text-center mb-4">
+                            <h5 class="fw-bold text-dark mb-1">${escapeHtml(user.studentName)}</h5>
+                            <div class="text-muted font-monospace">${escapeHtml(user.studentMatricula)}</div>
+                            <span class="badge ${isCondonado ? 'bg-success' : 'bg-danger'} mt-2">${isCondonado ? 'Condonado' : 'Adeudo Activo'}</span>
+                        </div>
+                        <h6 class="fw-bold text-secondary mb-3">${isCondonado ? 'Historial de Condonaciones' : 'Préstamos Vencidos'}</h6>
+                        <div class="list-group" style="max-height: 50vh; overflow-y: auto;">
+                            ${itemsHTML}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        new bootstrap.Modal(mEl).show();
+    }
+
     function cambiarPaginaDeudores(dir) {
         _debtorsPage += dir;
         renderDebtorsTable();
@@ -331,6 +501,22 @@ window.AdminBiblio.Devoluciones = (function () {
         clearLiveAssetStreams();
         _isShowingCondonados = false;
         _debtorsPage = 0;
+        
+        const now = new Date();
+        const m = now.getMonth();
+        const q = Math.floor(m / 3);
+        const s = Math.floor(m / 6);
+        const meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+        
+        let monthOpts = '<option value="">Por Mes</option>';
+        for(let i = m; i >= 0; i--) monthOpts += `<option value="m_${i}">${meses[i]}</option>`;
+        
+        let quarterOpts = '<option value="">Por Trimestre</option>';
+        for(let i = q; i >= 0; i--) quarterOpts += `<option value="q_${i}">Trimestre ${i+1}</option>`;
+        
+        let semOpts = '<option value="">Por Semestre</option>';
+        for(let i = s; i >= 0; i--) semOpts += `<option value="s_${i}">Semestre ${i+1}</option>`;
+
         const body = document.getElementById('modal-admin-body');
         body.innerHTML = `
             <div class="modal-header border-0 bg-secondary text-white p-4">
@@ -338,8 +524,20 @@ window.AdminBiblio.Devoluciones = (function () {
                 <button class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body p-4 bg-light">
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h5 class="fw-bold text-dark mb-0" id="condon-table-title">Usuarios con Deuda Pendiente</h5>
+                <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                        <h5 class="fw-bold text-dark mb-0 me-2" id="condon-table-title">Usuarios con Deuda Pendiente</h5>
+                        <select class="form-select form-select-sm w-auto rounded-pill fw-bold text-secondary shadow-sm" id="filter-month" onchange="AdminBiblio.onFilterChange('month')">
+                            ${monthOpts}
+                        </select>
+                        <select class="form-select form-select-sm w-auto rounded-pill fw-bold text-secondary shadow-sm" id="filter-quarter" onchange="AdminBiblio.onFilterChange('quarter')">
+                            ${quarterOpts}
+                        </select>
+                        <select class="form-select form-select-sm w-auto rounded-pill fw-bold text-secondary shadow-sm" id="filter-semester" onchange="AdminBiblio.onFilterChange('semester')">
+                            ${semOpts}
+                        </select>
+                        <button class="btn btn-sm btn-dark rounded-pill fw-bold shadow-sm" id="btn-filter-all" onclick="AdminBiblio.onFilterChange('all')">Todos</button>
+                    </div>
                     <button class="btn btn-outline-secondary rounded-pill fw-bold btn-sm bg-white shadow-sm" id="btn-toggle-condonados" onclick="AdminBiblio.toggleCondonadosView()">
                         <i class="bi bi-arrow-left-right me-1"></i>Ver Solo Condonaciones
                     </button>
@@ -366,16 +564,6 @@ window.AdminBiblio.Devoluciones = (function () {
                 <div id="condon-pagination" class="d-flex justify-content-between align-items-center mb-4 d-none"></div>
 
                 <div class="mt-4 border-top pt-3 d-flex flex-wrap justify-content-end align-items-center gap-3">
-                    <select class="form-select w-auto rounded-pill fw-bold text-secondary shadow-sm" id="export-period-select">
-                        <option value="este_mes">Este mes</option>
-                        <option value="trimestre_1">Trimestre 1</option>
-                        <option value="trimestre_2">Trimestre 2</option>
-                        <option value="trimestre_3">Trimestre 3</option>
-                        <option value="trimestre_4">Trimestre 4</option>
-                        <option value="semestre_1">Semestre 1 (de 2)</option>
-                        <option value="semestre_2">Semestre 2 (de 2)</option>
-                        <option value="ano_completo">Todo el año</option>
-                    </select>
                     <button class="btn btn-primary rounded-pill fw-bold shadow-sm px-4" onclick="AdminBiblio.exportarDeudores()">
                         <i class="bi bi-file-earmark-pdf me-2"></i>Exportar lista
                     </button>
@@ -475,64 +663,7 @@ window.AdminBiblio.Devoluciones = (function () {
             return showToast("ExportUtils no está cargado.", "warning");
         }
         
-        const select = document.getElementById('export-period-select');
-        const period = select ? select.value : 'este_mes';
-        
-        const now = new Date();
-        const currentYear = now.getFullYear();
-        let startDate, endDate;
-        
-        if (period === 'este_mes') {
-            startDate = new Date(currentYear, now.getMonth(), 1);
-            endDate = new Date(currentYear, now.getMonth() + 1, 0, 23, 59, 59);
-        } else if (period === 'trimestre_1') {
-            startDate = new Date(currentYear, 0, 1);
-            endDate = new Date(currentYear, 2, 31, 23, 59, 59);
-        } else if (period === 'trimestre_2') {
-            startDate = new Date(currentYear, 3, 1);
-            endDate = new Date(currentYear, 5, 30, 23, 59, 59);
-        } else if (period === 'trimestre_3') {
-            startDate = new Date(currentYear, 6, 1);
-            endDate = new Date(currentYear, 8, 30, 23, 59, 59);
-        } else if (period === 'trimestre_4') {
-            startDate = new Date(currentYear, 9, 1);
-            endDate = new Date(currentYear, 11, 31, 23, 59, 59);
-        } else if (period === 'semestre_1') {
-            startDate = new Date(currentYear, 0, 1);
-            endDate = new Date(currentYear, 5, 30, 23, 59, 59);
-        } else if (period === 'semestre_2') {
-            startDate = new Date(currentYear, 6, 1);
-            endDate = new Date(currentYear, 11, 31, 23, 59, 59);
-        } else {
-            startDate = new Date(currentYear, 0, 1);
-            endDate = new Date(currentYear, 11, 31, 23, 59, 59);
-        }
-
-        const getMs = (dateVal) => {
-            if (!dateVal) return 0;
-            if (dateVal.toMillis) return dateVal.toMillis();
-            if (dateVal.seconds) return dateVal.seconds * 1000;
-            return new Date(dateVal).getTime() || 0;
-        };
-
-        const startMs = startDate.getTime();
-        const endMs = endDate.getTime();
-
-        const filteredDebtors = _debtorsList.map(u => {
-            const validDeudas = u.deudas.filter(d => {
-                const ms = getMs(d.fechaVencimiento);
-                return ms >= startMs && ms <= endMs;
-            });
-            return validDeudas.length > 0 ? { ...u, deudas: validDeudas, deudaTotal: validDeudas.reduce((acc, d) => acc + (Number(d.montoDeuda)||0), 0) } : null;
-        }).filter(Boolean);
-
-        const filteredCondonados = _condonadosList.map(u => {
-            const validCondon = u.condonaciones.filter(c => {
-                const ms = getMs(c.fechaVencimiento);
-                return ms >= startMs && ms <= endMs;
-            });
-            return validCondon.length > 0 ? { ...u, condonaciones: validCondon, totalCondonado: validCondon.reduce((acc, c) => acc + (Number(c.multaOriginal) || Number(c.multaReferencia) || 0), 0) } : null;
-        }).filter(Boolean);
+        const { filteredDebtors, filteredCondonados, period, startDate, endDate, currentYear } = getFilteredLists();
 
         const totalDeudaPeriodo = filteredDebtors.reduce((acc, u) => acc + u.deudaTotal, 0);
         const totalCondonadoPeriodo = filteredCondonados.reduce((acc, u) => acc + u.totalCondonado, 0);
@@ -542,13 +673,24 @@ window.AdminBiblio.Devoluciones = (function () {
         if (filteredDebtors.length > 0) {
             sections.push({
                 title: 'Usuarios con Adeudos Activos',
-                headers: ['Matrícula', 'Nombre', 'Vocación', 'Monto'],
-                rows: filteredDebtors.map(u => [
-                    u.studentMatricula || 'S/N',
-                    u.studentName,
-                    u.tipoUsuario,
-                    `$${u.deudaTotal.toFixed(2)}`
-                ]),
+                headers: ['Matrícula', 'Nombre', 'Vocación', 'Libro(s)', 'Estado', 'Monto'],
+                rows: filteredDebtors.map(u => {
+                    const hasUnreturned = u.deudas.some(d => {
+                        const status = String(d.status).toLowerCase();
+                        return !d.fechaDevolucionReal && !status.includes('devuelto') && status !== 'entregado' && status !== 'completado';
+                    });
+                    const statusText = hasUnreturned ? 'Deuda Sumando' : 'Devuelto (Solo Multa)';
+                    const books = u.deudas.map(d => d.tituloLibro || 'Libro sin título').join('\n');
+                    
+                    return [
+                        u.studentMatricula || 'S/N',
+                        u.studentName,
+                        u.tipoUsuario,
+                        books,
+                        statusText,
+                        `$${u.deudaTotal.toFixed(2)}`
+                    ];
+                }),
                 tone: 'danger'
             });
         }
@@ -556,13 +698,20 @@ window.AdminBiblio.Devoluciones = (function () {
         if (filteredCondonados.length > 0) {
             sections.push({
                 title: 'Usuarios Condonados',
-                headers: ['Matrícula', 'Nombre', 'Vocación', 'Monto'],
-                rows: filteredCondonados.map(u => [
-                    u.studentMatricula || 'S/N',
-                    u.studentName,
-                    u.tipoUsuario,
-                    `$${u.totalCondonado.toFixed(2)} (Condonado)`
-                ]),
+                headers: ['Matrícula', 'Nombre', 'Vocación', 'Libro(s)', 'Motivo', 'Monto'],
+                rows: filteredCondonados.map(u => {
+                    const books = u.condonaciones.map(d => d.tituloLibro || 'Libro sin título').join('\n');
+                    const reasons = u.condonaciones.map(d => d.motivoPerdon || 'Perdón general').join('\n');
+                    
+                    return [
+                        u.studentMatricula || 'S/N',
+                        u.studentName,
+                        u.tipoUsuario,
+                        books,
+                        reasons,
+                        `$${u.totalCondonado.toFixed(2)} (Condonado)`
+                    ];
+                }),
                 tone: 'success'
             });
         }
@@ -578,6 +727,7 @@ window.AdminBiblio.Devoluciones = (function () {
             filenameBase: `Deudores_${period}_${currentYear}`,
             title: 'Reporte de Deudores y Condonaciones',
             subtitle: `Periodo: ${startDate.toLocaleDateString('es-MX')} al ${endDate.toLocaleDateString('es-MX')}`,
+            recordCount: filteredDebtors.length + filteredCondonados.length,
             summary: [
                 ['Total Adeudos Pendientes', `$${totalDeudaPeriodo.toFixed(2)}`],
                 ['Total Condonado', `$${totalCondonadoPeriodo.toFixed(2)}`],
@@ -803,9 +953,11 @@ window.AdminBiblio.Devoluciones = (function () {
         cambiarPaginaDeudores: withState(cambiarPaginaDeudores),
         iniciarCondonacionUsuario: withState(iniciarCondonacionUsuario),
         condonarRegistroIndividual: withState(condonarRegistroIndividual),
+        mostrarDetallesUsuario: withState(mostrarDetallesUsuario),
         exportarDeudores: withState(exportarDeudores),
         consultarDevolucion: withState(consultarDevolucion),
         perdonarRetrasoModal: withState(perdonarRetrasoModal),
-        confirmarDevolucion: withState(confirmarDevolucion)
+        confirmarDevolucion: withState(confirmarDevolucion),
+        onFilterChange: withState(onFilterChange)
     };
 })();
