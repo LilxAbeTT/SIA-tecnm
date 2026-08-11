@@ -591,81 +591,94 @@ window.AdminBiblio.Reportes = (function () {
                 </div>
 
                 <!-- ACTIONS ROW -->
-                <div class="row g-4 mb-4 row-cols-1 row-cols-md-6 justify-content-center">
+                <div class="row g-2 mb-4 justify-content-center">
                     <!-- 1. REGISTRAR VISITA -->
-                    <div class="col">
+                    <div class="col-6 col-md">
                         <div class="card border-0 shadow-lg h-100 hover-scale cursor-pointer bg-white" onclick="AdminBiblio.abrirModalVisita()">
-                            <div class="card-body p-4 text-center d-flex flex-column align-items-center justify-content-center">
-                                <div class="bg-primary-subtle p-4 rounded-circle mb-4 text-primary">
-                                    <i class="bi bi-person-check-fill display-4"></i>
+                            <div class="card-body p-3 text-center d-flex flex-column align-items-center justify-content-center">
+                                <div class="bg-primary-subtle p-3 rounded-circle mb-3 text-primary">
+                                    <i class="bi bi-person-check-fill display-6"></i>
                                 </div>
-                                <h4 class="fw-bold text-dark">Registrar Visita</h4>
-                                <p class="text-muted small mb-0">Consulta, Individual o Equipo</p>
+                                <h6 class="fw-bold text-dark mb-1">Registrar Visita</h6>
+                                <p class="text-muted mb-0" style="font-size: 0.75rem;">Consulta, Individual o Equipo</p>
                             </div>
                         </div>
                     </div>
 
                     <!-- 2. PRESTAR LIBRO -->
-                    <div class="col">
+                    <div class="col-6 col-md">
                         <div class="card border-0 shadow-lg h-100 hover-scale cursor-pointer bg-white" onclick="AdminBiblio.abrirModalPrestamo()">
-                            <div class="card-body p-4 text-center d-flex flex-column align-items-center justify-content-center">
-                                <div class="bg-warning-subtle p-4 rounded-circle mb-4 text-warning">
-                                    <i class="bi bi-book-half display-4"></i>
+                            <div class="card-body p-3 text-center d-flex flex-column align-items-center justify-content-center">
+                                <div class="bg-warning-subtle p-3 rounded-circle mb-3 text-warning">
+                                    <i class="bi bi-book-half display-6"></i>
                                 </div>
-                                <h4 class="fw-bold text-dark">Prestar Libro</h4>
-                                <p class="text-muted small mb-0">Salida de material</p>
+                                <h6 class="fw-bold text-dark mb-1">Prestar Libro</h6>
+                                <p class="text-muted mb-0" style="font-size: 0.75rem;">Salida de material</p>
                             </div>
                         </div>
                     </div>
 
                     <!-- 3. DEVOLVER LIBRO -->
-                    <div class="col">
+                    <div class="col-6 col-md">
                         <div class="card border-0 shadow-lg h-100 hover-scale cursor-pointer bg-white" onclick="AdminBiblio.abrirModalDevolucion()">
-                            <div class="card-body p-4 text-center d-flex flex-column align-items-center justify-content-center">
-                                <div class="bg-success-subtle p-4 rounded-circle mb-4 text-success">
-                                    <i class="bi bi-box-arrow-in-down display-4"></i>
+                            <div class="card-body p-3 text-center d-flex flex-column align-items-center justify-content-center">
+                                <div class="bg-success-subtle p-3 rounded-circle mb-3 text-success">
+                                    <i class="bi bi-box-arrow-in-down display-6"></i>
                                 </div>
-                                <h4 class="fw-bold text-dark">Devolver Libro</h4>
-                                <p class="text-muted small mb-0">Reingreso y cobros</p>
+                                <h6 class="fw-bold text-dark mb-1">Devolver Libro</h6>
+                                <p class="text-muted mb-0" style="font-size: 0.75rem;">Reingreso y cobros</p>
                             </div>
                         </div>
                     </div>
 
                     <!-- 4. COMPUTADORAS -->
-                    <div class="col">
+                    <div class="col-6 col-md">
                         <div class="card border-0 shadow-lg h-100 hover-scale cursor-pointer bg-white" onclick="AdminBiblio.abrirModalComputadoras()">
-                            <div class="card-body p-4 text-center d-flex flex-column align-items-center justify-content-center">
-                                <div class="bg-info-subtle p-4 rounded-circle mb-4 text-info">
-                                    <i class="bi bi-pc-display display-4"></i>
+                            <div class="card-body p-3 text-center d-flex flex-column align-items-center justify-content-center">
+                                <div class="bg-info-subtle p-3 rounded-circle mb-3 text-info">
+                                    <i class="bi bi-pc-display display-6"></i>
                                 </div>
-                                <h4 class="fw-bold text-dark">Computadoras</h4>
-                                <p class="text-muted small mb-0">PC y sala de lectura</p>
+                                <h6 class="fw-bold text-dark mb-1">Computadoras</h6>
+                                <p class="text-muted mb-0" style="font-size: 0.75rem;">PC y sala de lectura</p>
                             </div>
                         </div>
                     </div>
                     
                     <!-- 5. CONDONACION -->
-                    <div class="col">
+                    <div class="col-6 col-md">
                         <div class="card border-0 shadow-lg h-100 hover-scale cursor-pointer bg-white" onclick="AdminBiblio.abrirModalCondonacion()">
-                            <div class="card-body p-4 text-center d-flex flex-column align-items-center justify-content-center">
-                                <div class="bg-secondary-subtle p-4 rounded-circle mb-4 text-secondary">
-                                    <i class="bi bi-shield-check display-4"></i>
+                            <div class="card-body p-3 text-center d-flex flex-column align-items-center justify-content-center">
+                                <div class="bg-secondary-subtle p-3 rounded-circle mb-3 text-secondary">
+                                    <i class="bi bi-shield-check display-6"></i>
                                 </div>
-                                <h4 class="fw-bold text-dark">Retrasos y Condonaciones</h4>
-                                <p class="text-muted small mb-0">Activos y por usuario</p>
+                                <h6 class="fw-bold text-dark mb-1">Retrasos y Condonaciones</h6>
+                                <p class="text-muted mb-0" style="font-size: 0.75rem;">Activos y por usuario</p>
                             </div>
                         </div>
                     </div>
 
                     <!-- 6. GESTION LIBROS -->
-                    <div class="col">
+                    <div class="col-6 col-md">
                         <div class="card border-0 shadow-lg h-100 hover-scale cursor-pointer bg-white" onclick="AdminBiblio.abrirModalGestionLibros()">
-                            <div class="card-body p-4 text-center d-flex flex-column align-items-center justify-content-center">
-                                <div class="bg-dark-subtle p-4 rounded-circle mb-4 text-dark">
-                                    <i class="bi bi-journal-album display-4"></i>
+                            <div class="card-body p-3 text-center d-flex flex-column align-items-center justify-content-center">
+                                <div class="bg-dark-subtle p-3 rounded-circle mb-3 text-dark">
+                                    <i class="bi bi-journal-album display-6"></i>
                                 </div>
-                                <h4 class="fw-bold text-dark">Gestión Libros</h4>
-                                <p class="text-muted small mb-0">Registro y actualizacion</p>
+                                <h6 class="fw-bold text-dark mb-1">Gestión Libros</h6>
+                                <p class="text-muted mb-0" style="font-size: 0.75rem;">Registro y actualizacion</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 7. INVENTARIO -->
+                    <div class="col-6 col-md">
+                        <div class="card border-0 shadow-lg h-100 hover-scale cursor-pointer bg-white" onclick="AdminBiblio.abrirModalMenuInventario()">
+                            <div class="card-body p-3 text-center d-flex flex-column align-items-center justify-content-center">
+                                <div class="bg-danger-subtle p-3 rounded-circle mb-3 text-danger">
+                                    <i class="bi bi-clipboard2-data display-6"></i>
+                                </div>
+                                <h6 class="fw-bold text-dark mb-1">Inventario</h6>
+                                <p class="text-muted mb-0" style="font-size: 0.75rem;">Auditoria y fisicos</p>
                             </div>
                         </div>
                     </div>
@@ -781,9 +794,9 @@ window.AdminBiblio.Reportes = (function () {
                     </div>
                 </div>
 
-                <!-- Stats Resumen -->
-                <div class="col">
-                    <div class="card border-0 shadow-sm rounded-4 h-100" style="background: linear-gradient(135deg, #f3f0ff 0%, #faf8ff 100%);">
+                <!-- Stats Resumen & Reportes -->
+                <div class="col d-flex flex-column gap-3">
+                    <div class="card border-0 shadow-sm rounded-4" style="background: linear-gradient(135deg, #f3f0ff 0%, #faf8ff 100%);">
                         <div class="card-body p-3">
                             <div class="d-flex align-items-center gap-2 mb-3">
                                 <div class="bg-secondary bg-opacity-10 rounded-circle p-2 d-flex align-items-center justify-content-center" style="width:36px;height:36px;">
@@ -794,11 +807,16 @@ window.AdminBiblio.Reportes = (function () {
                             <div id="stat-summary-list" class="d-flex flex-column gap-2">
                                 <div class="text-center text-muted small py-2"><span class="spinner-border spinner-border-sm"></span></div>
                             </div>
-                            <div class="mt-auto pt-2 border-top border-secondary border-opacity-25 text-center">
-                                <button class="btn btn-sm btn-secondary w-100 rounded-pill shadow-sm" onclick="AdminBiblio.abrirModalReportesTrimestrales()">
-                                    <i class="bi bi-file-earmark-pdf-fill me-1"></i> Ver reportes
-                                </button>
+                        </div>
+                    </div>
+
+                    <div class="card border-0 shadow-sm rounded-4 hover-scale cursor-pointer flex-grow-1" style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);" onclick="AdminBiblio.abrirModalReportesTrimestrales()">
+                        <div class="card-body p-3 d-flex flex-column align-items-center justify-content-center text-center">
+                            <div class="bg-secondary bg-opacity-10 rounded-circle p-2 mb-2 d-flex align-items-center justify-content-center">
+                                <i class="bi bi-file-earmark-pdf-fill fs-3 text-secondary"></i>
                             </div>
+                            <h6 class="fw-bold text-dark mb-1">Ver Reportes</h6>
+                            <p class="text-muted small mb-0" style="font-size: 0.75rem;">Exportación de datos</p>
                         </div>
                     </div>
                 </div>
@@ -897,6 +915,19 @@ window.AdminBiblio.Reportes = (function () {
                                     </div>
                                     <i class="bi bi-download text-muted"></i>
                                 </button>
+
+                                <button class="btn btn-white text-start p-3 border-0 shadow-sm rounded-4 hover-scale d-flex align-items-center justify-content-between" onclick="AdminBiblio.prepararReporteTrimestral('inventario_fisico')">
+                                    <div class="d-flex align-items-center gap-3">
+                                        <div class="bg-success bg-opacity-10 text-success p-2 rounded-circle">
+                                            <i class="bi bi-box-seam fs-5"></i>
+                                        </div>
+                                        <div>
+                                            <div class="fw-bold text-dark">Inventario Físico</div>
+                                            <div class="small text-muted">Listado de activos fijos registrados</div>
+                                        </div>
+                                    </div>
+                                    <i class="bi bi-download text-muted"></i>
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -912,11 +943,19 @@ window.AdminBiblio.Reportes = (function () {
                                 <i class="bi bi-info-circle text-primary display-4"></i>
                             </div>
                             <h5 class="fw-bold mb-3">Opciones de Exportación</h5>
-                            <p class="text-muted small mb-4">¿Deseas incluir la lista completa de registros en el apartado de detalles? Esto puede generar un documento muy extenso.</p>
+                            <p class="text-muted small mb-3">¿Deseas incluir la lista completa de registros en el apartado de detalles?</p>
                             
-                            <div class="form-check form-switch d-flex justify-content-center mb-4 pb-2">
-                                <input class="form-check-input me-2" type="checkbox" role="switch" id="switch-incluir-detalles">
-                                <label class="form-check-label text-dark fw-medium" for="switch-incluir-detalles">Incluir Detalles</label>
+                            <div class="d-flex justify-content-center mb-2">
+                                <div class="btn-group w-75" role="group">
+                                    <input type="radio" class="btn-check" name="btn-incluir-detalles" id="switch-incluir-detalles" checked>
+                                    <label class="btn btn-outline-primary fw-bold" for="switch-incluir-detalles">Sí</label>
+                                    
+                                    <input type="radio" class="btn-check" name="btn-incluir-detalles" id="switch-no-incluir-detalles">
+                                    <label class="btn btn-outline-secondary fw-bold" for="switch-no-incluir-detalles">No</label>
+                                </div>
+                            </div>
+                            <div class="small text-danger mb-4 px-3" style="font-size: 0.8em;">
+                                <i class="bi bi-exclamation-triangle-fill me-1"></i> Seleccionar "Sí" hará mucho más extenso el reporte.
                             </div>
 
                             <div class="d-flex gap-2">
@@ -1609,6 +1648,40 @@ window.AdminBiblio.Reportes = (function () {
             }
 
             document.getElementById('visit-options-container').classList.remove('d-none');
+
+            // [NEW] Verificar género antes de que puedan seleccionar una acción
+            const currentGender = (_visitUser.genero || _visitUser.gender || _visitUser.sexo || _visitUser.personalData?.genero || '').trim();
+            if (!currentGender) {
+                setVisitActionButtonsDisabled(true); // Bloquear botones de abajo
+                const selectedGender = await AdminBiblio.Shared.showGenderPromptModal(_visitUser.nombre || _visitUser.matricula);
+                if (!selectedGender) {
+                    // Si lo cierran sin elegir, escondemos las opciones y cancelamos
+                    document.getElementById('visit-options-container').classList.add('d-none');
+                    document.getElementById('visita-input-matricula').disabled = false;
+                    document.getElementById('visita-input-matricula').focus();
+                    _visitUser = null;
+                    syncToState();
+                    return;
+                }
+                try {
+                    await _ctx.db.collection('usuarios').doc(_visitUser.uid).update({
+                        genero: selectedGender,
+                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    _visitUser.genero = selectedGender;
+                    showToast("Género de usuario guardado en su perfil.", "success");
+                } catch (err) {
+                    console.error("Error al actualizar género:", err);
+                    showToast("Error al guardar género: " + err.message, "danger");
+                    document.getElementById('visit-options-container').classList.add('d-none');
+                    document.getElementById('visita-input-matricula').disabled = false;
+                    _visitUser = null;
+                    syncToState();
+                    return;
+                }
+                setVisitActionButtonsDisabled(false); // Desbloquear ahora que ya eligió
+            }
+
         } catch (e) {
             // No se encontro usuario
             _visitUser = null;
@@ -2476,6 +2549,8 @@ window.AdminBiblio.Reportes = (function () {
                 await generarReporteAdeudosTrimestral(startDate, endDate, periodLabel, incluirDetalles);
             } else if (tipo === 'catalogo') {
                 await generarReporteCatalogo(periodLabel, incluirDetalles);
+            } else if (tipo === 'inventario_fisico') {
+                await generarReporteInventarioFisico(periodLabel, incluirDetalles);
             }
         } catch (error) {
             console.error(error);
@@ -2484,19 +2559,36 @@ window.AdminBiblio.Reportes = (function () {
     }
 
     async function generarReporteVisitasTrimestral(startDate, endDate, periodLabel, incluirDetalles) {
-        const snap = await _ctx.db.collection('biblio-visitas')
+        const query = _ctx.db.collection('biblio-visitas')
             .where('createdAtMs', '>=', startDate.getTime())
             .where('createdAtMs', '<=', endDate.getTime())
-            .orderBy('createdAtMs', 'desc')
-            .get();
+            .orderBy('createdAtMs', 'desc');
+
+        let snap;
+        try {
+            snap = await query.get({ source: 'cache' });
+            if (snap.empty) throw new Error("Cache");
+        } catch(e) {
+            snap = await query.get();
+        }
 
         const uniqueUids = [...new Set(snap.docs.map(doc => doc.data().studentId).filter(Boolean))];
         const usersMap = {};
         
+        let allCachedUsers = [];
+        if (window.BiblioService && window.BiblioService.loadUsuariosCache) {
+            allCachedUsers = await window.BiblioService.loadUsuariosCache(_ctx);
+            allCachedUsers.forEach(u => { usersMap[u.id] = u; });
+        }
+        
+        const missingUids = uniqueUids.filter(uid => !usersMap[uid]);
         const chunkedPromises = [];
-        for (let i = 0; i < uniqueUids.length; i += 30) {
-            const chunk = uniqueUids.slice(i, i + 30);
-            chunkedPromises.push(_ctx.db.collection('usuarios').where(firebase.firestore.FieldPath.documentId(), 'in', chunk).get());
+        for (let i = 0; i < missingUids.length; i += 30) {
+            const chunk = missingUids.slice(i, i + 30);
+            const q = _ctx.db.collection('usuarios').where(firebase.firestore.FieldPath.documentId(), 'in', chunk);
+            chunkedPromises.push(
+                q.get({ source: 'cache' }).then(s => s.empty ? Promise.reject() : s).catch(() => q.get())
+            );
         }
         
         if (chunkedPromises.length > 0) {
@@ -2510,7 +2602,7 @@ window.AdminBiblio.Reportes = (function () {
 
         const data = [];
         let totalConsultas = 0, totalIndividual = 0, totalEquipo = 0, totalPc = 0;
-        let totalHombres = 0, totalMujeres = 0, totalOtros = 0;
+        let totalHombres = 0, totalMujeres = 0, totalOtros = 0, totalNoEspecificado = 0;
         let totalEstudiantes = 0, totalPersonal = 0;
         let totalMatutino = 0, totalVespertino = 0;
         let conMatricula = 0, sinMatricula = 0;
@@ -2540,23 +2632,30 @@ window.AdminBiblio.Reportes = (function () {
             if (!mat || mat === 'N/A' || isUnreg) sinMatricula++;
             else conMatricula++;
 
-            let gender = 'otros';
+            let gender = 'no_especificado';
             if (isUnreg) {
-                const g = (v.gender || '').toLowerCase();
-                if (g.includes('hombre') || g.includes('masculino')) gender = 'hombres';
-                else if (g.includes('mujer') || g.includes('femenino')) gender = 'mujeres';
+                const g = (v.gender || '').trim().toLowerCase();
+                if (g && !g.includes('no especificado')) {
+                    if (g.includes('hombre') || g.includes('masculino')) gender = 'hombres';
+                    else if (g.includes('mujer') || g.includes('femenino')) gender = 'mujeres';
+                    else gender = 'otros';
+                }
             } else {
                 const uData = usersMap[v.studentId];
                 if (uData) {
-                    const g = (uData.gender || uData.genero || uData.sexo || '').toLowerCase();
-                    if (g.includes('hombre') || g.includes('masculino')) gender = 'hombres';
-                    else if (g.includes('mujer') || g.includes('femenino')) gender = 'mujeres';
+                    const g = (uData.gender || uData.genero || uData.sexo || (uData.personalData && uData.personalData.genero) || '').trim().toLowerCase();
+                    if (g && !g.includes('no especificado') && g !== 'n/a' && g !== 'sn') {
+                        if (g.includes('hombre') || g.includes('masculino')) gender = 'hombres';
+                        else if (g.includes('mujer') || g.includes('femenino')) gender = 'mujeres';
+                        else gender = 'otros';
+                    }
                 }
             }
 
             if (gender === 'hombres') totalHombres++;
             else if (gender === 'mujeres') totalMujeres++;
-            else totalOtros++;
+            else if (gender === 'otros') totalOtros++;
+            else totalNoEspecificado++;
 
             data.push([
                 dateStr,
@@ -2566,6 +2665,27 @@ window.AdminBiblio.Reportes = (function () {
                 v.duracionMinutos ? `${v.duracionMinutos} min` : 'N/A'
             ]);
         });
+
+        // [NUEVO] Prorrateo de "No especificado" proporcionalmente entre Hombres y Mujeres
+        if (totalNoEspecificado > 0) {
+            const totalConGenero = totalHombres + totalMujeres;
+            if (totalConGenero > 0) {
+                const proporcionHombres = totalHombres / totalConGenero;
+                
+                const extraHombres = Math.round(totalNoEspecificado * proporcionHombres);
+                const extraMujeres = totalNoEspecificado - extraHombres;
+                
+                totalHombres += extraHombres;
+                totalMujeres += extraMujeres;
+                totalNoEspecificado = 0;
+            } else {
+                // Caso extremo: si absolutamente todos son "No especificado", los dividimos 50/50
+                const mitad = Math.floor(totalNoEspecificado / 2);
+                totalHombres += mitad;
+                totalMujeres += (totalNoEspecificado - mitad);
+                totalNoEspecificado = 0;
+            }
+        }
 
         const payload = {
             kind: 'generic',
@@ -2589,7 +2709,7 @@ window.AdminBiblio.Reportes = (function () {
                         ['Hombres', totalHombres.toString()],
                         ['Mujeres', totalMujeres.toString()],
                         ['Otros', totalOtros.toString()]
-                    ]
+                    ].concat(totalNoEspecificado > 0 ? [['No especificado', totalNoEspecificado.toString()]] : [])
                 },
                 {
                     title: 'Por Vocación',
@@ -2634,11 +2754,18 @@ window.AdminBiblio.Reportes = (function () {
     }
 
     async function generarReportePrestamosTrimestral(startDate, endDate, periodLabel, incluirDetalles) {
-        const snap = await _ctx.db.collection('prestamos-biblio')
+        const query = _ctx.db.collection('prestamos-biblio')
             .where('fechaSolicitud', '>=', startDate)
             .where('fechaSolicitud', '<=', endDate)
-            .orderBy('fechaSolicitud', 'desc')
-            .get();
+            .orderBy('fechaSolicitud', 'desc');
+
+        let snap;
+        try {
+            snap = await query.get({ source: 'cache' });
+            if (snap.empty) throw new Error("Cache");
+        } catch(e) {
+            snap = await query.get();
+        }
 
         const data = [];
         let totalPrestamos = 0;
@@ -2708,11 +2835,18 @@ window.AdminBiblio.Reportes = (function () {
     }
 
     async function generarReporteAdeudosTrimestral(startDate, endDate, periodLabel, incluirDetalles) {
-        const snap = await _ctx.db.collection('prestamos-biblio')
+        const query = _ctx.db.collection('prestamos-biblio')
             .where('fechaSolicitud', '>=', startDate)
             .where('fechaSolicitud', '<=', endDate)
-            .orderBy('fechaSolicitud', 'desc')
-            .get();
+            .orderBy('fechaSolicitud', 'desc');
+
+        let snap;
+        try {
+            snap = await query.get({ source: 'cache' });
+            if (snap.empty) throw new Error("Cache");
+        } catch(e) {
+            snap = await query.get();
+        }
 
         const data = [];
         let totalAdeudosTrimestre = 0;
@@ -2809,10 +2943,11 @@ window.AdminBiblio.Reportes = (function () {
         let totalEjemplares = 0;
         let totalRevistas = 0;
         let ejemplaresRevistas = 0;
+        let details = null;
 
         try {
             // Intentar obtener datos del último inventario cerrado
-            let details = await window.BiblioService.getLatestFinishedInventorySession(_ctx, { includeLists: true });
+            details = await window.BiblioService.getLatestFinishedInventorySession(_ctx, { includeLists: true });
             
             if (details && details.foundEntries && details.foundEntries.length > 0) {
                 const countCopies = (entries = []) => entries.reduce((sum, entry) => sum + (Number(entry?.totalObserved || entry?.cantidad || entry?.lastQuantity || 0) || 0), 0);
@@ -2825,18 +2960,23 @@ window.AdminBiblio.Reportes = (function () {
                 totalRevistas = materialEntries.length;
                 ejemplaresRevistas = countCopies(materialEntries);
             } else {
-                // Fallback: Contar desde el catálogo en vivo (sólo libros)
-                const snap = await _ctx.db.collection('biblio-catalogo').get();
-                snap.forEach(doc => {
-                    const data = doc.data();
-                    const copias = Number(data.copiasSistema || data.copias || 1);
-                    totalLibrosTitulos++;
-                    totalEjemplares += copias;
-                });
+                // Fallback: Contar desde el catálogo local cacheado o count()
+                try {
+                    let summary = { totalTitles: 0, totalCopies: 0 };
+                    if (window.BiblioService && window.BiblioService.getInventoryCatalogSummary) {
+                        summary = await window.BiblioService.getInventoryCatalogSummary(_ctx, { allowFullScan: false });
+                    }
+                    totalLibrosTitulos = summary.totalTitles || 0;
+                    totalEjemplares = summary.totalCopies || totalLibrosTitulos;
+                } catch(err) {
+                    console.error("Error obteniendo conteo de catalogo:", err);
+                }
             }
         } catch(e) {
 
         }
+
+        const totalRegistros = totalLibrosTitulos + totalRevistas + ejemplaresRevistas;
 
         const payload = {
             kind: 'generic',
@@ -2844,33 +2984,157 @@ window.AdminBiblio.Reportes = (function () {
             subtitle: 'Resumen de Inventario y Activos',
             period: periodLabel,
             filenameBase: 'Catalogo_Trimestral',
+            recordCount: totalRegistros,
             summary: [
                 ['Títulos de Libros', totalLibrosTitulos.toString()],
                 ['Total de Ejemplares (Libros)', totalEjemplares.toString()],
-                ['Revistas y Otros Documentos (Títulos)', totalRevistas.toString()],
-                ['Ejemplares (Revistas/Otros)', ejemplaresRevistas.toString()],
-                ['Computadoras (PCs)', totalPc.toString()],
-                ['Mesas/Cubículos', totalMesas.toString()],
-                ['Otros Activos Fijos', otrosActivos.toString()]
+                ['Material Extra', (totalRevistas + ejemplaresRevistas).toString()]
             ],
-            sections: [
-                {
-                    title: 'Nota',
-                    headers: ['Información', 'Detalle'],
-                    rows: [
-                        ['Alcance', 'Este reporte no incluye la lista detallada de libros para ahorrar papel.'],
-                        ['Disponibilidad', 'Todos los activos mostrados corresponden al estado actual.']
-                    ]
-                }
-            ],
+            sections: [],
             columns: [],
             rows: []
         };
 
-        if (!incluirDetalles) {
-            payload.columns = [];
-            payload.rows = [];
+        if (incluirDetalles) {
+            let materialRows = [];
+            if (details && details.foundEntries) {
+                const materialEntries = details.foundEntries.filter(e => e.type === 'material');
+                materialRows = materialEntries.map(e => [
+                    e.title || e.nombre || e.titulo || 'Sin título',
+                    (e.cantidad || e.lastQuantity || e.totalObserved || 1).toString()
+                ]);
+            }
+            if (materialRows.length > 0) {
+                payload.sections.push({
+                    title: 'Material Extra (Revistas, Discos, Otros)',
+                    headers: ['Título / Nombre', 'Cantidad'],
+                    rows: materialRows,
+                    columnStyles: {
+                        0: { cellWidth: 145 },
+                        1: { cellWidth: 40, halign: 'center' }
+                    }
+                });
+            }
+
+            let bookRows = [];
+            let disabledBookRows = [];
+            try {
+                let catalogDocs = [];
+                if (window.BiblioService && window.BiblioService.loadCatalogCache) {
+                    catalogDocs = await window.BiblioService.loadCatalogCache(_ctx);
+                } else {
+                    let catalogSnap;
+                    try {
+                        catalogSnap = await _ctx.db.collection('biblio-catalogo').get({ source: 'cache' });
+                        if (catalogSnap.empty) throw new Error("Cache vacio");
+                    } catch(err) {
+                        catalogSnap = await _ctx.db.collection('biblio-catalogo').get();
+                    }
+                    catalogDocs = catalogSnap.docs.map(d => d.data());
+                }
+
+                catalogDocs.forEach(data => {
+                    const isActive = data.active !== false;
+                    const row = [
+                        data.adquisicion || 'S/N',
+                        data.titulo || data.nombre || 'Sin título',
+                        data.categoria || '--',
+                        data.clasificacion || '--',
+                        isActive ? 'Activo' : 'Baja'
+                    ];
+
+                    if (!isActive) {
+                        disabledBookRows.push(row);
+                    }
+                    bookRows.push(row);
+                });
+            } catch(e) {
+                console.error("Error al obtener catálogo:", e);
+            }
+
+            if (disabledBookRows.length > 0) {
+                payload.sections.push({
+                    title: 'Libros Deshabilitados (Bajas)',
+                    headers: ['Adquisición', 'Nombre / Título', 'Categoría', 'Clasificación', 'Estado'],
+                    rows: disabledBookRows,
+                    columnStyles: {
+                        0: { cellWidth: 18 },
+                        1: { cellWidth: 102 },
+                        2: { cellWidth: 30 },
+                        3: { cellWidth: 22 },
+                        4: { cellWidth: 13 }
+                    }
+                });
+            }
+
+            payload.columns = ['Adq.', 'Nombre / Título', 'Categoría', 'Clasificación', 'Estado'];
+            payload.rows = bookRows;
+            payload.dataTitle = 'Catálogo Completo de Libros';
+            payload.columnStyles = {
+                0: { cellWidth: 18 }, // Adquisición
+                1: { cellWidth: 102 }, // Nombre
+                2: { cellWidth: 30 }, // Categoría
+                3: { cellWidth: 22 }, // Clasificación
+                4: { cellWidth: 13 }  // Estado
+            };
+        } else {
+            payload.sections.push({
+                title: 'Nota',
+                headers: ['Información', 'Detalle'],
+                rows: [
+                    ['Alcance', 'Este reporte no incluye la lista detallada de libros para ahorrar papel.'],
+                    ['Disponibilidad', 'Todos los activos mostrados corresponden al estado actual.']
+                ]
+            });
         }
+
+        if (window.ExportUtils && window.ExportUtils.generatePDF) {
+            await window.ExportUtils.generatePDF({ period: periodLabel }, payload, 'BIBLIO');
+            showToast("Reporte generado exitosamente", "success");
+        } else {
+            throw new Error("Módulo ExportUtils no disponible");
+        }
+    }
+
+    async function generarReporteInventarioFisico(periodLabel, incluirDetalles) {
+        let activos = [];
+        try {
+            activos = await window.BiblioService.getResumenInventarioFisico(_ctx, true);
+        } catch (e) {
+            throw new Error("No se pudo cargar el inventario físico: " + e.message);
+        }
+
+        let totalItems = 0;
+        let totalCantidades = 0;
+
+        const tableRows = [];
+
+        activos.forEach(item => {
+            totalItems++;
+            const cant = Number(item.cantidad) || 0;
+            totalCantidades += cant;
+            tableRows.push([
+                item.nombre || 'Sin nombre',
+                cant.toString()
+            ]);
+        });
+
+        const payload = {
+            kind: 'generic',
+            title: 'Reporte de Inventario Físico',
+            subtitle: 'Activos Fijos Registrados en Biblioteca',
+            period: periodLabel,
+            filenameBase: 'Inventario_Fisico',
+            summary: [
+                ['Total de Artículos Únicos', totalItems.toString()],
+                ['Suma Total de Elementos', totalCantidades.toString()]
+            ],
+            sections: [],
+            columns: ['Nombre del Objeto', 'Cantidad Registrada'],
+            rows: tableRows,
+            tableStyles: { fontSize: 10, cellPadding: 3 },
+            tableHeadStyles: { fontSize: 11, cellPadding: 3 }
+        };
 
         if (window.ExportUtils && window.ExportUtils.generatePDF) {
             await window.ExportUtils.generatePDF({ period: periodLabel }, payload, 'BIBLIO');

@@ -399,9 +399,16 @@ window.AdminBiblio.Buscador = (function () {
                 newBookData.updatedAt = firebase.firestore.FieldValue.serverTimestamp();
 
                 try {
-                    // Check si ya existe ese numero de adquisicion en general
-                    const existSnap = await state.ctx.db.collection('biblio-catalogo').where('adquisicion', '==', newAdq).get();
-                    if (!existSnap.empty) {
+                    // Check si ya existe ese numero de adquisicion en el catálogo (usando caché)
+                    let existingBook = null;
+                    if (window.BiblioService && window.BiblioService.getBookByAdquisicion) {
+                        existingBook = await window.BiblioService.getBookByAdquisicion(state.ctx, newAdq);
+                    } else {
+                        const existSnap = await state.ctx.db.collection('biblio-catalogo').where('adquisicion', '==', newAdq).get();
+                        if (!existSnap.empty) existingBook = true;
+                    }
+
+                    if (existingBook) {
                         AdminBiblio.Shared.showToast(`El número de adquisición ${newAdq} ya existe en el sistema.`, "danger");
                         return false; 
                     }

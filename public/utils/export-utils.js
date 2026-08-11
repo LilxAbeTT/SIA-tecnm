@@ -895,7 +895,8 @@ window.ExportUtils = (function () {
                     fontSize: 7.8
                 },
                 bodyStyles: { textColor: [55, 65, 81] },
-                alternateRowStyles: { fillColor: ALT_ROW }
+                alternateRowStyles: { fillColor: ALT_ROW },
+                columnStyles: section.columnStyles || {}
             });
             y = doc.lastAutoTable.finalY + 7;
         });
@@ -911,10 +912,11 @@ window.ExportUtils = (function () {
                 }),
                 margin: { left: M, right: M },
                 theme: 'striped',
-                styles: { fontSize: 6.1, cellPadding: 1.2, overflow: 'linebreak', cellWidth: 'wrap' },
-                headStyles: { fillColor: palette.dark, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 6.8, cellPadding: 1.4 },
+                styles: Object.assign({ fontSize: 6.1, cellPadding: 1.2, overflow: 'linebreak', cellWidth: 'wrap' }, payload.tableStyles || {}),
+                headStyles: Object.assign({ fillColor: palette.dark, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 6.8, cellPadding: 1.4 }, payload.tableHeadStyles || {}),
                 bodyStyles: { textColor: [55, 65, 81] },
                 alternateRowStyles: { fillColor: ALT_ROW },
+                columnStyles: payload.columnStyles || {},
                 didDrawPage: function () {
                     drawHeader();
                 }

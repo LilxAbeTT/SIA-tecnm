@@ -61,6 +61,12 @@ service cloud.firestore {
         && request.resource.data.allowedViews == resource.data.allowedViews
         && request.resource.data.safetyProfile == resource.data.safetyProfile;
     }
+    function isSafeAdminGenderUpdate() {
+      let changed = request.resource.data.diff(resource.data).affectedKeys();
+      // Permite si es un administrador (como biblioteca) y sólo altera campos de género
+      return (isBiblio() || isSuperAdmin()) 
+        && changed.hasOnly(['genero', 'gender', 'updatedAt']);
+    }
     function isPanicStaffResponder() {
       let data = userDoc(request.auth.uid).data;
       let role = data.get('role', '');
@@ -288,7 +294,7 @@ service cloud.firestore {
     match /usuarios/{uid} {
       allow read: if isSignedIn(); // Desarrollo necesita leer nombres para reportes
       allow create: if isOwner(uid);
-      allow update: if isSuperAdmin() || isTrustedOwnerProfileBootstrap(uid) || isSafeOwnerUserUpdate(uid);
+      allow update: if isSuperAdmin() || isTrustedOwnerProfileBootstrap(uid) || isSafeOwnerUserUpdate(uid) || isSafeAdminGenderUpdate();
       
       match /notificaciones/{notifId} {
         allow create: if isOwner(uid) || isSalud() || isSuperAdmin() || isBiblio() || isLactarioAdmin();
@@ -481,6 +487,10 @@ service cloud.firestore {
     match /biblio-config/{id} {
       allow read: if isBiblio() || isSuperAdmin();
       allow write: if isBiblio() || isSuperAdmin();
+    }
+
+    match /biblio-inventario-fisico/{id} {
+      allow read, write: if isBiblio() || isSuperAdmin();
     }
 
     match /biblio-inventarios/{sessionId} {

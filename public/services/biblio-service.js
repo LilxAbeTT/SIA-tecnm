@@ -10,6 +10,9 @@ const BiblioService = (function () {
     const HOLIDAY_CALENDAR_DOC_ID = 'loan-calendar';
     const INVENTORY_COLL = 'biblio-inventarios';
     const INVENTORY_META_DOC_ID = 'inventory-current';
+    const INVENTORY_FISICO_COLL = 'biblio-inventario-fisico';
+    const INVENTORY_FISICO_STORAGE_KEY = 'sia_biblio_inventario_fisico';
+    const INVENTORY_FISICO_TTL = 3 * 24 * 60 * 60 * 1000;
     const INVENTORY_FOUND_SUBCOLL = 'encontrados';
     const INVENTORY_MISSING_SUBCOLL = 'faltantes';
     const CATALOG_STATE_DOC_ID = 'catalog-state';
@@ -2143,6 +2146,37 @@ const BiblioService = (function () {
         }
     }
 
+    async function getAllDisabledBooksAdmin(ctx) {
+        try {
+            const allBooks = await _loadCatalogCache(ctx);
+            const disabledBooks = allBooks.filter(b => b.active === false);
+            
+            const groups = new Map();
+            for (const b of disabledBooks) {
+                const tituloNorm = (b.titulo || '').trim().toLowerCase();
+                const autorNorm = (b.autor || '').trim().toLowerCase();
+                const key = `${tituloNorm}|${autorNorm}`;
+                
+                if (!groups.has(key)) {
+                    const allCopies = allBooks.filter(c => 
+                        (c.titulo || '').trim().toLowerCase() === tituloNorm &&
+                        (c.autor || '').trim().toLowerCase() === autorNorm
+                    );
+                    allCopies.sort((x, y) => (x.adquisicion || '').localeCompare(y.adquisicion || ''));
+                    groups.set(key, allCopies);
+                }
+                const copies = groups.get(key);
+                const index = copies.findIndex(c => c.id === b.id);
+                b.isCopy = index > 0;
+            }
+            
+            return disabledBooks;
+        } catch (error) {
+            console.error('[BIBLIO] Error en getAllDisabledBooksAdmin:', error);
+            return [];
+        }
+    }
+
     async function searchCatalogoAdmin(ctx, term, limit = 10) {
         const rawTerm = (term || '').toString().trim();
         if (!rawTerm) return [];
@@ -3169,6 +3203,10 @@ const BiblioService = (function () {
             area: userData.area || userData.areaAdscripcion || userData.adscripcion || '',
             department: userData.department || userData.departamento || '',
             jobTitle: userData.originalJobTitle || userData.jobTitle || userData.puesto || '',
+            genero: userData.genero || '',
+            gender: userData.gender || '',
+            sexo: userData.sexo || '',
+            personalData: userData.personalData || null,
             academicInfoKind: academicInfo.kind,
             academicInfoLabel: academicInfo.label,
             xp: userData.biblioXP || 0,
@@ -4317,7 +4355,14 @@ const BiblioService = (function () {
         return summary;
     }
 
-    async function getDashboardStats(ctx) {
+    let _dashboardStatsCache = null;
+    let _dashboardStatsCacheTime = 0;
+
+    async function getDashboardStats(ctx, forceRefresh = false) {
+        const now = Date.now();
+        if (!forceRefresh && _dashboardStatsCache && (now - _dashboardStatsCacheTime < 45000)) {
+            return _dashboardStatsCache;
+        }
         await ensureHolidayCalendarLoaded(ctx);
         await cleanupExpiredPendingLoans(ctx);
         await cleanupExpiredActiveVisits(ctx);
@@ -4400,7 +4445,7 @@ const BiblioService = (function () {
             return item;
         };
 
-        return {
+        const result = {
             visitasHoy: Number.isFinite(visitasHoyCount) ? visitasHoyCount : visitasSnap.size,
             prestamosHoy: Number.isFinite(prestamosHoyCount) ? prestamosHoyCount : 0,
             activosOcupados: Number.isFinite(activosCount) ? activosCount : activosSnap.size,
@@ -4410,6 +4455,10 @@ const BiblioService = (function () {
             ultimasDevoluciones: ultimasDevoluciones.map(enrich),
             pcsActivas: activosSnap.docs.slice(0, 3).map(d => ({ id: d.id, ...d.data() }))
         };
+
+        _dashboardStatsCache = result;
+        _dashboardStatsCacheTime = now;
+        return result;
     }
 
     // GESTION EQUIPOS/ACTIVOS
@@ -6337,12 +6386,89 @@ const BiblioService = (function () {
         }
     }
 
+    // --- INVENTARIO FISICO ---
+    
+    async function getResumenInventarioFisico(ctx, forceRefresh = false) {
+        if (!forceRefresh) {
+            try {
+                const cached = localStorage.getItem(INVENTORY_FISICO_STORAGE_KEY);
+                if (cached) {
+                    const parsed = JSON.parse(cached);
+                    if (Date.now() - parsed.timestamp < INVENTORY_FISICO_TTL) {
+                        return parsed.data;
+                    }
+                }
+            } catch (e) {
+                // ignorar errores de parseo
+            }
+        }
+        
+        try {
+            const snap = await ctx.db.collection(INVENTORY_FISICO_COLL).get();
+            const data = [];
+            snap.forEach(doc => {
+                data.push({ id: doc.id, ...doc.data() });
+            });
+            
+            data.sort((a, b) => a.nombre.localeCompare(b.nombre));
+            
+            try {
+                localStorage.setItem(INVENTORY_FISICO_STORAGE_KEY, JSON.stringify({
+                    timestamp: Date.now(),
+                    data: data
+                }));
+            } catch (e) {
+                // ignorar quota de storage
+            }
+            
+            return data;
+        } catch (error) {
+            console.error('[BiblioService] Error getResumenInventarioFisico:', error);
+            throw new Error('No se pudo cargar el inventario fisico.');
+        }
+    }
+    
+    async function saveInventarioFisicoItem(ctx, id, data) {
+        try {
+            const docId = id || data.nombre.trim().toLowerCase().replace(/\s+/g, '-');
+            const docRef = ctx.db.collection(INVENTORY_FISICO_COLL).doc(docId);
+            
+            const payload = {
+                nombre: data.nombre.trim(),
+                cantidad: Number(data.cantidad) || 0,
+                ultimaActualizacion: new Date().toISOString(),
+                actualizadoPor: ctx?.auth?.currentUser?.uid || 'admin'
+            };
+            
+            await docRef.set(payload, { merge: true });
+            localStorage.removeItem(INVENTORY_FISICO_STORAGE_KEY);
+            return docId;
+        } catch (error) {
+            console.error('[BiblioService] Error saveInventarioFisicoItem:', error);
+            throw new Error('No se pudo guardar el elemento fisico.');
+        }
+    }
+    
+    async function deleteInventarioFisicoItem(ctx, id) {
+        try {
+            await ctx.db.collection(INVENTORY_FISICO_COLL).doc(id).delete();
+            localStorage.removeItem(INVENTORY_FISICO_STORAGE_KEY);
+        } catch (error) {
+            console.error('[BiblioService] Error deleteInventarioFisicoItem:', error);
+            throw new Error('No se pudo eliminar el elemento fisico.');
+        }
+    }
+
     return {
+        getResumenInventarioFisico,
+        saveInventarioFisicoItem,
+        deleteInventarioFisicoItem,
         findUserByQuery,
         findBookByCode,
         searchCatalogo,
         searchCatalogoAdmin,
         getCopiesByTitleAndAuthorAdmin,
+        getAllDisabledBooksAdmin,
         getTopBooks,
         getBooksByCategory,
         getLoanPolicy,
@@ -6353,6 +6479,8 @@ const BiblioService = (function () {
         finalizarVisita,
         cleanupExpiredActiveVisits,
         getDashboardStats,
+        loadUsuariosCache: _loadUsuariosCache,
+        loadCatalogCache: _loadCatalogCache,
         getVisitSummaryStats,
         saveAsset,
         deleteAsset,

@@ -216,6 +216,70 @@ window.AdminBiblio.Shared = (function () {
     }
 
 
+    function showGenderPromptModal(nombreAlumno) {
+        return new Promise((resolve) => {
+            const modalId = `modal-gender-${Date.now()}`;
+            const modalHtml = `
+            <div class="modal fade" id="${modalId}" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered modal-sm">
+                    <div class="modal-content rounded-4 border-0 shadow-lg">
+                        <div class="modal-header border-bottom-0 pb-0">
+                            <h5 class="modal-title fw-bold text-primary"><i class="bi bi-person-fill-exclamation me-2"></i>Género Requerido</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                        </div>
+                        <div class="modal-body py-4">
+                            <p class="small text-muted mb-3">Para continuar, selecciona el género de <strong>${escapeHtml(nombreAlumno)}</strong>.</p>
+                            <select id="${modalId}-select" class="form-select form-select-lg mb-4">
+                                <option value="" selected disabled>Seleccionar...</option>
+                                <option value="Femenino">Femenino</option>
+                                <option value="Masculino">Masculino</option>
+                                <option value="Otro">Otro</option>
+                            </select>
+                            <button type="button" class="btn btn-primary w-100 rounded-pill fw-bold" id="${modalId}-btn-guardar">Guardar y Continuar</button>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+            const modalEl = document.getElementById(modalId);
+            const modal = new bootstrap.Modal(modalEl);
+            const selectEl = document.getElementById(`${modalId}-select`);
+            const btnGuardar = document.getElementById(`${modalId}-btn-guardar`);
+
+            let resolvedValue = null;
+
+            btnGuardar.addEventListener('click', () => {
+                const val = selectEl.value;
+                if (!val) {
+                    selectEl.classList.add('is-invalid');
+                    return;
+                }
+                resolvedValue = val;
+                modal.hide();
+            });
+
+            selectEl.addEventListener('change', () => {
+                selectEl.classList.remove('is-invalid');
+            });
+
+            modalEl.addEventListener('hidden.bs.modal', () => {
+                resolve(resolvedValue);
+                modalEl.remove();
+                document.querySelectorAll('.modal-backdrop').forEach(b => b.remove());
+                if (document.querySelector('.modal.show')) {
+                    document.body.classList.add('modal-open');
+                } else {
+                    document.body.classList.remove('modal-open');
+                    document.body.style.removeProperty('overflow');
+                    document.body.style.removeProperty('padding-right');
+                }
+            }, { once: true });
+
+            modal.show();
+        });
+    }
+
     function resetServiceSelection() {
         state.selectedAssetId = null;
         state.selectedTimeBlock = null;
@@ -244,6 +308,7 @@ window.AdminBiblio.Shared = (function () {
         parseDate,
         showConfirmModal,
         showPromptModal,
+        showGenderPromptModal,
         resetServiceSelection,
         cleanupBackdrop
     };

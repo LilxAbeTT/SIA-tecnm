@@ -13,6 +13,9 @@ window.AdminBiblio.Catalogo = (function () {
     let _holidayPointerMode = 'add';
     let _holidayLastPointerDate = '';
     let _labelsPrintQueue = [];
+    let _statusSearchResults = [];
+    let _statusSearchCurrentPage = 1;
+    const STATUS_RESULTS_PER_PAGE = 5;
 
     function syncFromState() {
         _ctx = state.ctx;
@@ -484,7 +487,7 @@ window.AdminBiblio.Catalogo = (function () {
             <div class="modal-body p-3 p-md-4 pb-5 bg-light" style="padding-bottom:calc(5rem + env(safe-area-inset-bottom));">
                 
                 <div class="row g-4">
-                    <div class="col-12 col-md-4">
+                    <div class="col-12 col-md-6">
                         <div class="card border-0 shadow-sm rounded-4 h-100" style="cursor: pointer;" onclick="AdminBiblio.abrirSubmodalGestionarLibros()">
                             <div class="card-body p-4 text-center">
                                 <div class="bg-success bg-opacity-10 rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style="width:64px;height:64px;">
@@ -496,7 +499,7 @@ window.AdminBiblio.Catalogo = (function () {
                         </div>
                     </div>
                     
-                    <div class="col-12 col-md-4">
+                    <div class="col-12 col-md-6">
                         <div class="card border-0 shadow-sm rounded-4 h-100" style="cursor: pointer;" onclick="AdminBiblio.abrirSubmodalEtiquetas()">
                             <div class="card-body p-4 text-center">
                                 <div class="bg-primary bg-opacity-10 rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style="width:64px;height:64px;">
@@ -504,18 +507,6 @@ window.AdminBiblio.Catalogo = (function () {
                                 </div>
                                 <h5 class="fw-bold text-dark mb-2">Generar etiquetas</h5>
                                 <p class="small text-muted mb-0">Impresion de codigos de barras y lomos.</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="col-12 col-md-4">
-                        <div class="card border-0 shadow-sm rounded-4 h-100" style="cursor: pointer;" onclick="AdminBiblio.abrirSubmodalInventario()">
-                            <div class="card-body p-4 text-center">
-                                <div class="bg-danger bg-opacity-10 rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style="width:64px;height:64px;">
-                                    <i class="bi bi-clipboard2-data fs-3 text-danger"></i>
-                                </div>
-                                <h5 class="fw-bold text-dark mb-2">Inventario Semestral</h5>
-                                <p class="small text-muted mb-0">Auditoria del catalogo de la biblioteca.</p>
                             </div>
                         </div>
                     </div>
@@ -584,17 +575,21 @@ window.AdminBiblio.Catalogo = (function () {
                 return;
             }
 
-            const copiesSnap = await _ctx.db.collection('biblio-catalogo')
-                .where('titulo', '==', searchedBook.titulo)
-                .get();
-
             let copies = [];
-            copiesSnap.forEach(doc => {
-                const data = doc.data();
-                if (data.autor === searchedBook.autor) {
-                    copies.push({ id: doc.id, ...data });
-                }
-            });
+            if (window.BiblioService && window.BiblioService.getCopiesByTitleAndAuthorAdmin) {
+                copies = await window.BiblioService.getCopiesByTitleAndAuthorAdmin(_ctx, searchedBook.titulo, searchedBook.autor);
+            } else {
+                const copiesSnap = await _ctx.db.collection('biblio-catalogo')
+                    .where('titulo', '==', searchedBook.titulo)
+                    .get();
+
+                copiesSnap.forEach(doc => {
+                    const data = doc.data();
+                    if (data.autor === searchedBook.autor) {
+                        copies.push({ id: doc.id, ...data });
+                    }
+                });
+            }
 
             copies.sort((a, b) => a.adquisicion.localeCompare(b.adquisicion));
 
@@ -766,6 +761,58 @@ window.AdminBiblio.Catalogo = (function () {
         }
     }
 
+    function abrirModalMenuInventario() {
+        clearLiveAssetStreams();
+        const body = document.getElementById('modal-admin-body');
+        const modalEl = document.getElementById('modal-admin-action');
+        const modal = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
+
+        body.innerHTML = `
+            <div class="modal-header border-0 bg-danger text-white p-4">
+                <div>
+                    <h3 class="fw-bold mb-1"><i class="bi bi-clipboard2-data me-3"></i>Inventario</h3>
+                    <div class="small text-white-50">Elige el tipo de inventario a realizar.</div>
+                </div>
+                <button class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-3 p-md-4 pb-5 bg-light" style="padding-bottom:calc(5rem + env(safe-area-inset-bottom));">
+                
+                <div class="row g-4">
+                    <div class="col-12 col-md-6">
+                        <div class="card border-0 shadow-sm rounded-4 h-100" style="cursor: pointer;" onclick="AdminBiblio.abrirSubmodalInventario()">
+                            <div class="card-body p-4 text-center">
+                                <div class="bg-danger bg-opacity-10 rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style="width:64px;height:64px;">
+                                    <i class="bi bi-clipboard2-data fs-3 text-danger"></i>
+                                </div>
+                                <h5 class="fw-bold text-dark mb-2">Inventario Semestral</h5>
+                                <p class="small text-muted mb-0">Auditoria del catalogo de la biblioteca.</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-12 col-md-6">
+                        <div class="card border-0 shadow-sm rounded-4 h-100" style="cursor: pointer;" onclick="AdminBiblio.abrirSubmodalInventarioFisico()">
+                            <div class="card-body p-4 text-center">
+                                <div class="bg-info bg-opacity-10 rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style="width:64px;height:64px;">
+                                    <i class="bi bi-box-seam fs-3 text-info"></i>
+                                </div>
+                                <h5 class="fw-bold text-dark mb-2">Inventario Físico</h5>
+                                <p class="small text-muted mb-0">Sillas, mesas, anaqueles, equipos, etc.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+         `;
+
+        if (!modalEl.classList.contains('show')) {
+            modal.show();
+        }
+
+        modalEl.removeEventListener('hidden.bs.modal', _cleanupBackdrop);
+        modalEl.addEventListener('hidden.bs.modal', _cleanupBackdrop);
+    }
+
     function abrirSubmodalInventario() {
         const body = document.getElementById('modal-admin-body');
         body.innerHTML = `
@@ -774,7 +821,7 @@ window.AdminBiblio.Catalogo = (function () {
                     <h3 class="fw-bold mb-1"><i class="bi bi-clipboard2-data me-3"></i>Inventario Semestral</h3>
                     <div class="small text-white-50">Auditoria del catalogo de la biblioteca.</div>
                 </div>
-                <button class="btn-close btn-close-white" onclick="AdminBiblio.abrirModalGestionLibros()"></button>
+                <button class="btn-close btn-close-white" onclick="AdminBiblio.abrirModalMenuInventario()"></button>
             </div>
             <div class="modal-body p-4 pb-5 bg-light" style="padding-bottom:calc(5rem + env(safe-area-inset-bottom));">
                 <div class="card border-0 shadow-sm rounded-4 bg-danger-subtle mb-4">
@@ -1038,13 +1085,19 @@ window.AdminBiblio.Catalogo = (function () {
             let maxAdqStr = book.adquisicion;
             if (book.titulo) {
                 try {
-                    const titleSnap = await _ctx.db.collection('biblio-catalogo')
-                        .where('titulo', '==', book.titulo)
-                        .get();
+                    let copies = [];
+                    if (window.BiblioService && window.BiblioService.getCopiesByTitleAndAuthorAdmin) {
+                        copies = await window.BiblioService.getCopiesByTitleAndAuthorAdmin(_ctx, book.titulo, book.autor);
+                    } else {
+                        const titleSnap = await _ctx.db.collection('biblio-catalogo')
+                            .where('titulo', '==', book.titulo)
+                            .get();
+                        titleSnap.forEach(doc => copies.push(doc.data()));
+                    }
                         
                     let maxNum = -1;
-                    titleSnap.forEach(doc => {
-                        const adq = doc.data().adquisicion;
+                    copies.forEach(data => {
+                        const adq = data.adquisicion;
                         if (adq) {
                             const match = adq.match(/^([a-zA-Z\-]*)(\d+)$/);
                             if (match) {
@@ -1362,6 +1415,8 @@ window.AdminBiblio.Catalogo = (function () {
     }
 
     function renderBookStatusSearch() {
+        _statusSearchResults = [];
+        _statusSearchCurrentPage = 1;
         const body = document.getElementById('modal-admin-body');
         body.innerHTML = `
             <div class="modal-header border-0 bg-danger text-white px-4 py-3">
@@ -1370,15 +1425,19 @@ window.AdminBiblio.Catalogo = (function () {
             </div>
             <div class="modal-body p-4 pb-5" style="padding-bottom:calc(5rem + env(safe-area-inset-bottom));">
                 <div class="input-group mb-4 shadow-sm">
-                    <input type="text" class="form-control border-0 p-3" id="status-search-input" placeholder="Ingresa No. Adquisicion (Ej: 00001)">
+                    <input type="text" class="form-control border-0 p-3" id="status-search-input" placeholder="Ingresa No. Adquisicion o nombre del libro" onkeydown="if(event.key === 'Enter') AdminBiblio.handleStatusSearch()">
                     <button class="btn btn-danger px-4 fw-bold" onclick="AdminBiblio.handleStatusSearch()">
                         <i class="bi bi-search"></i>
                     </button>
                 </div>
                 
-                <h6 class="fw-bold text-muted small mb-3 text-uppercase ls-1">Resultado de busqueda</h6>
-                <div id="status-search-result" class="card border-0 shadow-sm">
-                    <div class="text-center py-4 text-muted"><i class="bi bi-info-circle mb-2 fs-3 d-block"></i>Busca un libro para cambiar su estado.</div>
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h6 class="fw-bold text-muted small mb-0 text-uppercase ls-1">Resultado de busqueda</h6>
+                    <button class="btn btn-sm btn-outline-danger rounded-pill fw-bold" onclick="AdminBiblio.renderDisabledBooksList()">Ver libros deshabilitados</button>
+                </div>
+
+                <div id="status-search-result" class="card border-0 shadow-sm bg-transparent">
+                    <div class="text-center py-4 text-muted bg-white rounded"><i class="bi bi-info-circle mb-2 fs-3 d-block"></i>Busca un libro para cambiar su estado.</div>
                 </div>
             </div>
         `;
@@ -1386,62 +1445,248 @@ window.AdminBiblio.Catalogo = (function () {
 
     async function handleStatusSearch() {
         const q = document.getElementById('status-search-input').value.trim();
-        if (!q) return showToast("Ingresa un numero de adquisicion", "warning");
+        if (!q) return showToast("Ingresa un codigo o nombre", "warning");
 
         const container = document.getElementById('status-search-result');
-        container.innerHTML = '<div class="text-center py-4 text-muted"><span class="spinner-border spinner-border-sm"></span> Buscando...</div>';
+        container.innerHTML = '<div class="text-center py-4 text-muted bg-white rounded"><span class="spinner-border spinner-border-sm"></span> Buscando en el catalogo...</div>';
 
         try {
-            const bookByCode = await BiblioService.getBookByAdquisicion(_ctx, q.toUpperCase());
-                
-            if (!bookByCode) {
-                container.innerHTML = '<div class="p-4 text-center text-muted">No se encontro el libro.</div>';
+            _statusSearchResults = await BiblioService.searchCatalogoAdmin(_ctx, q, 100);
+            _statusSearchCurrentPage = 1;
+            
+            if (!_statusSearchResults || _statusSearchResults.length === 0) {
+                container.innerHTML = '<div class="p-4 text-center text-muted bg-white rounded">No se encontraron libros.</div>';
                 return;
             }
             
-            const book = bookByCode;
-            renderStatusBookCard(book);
+            AdminBiblio.renderStatusSearchPage();
         } catch (e) {
-            container.innerHTML = `<div class="p-4 text-center text-danger">Error: ${e.message}</div>`;
+            container.innerHTML = `<div class="p-4 text-center text-danger bg-white rounded">Error: ${e.message}</div>`;
         }
     }
 
-    function renderStatusBookCard(book) {
+    async function renderStatusSearchPage() {
         const container = document.getElementById('status-search-result');
-        if (!book) return;
+        if (!_statusSearchResults || _statusSearchResults.length === 0) return;
 
-        const isActive = book.active !== false;
-        const adquisicion = escapeHtml(book.adquisicion || 'S/N');
-        const titulo = escapeHtml(book.titulo || 'Sin titulo');
-        const autor = escapeHtml(book.autor || 'Desconocido');
-        const statusBadge = isActive 
-            ? '<span class="badge bg-success mb-1">Activo</span>' 
-            : '<span class="badge bg-danger mb-1">Dado de baja</span>';
+        const totalPages = Math.ceil(_statusSearchResults.length / STATUS_RESULTS_PER_PAGE);
+        const start = (_statusSearchCurrentPage - 1) * STATUS_RESULTS_PER_PAGE;
+        const pageItems = _statusSearchResults.slice(start, start + STATUS_RESULTS_PER_PAGE);
+
+        let html = '';
+        
+        for (const book of pageItems) {
+            const copies = await BiblioService.getCopiesByTitleAndAuthorAdmin(_ctx, book.titulo, book.autor);
+            copies.sort((a, b) => (a.adquisicion || '').localeCompare(b.adquisicion || ''));
             
-        const btnAction = isActive 
-            ? `<button class="btn btn-sm btn-outline-danger rounded-pill px-3 fw-bold mt-2" onclick="AdminBiblio.toggleBookStatusFromSearch('${book.id}', false)"><i class="bi bi-x-circle me-1"></i>Dar de baja</button>`
-            : `<button class="btn btn-sm btn-outline-success rounded-pill px-3 fw-bold mt-2" onclick="AdminBiblio.toggleBookStatusFromSearch('${book.id}', true)"><i class="bi bi-check-circle me-1"></i>Reactivar</button>`;
+            const titulo = escapeHtml(book.titulo || 'Sin titulo');
+            const autor = escapeHtml(book.autor || 'Desconocido');
+            
+            let copiesHtml = '';
+            copies.forEach((copy, index) => {
+                const isActive = copy.active !== false;
+                const adq = escapeHtml(copy.adquisicion || 'S/N');
+                const label = index === 0 ? `${adq} Original` : `${adq} Copia`;
+                
+                const btnAction = isActive 
+                    ? `<button class="btn btn-sm btn-outline-danger py-0 px-2 fw-bold" onclick="AdminBiblio.toggleBookStatusFromSearch('${copy.id}', false, this)"><i class="bi bi-x"></i> Deshabilitar</button>`
+                    : `<button class="btn btn-sm btn-outline-success py-0 px-2 fw-bold" onclick="AdminBiblio.toggleBookStatusFromSearch('${copy.id}', true, this)"><i class="bi bi-check"></i> Habilitar</button>`;
+                
+                const statusDot = isActive ? '<span class="text-success"><i class="bi bi-circle-fill" style="font-size:0.5rem;vertical-align:middle;"></i></span>' : '<span class="text-danger"><i class="bi bi-circle-fill" style="font-size:0.5rem;vertical-align:middle;"></i></span>';
+                const statusText = isActive ? 'Activo' : 'Baja';
 
-        container.innerHTML = `
-            <div class="card-body p-4 text-center">
-                <div class="mb-3">
-                    ${statusBadge}
-                    <div class="badge bg-dark text-white mb-1 ms-1">${adquisicion}</div>
+                copiesHtml += `
+                    <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
+                        <div class="small fw-semibold d-flex align-items-center gap-2">
+                            ${statusDot} <span class="${isActive ? '' : 'text-muted text-decoration-line-through'}">${label}</span> <span class="badge ${isActive ? 'bg-success-subtle text-success' : 'bg-danger-subtle text-danger'} rounded-pill" style="font-size: 0.65em;">${statusText}</span>
+                        </div>
+                        <div>
+                            ${btnAction}
+                        </div>
+                    </div>
+                `;
+            });
+            
+            let copiasText = 'Unico ejemplar';
+            if (copies.length > 1) {
+                const adqs = copies.slice(1).map(c => c.adquisicion || 'S/N').join(', ');
+                copiasText = `${copies[0].adquisicion || 'S/N'} Original, Copias: ${adqs}`;
+            }
+
+            html += `
+                <div class="card mb-3 border-0 shadow-sm overflow-hidden">
+                    <div class="card-body p-0">
+                        <div class="p-3 bg-light border-bottom">
+                            <h6 class="fw-bold mb-1 text-dark">${titulo}</h6>
+                            <div class="small text-muted d-flex justify-content-between align-items-center">
+                                <span><i class="bi bi-person me-1"></i>${autor}</span>
+                                <span class="badge bg-secondary rounded-pill">${copies.length} ejemplares</span>
+                            </div>
+                            <div class="small text-muted mt-1" style="font-size:0.75rem;">
+                                <i class="bi bi-upc-scan me-1"></i>${escapeHtml(copiasText)}
+                            </div>
+                        </div>
+                        <div class="px-3 pb-2 pt-1 bg-white">
+                            ${copiesHtml}
+                        </div>
+                    </div>
                 </div>
-                <h5 class="fw-bold mb-1">${titulo}</h5>
-                <p class="text-muted small mb-3">${autor}</p>
-                ${btnAction}
-            </div>
-        `;
+            `;
+        }
+
+        if (totalPages > 1) {
+            html += `
+                <div class="d-flex justify-content-between align-items-center mt-4 bg-white p-3 rounded shadow-sm border">
+                    <button class="btn btn-sm btn-outline-secondary rounded-pill px-3 fw-bold" onclick="AdminBiblio.changeStatusSearchPage(-1)" ${_statusSearchCurrentPage === 1 ? 'disabled' : ''}>
+                        <i class="bi bi-chevron-left me-1"></i>Anterior
+                    </button>
+                    <span class="small text-muted fw-bold">Pagina ${_statusSearchCurrentPage} de ${totalPages}</span>
+                    <button class="btn btn-sm btn-outline-secondary rounded-pill px-3 fw-bold" onclick="AdminBiblio.changeStatusSearchPage(1)" ${_statusSearchCurrentPage === totalPages ? 'disabled' : ''}>
+                        Siguiente<i class="bi bi-chevron-right ms-1"></i>
+                    </button>
+                </div>
+            `;
+        }
+
+        container.innerHTML = html;
     }
 
-    async function toggleBookStatusFromSearch(bookId, isActive) {
+    function changeStatusSearchPage(delta) {
+        const totalPages = Math.ceil(_statusSearchResults.length / STATUS_RESULTS_PER_PAGE);
+        const newPage = _statusSearchCurrentPage + delta;
+        if (newPage >= 1 && newPage <= totalPages) {
+            _statusSearchCurrentPage = newPage;
+            AdminBiblio.renderStatusSearchPage();
+            const resEl = document.getElementById('status-search-result');
+            if (resEl) resEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    }
+
+    async function toggleBookStatusFromSearch(bookId, isActive, btnEl) {
+        if (btnEl) {
+            btnEl.disabled = true;
+            btnEl.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+        }
         try {
             await BiblioService.toggleLibroStatus(_ctx, bookId, isActive);
             showToast(isActive ? 'Libro reactivado' : 'Libro dado de baja', 'success');
-            AdminBiblio.handleStatusSearch();
+            
+            const container = document.getElementById('status-search-result');
+            if (container && container.innerHTML.includes('Libros dados de baja')) {
+                AdminBiblio.renderDisabledBooksList();
+            } else {
+                AdminBiblio.renderStatusSearchPage();
+            }
         } catch (e) {
             showToast("Error al cambiar estado: " + e.message, "danger");
+            if (btnEl) {
+                btnEl.disabled = false;
+                btnEl.innerHTML = isActive ? '<i class="bi bi-check"></i> Habilitar' : '<i class="bi bi-x"></i> Deshabilitar';
+            }
+        }
+    }
+
+    let _disabledBooksCache = [];
+
+    async function renderDisabledBooksList() {
+        const container = document.getElementById('status-search-result');
+        container.innerHTML = '<div class="text-center py-4 text-muted bg-white rounded"><span class="spinner-border spinner-border-sm"></span> Cargando libros deshabilitados...</div>';
+
+        try {
+            _disabledBooksCache = await BiblioService.getAllDisabledBooksAdmin(_ctx);
+            if (!_disabledBooksCache || _disabledBooksCache.length === 0) {
+                container.innerHTML = '<div class="p-4 text-center text-muted bg-white rounded">No hay libros dados de baja.</div>';
+                return;
+            }
+
+            let html = `
+                <div class="card mb-3 border-0 shadow-sm overflow-hidden">
+                    <div class="card-body p-0">
+                        <div class="p-3 bg-light border-bottom d-flex justify-content-between align-items-center">
+                            <h6 class="fw-bold mb-0 text-dark">Libros dados de baja (${_disabledBooksCache.length})</h6>
+                            <button class="btn btn-sm btn-danger fw-bold rounded-pill" onclick="AdminBiblio.downloadDisabledBooksReport()">
+                                <i class="bi bi-file-earmark-pdf me-1"></i> Descargar Reporte
+                            </button>
+                        </div>
+                        <div class="px-3 pb-2 pt-1 bg-white" style="max-height: 400px; overflow-y: auto;">
+            `;
+
+            for (const book of _disabledBooksCache) {
+                const titulo = escapeHtml(book.titulo || 'Sin titulo');
+                const adq = escapeHtml(book.adquisicion || 'S/N');
+                const label = book.isCopy ? `${adq} Copia` : `${adq} Original`;
+                const statusText = 'Dado de baja';
+
+                const btnAction = `<button class="btn btn-sm btn-outline-success py-0 px-2 fw-bold" onclick="AdminBiblio.toggleBookStatusFromSearch('${book.id}', true, this)"><i class="bi bi-check"></i> Habilitar</button>`;
+
+                html += `
+                    <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
+                        <div>
+                            <div class="fw-bold text-dark small">${titulo}</div>
+                            <div class="small text-muted d-flex align-items-center gap-2 mt-1">
+                                <span class="text-danger"><i class="bi bi-circle-fill" style="font-size:0.5rem;vertical-align:middle;"></i></span> 
+                                <span class="text-muted text-decoration-line-through">${label}</span> 
+                                <span class="badge bg-danger-subtle text-danger rounded-pill" style="font-size: 0.65em;">${statusText}</span>
+                            </div>
+                        </div>
+                        <div>
+                            ${btnAction}
+                        </div>
+                    </div>
+                `;
+            }
+
+            html += `
+                        </div>
+                    </div>
+                </div>
+            `;
+            container.innerHTML = html;
+
+        } catch (e) {
+            container.innerHTML = `<div class="p-4 text-center text-danger bg-white rounded">Error: ${e.message}</div>`;
+        }
+    }
+
+    async function downloadDisabledBooksReport() {
+        if (!window.ExportUtils) {
+            alert('Las utilidades de exportacion no estan disponibles.');
+            return;
+        }
+
+        const btnEl = event.currentTarget;
+        const originalHtml = btnEl.innerHTML;
+        btnEl.disabled = true;
+        btnEl.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Generando...';
+
+        try {
+            const config = {
+                title: 'Reporte de Libros Dados de Baja',
+                headers: ['No. Adquisicion', 'Titulo', 'Autor', 'Tipo', 'Estado'],
+                widths: ['auto', '*', '*', 'auto', 'auto']
+            };
+
+            const rows = _disabledBooksCache.map(b => [
+                b.adquisicion || 'S/N',
+                b.titulo || 'Sin titulo',
+                b.autor || 'Desconocido',
+                b.isCopy ? 'Copia' : 'Original',
+                'Dado de baja'
+            ]);
+
+            const payload = {
+                rows,
+                pdfRows: rows,
+                description: ['Listado de ejemplares que actualmente se encuentran dados de baja o deshabilitados en el sistema.']
+            };
+
+            await window.ExportUtils.generatePDF(config, payload, 'BIBLIO');
+        } catch (error) {
+            console.error('[BIBLIO] Error generating disabled books report', error);
+            showToast('Error al generar el reporte', 'danger');
+        } finally {
+            btnEl.disabled = false;
+            btnEl.innerHTML = originalHtml;
         }
     }
 
@@ -1991,8 +2236,206 @@ window.AdminBiblio.Catalogo = (function () {
 
 
 
+    // --- INVENTARIO FISICO ---
+
+    async function abrirSubmodalInventarioFisico() {
+        const body = document.getElementById('modal-admin-body');
+        
+        body.innerHTML = `
+            <div class="modal-header border-0 bg-info text-white p-4">
+                <div>
+                    <h3 class="fw-bold mb-1"><i class="bi bi-box-seam me-3"></i>Inventario Físico</h3>
+                    <div class="small text-white-75">Sillas, mesas, anaqueles, equipos y otros.</div>
+                </div>
+                <button class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="bg-light px-4 py-2 border-bottom d-flex align-items-center">
+                <button class="btn btn-sm btn-outline-secondary rounded-pill me-2" onclick="AdminBiblio.abrirModalMenuInventario()">
+                    <i class="bi bi-arrow-left me-1"></i>Volver
+                </button>
+            </div>
+            <div class="modal-body p-4 bg-light">
+                <div class="card border-0 shadow-sm rounded-4 mb-4">
+                    <div class="card-body p-4">
+                        <h5 class="fw-bold mb-3">Agregar Elemento</h5>
+                        <form id="formInventarioFisico" onsubmit="event.preventDefault(); AdminBiblio.guardarInventarioFisicoItem();">
+                            <input type="hidden" id="invFisicoId" value="">
+                            <div class="row g-3">
+                                <div class="col-md-8">
+                                    <label class="form-label small fw-bold text-muted">Nombre del objeto</label>
+                                    <input type="text" id="invFisicoNombre" class="form-control" placeholder="Ej. Sillas de lectura" required>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label small fw-bold text-muted">Cantidad</label>
+                                    <input type="number" id="invFisicoCantidad" class="form-control" min="0" placeholder="0" required>
+                                </div>
+                                <div class="col-12 text-end mt-3">
+                                    <button type="button" class="btn btn-light me-2 d-none" id="btnInvFisicoCancelar" onclick="AdminBiblio.cancelarEdicionInventarioFisico()">Cancelar</button>
+                                    <button type="submit" class="btn btn-info text-white px-4 fw-bold" id="btnInvFisicoGuardar">Agregar al inventario</button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <h5 class="fw-bold mb-3 px-1 text-muted">Elementos Registrados</h5>
+                <div id="listaInventarioFisico" class="d-flex flex-column gap-2 pb-5">
+                    <div class="text-center py-4 text-muted"><div class="spinner-border spinner-border-sm me-2"></div>Cargando...</div>
+                </div>
+            </div>
+        `;
+        
+        cargarListaInventarioFisico();
+    }
+
+    async function cargarListaInventarioFisico(forceRefresh = false) {
+        const container = document.getElementById('listaInventarioFisico');
+        if (!container) return;
+        
+        try {
+            const data = await BiblioService.getResumenInventarioFisico(_ctx, forceRefresh);
+            
+            if (!data || data.length === 0) {
+                container.innerHTML = `<div class="text-center py-5 text-muted bg-white rounded-4 border-0 shadow-sm">
+                    <i class="bi bi-inbox fs-1 d-block mb-3 opacity-50"></i>
+                    No hay elementos físicos registrados.
+                </div>`;
+                return;
+            }
+            
+            let html = '';
+            let totalItems = 0;
+            
+            data.forEach(item => {
+                totalItems += Number(item.cantidad) || 0;
+                // escape strings to prevent xss
+                const nombreSeguro = escapeHtml(item.nombre);
+                html += `
+                    <div class="card border-0 shadow-sm rounded-3">
+                        <div class="card-body p-3 d-flex align-items-center justify-content-between">
+                            <div>
+                                <h6 class="fw-bold mb-0 text-dark">${nombreSeguro}</h6>
+                                <div class="small text-muted mt-1">Ultima act: ${new Date(item.ultimaActualizacion).toLocaleDateString()}</div>
+                            </div>
+                            <div class="d-flex align-items-center gap-3">
+                                <div class="bg-light rounded-pill px-3 py-1 fw-bold text-info border">${item.cantidad}</div>
+                                <div class="dropdown">
+                                    <button class="btn btn-sm btn-light rounded-circle" type="button" data-bs-toggle="dropdown">
+                                        <i class="bi bi-three-dots-vertical"></i>
+                                    </button>
+                                    <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0">
+                                        <li><a class="dropdown-item small" href="#" onclick="event.preventDefault(); AdminBiblio.editarInventarioFisicoItem('${item.id}', '${nombreSeguro.replace(/'/g, "\\'")}', ${item.cantidad})"><i class="bi bi-pencil me-2 text-primary"></i>Editar</a></li>
+                                        <li><hr class="dropdown-divider"></li>
+                                        <li><a class="dropdown-item small text-danger" href="#" onclick="event.preventDefault(); AdminBiblio.eliminarInventarioFisicoItem('${item.id}')"><i class="bi bi-trash me-2"></i>Eliminar</a></li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            html = `
+                <div class="bg-info bg-opacity-10 rounded-3 p-3 mb-2 d-flex justify-content-between align-items-center text-info fw-bold">
+                    <span>Total de Objetos</span>
+                    <span class="fs-5">${totalItems}</span>
+                </div>
+            ` + html;
+            
+            container.innerHTML = html;
+            
+        } catch (error) {
+            container.innerHTML = `<div class="alert alert-danger shadow-sm border-0"><i class="bi bi-exclamation-triangle me-2"></i>Error al cargar: ${error.message}</div>`;
+        }
+    }
+    
+    function escapeHtml(unsafe) {
+        return (unsafe || '').toString()
+             .replace(/&/g, "&amp;")
+             .replace(/</g, "&lt;")
+             .replace(/>/g, "&gt;")
+             .replace(/"/g, "&quot;")
+             .replace(/'/g, "&#039;");
+    }
+
+    async function guardarInventarioFisicoItem() {
+        const idInput = document.getElementById('invFisicoId');
+        const nombreInput = document.getElementById('invFisicoNombre');
+        const cantidadInput = document.getElementById('invFisicoCantidad');
+        const btnGuardar = document.getElementById('btnInvFisicoGuardar');
+        
+        const id = idInput.value;
+        const nombre = nombreInput.value.trim();
+        const cantidad = Number(cantidadInput.value);
+        
+        if (!nombre) {
+            if(window.showToast) window.showToast('El nombre es requerido', 'warning');
+            return;
+        }
+        
+        btnGuardar.disabled = true;
+        btnGuardar.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Guardando...';
+        
+        try {
+            await BiblioService.saveInventarioFisicoItem(_ctx, id, { nombre, cantidad });
+            if(window.showToast) window.showToast('Guardado correctamente', 'success');
+            
+            // reset form
+            cancelarEdicionInventarioFisico();
+            
+            // refresh list
+            cargarListaInventarioFisico(true);
+        } catch (error) {
+            if(window.showToast) window.showToast(error.message, 'error');
+            btnGuardar.disabled = false;
+            btnGuardar.innerHTML = 'Agregar al inventario';
+        }
+    }
+
+    function editarInventarioFisicoItem(id, nombre, cantidad) {
+        document.getElementById('invFisicoId').value = id;
+        document.getElementById('invFisicoNombre').value = nombre;
+        document.getElementById('invFisicoCantidad').value = cantidad;
+        
+        document.getElementById('btnInvFisicoCancelar').classList.remove('d-none');
+        document.getElementById('btnInvFisicoGuardar').innerHTML = 'Guardar Cambios';
+        document.getElementById('btnInvFisicoGuardar').classList.replace('btn-info', 'btn-primary');
+        
+        // scroll to top
+        document.querySelector('.modal-body').scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function cancelarEdicionInventarioFisico() {
+        document.getElementById('invFisicoId').value = '';
+        document.getElementById('invFisicoNombre').value = '';
+        document.getElementById('invFisicoCantidad').value = '';
+        
+        document.getElementById('btnInvFisicoCancelar').classList.add('d-none');
+        document.getElementById('btnInvFisicoGuardar').disabled = false;
+        document.getElementById('btnInvFisicoGuardar').innerHTML = 'Agregar al inventario';
+        document.getElementById('btnInvFisicoGuardar').classList.replace('btn-primary', 'btn-info');
+    }
+
+    async function eliminarInventarioFisicoItem(id) {
+        if (!confirm('¿Seguro que deseas eliminar este elemento del inventario?')) return;
+        
+        try {
+            await BiblioService.deleteInventarioFisicoItem(_ctx, id);
+            if(window.showToast) window.showToast('Elemento eliminado', 'success');
+            cargarListaInventarioFisico(true);
+        } catch (error) {
+            if(window.showToast) window.showToast(error.message, 'error');
+        }
+    }
+
     return {
         abrirModalGestionLibros: withState(abrirModalGestionLibros),
+        abrirModalMenuInventario: withState(abrirModalMenuInventario),
+        abrirSubmodalInventarioFisico: withState(abrirSubmodalInventarioFisico),
+        guardarInventarioFisicoItem: withState(guardarInventarioFisicoItem),
+        editarInventarioFisicoItem: withState(editarInventarioFisicoItem),
+        cancelarEdicionInventarioFisico: withState(cancelarEdicionInventarioFisico),
+        eliminarInventarioFisicoItem: withState(eliminarInventarioFisicoItem),
         refreshGestionLibrosInventoryStatus: withState(refreshGestionLibrosInventoryStatus),
         confirmFinalizeInventoryFromGestion: withState(confirmFinalizeInventoryFromGestion),
         confirmAdjustFinishedInventoryFromGestion: withState(confirmAdjustFinishedInventoryFromGestion),
@@ -2012,7 +2455,11 @@ window.AdminBiblio.Catalogo = (function () {
         handleCopySearch: withState(handleCopySearch),
         renderBookStatusSearch: withState(renderBookStatusSearch),
         handleStatusSearch: withState(handleStatusSearch),
+        renderStatusSearchPage: withState(renderStatusSearchPage),
+        changeStatusSearchPage: withState(changeStatusSearchPage),
         toggleBookStatusFromSearch: withState(toggleBookStatusFromSearch),
+        renderDisabledBooksList: withState(renderDisabledBooksList),
+        downloadDisabledBooksReport: withState(downloadDisabledBooksReport),
         abrirModalConfig: withState(abrirModalConfig),
         abrirModalDiasInhabiles: withState(abrirModalDiasInhabiles),
         cambiarMesDiasInhabiles: withState(cambiarMesDiasInhabiles),
@@ -2038,3 +2485,8 @@ window.AdminBiblio.Catalogo = (function () {
         renderLabelsQueue: withState(renderLabelsQueue)
     };
 })();
+
+// Re-expose to AdminBiblio directly to support hot-reloading without requiring admin.biblio.js to re-run
+if (window.AdminBiblio && window.AdminBiblio.Catalogo) {
+    Object.assign(window.AdminBiblio, window.AdminBiblio.Catalogo);
+}
